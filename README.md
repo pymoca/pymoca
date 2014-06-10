@@ -7,8 +7,7 @@ A pure python modelica based simulation environment.
 
 ### WORK IN PROGRESS
 
-* Parser that can handle helloworld example, 
-  I haven't decided on final parser, currently 3 in the running
+* Parser: I haven't decided on final parser, currently 3 in the running
         1. parsimonious
             * parser type: PEG
             * good: EBNF support
@@ -35,6 +34,12 @@ A pure python modelica based simulation environment.
 * full hello world working prototype example with backend
 
 ### DONE
+
+* Project setup.
+* Unit testing for parsers.
+* Parsing basic hello world example.
+
+### GOALS
 
 #### backend representation
 
