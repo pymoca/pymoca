@@ -1,9 +1,10 @@
-pymola
+#pymola
 ======
 
 A pure python modelica based simulation environment.
 
 ##Roadmap
+======
 
 ### WORK IN PROGRESS
 
@@ -31,6 +32,7 @@ A pure python modelica based simulation environment.
 
 ### TODO
 
+
 * full hello world working prototype example with backend
 
 ### DONE
@@ -39,13 +41,14 @@ A pure python modelica based simulation environment.
 * Unit testing for parsers.
 * Parsing basic hello world example.
 
-### GOALS
+## GOALS
+======
 
-#### backend representation
+### backend representation
 
 We need to create a backend representation of the models that can generate the equations for simulation/ inverse simulation/ jacobians etc.
 
-#### modelica magic
+### modelica magic
 
 If you have ever used fortran magic I would imagine that modelica magic would work the same way. You would do something like
 
@@ -61,7 +64,7 @@ in one cell, then you get the python object out to play with
     results = ball.simulate(tf=10)
     plot(results.a)
 
-#### real-time simulation
+### real-time simulation
 
     sim = ode(ball.dynamics)
     while sim.successfull
@@ -70,7 +73,7 @@ in one cell, then you get the python object out to play with
         // wait on wall clock
 
 
-#### analytical jacobians
+### analytical jacobians
 
 We want to create analytical jacobians that play well with sympy.
 
@@ -87,7 +90,7 @@ Now we can use python control for linear analysis.
         C=np.eye(2),D=np.eye(2))
     control.bode(ss)
 
-#### inverse dynamics
+### inverse dynamics
 
 The inverse dynamics should be able to be simulated with numpy and printed with the same interface as the standard dynamics.
 
