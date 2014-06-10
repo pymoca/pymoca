@@ -119,7 +119,7 @@ class ModelicaParser(Parser):
         'IDENT',
         'UNSIGNED_NUMBER',
         'STRING'
-    ] + reserved.values() + symbols.values()
+    ] + list(reserved.values()) + list(symbols.values())
 
     t_ignore = ' \t'
 
