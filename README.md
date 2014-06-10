@@ -50,7 +50,7 @@ We need to create a backend representation of the models that can generate the e
 
 ### Modelica Magic
 
-If you have ever used fortran magic I would imagine that modelica magic would work the same way. You would do something like
+If you have ever used fortran/cython magic, I would imagine that modelica magic would be similar. You would type modelica in one cell:
 
     %modelica
     model ball
@@ -59,7 +59,7 @@ If you have ever used fortran magic I would imagine that modelica magic would wo
       der(a) = a;
     end model ball
 
-in one cell, then you get the python object out to play with
+And then you can access the compiled modelica object via python.
 
     results = ball.simulate(tf=10)
     plot(results.a)
@@ -75,17 +75,19 @@ in one cell, then you get the python object out to play with
 
 ### Analytical Jacobians
 
-We want to create analytical jacobians that play well with sympy.
+In order to linear control/ estimation etc, it is useful to have analytical jacobians. The backend for this could by sympy.
 
+    import sympy
     ball_trimmed = ball.trim(a=1).
-    states = [ball.a]
-    inputs = [ball.u]
+    states = sympy.Matrix([ball.a])
+    inputs = sympy.Matrix([ball.u])
     f = ball_trimmed.dynamics([states]) # sympy matrix
     A = f.jacobian(states)
     B = f.jacobian(input)
 
-Now we can use python control for linear analysis.
+Next, we can use the python control toolbox.
 
+    import control
     ss = control.ss(A.subs(const),B.subs(const),
         C=np.eye(2),D=np.eye(2))
     control.bode(ss)
@@ -98,4 +100,4 @@ The inverse dynamics should be able to be simulated with numpy and printed with 
     while sim.successfull
         sim.integrate(sim.t + dt)
 
-vim:ts=4:sw=4:expandtab
+<!--- vim:ts=4:sw=4:expandtab !-->
