@@ -143,10 +143,11 @@ def setup_package():
         install_requires=['parsimonious', 'ply', 'grako'],
         tests_require=['nose'],
         test_suite='nose.collector',
-        packages=find_packages(exclude=['*.test']),
+        # choosing to package tests currently
+        # user can choose not to import tests
+        # packages=find_packages(exclude=['*.test']),
     )
 
-    print('packages: ', metadata['packages'])
     FULLVERSION, GIT_REVISION = get_version_info()
     metadata['version'] = FULLVERSION
 
