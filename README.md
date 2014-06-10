@@ -8,18 +8,18 @@ A pure python modelica based simulation environment.
 
 * Parser: I haven't decided on final parser, currently 3 in the running
 
-        1. parsimonious
-            * parser type: PEG
-            * good: EBNF support
-            * bad: developer unresponsive
-        1. ply  
-            * parser type: LALR
-            * good: fast, proven, lexer so it can parse tokens (avoid keywords as identifiers etc.)
-            * bad: BNF grammar (haved to translate EBNF standard)
-        1. grako
-            * parser type: PEG
-            * good: EBNF support, developer responsive
-            * bad: debugging difficult currently
+    1. parsimonious
+        * parser type: PEG
+        * good: EBNF support
+        * bad: developer unresponsive
+    1. ply  
+        * parser type: LALR
+        * good: fast, proven, lexer so it can parse tokens (avoid keywords as identifiers etc.)
+        * bad: BNF grammar (haved to translate EBNF standard)
+    1. grako
+        * parser type: PEG
+        * good: EBNF support, developer responsive
+        * bad: debugging difficult currently
 
     The current parsers all have built in unit tests that can be run with
 
