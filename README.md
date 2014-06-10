@@ -22,6 +22,14 @@ A pure python modelica based simulation environment.
             * good: EBNF support, developer responsive
             * bad: debugging difficult currently
 
+    The current parsers all have built in unit tests that can be run with
+
+        python setup.py test
+
+    or
+   
+        nosetests
+
 ### TODO
 
 * full hello world working prototype example with backend
