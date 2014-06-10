@@ -2,10 +2,24 @@
 
 import os
 import sys
+import pprint
 
-import ply.lex as lex
-import ply.yacc as yacc
-from ply.lex import TOKEN
+import ply
+import ply.yacc
+import ply.lex
+
+
+# monkey patch ply for python 3 compat since not up on pypi yet
+def __getitem__v3_patch(self, n):
+    if isinstance(n, slice):
+        return [self[i] for i in range(*(n.indices(len(self.slice))))]
+    else:  # for integer indices, do what we used to
+        if n >= 0:
+            return self.slice[n].value
+        else:
+            return self.stack[n].value
+        print(self.classes)
+ply.yacc.YaccProduction.__getitem__ = __getitem__v3_patch
 
 
 class Parser:
@@ -28,11 +42,12 @@ class Parser:
         # print(self.debugfile, self.tabmodule)
 
         # Build the lexer and parser
-        lex.lex(module=self, debug=self.debug)
-        yacc.yacc(module=self,
-                  debug=self.debug,
-                  debugfile=self.debugfile,
-                  tabmodule=self.tabmodule)
+        ply.lex.lex(module=self, debug=self.debug)
+        ply.yacc.yacc(
+            module=self,
+            debug=self.debug,
+            debugfile=self.debugfile,
+            tabmodule=self.tabmodule)
 
     def run(self):
         while 1:
@@ -42,35 +57,11 @@ class Parser:
                 break
             if not s:
                 continue
-            print(yacc.parse(s))
-
-    def dump(self, obj, nested_level=0, output=sys.stdout):
-        spacing = '   '
-        if type(obj) == dict:
-            print >> output, '%s{' % ((nested_level) * spacing)
-            for k, v in obj.items():
-                if hasattr(v, '__iter__'):
-                    print >> output, '%s%s:' % \
-                        ((nested_level + 1) * spacing, k)
-                    self.dump(v, nested_level + 1, output)
-                else:
-                    print >> output, '%s%s: %s' % \
-                        ((nested_level + 1) * spacing, k, v)
-            print >> output, '%s}' % (nested_level * spacing)
-        elif type(obj) == list:
-            print >> output, '%s[' % ((nested_level) * spacing)
-            for v in obj:
-                if hasattr(v, '__iter__'):
-                    self.dump(v, nested_level + 1, output)
-                else:
-                    print >> output, '%s%s' % ((nested_level + 1) * spacing, v)
-            print >> output, '%s]' % ((nested_level) * spacing)
-        else:
-            print >> output, '%s%s' % (nested_level * spacing, obj)
+            print(ply.yacc.parse(s))
 
     def parse(self, s):
-        res = yacc.parse(s)
-        self.dump(res)
+        res = ply.yacc.parse(s)
+        pprint.pprint(res)
 
 
 class ModelicaParser(Parser):
@@ -140,16 +131,16 @@ class ModelicaParser(Parser):
     for key, val in re_process_list:
         re_dict[key] = val.format(**re_dict)
 
-    @TOKEN(re_dict['ident'])
+    @ply.lex.TOKEN(re_dict['ident'])
     def t_IDENT(self, t):
         t.type = self.reserved.get(t.value, 'IDENT')
         return t
 
-    @TOKEN(re_dict['unsigned_number'])
+    @ply.lex.TOKEN(re_dict['unsigned_number'])
     def t_UNSIGNED_NUMBER(self, t):
         return t
 
-    @TOKEN(re_dict['string'])
+    @ply.lex.TOKEN(re_dict['string'])
     def t_STRING(self, t):
         t.value = t.value[1:-1]  # remove double quotes
         return t
@@ -308,7 +299,7 @@ class ModelicaParser(Parser):
             | PURE OPERATOR FUNCTION
             | IMPURE OPERATOR FUNCTION
             | OPERATOR'''
-        p[0] = ''.join(p[1:len(p)])
+        p[0] = p[1]  # ''.join(p[1:len(p)])
 
     # class_specifier :
     # IDENT string_comment composition end IDENT
