@@ -147,6 +147,9 @@ def setup_package():
         packages=find_packages(exclude="*._test"),
     )
 
+    FULLVERSION, GIT_REVISION = get_version_info()
+    metadata['version'] = FULLVERSION
+
     try:
         setup(**metadata)
     finally:

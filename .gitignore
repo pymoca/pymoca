@@ -54,3 +54,6 @@ docs/_build/
 
 # ply
 *_parsetab.py*
+
+# version
+pymola/version.py
