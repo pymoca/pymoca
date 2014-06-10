@@ -1,7 +1,7 @@
 pymola
 ======
 
-A pure python modelica based object-oriented simulation environment.
+A pure python modelica based simulation environment.
 
 ##Roadmap
 
