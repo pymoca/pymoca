@@ -17,7 +17,6 @@ class Parser:
 
     def __init__(self, **kw):
         self.debug = kw.get('debug', 0)
-        self.classes = {}
         try:
             modname = os.path.split(
                 os.path.splitext(__file__)[0])[1] \
@@ -26,7 +25,7 @@ class Parser:
             modname = "parser"+"_"+self.__class__.__name__
         self.debugfile = modname + ".dbg"
         self.tabmodule = modname + "_" + "parsetab"
-        # print self.debugfile, self.tabmodule
+        # print(self.debugfile, self.tabmodule)
 
         # Build the lexer and parser
         lex.lex(module=self, debug=self.debug)
@@ -43,8 +42,7 @@ class Parser:
                 break
             if not s:
                 continue
-            yacc.parse(s)
-            print self.classes
+            print(yacc.parse(s))
 
     def dump(self, obj, nested_level=0, output=sys.stdout):
         spacing = '   '

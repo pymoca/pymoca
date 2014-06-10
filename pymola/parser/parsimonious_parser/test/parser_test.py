@@ -10,12 +10,12 @@ class Test(unittest.TestCase):
 
     def test_empty_class(self):
         ast = modelica_parser.parse(empty_class_src)
-        print ModelicaPrinter().visit(ast)
+        print(ModelicaPrinter().visit(ast))
 
     # @unittest.skip('not working yet')
     def test_hello_world(self):
         ast = modelica_parser.parse(hello_world_src)
-        print ModelicaPrinter().visit(ast)
+        print(ModelicaPrinter().visit(ast))
 
 empty_class_src = """
 class test "empty"
