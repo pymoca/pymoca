@@ -1,2 +1,2 @@
-[report]
-omit = *site-packages*
+[run]
+source = pymola
