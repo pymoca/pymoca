@@ -1,5 +1,5 @@
 import unittest
-from .parser import ModelicaParser
+from ..parser import ModelicaParser
 
 
 class Test(unittest.TestCase):

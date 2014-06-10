@@ -1,7 +1,7 @@
 import unittest
 import pprint
 
-from .parser import ModelicaParser
+from ..parser import ModelicaParser
 
 
 class Test(unittest.TestCase):

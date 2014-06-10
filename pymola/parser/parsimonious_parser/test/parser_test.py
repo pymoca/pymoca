@@ -1,6 +1,6 @@
 import unittest
-from .parser import modelica_parser
-from .visitors import ModelicaPrinter
+from ..parser import modelica_parser
+from ..visitors import ModelicaPrinter
 
 
 class Test(unittest.TestCase):

@@ -38,7 +38,7 @@ Topic :: Software Development :: Embedded Systems
 
 MAJOR = 0
 MINOR = 0
-MICRO = 1
+MICRO = 2
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
@@ -144,7 +144,7 @@ def setup_package():
         install_requires=['parsimonious', 'ply', 'grako'],
         tests_require=['nose'],
         test_suite='nose.collector',
-        packages=find_packages(exclude="*._test"),
+        packages=find_packages(exclude='*.test')
     )
 
     FULLVERSION, GIT_REVISION = get_version_info()
