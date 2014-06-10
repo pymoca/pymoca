@@ -5,6 +5,11 @@ Pymola contains a Python based compiler for the modelica language
 and enables interacting with Modelica easily in Python.
 
 """
+MAJOR = 0
+MINOR = 0
+MICRO = 3
+ISRELEASED = True
+VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 DOCLINES = __doc__.split("\n")
 
@@ -35,12 +40,6 @@ Topic :: Software Development :: Code Generators
 Topic :: Software Development :: Compilers
 Topic :: Software Development :: Embedded Systems
 """
-
-MAJOR = 0
-MINOR = 0
-MICRO = 2
-ISRELEASED = False
-VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 
 # Return the git revision as a string
