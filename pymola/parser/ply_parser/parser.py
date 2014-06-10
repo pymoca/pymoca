@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os
-import sys
 import pprint
 
 import ply
@@ -73,18 +72,67 @@ class ModelicaParser(Parser):
     # ----------------------------------------------------------
     # Reserved Keywords
     # ----------------------------------------------------------
-    keywords = (
-        'algorithm', 'and', 'annotation', 'assert', 'block',
-        'break', 'class', 'connect', 'connector', 'constant',
-        'constrainedby', 'der', 'discrete', 'each', 'else',
-        'elseif', 'elsewhen', 'encapsulated', 'end', 'enumeration',
-        'equation', 'expandable', 'extends', 'external', 'false',
-        'final', 'flow', 'for', 'function', 'if', 'import', 'impure',
-        'in', 'initial', 'inner', 'input', 'loop', 'model', 'not',
-        'operator', 'or', 'outer', 'output', 'package', 'parameter',
-        'partial', 'protected', 'public', 'pure', 'record',
-        'redeclare', 'return', 'stream', 'then',
-        'true', 'type', 'when', 'while', 'within')
+    keywords = [
+        'algorithm',
+        # 'and',
+        # 'annotation',
+        # 'assert',
+        'block',
+        # 'break',
+        'class',
+        # 'connect',
+        'connector',
+        'constant',
+        # 'constrainedby',
+        # 'der',
+        'discrete',
+        # 'each',
+        # 'else',
+        # 'elseif',
+        # 'elsewhen',
+        'encapsulated',
+        'end',
+        # 'enumeration',
+        'equation',
+        'expandable',
+        # 'extends',
+        # 'external',
+        # 'false',
+        'final',
+        'flow',
+        # 'for',
+        'function',
+        # 'if',
+        # 'import',
+        'impure',
+        # 'in',
+        # 'initial',
+        # 'inner',
+        'input',
+        # 'loop',
+        'model',
+        # 'not',
+        'operator',
+        # 'or',
+        # 'outer',
+        'output',
+        'package',
+        'parameter',
+        'partial',
+        'protected',
+        'public',
+        'pure',
+        'record',
+        # 'redeclare',
+        # 'return',
+        'stream',
+        # 'then',
+        # 'true',
+        'type',
+        # 'when',
+        # 'while',
+        'within',
+        ]
 
     reserved = {key: key.upper() for key in keywords}
 
@@ -96,8 +144,8 @@ class ModelicaParser(Parser):
         '\=': 'EQUALS',
         '\+': 'PLUS',
         '\,': 'COMMA',
-        '\(': 'LPAREN',
-        '\)': 'RPAREN',
+        # '\(': 'LPAREN',
+        # '\)': 'RPAREN',
     }
     # create token handling for symbols
     for key in symbols.keys():
