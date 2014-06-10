@@ -10,7 +10,7 @@ class Test(unittest.TestCase):
         self.parser = ModelicaParser()
         pass
 
-    def test_basic(self):
+    def basic_test(self):
         res = self.parser.parse('''
             class test "hello world \a \b \f \r"
                 flow a;
