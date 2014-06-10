@@ -8,7 +8,7 @@ and enables interacting with Modelica easily in Python.
 MAJOR = 0
 MINOR = 0
 MICRO = 3
-ISRELEASED = True
+ISRELEASED = False
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 DOCLINES = __doc__.split("\n")
