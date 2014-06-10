@@ -11,10 +11,6 @@ A python/modelica based simulation environment.
 
 * Parser: I haven't decided on final parser, currently 3 in the running
 
-    1. parsimonious
-        * parser type: PEG
-        * good: EBNF support
-        * bad: developer unresponsive, no lexer
     1. ply  
         * parser type: LALR
         * good: fast, proven, lexer so it can parse tokens (avoid keywords as identifiers etc.)
@@ -23,6 +19,10 @@ A python/modelica based simulation environment.
         * parser type: PEG
         * good: EBNF support, developer responsive
         * bad: no lexer
+    1. parsimonious
+        * parser type: PEG
+        * good: EBNF support
+        * bad: developer unresponsive, no lexer, doesn't integrate well with coverage testing, slight modificatin of EBNF when typing
 
     The current parsers all have built in unit tests that can be run with
 
