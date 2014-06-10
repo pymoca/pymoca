@@ -2,6 +2,8 @@
 
 A python/modelica based simulation environment.
 
+[![Build Status](https://travis-ci.org/jgoppert/pymola.svg)](https://travis-ci.org/jgoppert/pymola)
+
 ##Roadmap
 
 ### Current Tasks
