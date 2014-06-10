@@ -18,5 +18,5 @@ class Test(unittest.TestCase):
 
             class test2
             end test2;
-        ''', rule_name='stored_definition')
+        ''', rule_name='stored_definition', trace=True)
         pprint.pprint(res)

@@ -14,7 +14,7 @@ A python/modelica based simulation environment.
     1. parsimonious
         * parser type: PEG
         * good: EBNF support
-        * bad: developer unresponsive
+        * bad: developer unresponsive, no lexer
     1. ply  
         * parser type: LALR
         * good: fast, proven, lexer so it can parse tokens (avoid keywords as identifiers etc.)
@@ -22,7 +22,7 @@ A python/modelica based simulation environment.
     1. grako
         * parser type: PEG
         * good: EBNF support, developer responsive
-        * bad: debugging difficult currently
+        * bad: no lexer
 
     The current parsers all have built in unit tests that can be run with
 
