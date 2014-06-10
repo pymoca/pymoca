@@ -11,12 +11,13 @@ class Test(unittest.TestCase):
         pass
 
     def basic_test(self):
-        res = self.parser.parse('''
+        ast = self.parser.parse('''
             class test "hello world \a \b \f \r"
                 flow a;
             end test;
 
             class test2
             end test2;
-        ''', rule_name='stored_definition', trace=True)
-        pprint.pprint(res)
+        ''', rule_name='stored_definition', trace=False)
+        pprint.pprint(ast)
+
