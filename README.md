@@ -41,6 +41,8 @@ A python/modelica based simulation environment.
 * Project setup.
 * Unit testing for parsers.
 * Parsing basic hello world example.
+* Travis continuous integration testing setup.
+* Coveralls coverage testing setup.
 
 ## Goals
 
@@ -100,4 +102,5 @@ The inverse dynamics should be able to be simulated with numpy and printed with 
     while sim.successfull
         sim.integrate(sim.t + dt)
 
-<!--- vim:ts=4:sw=4:expandtab !-->
+<!--- vim:ts=4:sw=4:expandtab:
+!-->
