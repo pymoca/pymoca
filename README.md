@@ -1,6 +1,6 @@
 #pymola
 
-A pure python modelica based simulation environment.
+A python/modelica based simulation environment.
 
 ##Roadmap
 
