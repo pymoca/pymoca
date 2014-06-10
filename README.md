@@ -5,11 +5,28 @@ A pure python modelica based simulation environment.
 
 ##Roadmap
 
-### DONE
+### WORK IN PROGRESS
 
-* basic parser that can handle helloworld example
+* Parser that can handle helloworld example, 
+  I haven't decided on final parser, currently 3 in the running
+        1. parsimonious
+            * parser type: PEG
+            * good: EBNF support
+            * bad: developer unresponsive
+        1. ply  
+            * parser type: LALR
+            * good: fast, proven, lexer so it can parse tokens (avoid keywords as identifiers etc.)
+            * bad: BNF grammar (haved to translate EBNF standard)
+        1. grako
+            * parser type: PEG
+            * good: EBNF support, developer responsive
+            * bad: debugging difficult currently
 
 ### TODO
+
+* full hello world working prototype example with backend
+
+### DONE
 
 #### backend representation
 
