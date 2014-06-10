@@ -15,7 +15,7 @@ python:
 install:
   - while [[ 1 ]]; do echo "building deps"; sleep 300; done &
   - msg_pid=$!
-  - pip install -q nosetests
+  - pip install -q nose
   - pip install -q grako
   - pip install -q ply
   - pip install -q parsimonious
