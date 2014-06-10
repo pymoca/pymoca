@@ -24,10 +24,6 @@ end test;
 
 hello_world_src = """
 model helloworld "A differential equation"
-real a;
-real b;
-equation
-algorithm
 end helloworld;
 """
 # model HelloWorld "Adifferrentialequation"

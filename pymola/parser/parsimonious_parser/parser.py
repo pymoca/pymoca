@@ -311,17 +311,9 @@ modelica_parser = Grammar(r"""
     greater_than_or_equal = '>='_
     equality = '=='_
     inequality = '<>'_
-    ident = (nondigit ( digit / nondigit )*_) / q_ident
-    q_ident = single_quote (q_char / s_escape)+ single_quote
-    string = double_quote (s_char/s_escape)* double_quote
-    nondigit = ~'[_a-zA-Z]'
-    s_char = ~r'[^"\\]*'u
-    q_char = (nondigit/digit/~r'[#$%&()*+,-./:;<>=?@[]^\{}|~ ')
-    s_escape = ~r'[\'"\?\\\a\b\f\n\r\t\v]'
-    digit = ~'[0-9]'
-    unsigned_integer = digit+
-    unsigned_number = unsigned_integer ( '.' unsigned_integer?)?
-        (('e'/'E') ('+'/'-')? unsigned_integer)?
+    ident = ~'([_a-zA-Z][0-9_a-zA_Z]*|\'([0-9_a-zA-Z#$%&()*+,-./:;<>=?@[]^\{}|~ ]|[\'"\?\\\a\b\f\n\r\t\v])+\')' _
+    string = ~r'"([^"\\]|[\\][\'\"\?abfnrtv])+"' _
+    unsigned_number = ~r'[0-9]+(\.[0-9]+?)?((e|E)(\+|\-)?[0-9]+)?'
 
     #===============================================================
     # KEYWORDS
