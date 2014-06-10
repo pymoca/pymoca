@@ -4,7 +4,7 @@ A pure python modelica based simulation environment.
 
 ##Roadmap
 
-### Work in progress
+### Current Tasks
 
 * Parser: I haven't decided on final parser, currently 3 in the running
 
@@ -31,10 +31,9 @@ A pure python modelica based simulation environment.
 
 ### TODO
 
-
 * full hello world working prototype example with backend
 
-### Done
+### Completed Tasks
 
 * Project setup.
 * Unit testing for parsers.
