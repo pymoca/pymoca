@@ -13,11 +13,11 @@ class ModelicaPrinter(NodeVisitor):
     def generic_visit(self, node, visited_children):
         print(self.info(node))
 
-    def visit_class_definition(self, node, visitied_children):
-        print(self.info(node))
-
     def visit_(self, node, visitied_children):
         pass
 
     def visit__(self, node, visitied_children):
+        pass
+
+    def visit_semicolon(self, node, visitied_children):
         pass

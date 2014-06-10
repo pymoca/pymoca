@@ -24,6 +24,10 @@ end test;
 
 hello_world_src = """
 model helloworld "A differential equation"
+    Real a;
+    Real b;
+equation
+algorithm
 end helloworld;
 """
 # model HelloWorld "Adifferrentialequation"

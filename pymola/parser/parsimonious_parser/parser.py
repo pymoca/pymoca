@@ -3,380 +3,394 @@ from parsimonious.grammar import Grammar
 # This grammar is based off of the Modelica 3.3 standard.
 # https://www.modelica.org/documents/ModelicaSpec33.pdf
 
-modelica_parser = Grammar(r"""
-    #===============================================================
-    # STORED DEFINITION
-    #===============================================================
-    stored_definition = _ (within name? semicolon)?
-        (_ final? class_definition semicolon)
+re_dict = {
+    '{re_ident}': r'([_a-zA-Z][0-9_a-zA_Z]*|\'([0-9_a-zA-Z#$%&()*'
+    r'+,-./:;<>=?@[]^\{}|~ ]|[\'"\?\\\a\b\f\n\r\t\v])+\')',
+    '{re_string}': r'"([^"\\]|[\\][\'\"\?abfnrtv])+"',
+    '{re_unsigned_number}': r'[0-9]+(\.[0-9]+?)?((e|E)(\+|\-)?[0-9]+)?',
+}
 
-    #===============================================================
-    # CLASS DEFINITION
-    #===============================================================
-    class_definition = encapsulated? class_prefixes class_specifier
+grammar = r"""
+#===============================================================
+# STORED DEFINITION
+#===============================================================
+stored_definition = _ (within name? semicolon)?
+    (_ final? class_definition semicolon)
 
-    class_prefixes = partial?
-        (class/model/(operator? record)/block/
-        (expandable? connector)/type/package/
-        ((pure/impure)? operator? function)/
-        operator)
+#===============================================================
+# CLASS DEFINITION
+#===============================================================
+class_definition = encapsulated? class_prefixes class_specifier
 
-    class_specifier = long_class_specifier/
-        short_class_specifier/
-        der_class_specifier/
-        extends_class_specifier
+class_prefixes = partial?
+    (class/model/(operator? record)/block/
+    (expandable? connector)/type/package/
+    ((pure/impure)? operator? function)/
+    operator)
 
-    long_class_specifier = ident string_comment
-        composition end ident
+class_specifier = long_class_specifier/
+    short_class_specifier/
+    der_class_specifier/
+    extends_class_specifier
 
-    short_class_specifier = (ident equals base_prefix name
-        array_subscripts? class_modification? comment) /
-        (ident  equals enumeration lparen (enum_list/colon) rparen
-        comment)
+long_class_specifier = ident string_comment
+    composition end ident
 
-    der_class_specifier = ident equals der lparen name
-        (comma ident)+ rparen comment
+short_class_specifier = (ident equals base_prefix name
+    array_subscripts? class_modification? comment) /
+    (ident  equals enumeration lparen (enum_list/colon) rparen
+    comment)
 
-    extends_class_specifier = extends ident class_modification?
-        string_comment composition end ident
+der_class_specifier = ident equals der lparen name
+    (comma ident)+ rparen comment
 
-    base_prefix = type_prefix
+extends_class_specifier = extends ident class_modification?
+    string_comment composition end ident
 
-    enum_list = enumeration_literal (comma enumeration_literal)*
+base_prefix = type_prefix
 
-    enumeration_literal = ident comment
+enum_list = enumeration_literal (comma enumeration_literal)*
 
-    composition = element_list (((public/protected)
-       element_list)/ equation_section/ algorithm_section)*
-       (external language_specification?
-       external_function_call? annotation? semicolon)?
-       (annotation semicolon)?
+enumeration_literal = ident comment
 
-    language_specification = string
+composition = element_list (((public/protected)
+    element_list)/ equation_section/ algorithm_section)*
+    (external language_specification?
+    external_function_call? annotation? semicolon)?
+    (annotation semicolon)?
 
-    external_function_call = (component_reference equals)? ident
-        lparen expression_list? rparen
+language_specification = string
 
-    # notice we do a lookahead assertion here that is PEG but not EBNF
-    # to ensure that end is not consumed as an ident
-    element_list = (!(end/equation/algorithm)
-        ((element semicolon)/(annotation semicolon)))*
+external_function_call = (component_reference equals)? ident
+    lparen expression_list? rparen
 
-    element = import_clause /  extends_clause
-         / (redeclare? final? inner? outer? (
-         (class_definition / component_clause)
-         /(replaceable (class_definition / component_clause)
-         constraining_clause comment)))
+# notice we do a lookahead assertion here that is PEG but not EBNF
+# to ensure that end is not consumed as an ident
+# FIXME it should not be necessary to do lookahead hear for PEG
+# parser, should see it doesn't match and try again
+element_list = (!(end/equation/algorithm)
+    ((element semicolon)/(annotation semicolon)))*
 
-    import_clause = import ( (ident equals name) /
-        (name (period (times / (lbrace import_list rbrace)) )?)) comment
+element = import_clause /  extends_clause
+        / (redeclare? final? inner? outer? (
+        (class_definition / component_clause)
+        /(replaceable (class_definition / component_clause)
+        constraining_clause comment)))
 
-    import_list = ident (comma import_list)?
+import_clause = import ( (ident equals name) /
+    (name (period (times / (lbrace import_list rbrace)) )?)) comment
 
-    #===============================================================
-    # EXTENDS
-    #===============================================================
-    extends_clause = extends name class_modification? annotation?
+import_list = ident (comma import_list)?
 
-    constraining_clause = constrainedby name class_modification?
+#===============================================================
+# EXTENDS
+#===============================================================
+extends_clause = extends name class_modification? annotation?
 
-    #===============================================================
-    # COMPONENT CLAUSE
-    #===============================================================
-    component_clause = type_prefix type_specifier array_subscripts?
-       component_list
+constraining_clause = constrainedby name class_modification?
 
-    type_prefix = (flow/ stream)? (discrete/parameter/constant)?
-    (input/output)?
+#===============================================================
+# COMPONENT CLAUSE
+#===============================================================
+component_clause = type_prefix type_specifier array_subscripts?
+    component_list
 
-    type_specifier = name
+type_prefix = (flow/ stream)? (discrete/parameter/constant)?
+(input/output)?
 
-    component_list = component_declaration (comma
-      component_declaration)*
+type_specifier = name _
 
-    component_declaration = declaration condition_attribute? comment?
+component_list = component_declaration (comma
+    component_declaration)*
 
-    condition_attribute = if expression
+component_declaration = declaration condition_attribute? comment?
 
-    declaration = ident array_subscripts? modification?
+condition_attribute = if expression
 
-    #===============================================================
-    # MODIFICATION
-    #===============================================================
-    modification = (class modification ( equals expression)?) /
-        ( equals expression) / (assign expression)
+declaration = ident array_subscripts? modification?
 
-    class_modification = lparen argument_list? rparen
+#===============================================================
+# MODIFICATION
+#===============================================================
+modification = (class modification ( equals expression)?) /
+    ( equals expression) / (assign expression)
 
-    argument_list = argument (comma argument)*
+class_modification = lparen argument_list? rparen
 
-    argument = element_modification_or_replaceable /
-        element_redeclaration
+argument_list = argument (comma argument)*
 
-    element_modification_or_replaceable =
-        each? final? (element_modification / element_replaceable)
+argument = element_modification_or_replaceable /
+    element_redeclaration
 
-    element_modification = name modification? string_comment
+element_modification_or_replaceable =
+    each? final? (element_modification / element_replaceable)
 
-    element_redeclaration = redeclare each? final?
+element_modification = name modification? string_comment
 
-    element_replaceable = replaceable (short_class_definition /
-        component_clause1) constraining_clause?
+element_redeclaration = redeclare each? final?
 
-    component_clause1 = type_prefix type_specifier
-        component_declaration1
+element_replaceable = replaceable (short_class_definition /
+    component_clause1) constraining_clause?
 
-    component_declaration1 = declaration comment
+component_clause1 = type_prefix type_specifier
+    component_declaration1
 
-    short_class_definition = class_prefixes ident equals ((
-        base_prefix name array_subscripts? class_modification?
-        comment) / (enumeration lparen ( enum_list? / colon )
-        rparen comment ))
+component_declaration1 = declaration comment
+
+short_class_definition = class_prefixes ident equals ((
+    base_prefix name array_subscripts? class_modification?
+    comment) / (enumeration lparen ( enum_list? / colon )
+    rparen comment ))
 
 
-    #===============================================================
-    # EQUATION
-    #===============================================================
-    equation_section = initial? equation (equation_expr semicolon)*
+#===============================================================
+# EQUATION
+#===============================================================
+equation_section = initial? equation (equation_expr semicolon)*
 
-    algorithm_section = initial? algorithm (statement semicolon)*
+algorithm_section = initial? algorithm (statement semicolon)*
 
-    # note there is also an equation keywords so we call the
-    # expression equation_expr
-    equation_expr = ((simple_expression equals expression)
-        / if_equation / for_equation
-        / connect_clause / when_equation
-        / (name function_call_args)) comment
+# note there is also an equation keywords so we call the
+# expression equation_expr
+equation_expr = ((simple_expression equals expression)
+    / if_equation / for_equation
+    / connect_clause / when_equation
+    / (name function_call_args)) comment
 
-    statement = ((component_reference ( (assign expression)
-        / function_call_args )) / ( lparen output_expression_list
-        rparen assign component_reference function_call_args)
-        / break / return / if_statement
-        / for_statement / while_statement / when_statement )
+statement = ((component_reference ( (assign expression)
+    / function_call_args )) / ( lparen output_expression_list
+    rparen assign component_reference function_call_args)
+    / break / return / if_statement
+    / for_statement / while_statement / when_statement )
 
-    if_equation = if expression then
-            (equation_expr semicolon)*
-        (elseif expression then
-            (equation_expr semicolon)* )*
-        (else
-            (equation_expr semicolon)* )?
-        end if
-
-    if_statement = if expression then
-            (statement semicolon)*
-        (elseif expression then
-            (statement semicolon)*
-        )*
-        (else
-            (statement semicolon)*
-        )?
-        end if
-
-    for_equation = for for_indices loop
+if_equation = if expression then
         (equation_expr semicolon)*
-        end for
+    (elseif expression then
+        (equation_expr semicolon)* )*
+    (else
+        (equation_expr semicolon)* )?
+    end if
 
-    for_statement = for for_indices loop
+if_statement = if expression then
         (statement semicolon)*
-        end for
-
-    for_indices = for_index (comma for_index)*
-
-    for_index = ident (in expression)?
-
-    while_statement = while expression loop
+    (elseif expression then
         (statement semicolon)*
-        end while
+    )*
+    (else
+        (statement semicolon)*
+    )?
+    end if
 
-    when_equation = when expression then
-            (equation semicolon)*
-        (elsewhen expression then
-            (equation semicolon)*
-        )*
-        end when
+for_equation = for for_indices loop
+    (equation_expr semicolon)*
+    end for
 
-    when_statement = when expression then
-            (statement semicolon)*
-        (elsewhen expression then
-            (statement semicolon)*
-        )*
-        end when
+for_statement = for for_indices loop
+    (statement semicolon)*
+    end for
 
-    connect_clause = connect lparen component_reference comma
-        component_reference rparen
+for_indices = for_index (comma for_index)*
 
-    #===============================================================
-    # EXPRESSION
-    #===============================================================
-    expression = simple_expression /
-        (if expression then expression
-        (elseif expression then expression)* else expression)
+for_index = ident (in expression)?
 
-    simple_expression = logical_expression
-        (semicolon logical_expression
-        (semicolon logical_expression)?)?
+while_statement = while expression loop
+    (statement semicolon)*
+    end while
 
-    logical_expression = logical_term (or logical_term)*
+when_equation = when expression then
+        (equation semicolon)*
+    (elsewhen expression then
+        (equation semicolon)*
+    )*
+    end when
 
-    logical_term = logical_factor (and logical_factor)*
+when_statement = when expression then
+        (statement semicolon)*
+    (elsewhen expression then
+        (statement semicolon)*
+    )*
+    end when
 
-    logical_factor = not? relation
+connect_clause = connect lparen component_reference comma
+    component_reference rparen
 
-    relation = arithmetic_expression (rel_op arithmetic_expression)?
+#===============================================================
+# EXPRESSION
+#===============================================================
+expression = simple_expression /
+    (if expression then expression
+    (elseif expression then expression)* else expression)
 
-    rel_op = less_than / less_than_or_equal / greater_than
-        / greater_than_or_equal / equality / inequality
+simple_expression = logical_expression
+    (semicolon logical_expression
+    (semicolon logical_expression)?)?
 
-    arithmetic_expression = add_op? term (add_op term)*
+logical_expression = logical_term (or logical_term)*
 
-    add_op = plus / minus / dot_plus / dot_minus
+logical_term = logical_factor (and logical_factor)*
 
-    term = factor (mul_op factor)*
+logical_factor = not? relation
 
-    mul_op = times / divide / dot_times / dot_divide
+relation = arithmetic_expression (rel_op arithmetic_expression)?
 
-    factor = primary ( (exp / dot_exp) primary)?
+rel_op = less_than / less_than_or_equal / greater_than
+    / greater_than_or_equal / equality / inequality
 
-    primary = unsigned_number / string / false / true
-        / ((name / der / initial) function_call_args)
-        / component_reference
-        / (lparen output_expression_list rparen)
-        / (lbracket expression_list
-            ( semicolon expression_list )* rbracket)
-        / (lbrace function_arguments rbrace)
-        / end
+arithmetic_expression = add_op? term (add_op term)*
 
-    name = period ? ident (period ident)*
+add_op = plus / minus / dot_plus / dot_minus
 
-    component_reference = (period ident array_subscripts?)+
+term = factor (mul_op factor)*
 
-    function_call_args = lparen function_arguments? rparen
+mul_op = times / divide / dot_times / dot_divide
 
-    function_arguments = function argument
-        ((comma function_arguments) / (for for_indices) /
-        named_arguments)
+factor = primary ( (exp / dot_exp) primary)?
 
-    named_arguments = named_argument (comma named_arguments)?
+primary = unsigned_number / string / false / true
+    / ((name / der / initial) function_call_args)
+    / component_reference
+    / (lparen output_expression_list rparen)
+    / (lbracket expression_list
+        ( semicolon expression_list )* rbracket)
+    / (lbrace function_arguments rbrace)
+    / end
 
-    named_argument = ident equals function_argument
+name = period? ident (period ident)*
 
-    function_argument = function name
-        ((lparen named_arguments? rparen) / expression)
+component_reference = (period ident array_subscripts?)+
 
-    output_expression_list = expression? (comma expression?)*
+function_call_args = lparen function_arguments? rparen
 
-    expression_list = expression (comma expression)*
+function_arguments = function argument
+    ((comma function_arguments) / (for for_indices) /
+    named_arguments)
 
-    array_subscripts = lbracket subscript (comma subscript)* rbracket
+named_arguments = named_argument (comma named_arguments)?
 
-    subscript = colon / expression
+named_argument = ident equals function_argument
 
-    comment = string_comment annotation?
+function_argument = function name
+    ((lparen named_arguments? rparen) / expression)
 
-    string_comment = string ( plus string)*
+output_expression_list = expression? (comma expression?)*
 
-    annotation = annotation class_modification
+expression_list = expression (comma expression)*
 
-    #===============================================================
-    # BASIC
-    #===============================================================
-    _ = ~'\s*'
-    equals = '='_
-    assign = ':='_
-    semicolon = ';'_
-    lparen = '('_
-    rparen = ')'_
-    lbracket = '{'_
-    rbracket = '}'_
-    colon = ':'_
-    comma = ','_
-    double_quote = '"'_
-    single_quote = "'"_
-    lbrace = '{'_
-    rbrace = '}'_
-    period = '.'_
-    plus = '+'_
-    dot_plus = '.+'_
-    minus = '-'_
-    dot_minus = '.-'_
-    times = '*'_
-    dot_times = '.*'_
-    divide = '/'_
-    dot_divide = './'_
-    exp = '^'_
-    dot_exp = '.^'_
-    less_than = '<'_
-    less_than_or_equal = '<='_
-    greater_than = '>'_
-    greater_than_or_equal = '>='_
-    equality = '=='_
-    inequality = '<>'_
-    ident = ~'([_a-zA-Z][0-9_a-zA_Z]*|\'([0-9_a-zA-Z#$%&()*+,-./:;<>=?@[]^\{}|~ ]|[\'"\?\\\a\b\f\n\r\t\v])+\')' _
-    string = ~r'"([^"\\]|[\\][\'\"\?abfnrtv])+"' _
-    unsigned_number = ~r'[0-9]+(\.[0-9]+?)?((e|E)(\+|\-)?[0-9]+)?'
+array_subscripts = lbracket subscript (comma subscript)* rbracket
 
-    #===============================================================
-    # KEYWORDS
-    #===============================================================
-    algorithm = 'algorithm'_
-    and = 'and'_
-    annotation = 'annotation'_
-    assert = 'assert'_
-    block = 'block'_
-    break = 'break'_
-    class = 'class'_
-    connect = 'connect'_
-    connector = 'connector'_
-    constant = 'constant'_
-    constrainedby = 'constrainedby'_
-    der = 'der'_
-    discrete = 'discrete'_
-    each = 'each'_
-    else = 'else'_
-    elseif = 'elseif'_
-    elsewhen = 'elsewhen'_
-    encapsulated = 'encapsulated'_
-    end = 'end'_
-    enumeration = 'enumeration'_
-    equation = 'equation'_
-    expandable = 'expandable'_
-    extends = 'extends'_
-    external = 'external'_
-    false = 'false'_
-    final = 'final'_
-    flow = 'flow'_
-    for= 'for'_
-    function = 'function'_
-    if = 'if'_
-    import = 'import'_
-    impure = 'impure'_
-    in = 'in'_
-    initial = 'initial'_
-    inner = 'inner'_
-    input = 'input'_
-    initial = 'initial'_
-    loop = 'loop'_
-    model = 'model'_
-    not = 'not'_
-    operator = 'operator'_
-    or = 'or'_
-    outer = 'outer'_
-    output = 'output'_
-    package = 'package'_
-    parameter = 'parameter'_
-    partial = 'partial'_
-    protected = 'protected'_
-    public = 'public'_
-    pure = 'pure'_
-    record = 'record'_
-    redeclare = 'redeclare'_
-    replaceable = 'replaceable'_
-    return = 'return'_
-    stream = 'stream'_
-    then = 'then'_
-    true = 'true'_
-    type = 'type'_
-    when = 'when'_
-    while = 'while'_
-    within = 'within'_
-    """)
+subscript = colon / expression
+
+comment = string_comment annotation?
+
+string_comment = string ( plus string)*
+
+annotation = annotation class_modification
+
+#===============================================================
+# BASIC
+#===============================================================
+_ = ~'\s*'
+equals = '='_
+assign = ':='_
+semicolon = ';'_
+lparen = '('_
+rparen = ')'_
+lbracket = '{'_
+rbracket = '}'_
+colon = ':'_
+comma = ','_
+double_quote = '"'_
+single_quote = "'"_
+lbrace = '{'_
+rbrace = '}'_
+period = '.'_
+plus = '+'_
+dot_plus = '.+'_
+minus = '-'_
+dot_minus = '.-'_
+times = '*'_
+dot_times = '.*'_
+divide = '/'_
+dot_divide = './'_
+exp = '^'_
+dot_exp = '.^'_
+less_than = '<'_
+less_than_or_equal = '<='_
+greater_than = '>'_
+greater_than_or_equal = '>='_
+equality = '=='_
+inequality = '<>'_
+ident = ~r'{re_ident}' _
+string = ~r'{re_string}' _
+unsigned_number = ~r'{re_unsigned_number}' _
+
+#===============================================================
+# KEYWORDS
+#===============================================================
+algorithm = 'algorithm'_
+and = 'and'_
+annotation = 'annotation'_
+assert = 'assert'_
+block = 'block'_
+break = 'break'_
+class = 'class'_
+connect = 'connect'_
+connector = 'connector'_
+constant = 'constant'_
+constrainedby = 'constrainedby'_
+der = 'der'_
+discrete = 'discrete'_
+each = 'each'_
+else = 'else'_
+elseif = 'elseif'_
+elsewhen = 'elsewhen'_
+encapsulated = 'encapsulated'_
+end = 'end'_
+enumeration = 'enumeration'_
+equation = 'equation'_
+expandable = 'expandable'_
+extends = 'extends'_
+external = 'external'_
+false = 'false'_
+final = 'final'_
+flow = 'flow'_
+for= 'for'_
+function = 'function'_
+if = 'if'_
+import = 'import'_
+impure = 'impure'_
+in = 'in'_
+initial = 'initial'_
+inner = 'inner'_
+input = 'input'_
+initial = 'initial'_
+loop = 'loop'_
+model = 'model'_
+not = 'not'_
+operator = 'operator'_
+or = 'or'_
+outer = 'outer'_
+output = 'output'_
+package = 'package'_
+parameter = 'parameter'_
+partial = 'partial'_
+protected = 'protected'_
+public = 'public'_
+pure = 'pure'_
+record = 'record'_
+redeclare = 'redeclare'_
+replaceable = 'replaceable'_
+return = 'return'_
+stream = 'stream'_
+then = 'then'_
+true = 'true'_
+type = 'type'_
+when = 'when'_
+while = 'while'_
+within = 'within'_
+"""
+
+for key in re_dict.keys():
+    grammar = grammar.replace(key, re_dict[key])
+
+modelica_parser = Grammar(grammar)
