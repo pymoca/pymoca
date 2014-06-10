@@ -1,10 +1,8 @@
 #pymola
-======
 
 A pure python modelica based simulation environment.
 
 ##Roadmap
-======
 
 ### WORK IN PROGRESS
 
@@ -42,7 +40,6 @@ A pure python modelica based simulation environment.
 * Parsing basic hello world example.
 
 ## GOALS
-======
 
 ### backend representation
 
