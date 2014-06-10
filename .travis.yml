@@ -1,0 +1,25 @@
+language: python
+python:
+  - "2.7"
+  - "3.2"
+  - "3.3"
+# install required system libraries
+# before_install:
+#  - sudo apt-get update --fix-missing -qq
+
+# command to install dependencies from source
+# note, separating requirements so that travis
+# will get output in less than 5 min and won't
+# terminate, using q to keep build info to a
+# minumum for dependencies
+install:
+  - while [[ 1 ]]; do echo "building deps"; sleep 300; done &
+  - msg_pid=$!
+  - pip install -q nosetests
+  - pip install -q grako
+  - pip install -q ply
+  - pip install -q parsimonious
+  - kill $msg_pid
+
+# command to run tests
+script: python setup.py test
