@@ -1,7 +1,6 @@
-from sets import Set
 from grako.exceptions import FailedSemantics
 
-keywords = Set([
+keywords = set([
     'algorithm', 'and', 'annotation', 'assert',
     'block', 'break', 'class', 'connect', 'connector',
     'constant', 'constrainedby', 'der', 'discrete',
