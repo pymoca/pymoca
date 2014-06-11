@@ -140,12 +140,13 @@ def setup_package():
         license='GPLv3+',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
-        install_requires=['parsimonious', 'ply', 'grako'],
+        install_requires=['parsimonious', 'ply', 'grako', 'enum'],
         tests_require=['nose'],
         test_suite='nose.collector',
-        # choosing to package tests currently
-        # user can choose not to import tests
-        # packages=find_packages(exclude=['*.test']),
+        packages=find_packages(
+            # choosing to distribute tests
+            # exclude=['*.test']
+        ),
     )
 
     FULLVERSION, GIT_REVISION = get_version_info()

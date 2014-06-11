@@ -58,3 +58,6 @@ docs/_build/
 # version
 pymola/version.py
 .coveralls.yml
+
+# vi
+*.swp

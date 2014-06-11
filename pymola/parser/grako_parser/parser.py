@@ -13,7 +13,7 @@ from grako.parsing import * # noqa
 from grako.exceptions import * # noqa
 
 
-__version__ = '14.160.22.15.56'
+__version__ = '14.162.17.25.11'
 
 
 class ModelicaParser(Parser):
@@ -23,72 +23,133 @@ class ModelicaParser(Parser):
     @rule_def
     def _stored_definition_(self):
         with self._optional():
-            self._within_()
+            self._token('within')
             with self._optional():
                 self._name_()
+                self.ast['within'] = self.last_node
             self._token(';')
-        def block0():
+        def block1():
             with self._optional():
-                self._final_()
+                self._token('final')
+            self.ast['final'] = self.last_node
             self._class_definition_()
+            self.ast['class_definition'] = self.last_node
             self._token(';')
-        self._closure(block0)
+        self._positive_closure(block1)
 
     @rule_def
     def _class_definition_(self):
         with self._optional():
-            self._encapsulated_()
+            self._token('encapsulated')
+        self.ast['encapsulated'] = self.last_node
         self._class_prefixes_()
+        self.ast['prefixes'] = self.last_node
         self._class_specifier_()
+        self.ast['specifier'] = self.last_node
 
     @rule_def
     def _class_prefixes_(self):
         with self._optional():
-            self._partial_()
+            self._token('partial')
+        self.ast['partial'] = self.last_node
         with self._group():
             with self._choice():
                 with self._option():
-                    self._class_()
+                    self._token('class')
                 with self._option():
-                    self._model_()
-                with self._option():
-                    with self._optional():
-                        self._operator_()
-                    self._record_()
-                with self._option():
-                    self._block_()
+                    self._token('model')
                 with self._option():
                     with self._optional():
-                        self._expandable_()
-                    self._connector_()
+                        self._token('operator')
+                    self._token('record')
                 with self._option():
-                    self._type_()
+                    self._token('block')
                 with self._option():
-                    self._package_()
+                    with self._optional():
+                        self._token('expandable')
+                    self._token('connector')
+                with self._option():
+                    self._token('type')
+                with self._option():
+                    self._token('package')
                 with self._option():
                     with self._optional():
                         with self._group():
                             with self._choice():
                                 with self._option():
-                                    self._pure_()
+                                    self._token('pure')
                                 with self._option():
-                                    self._impure_()
-                                self._error('no available options')
+                                    self._token('impure')
+                                self._error('expecting one of: impure pure')
                     with self._optional():
-                        self._operator_()
-                    self._function_()
+                        self._token('operator')
+                    self._token('function')
                 with self._option():
-                    self._operator_()
-                self._error('no available options')
+                    self._token('operator')
+                self._error('expecting one of: model function pure type class expandable block connector record package impure operator')
+        self.ast['type'] = self.last_node
 
     @rule_def
     def _class_specifier_(self):
-        self._IDENT_()
-        with self._optional():
-            self._string_comment_()
-        self._composition_()
-        self._end_()
-        self._IDENT_()
+        with self._choice():
+            with self._option():
+                self._IDENT_()
+                self.ast['name'] = self.last_node
+                self._string_comment_()
+                self.ast['comment'] = self.last_node
+                self._composition_()
+                self.ast['composition'] = self.last_node
+                self._token('end')
+                self._IDENT_()
+            with self._option():
+                self._IDENT_()
+                self._token('=')
+                self._base_prefix_()
+                self._name_()
+                with self._optional():
+                    self._array_subscripts_()
+                with self._optional():
+                    self._class_modification_()
+                self._comment_()
+            with self._option():
+                self._IDENT_()
+                self._token('=')
+                self._token('enumeration')
+                self._token('(')
+                with self._group():
+                    with self._choice():
+                        with self._option():
+                            with self._optional():
+                                self._enum_list_()
+                        with self._option():
+                            self._token(':')
+                        self._error('expecting one of: :')
+                self._token(')')
+                self._comment_()
+            with self._option():
+                self._IDENT_()
+                self._token('=')
+                self._token('der')
+                self._token('(')
+                self._name_()
+                self._token(',')
+                self._IDENT_()
+                def block4():
+                    self._token(',')
+                    self._IDENT_()
+                self._closure(block4)
+                self._token(')')
+                self._comment_()
+            with self._option():
+                self._token('extends')
+                self._IDENT_()
+                with self._optional():
+                    self._class_modification_()
+                self._string_comment_()
+                self._composition_()
+                self._token('end')
+                self._IDENT_()
+            self._error('no available options')
 
     @rule_def
     def _base_prefix_(self):
@@ -110,6 +171,7 @@ class ModelicaParser(Parser):
     @rule_def
     def _composition_(self):
         self._element_list_()
+        self.ast.add_list('element_list', self.last_node)
 
     @rule_def
     def _language_specification_(self):
@@ -130,16 +192,18 @@ class ModelicaParser(Parser):
     def _element_list_(self):
         def block0():
             self._element_()
+            self.ast['@'] = self.last_node
             self._token(';')
         self._closure(block0)
 
     @rule_def
     def _element_(self):
         self._component_clause_()
+        self.ast['@'] = self.last_node
 
     @rule_def
     def _import_clause_(self):
-        self._import_()
+        self._token('import')
         with self._group():
             with self._choice():
                 with self._option():
@@ -171,7 +235,7 @@ class ModelicaParser(Parser):
 
     @rule_def
     def _extends_clause_(self):
-        self._extends_()
+        self._token('extends')
         self._name_()
         with self._optional():
             self._class_modification_()
@@ -180,7 +244,7 @@ class ModelicaParser(Parser):
 
     @rule_def
     def _constraining_clause_(self):
-        self._constrainedby_()
+        self._token('constrainedby')
         self._name_()
         with self._optional():
             self._class_modification_()
@@ -188,37 +252,48 @@ class ModelicaParser(Parser):
     @rule_def
     def _component_clause_(self):
         self._type_prefix_()
+        self.ast['prefix'] = self.last_node
+        self._type_specifier_()
+        self.ast['type'] = self.last_node
+        with self._optional():
+            self._array_subscripts_()
+        self.ast['array_subscripts'] = self.last_node
         self._IDENT_()
+        self.ast['name'] = self.last_node
 
     @rule_def
     def _type_prefix_(self):
         with self._optional():
             with self._choice():
                 with self._option():
-                    self._flow_()
+                    self._token('flow')
                 with self._option():
-                    self._stream_()
-                self._error('no available options')
+                    self._token('stream')
+                self._error('expecting one of: stream flow')
+        self.ast['flow_type'] = self.last_node
         with self._optional():
             with self._choice():
                 with self._option():
-                    self._discrete_()
+                    self._token('discrete')
                 with self._option():
-                    self._parameter_()
+                    self._token('parameter')
                 with self._option():
-                    self._constant_()
-                self._error('no available options')
+                    self._token('constant')
+                self._error('expecting one of: constant discrete parameter')
+        self.ast['value_type'] = self.last_node
         with self._optional():
             with self._choice():
                 with self._option():
-                    self._input_()
+                    self._token('input')
                 with self._option():
-                    self._output_()
-                self._error('no available options')
+                    self._token('output')
+                self._error('expecting one of: output input')
+        self.ast['io_type'] = self.last_node
 
     @rule_def
     def _type_specifier_(self):
         self._IDENT_()
+        self.ast['@'] = self.last_node
 
     @rule_def
     def _component_list_(self):
@@ -231,13 +306,16 @@ class ModelicaParser(Parser):
     @rule_def
     def _component_declaration_(self):
         self._declaration_()
+        self.ast['name'] = self.last_node
         with self._optional():
             self._condition_attribute_()
+        self.ast['condition'] = self.last_node
         self._comment_()
+        self.ast['comment'] = self.last_node
 
     @rule_def
     def _condition_attribute_(self):
-        self._if_()
+        self._token('if')
         self._expression_()
 
     @rule_def
@@ -291,9 +369,9 @@ class ModelicaParser(Parser):
     @rule_def
     def _element_modification_or_replaceable_(self):
         with self._optional():
-            self._each_()
+            self._token('each')
         with self._optional():
-            self._final_()
+            self._token('final')
         with self._group():
             with self._choice():
                 with self._option():
@@ -311,11 +389,11 @@ class ModelicaParser(Parser):
 
     @rule_def
     def _element_redeclaration_(self):
-        self._redeclare_()
+        self._token('redeclare')
         with self._optional():
-            self._each_()
+            self._token('each')
         with self._optional():
-            self._final_()
+            self._token('final')
         with self._group():
             with self._choice():
                 with self._option():
@@ -332,7 +410,7 @@ class ModelicaParser(Parser):
 
     @rule_def
     def _element_replaceable_(self):
-        self._replaceable_()
+        self._token('replaceable')
         with self._group():
             with self._choice():
                 with self._option():
@@ -370,7 +448,7 @@ class ModelicaParser(Parser):
                         self._class_modification_()
                     self._comment_()
                 with self._option():
-                    self._enumeration_()
+                    self._token('enumeration')
                     self._token('(')
                     with self._group():
                         with self._choice():
@@ -387,8 +465,8 @@ class ModelicaParser(Parser):
     @rule_def
     def _equation_section_(self):
         with self._optional():
-            self._initial_()
-        self._equation_()
+            self._token('initial')
+        self._token('equation')
         def block0():
             self._equation_()
             self._token(';')
@@ -397,8 +475,8 @@ class ModelicaParser(Parser):
     @rule_def
     def _algorithm_section_(self):
         with self._optional():
-            self._initial_()
-        self._algorithm_()
+            self._token('initial')
+        self._token('algorithm')
         def block0():
             self._statement_()
             self._token(';')
@@ -406,30 +484,25 @@ class ModelicaParser(Parser):
 
     @rule_def
     def _equation_(self):
-        with self._choice():
-            with self._option():
-                with self._group():
-                    with self._choice():
-                        with self._option():
-                            self._simple_expression_()
-                            self._token('=')
-                            self._expression_()
-                        with self._option():
-                            self._if_equation_()
-                        with self._option():
-                            self._for_equation_()
-                        with self._option():
-                            self._connect_clause_()
-                        with self._option():
-                            self._when_equation_()
-                        with self._option():
-                            self._name_()
-                            self._function_call_args_()
-                        self._error('no available options')
-                self._comment_()
-            with self._option():
-                self._token('equation')
-            self._error('expecting one of: equation')
+        with self._group():
+            with self._choice():
+                with self._option():
+                    self._simple_expression_()
+                    self._token('=')
+                    self._expression_()
+                with self._option():
+                    self._if_equation_()
+                with self._option():
+                    self._for_equation_()
+                with self._option():
+                    self._connect_clause_()
+                with self._option():
+                    self._when_equation_()
+                with self._option():
+                    self._name_()
+                    self._function_call_args_()
+                self._error('no available options')
+        self._comment_()
 
     @rule_def
     def _statement_(self):
@@ -453,9 +526,9 @@ class ModelicaParser(Parser):
                     self._component_reference_()
                     self._function_call_args_()
                 with self._option():
-                    self._break_()
+                    self._token('break')
                 with self._option():
-                    self._return_()
+                    self._token('return')
                 with self._option():
                     self._if_statement_()
                 with self._option():
@@ -464,86 +537,86 @@ class ModelicaParser(Parser):
                     self._while_statement_()
                 with self._option():
                     self._when_statement_()
-                self._error('no available options')
+                self._error('expecting one of: break return')
         self._comment_()
 
     @rule_def
     def _if_equation_(self):
-        self._if_()
+        self._token('if')
         self._expression_()
-        self._then_()
+        self._token('then')
         def block0():
             self._equation_()
             self._token(';')
         self._closure(block0)
         def block1():
-            self._elseif_()
+            self._token('elseif')
             self._expression_()
-            self._then_()
+            self._token('then')
             def block2():
                 self._equation_()
                 self._token(';')
             self._closure(block2)
         self._closure(block1)
         with self._optional():
-            self._else_()
+            self._token('else')
             def block3():
                 self._equation_()
                 self._token(';')
             self._closure(block3)
-        self._end_()
-        self._if_()
+        self._token('end')
+        self._token('if')
 
     @rule_def
     def _if_statement_(self):
-        self._if_()
+        self._token('if')
         self._expression_()
-        self._then_()
+        self._token('then')
         def block0():
             self._statement_()
             self._token(';')
         self._closure(block0)
         def block1():
-            self._elseif_()
+            self._token('elseif')
             self._expression_()
-            self._then_()
+            self._token('then')
             def block2():
                 self._statement_()
                 self._token(';')
             self._closure(block2)
         self._closure(block1)
         with self._optional():
-            self._else_()
+            self._token('else')
             def block3():
                 self._statement_()
                 self._token(';')
             self._closure(block3)
-        self._end_()
-        self._if_()
+        self._token('end')
+        self._token('if')
 
     @rule_def
     def _for_equation_(self):
-        self._for_()
+        self._token('for')
         self._for_indices_()
-        self._loop_()
+        self._token('loop')
         def block0():
             self._equation_()
             self._token(';')
         self._closure(block0)
-        self._end_()
-        self._for_()
+        self._token('end')
+        self._token('for')
 
     @rule_def
     def _for_statement_(self):
-        self._for_()
+        self._token('for')
         self._for_indices_()
-        self._loop_()
+        self._token('loop')
         def block0():
             self._statement_()
             self._token(';')
         self._closure(block0)
-        self._end_()
-        self._for_()
+        self._token('end')
+        self._token('for')
 
     @rule_def
     def _for_indices_(self):
@@ -557,66 +630,66 @@ class ModelicaParser(Parser):
     def _for_index_(self):
         self._IDENT_()
         with self._optional():
-            self._in_()
+            self._token('in')
             self._expression_()
 
     @rule_def
     def _while_statement_(self):
-        self._while_()
+        self._token('while')
         self._expression_()
-        self._loop_()
+        self._token('loop')
         def block0():
             self._statement_()
             self._token(';')
         self._closure(block0)
-        self._end_()
-        self._while_()
+        self._token('end')
+        self._token('while')
 
     @rule_def
     def _when_equation_(self):
-        self._when_()
+        self._token('when')
         self._expression_()
-        self._then_()
+        self._token('then')
         def block0():
             self._equation_()
             self._token(';')
         self._closure(block0)
         def block1():
-            self._elsewhen_()
+            self._token('elsewhen')
             self._expression_()
-            self._then_()
+            self._token('then')
             def block2():
                 self._equation_()
                 self._token(';')
             self._closure(block2)
         self._closure(block1)
-        self._end_()
-        self._when_()
+        self._token('end')
+        self._token('when')
 
     @rule_def
     def _when_statement_(self):
-        self._when_()
+        self._token('when')
         self._expression_()
-        self._then_()
+        self._token('then')
         def block0():
             self._statement_()
             self._token(';')
         self._closure(block0)
         def block1():
-            self._elsewhen_()
+            self._token('elsewhen')
             self._expression_()
-            self._then_()
+            self._token('then')
             def block2():
                 self._statement_()
                 self._token(';')
             self._closure(block2)
         self._closure(block1)
-        self._end_()
-        self._when_()
+        self._token('end')
+        self._token('when')
 
     @rule_def
     def _connect_clause_(self):
-        self._connect_()
+        self._token('connect')
         self._token('(')
         self._component_reference_()
         self._token(',')
@@ -629,17 +702,17 @@ class ModelicaParser(Parser):
             with self._option():
                 self._simple_expression_()
             with self._option():
-                self._if_()
+                self._token('if')
                 self._expression_()
-                self._then_()
+                self._token('then')
                 self._expression_()
                 def block0():
-                    self._elseif_()
+                    self._token('elseif')
                     self._expression_()
-                    self._then_()
+                    self._token('then')
                     self._expression_()
                 self._closure(block0)
-                self._else_()
+                self._token('else')
                 self._expression_()
             self._error('no available options')
 
@@ -657,7 +730,7 @@ class ModelicaParser(Parser):
     def _logical_expression_(self):
         self._logical_term_()
         def block0():
-            self._or_()
+            self._token('or')
             self._logical_term_()
         self._closure(block0)
 
@@ -665,14 +738,14 @@ class ModelicaParser(Parser):
     def _logical_term_(self):
         self._logical_factor_()
         def block0():
-            self._and_()
+            self._token('and')
             self._logical_factor_()
         self._closure(block0)
 
     @rule_def
     def _logical_factor_(self):
         with self._optional():
-            self._not_()
+            self._token('not')
         self._relation_()
 
     @rule_def
@@ -764,19 +837,19 @@ class ModelicaParser(Parser):
             with self._option():
                 self._STRING_()
             with self._option():
-                self._false_()
+                self._token('false')
             with self._option():
-                self._true_()
+                self._token('true')
             with self._option():
                 with self._group():
                     with self._choice():
                         with self._option():
-                            self._name_()
+                            self._token('name')
                         with self._option():
-                            self._der_()
+                            self._token('der')
                         with self._option():
-                            self._initial_()
-                        self._error('no available options')
+                            self._token('initial')
+                        self._error('expecting one of: der name initial')
                 self._function_call_args_()
             with self._option():
                 self._component_reference_()
@@ -797,8 +870,8 @@ class ModelicaParser(Parser):
                 self._function_arguments_()
                 self._token('}')
             with self._option():
-                self._end_()
-            self._error('no available options')
+                self._token('end')
+            self._error('expecting one of: true end false')
 
     @rule_def
     def _name_(self):
@@ -836,7 +909,7 @@ class ModelicaParser(Parser):
                             self._token(',')
                             self._function_arguments_()
                         with self._option():
-                            self._for_()
+                            self._token('for')
                             self._for_indices_()
                         self._error('no available options')
             with self._option():
@@ -860,7 +933,7 @@ class ModelicaParser(Parser):
     def _function_argument_(self):
         with self._choice():
             with self._option():
-                self._function_()
+                self._token('function')
                 self._name_()
                 self._token('(')
                 with self._optional():
@@ -924,245 +997,8 @@ class ModelicaParser(Parser):
 
     @rule_def
     def _annotation_(self):
-        with self._choice():
-            with self._option():
-                self._annotation_()
-                self._class_modification_()
-            with self._option():
-                self._token('annotation')
-            self._error('expecting one of: annotation')
-
-    @rule_def
-    def _algorithm_(self):
-        self._token('algorithm')
-
-    @rule_def
-    def _and_(self):
-        self._token('and')
-
-    @rule_def
-    def _assert_(self):
-        self._token('assert')
-
-    @rule_def
-    def _block_(self):
-        self._token('block')
-
-    @rule_def
-    def _break_(self):
-        self._token('break')
-
-    @rule_def
-    def _class_(self):
-        self._token('class')
-
-    @rule_def
-    def _connect_(self):
-        self._token('connect')
-
-    @rule_def
-    def _connector_(self):
-        self._token('connector')
-
-    @rule_def
-    def _constant_(self):
-        self._token('constant')
-
-    @rule_def
-    def _constrainedby_(self):
-        self._token('constrainedby')
-
-    @rule_def
-    def _der_(self):
-        self._token('der')
-
-    @rule_def
-    def _discrete_(self):
-        self._token('discrete')
-
-    @rule_def
-    def _each_(self):
-        self._token('each')
-
-    @rule_def
-    def _else_(self):
-        self._token('else')
-
-    @rule_def
-    def _elseif_(self):
-        self._token('elseif')
-
-    @rule_def
-    def _elsewhen_(self):
-        self._token('elsewhen')
-
-    @rule_def
-    def _encapsulated_(self):
-        self._token('encapsulated')
-
-    @rule_def
-    def _end_(self):
-        self._token('end')
-
-    @rule_def
-    def _enumeration_(self):
-        self._token('enumeration')
-
-    @rule_def
-    def _expandable_(self):
-        self._token('expandable')
-
-    @rule_def
-    def _extends_(self):
-        self._token('extends')
-
-    @rule_def
-    def _external_(self):
-        self._token('external')
-
-    @rule_def
-    def _false_(self):
-        self._token('false')
-
-    @rule_def
-    def _final_(self):
-        self._token('final')
-
-    @rule_def
-    def _flow_(self):
-        self._token('flow')
-
-    @rule_def
-    def _for_(self):
-        self._token('for')
-
-    @rule_def
-    def _function_(self):
-        self._token('function')
-
-    @rule_def
-    def _if_(self):
-        self._token('if')
-
-    @rule_def
-    def _import_(self):
-        self._token('import')
-
-    @rule_def
-    def _impure_(self):
-        self._token('impure')
-
-    @rule_def
-    def _in_(self):
-        self._token('in')
-
-    @rule_def
-    def _initial_(self):
-        self._token('initial')
-
-    @rule_def
-    def _inner_(self):
-        self._token('inner')
-
-    @rule_def
-    def _input_(self):
-        self._token('input')
-
-    @rule_def
-    def _loop_(self):
-        self._token('loop')
-
-    @rule_def
-    def _model_(self):
-        self._token('model')
-
-    @rule_def
-    def _not_(self):
-        self._token('not')
-
-    @rule_def
-    def _operator_(self):
-        self._token('operator')
-
-    @rule_def
-    def _or_(self):
-        self._token('or')
-
-    @rule_def
-    def _outer_(self):
-        self._token('outer')
-
-    @rule_def
-    def _output_(self):
-        self._token('output')
-
-    @rule_def
-    def _package_(self):
-        self._token('package')
-
-    @rule_def
-    def _parameter_(self):
-        self._token('parameter')
-
-    @rule_def
-    def _partial_(self):
-        self._token('partial')
-
-    @rule_def
-    def _protected_(self):
-        self._token('protected')
-
-    @rule_def
-    def _public_(self):
-        self._token('public')
-
-    @rule_def
-    def _pure_(self):
-        self._token('pure')
-
-    @rule_def
-    def _record_(self):
-        self._token('record')
-
-    @rule_def
-    def _redeclare_(self):
-        self._token('redeclare')
-
-    @rule_def
-    def _replaceable_(self):
-        self._token('replaceable')
-
-    @rule_def
-    def _return_(self):
-        self._token('return')
-
-    @rule_def
-    def _stream_(self):
-        self._token('stream')
-
-    @rule_def
-    def _then_(self):
-        self._token('then')
-
-    @rule_def
-    def _true_(self):
-        self._token('true')
-
-    @rule_def
-    def _type_(self):
-        self._token('type')
-
-    @rule_def
-    def _when_(self):
-        self._token('when')
-
-    @rule_def
-    def _while_(self):
-        self._token('while')
-
-    @rule_def
-    def _within_(self):
-        self._token('within')
+        self._token('annotation')
+        self._class_modification_()
 
     @rule_def
     def _re_IDENT_(self):
@@ -1417,180 +1253,6 @@ class ModelicaSemantics(object):
         return ast
 
     def annotation(self, ast):
-        return ast
-
-    def algorithm(self, ast):
-        return ast
-
-    def and_(self, ast):
-        return ast
-
-    def assert_(self, ast):
-        return ast
-
-    def block(self, ast):
-        return ast
-
-    def break_(self, ast):
-        return ast
-
-    def class_(self, ast):
-        return ast
-
-    def connect(self, ast):
-        return ast
-
-    def connector(self, ast):
-        return ast
-
-    def constant(self, ast):
-        return ast
-
-    def constrainedby(self, ast):
-        return ast
-
-    def der(self, ast):
-        return ast
-
-    def discrete(self, ast):
-        return ast
-
-    def each(self, ast):
-        return ast
-
-    def else_(self, ast):
-        return ast
-
-    def elseif(self, ast):
-        return ast
-
-    def elsewhen(self, ast):
-        return ast
-
-    def encapsulated(self, ast):
-        return ast
-
-    def end(self, ast):
-        return ast
-
-    def enumeration(self, ast):
-        return ast
-
-    def expandable(self, ast):
-        return ast
-
-    def extends(self, ast):
-        return ast
-
-    def external(self, ast):
-        return ast
-
-    def false(self, ast):
-        return ast
-
-    def final(self, ast):
-        return ast
-
-    def flow(self, ast):
-        return ast
-
-    def for_(self, ast):
-        return ast
-
-    def function(self, ast):
-        return ast
-
-    def if_(self, ast):
-        return ast
-
-    def import_(self, ast):
-        return ast
-
-    def impure(self, ast):
-        return ast
-
-    def in_(self, ast):
-        return ast
-
-    def initial(self, ast):
-        return ast
-
-    def inner(self, ast):
-        return ast
-
-    def input(self, ast):
-        return ast
-
-    def loop(self, ast):
-        return ast
-
-    def model(self, ast):
-        return ast
-
-    def not_(self, ast):
-        return ast
-
-    def operator(self, ast):
-        return ast
-
-    def or_(self, ast):
-        return ast
-
-    def outer(self, ast):
-        return ast
-
-    def output(self, ast):
-        return ast
-
-    def package(self, ast):
-        return ast
-
-    def parameter(self, ast):
-        return ast
-
-    def partial(self, ast):
-        return ast
-
-    def protected(self, ast):
-        return ast
-
-    def public(self, ast):
-        return ast
-
-    def pure(self, ast):
-        return ast
-
-    def record(self, ast):
-        return ast
-
-    def redeclare(self, ast):
-        return ast
-
-    def replaceable(self, ast):
-        return ast
-
-    def return_(self, ast):
-        return ast
-
-    def stream(self, ast):
-        return ast
-
-    def then(self, ast):
-        return ast
-
-    def true(self, ast):
-        return ast
-
-    def type(self, ast):
-        return ast
-
-    def when(self, ast):
-        return ast
-
-    def while_(self, ast):
-        return ast
-
-    def within(self, ast):
         return ast
 
     def re_IDENT(self, ast):
