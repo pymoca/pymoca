@@ -26,3 +26,17 @@ class ModelicaSemantics(object):
             raise FailedSemantics(
                 '{:s} is a keywaord'.format(str(ast)))
         return ast
+
+    @staticmethod
+    def false_if_none(v):
+        if v is None:
+            v = False
+        return v
+
+    def class_definition(self, ast):
+        ast.encapsulated = self.false_if_none(ast.encapsulated)
+        return ast
+
+    def class_prefixes(self, ast):
+        ast.partial = self.false_if_none(ast.encapsulated)
+        return ast
