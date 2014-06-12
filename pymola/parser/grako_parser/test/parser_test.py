@@ -1,18 +1,14 @@
 import unittest
 import json
-from grako.exceptions import FailedParse
+import os
+
+from grako.exceptions import FailedParse, FailedSemantics
+from grako.buffering import Buffer
 
 from ..parser import ModelicaParser
 from ..semantics import ModelicaSemantics
 
-basic_test_code = '''
-model test
-    import Analog=Modelica.Electrical.Analog;
-    Real a;
-equation
-algorithm
-end test;
-'''
+path = os.path.dirname(os.path.realpath(__file__))
 
 
 class Test(unittest.TestCase):
@@ -21,23 +17,21 @@ class Test(unittest.TestCase):
         self.parser = ModelicaParser()
         pass
 
-    def basic_test(self):
+    def bouncing_ball_test(self):
+        COMMENTS_RE = r'/\*(?:|\n)*?\*/|//[^\n]*?\n'
         rule_name = 'stored_definition'
         semantics = ModelicaSemantics('Modelica.ebnf')
+        f = open(os.path.join(path, 'BouncingBall.mo'))
+        buffer = Buffer(f.read(), comments_re=COMMENTS_RE,
+                        trace=True)
         try:
             ast = self.parser.parse(
-                basic_test_code,
+                buffer,
                 rule_name=rule_name,
                 semantics=semantics,
                 trace=False)
             print(json.dumps(ast, indent=2))
+        except FailedSemantics as e:
+            print(e)
         except FailedParse as e:
             print(e)
-            try:
-                ast = self.parser.parse(
-                    basic_test_code,
-                    rule_name=rule_name,
-                    semantics=semantics,
-                    trace=True)
-            except:
-                pass

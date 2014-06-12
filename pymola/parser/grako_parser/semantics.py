@@ -40,3 +40,19 @@ class ModelicaSemantics(object):
     def class_prefixes(self, ast):
         ast.partial = self.false_if_none(ast.encapsulated)
         return ast
+
+    def class_specifier_long(self, ast):
+        if ast.name != ast.name_check:
+            raise FailedSemantics(
+                'class names doen\'t match'
+                ': {:s}, {:s}'.format(
+                    ast.name, ast.name_check))
+        return ast
+
+    def class_specifier_extends(self, ast):
+        if ast.name != ast.name_check:
+            raise FailedSemantics(
+                'class names doen\'t match'
+                ': {:s}, {:s}'.format(
+                    ast.name, ast.name_check))
+        return ast

@@ -1,7 +1,7 @@
 (* B.2.1 Stored Definition -Within *)
 
 stored_definition =
-    [ 'within'  [within:name] ';' ]
+    [ 'within'  >> within:[name] ';' ]
     { final:['final'] class_definition:class_definition ';'}+;
     (* forcing one class with + so we get useful debugging*)
 
@@ -9,26 +9,28 @@ stored_definition =
 
 class_definition =
     encapsulated:['encapsulated']
-    prefixes:class_prefixes
-    specifier:class_specifier ;
+    class_prefixes:class_prefixes
+    class_specifier:class_specifier;
 
 class_prefixes =
     partial:['partial']
     type:( 'class' | 'model' | ['operator'] 'record' | 'block' 
     | ['expandable'] 'connector' | 'type' | 'package' | 
     [('pure'|'impure')] ['operator'] 
-    'function' | 'operator' ) ;
+    'function' | 'operator' );
 
 class_specifier =
-    @(class_specifier_long |
-    class_specifier_short |
-    class_specifier_enum |
-    class_specifier_der |
-    class_specifier_extends) ;
+    (class_specifier_long:class_specifier_long |
+    class_specifier_short:class_specifier_short |
+    class_specifier_enum:class_specifier_enum |
+    class_specifier_der:class_specifier_der |
+    class_specifier_extends:class_specifier_extends) ;
 
 class_specifier_long =
-    name:IDENT comment:string_comment
-    composition:composition  'end' name_check:IDENT;
+    name:IDENT
+    comment:string_comment
+    composition:composition 
+    'end' >> name_check:IDENT;
 
 class_specifier_short =
     name:IDENT '='
@@ -36,28 +38,30 @@ class_specifier_short =
     base_name:name
     subscripts:[array_subscripts]
     modification:[class_modification]
-    comment:comment ;
+    comment:comment;
 
 class_specifier_enum =
-    name:IDENT '=' 'enumeration' 
-    '(' ( enum:[enum_list] | ':' ) ')'
-    commnet:comment;
+    name:IDENT
+    '=' 'enumeration' 
+    '(' enumeration: ( [enum_list] | ':' ) ')'
+    comment:comment;
 
 class_specifier_der =
     name:IDENT '=' 'der'  '(' name ','
-    IDENT { ',' IDENT } ')' comment;
+    IDENT { ',' IDENT } ')' comment:comment;
 
 class_specifier_extends =
-    'extends'  name:IDENT [class_modification]
-    string_comment composition
-     'end' IDENT;
+    'extends'  name:IDENT
+    class_modification:[class_modification]
+    comment:string_comment composition:composition
+    'end' >> name_check:IDENT;
 
 base_prefix =
     type_prefix;
 
 enum_list = enumeration_literal { ',' enumeration_literal};
 
-enumeration_literal = IDENT comment;
+enumeration_literal = name:IDENT comment:comment;
 
 composition =
     element_list:element_list
@@ -66,19 +70,20 @@ composition =
       equation_section:equation_section |
       algorithm_section:algorithm_section
     }
-    [ 'external'  [language_specification]
-               [external_function_call] [annotation] ';' ]
-    [ annotation ';' ] ;
+    [ 'external'  [language_specification:language_specification]
+               [function_call:external_function_call]
+               [function_call_anotation:annotation] ';' ]
+    [ annotation:annotation ';' ] ;
 
 language_specification =
-    STRING;
+    @:STRING;
 
 external_function_call =
     [ component_reference '=' ]
     IDENT '(' [expression_list] ')' ;
 
 element_list =
-    { element:element  ';' } ;
+    { @:element >> ';' } ;
 
 element =
     import_clause:import_clause |
@@ -87,9 +92,10 @@ element =
     final:['final']
     inner:['inner']
     outer:['outer']
-    ( ( class_definition | component_clause) |
-    'replaceable' ( class_definition | component_clause)
-    [constraining_clause comment]) ;
+    ( ( class_definition:class_definition | component_clause:component_clause) |
+    replaceable:'replaceable'
+    ( class_definition:class_definition | component_clause:component_clause)
+    [constraining_clause:constraining_clause comment:comment]) ;
 
 import_clause =
     'import' ( alias:IDENT '=' name:name | name:name ['.' ( '*' | 
@@ -108,10 +114,10 @@ constraining_clause =
 
 (* B.2.4 Component Clause *)
 
-component_clause = type:type_prefix
+component_clause = type_prefix:type_prefix
 	type_specifier:type_specifier
 	array_subscripts:[array_subscripts]
-	name:IDENT ;
+    component_list:component_list;
 
 type_prefix =
     flow_type: ['flow'|'stream']
@@ -122,71 +128,82 @@ type_specifier =
     @:name;
 
 component_list =
-    component_declaration { ',' component_declaration } ;
+    @component_declaration { ',' @component_declaration } ;
 
 component_declaration =
-    name:declaration condition:[condition_attribute] comment:comment ;
+    @:declaration condition:[condition_attribute] comment:comment ;
 
 condition_attribute =
-    'if' expression ;
+    'if' @expression ;
 
 declaration =
-    IDENT [array_subscripts] [modification] ;
+    name:IDENT array_subscripts:[array_subscripts]
+    modification:[modification] ;
 
 (* B.2.5 Modification *)
 
 modification =
-    class_modification [ '=' expression ]
-    | '=' expression
-    | ':=' expression;
+    (class_modification:class_modification
+        [ '=' >> expression:expression ])
+    | '=' >> expression:expression
+    | ':=' >> expression:expression;
 
 class_modification =
-    '(' [argument_list] ')';
+    '(' >> argument_list:[argument_list] ')';
 
 argument_list =
-    argument { ',' argument } ;
+    @:argument { ',' @:argument } ;
 
 argument =
-    element_modification_or_replaceable
-    | element_redeclaration ;
+    @:element_modification_or_replaceable
+    | @:element_redeclaration ;
 
 element_modification_or_replaceable =
-    ['each'] ['final']  ( element_modification | element_replaceable);
+    each:['each'] final:['final']
+    ( element_modification:element_modification |
+      element_replaceable:element_replaceable);
 
 element_modification =
-    name [modification] string_comment;
+    name:name modification:[modification] comment:string_comment;
 
 element_redeclaration =
-    'redeclare'  ['each'] ['final']
-    ( ( short_class_definition | component_clause1) | 
-        element_replaceable );
+    'redeclare'  each:['each'] final:['final']
+    ( ( short_class_definition:short_class_definition |
+        component_clause1:component_clause1) | 
+        element_replaceable:element_replaceable );
 
 element_replaceable =
-    'replaceable'  ( short_class_definition | component_clause1)
-    [constraining_clause];
+    'replaceable'  ( short_class_definition:short_class_definition |
+    component_clause1:component_clause1)
+    constraining_clause:[constraining_clause];
 
 component_clause1 =
-    type_prefix type_specifier component_declaration1;
+    type_prefix:type_prefix
+    type_specifier:type_specifier
+    component_declaration1:component_declaration1;
 
 component_declaration1 =
-    declaration comment;
+    declaration:declaration comment:comment;
 
 short_class_definition =
-    class_prefixes IDENT '='
-    ( base_prefix name [array_subscripts]
-    [class_modification] comment |
-    'enumeration' '(' ( [enum_list] | ':' ) ')' comment );
+    class_prefixes:class_prefixes IDENT '='
+    ( base_prefix:base_prefix base_name:name
+    array_subscripts:[array_subscripts]
+    class_modification:[class_modification]
+    comment:comment |
+    'enumeration' '(' ( [enum_list:enum_list] | ':' ) ')'
+    comment:comment );
 
 (* B.2.6 Equations *)
 
 equation_section =
-    initial:['initial'] 'equation'  { equation:equation ';' };
+    initial:['initial'] 'equation' >> { equation:equation >> ';' };
 
 algorithm_section =
-    initial:['initial'] 'algorithm'  { statement:statement ';' };
+    initial:['initial'] 'algorithm' >> { statement:statement >> ';' };
 
 equation =
-    ( simple_expression '='  expression
+    ( simple_expression '=' >> expression
     | if_equation
     | for_equation
     | connect_clause
@@ -195,8 +212,8 @@ equation =
     comment ;
 
 statement =
-    ( component_reference  ( ':=' expression | function_call_args )
-    | '('  output_expression_list ')' ':=' component_reference function_call_args
+    ( component_reference  ( ':=' >> expression | function_call_args )
+    | '('  output_expression_list ')' ':=' >> component_reference function_call_args
     | 'break'
     | 'return'
     | if_statement
@@ -274,34 +291,35 @@ expression =
     'else' expression);
 
 simple_expression =
-    logical_expression [ ':' logical_expression [ ':' logical_expression ] ];
+    simple_expression:(logical_expression
+    [ ':' logical_expression [ ':' logical_expression ] ]);
 
 logical_expression =
-    logical_term { 'or' logical_term };
+    logical_expression:(logical_term { 'or' logical_term });
 
 logical_term =
-    logical_factor { 'and' logical_factor };
+    logical_term:(logical_factor { 'and' logical_factor });
 
 logical_factor =
-    ['not'] relation;
+    not:['not'] relation:relation;
 
 relation =
-    arithmetic_expression [ rel_op arithmetic_expression ];
+    arithmetic_expression:(arithmetic_expression [ rel_op arithmetic_expression ]);
 
 rel_op =
-    '<' | '<=' | '>' | '>=' | '==' | '<>';
+    @:('<' | '<=' | '>' | '>=' | '==' | '<>');
 
 arithmetic_expression =
     [add_op] term { add_op term };
 
 add_op =
-    '+' | '-' | '.+' | '.-';
+    @:('+' | '-' | '.+' | '.-');
 
 term =
     factor { mul_op factor };
 
 mul_op =
-    '*' | '/' | '.*' | './';
+    @:('*' | '/' | '.*' | './');
 
 factor =
     primary [ ('^' | '.^') primary ];
@@ -351,17 +369,17 @@ subscript =
     ':' | expression;
 
 comment =
-    string_comment [annotation];
+    comment:string_comment annotation:[annotation];
 
 string_comment =
-    [ STRING { '+' STRING } ];
+    @:[ STRING { '+' STRING } ];
 
 annotation =
-    'annotation' class_modification;
+    'annotation' @:class_modification;
 
 re_IDENT = ?/[_a-zA-Z][_a-zA-Z0-9]*/?;
 re_STRING = ?/"[^"]+"/?;
-re_UNSIGNED_NUMBER = ?/[0-9]+([\.] [0-9]+)?[[eE][\+\-]?[0-9]+/?;
+re_UNSIGNED_NUMBER = ?/[0-9]+([\.][0-9]+)?([eE][\+\-]?[0-9]+)?/?;
 
 (* creating rules so whitespace skipped *)
 IDENT = re_IDENT; 
