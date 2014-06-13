@@ -1,3 +1,7 @@
+"""
+The grako semantics.
+"""
+
 from grako.exceptions import FailedSemantics
 
 keywords = set([
