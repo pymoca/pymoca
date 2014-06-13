@@ -10,7 +10,7 @@ stored_definition =
 class_definition =
     encapsulated:['encapsulated']
     class_prefixes:class_prefixes
-    class_specifier:class_specifier;
+    @:class_specifier;
 
 class_prefixes =
     partial:['partial']
@@ -20,16 +20,16 @@ class_prefixes =
     'function' | 'operator' );
 
 class_specifier =
-    (class_specifier_long:class_specifier_long |
-    class_specifier_short:class_specifier_short |
-    class_specifier_enum:class_specifier_enum |
-    class_specifier_der:class_specifier_der |
-    class_specifier_extends:class_specifier_extends) ;
+    @:(class_specifier_long |
+    class_specifier_short |
+    class_specifier_enum |
+    class_specifier_der |
+    class_specifier_extends) ;
 
 class_specifier_long =
     name:IDENT
     comment:string_comment
-    composition:composition 
+    @:composition 
     'end' >> name_check:IDENT;
 
 class_specifier_short =
@@ -79,23 +79,23 @@ language_specification =
     @:STRING;
 
 external_function_call =
-    [ component_reference '=' ]
-    IDENT '(' [expression_list] ')' ;
+    [ @+:component_reference '=' ]
+    @+:IDENT '(' [@+:expression_list] ')' ;
 
 element_list =
-    { @:element >> ';' } ;
+    { @+:element >> ';' } ;
 
 element =
-    import_clause:import_clause |
-    extends_clause:extends_clause |
-    redeclare:['redeclare']
-    final:['final']
-    inner:['inner']
-    outer:['outer']
-    ( ( class_definition:class_definition | component_clause:component_clause) |
-    replaceable:'replaceable'
-    ( class_definition:class_definition | component_clause:component_clause)
-    [constraining_clause:constraining_clause comment:comment]) ;
+    import_clause |
+    extends_clause |
+    ['redeclare']
+    ['final']
+    ['inner']
+    ['outer']
+    ( ( class_definition | component_clause) |
+    'replaceable'
+    ( class_definition | component_clause)
+    [constraining_clause comment:comment]) ;
 
 import_clause =
     'import' ( alias:IDENT '=' name:name | name:name ['.' ( '*' | 

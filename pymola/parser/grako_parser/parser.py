@@ -9,11 +9,11 @@
 #
 
 from __future__ import print_function, division, absolute_import, unicode_literals
-from grako.parsing import * # noqa
-from grako.exceptions import * # noqa
+from grako.parsing import *  # noqa
+from grako.exceptions import *  # noqa
 
 
-__version__ = '14.163.20.05.13'
+__version__ = '14.164.20.44.50'
 
 
 class ModelicaParser(Parser):
@@ -29,6 +29,7 @@ class ModelicaParser(Parser):
                 self._name_()
             self.ast['within'] = self.last_node
             self._token(';')
+
         def block1():
             with self._optional():
                 self._token('final')
@@ -46,7 +47,7 @@ class ModelicaParser(Parser):
         self._class_prefixes_()
         self.ast['class_prefixes'] = self.last_node
         self._class_specifier_()
-        self.ast['class_specifier'] = self.last_node
+        self.ast['@'] = self.last_node
 
     @rule_def
     def _class_prefixes_(self):
@@ -96,20 +97,16 @@ class ModelicaParser(Parser):
             with self._choice():
                 with self._option():
                     self._class_specifier_long_()
-                    self.ast['class_specifier_long'] = self.last_node
                 with self._option():
                     self._class_specifier_short_()
-                    self.ast['class_specifier_short'] = self.last_node
                 with self._option():
                     self._class_specifier_enum_()
-                    self.ast['class_specifier_enum'] = self.last_node
                 with self._option():
                     self._class_specifier_der_()
-                    self.ast['class_specifier_der'] = self.last_node
                 with self._option():
                     self._class_specifier_extends_()
-                    self.ast['class_specifier_extends'] = self.last_node
                 self._error('no available options')
+        self.ast['@'] = self.last_node
 
     @rule_def
     def _class_specifier_long_(self):
@@ -118,7 +115,7 @@ class ModelicaParser(Parser):
         self._string_comment_()
         self.ast['comment'] = self.last_node
         self._composition_()
-        self.ast['composition'] = self.last_node
+        self.ast['@'] = self.last_node
         self._token('end')
         self._cut()
         self._IDENT_()
@@ -172,6 +169,7 @@ class ModelicaParser(Parser):
         self._name_()
         self._token(',')
         self._IDENT_()
+
         def block1():
             self._token(',')
             self._IDENT_()
@@ -204,6 +202,7 @@ class ModelicaParser(Parser):
     @rule_def
     def _enum_list_(self):
         self._enumeration_literal_()
+
         def block0():
             self._token(',')
             self._enumeration_literal_()
@@ -220,6 +219,7 @@ class ModelicaParser(Parser):
     def _composition_(self):
         self._element_list_()
         self.ast['element_list'] = self.last_node
+
         def block1():
             with self._choice():
                 with self._option():
@@ -275,6 +275,7 @@ class ModelicaParser(Parser):
 
     @rule_def
     def _element_list_(self):
+
         def block0():
             self._element_()
             self.ast['@'] = self.last_node
@@ -437,6 +438,7 @@ class ModelicaParser(Parser):
     def _component_list_(self):
         self._component_declaration_()
         self.ast['@'] = self.last_node
+
         def block1():
             self._token(',')
             self._component_declaration_()
@@ -507,6 +509,7 @@ class ModelicaParser(Parser):
     def _argument_list_(self):
         self._argument_()
         self.ast['@'] = self.last_node
+
         def block1():
             self._token(',')
             self._argument_()
@@ -655,6 +658,7 @@ class ModelicaParser(Parser):
         self.ast['initial'] = self.last_node
         self._token('equation')
         self._cut()
+
         def block1():
             self._equation_()
             self.ast['equation'] = self.last_node
@@ -669,6 +673,7 @@ class ModelicaParser(Parser):
         self.ast['initial'] = self.last_node
         self._token('algorithm')
         self._cut()
+
         def block1():
             self._statement_()
             self.ast['statement'] = self.last_node
@@ -742,14 +747,17 @@ class ModelicaParser(Parser):
         self._token('if')
         self._expression_()
         self._token('then')
+
         def block0():
             self._equation_()
             self._token(';')
         self._closure(block0)
+
         def block1():
             self._token('elseif')
             self._expression_()
             self._token('then')
+
             def block2():
                 self._equation_()
                 self._token(';')
@@ -757,6 +765,7 @@ class ModelicaParser(Parser):
         self._closure(block1)
         with self._optional():
             self._token('else')
+
             def block3():
                 self._equation_()
                 self._token(';')
@@ -769,14 +778,17 @@ class ModelicaParser(Parser):
         self._token('if')
         self._expression_()
         self._token('then')
+
         def block0():
             self._statement_()
             self._token(';')
         self._closure(block0)
+
         def block1():
             self._token('elseif')
             self._expression_()
             self._token('then')
+
             def block2():
                 self._statement_()
                 self._token(';')
@@ -784,6 +796,7 @@ class ModelicaParser(Parser):
         self._closure(block1)
         with self._optional():
             self._token('else')
+
             def block3():
                 self._statement_()
                 self._token(';')
@@ -796,6 +809,7 @@ class ModelicaParser(Parser):
         self._token('for')
         self._for_indices_()
         self._token('loop')
+
         def block0():
             self._equation_()
             self._token(';')
@@ -808,6 +822,7 @@ class ModelicaParser(Parser):
         self._token('for')
         self._for_indices_()
         self._token('loop')
+
         def block0():
             self._statement_()
             self._token(';')
@@ -818,6 +833,7 @@ class ModelicaParser(Parser):
     @rule_def
     def _for_indices_(self):
         self._for_index_()
+
         def block0():
             self._token(',')
             self._for_index_()
@@ -835,6 +851,7 @@ class ModelicaParser(Parser):
         self._token('while')
         self._expression_()
         self._token('loop')
+
         def block0():
             self._statement_()
             self._token(';')
@@ -847,14 +864,17 @@ class ModelicaParser(Parser):
         self._token('when')
         self._expression_()
         self._token('then')
+
         def block0():
             self._equation_()
             self._token(';')
         self._closure(block0)
+
         def block1():
             self._token('elsewhen')
             self._expression_()
             self._token('then')
+
             def block2():
                 self._equation_()
                 self._token(';')
@@ -868,14 +888,17 @@ class ModelicaParser(Parser):
         self._token('when')
         self._expression_()
         self._token('then')
+
         def block0():
             self._statement_()
             self._token(';')
         self._closure(block0)
+
         def block1():
             self._token('elsewhen')
             self._expression_()
             self._token('then')
+
             def block2():
                 self._statement_()
                 self._token(';')
@@ -904,6 +927,7 @@ class ModelicaParser(Parser):
                     self._expression_()
                     self._token('then')
                     self._expression_()
+
                     def block0():
                         self._token('elseif')
                         self._expression_()
@@ -930,6 +954,7 @@ class ModelicaParser(Parser):
     def _logical_expression_(self):
         with self._group():
             self._logical_term_()
+
             def block1():
                 self._token('or')
                 self._logical_term_()
@@ -940,6 +965,7 @@ class ModelicaParser(Parser):
     def _logical_term_(self):
         with self._group():
             self._logical_factor_()
+
             def block1():
                 self._token('and')
                 self._logical_factor_()
@@ -987,6 +1013,7 @@ class ModelicaParser(Parser):
         with self._optional():
             self._add_op_()
         self._term_()
+
         def block0():
             self._add_op_()
             self._term_()
@@ -1010,6 +1037,7 @@ class ModelicaParser(Parser):
     @rule_def
     def _term_(self):
         self._factor_()
+
         def block0():
             self._mul_op_()
             self._factor_()
@@ -1074,6 +1102,7 @@ class ModelicaParser(Parser):
             with self._option():
                 self._token('[')
                 self._expression_list_()
+
                 def block1():
                     self._token(';')
                     self._expression_list_()
@@ -1093,6 +1122,7 @@ class ModelicaParser(Parser):
             self._token('.')
         self._IDENT_()
         self.ast['@'] = self.last_node
+
         def block1():
             self._token('.')
             self._IDENT_()
@@ -1106,6 +1136,7 @@ class ModelicaParser(Parser):
         self._IDENT_()
         with self._optional():
             self._array_subscripts_()
+
         def block0():
             self._token('.')
             self._IDENT_()
@@ -1169,6 +1200,7 @@ class ModelicaParser(Parser):
     def _output_expression_list_(self):
         with self._optional():
             self._expression_()
+
         def block0():
             self._token(',')
             with self._optional():
@@ -1178,6 +1210,7 @@ class ModelicaParser(Parser):
     @rule_def
     def _expression_list_(self):
         self._expression_()
+
         def block0():
             self._token(',')
             self._expression_()
@@ -1187,6 +1220,7 @@ class ModelicaParser(Parser):
     def _array_subscripts_(self):
         self._token('[')
         self._subscript_()
+
         def block0():
             self._token(',')
             self._subscript_()
@@ -1214,6 +1248,7 @@ class ModelicaParser(Parser):
     def _string_comment_(self):
         with self._optional():
             self._STRING_()
+
             def block1():
                 self._token('+')
                 self._STRING_()
