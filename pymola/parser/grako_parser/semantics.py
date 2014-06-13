@@ -38,7 +38,6 @@ class ModelicaSemantics(object):
         return v
 
     def class_definition(self, ast):
-        print dir(ast)
         ast.encapsulated = self.false_if_none(ast.encapsulated)
         return ast
 
