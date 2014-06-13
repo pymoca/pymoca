@@ -28,6 +28,7 @@ help:
 	@echo "  api        to autogenerate api doc"
 	@echo "  html       to make standalone HTML files"
 	@echo "  html-view   to make standalone HTML files"
+	@echo "  html-zip   create a zip of HTML files"
 	@echo "  dirhtml    to make HTML files named index.html in directories"
 	@echo "  singlehtml to make a single large HTML file"
 	@echo "  pickle     to make pickle files"
@@ -65,6 +66,9 @@ html:
 
 html-view: html
 	$(BROWSER) build/html/index.html
+
+html-zip: html
+	cd build/html && zip -r ../pymola-doc.zip .
 
 dirhtml:
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml
