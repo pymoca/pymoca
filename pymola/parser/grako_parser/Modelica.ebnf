@@ -2,18 +2,18 @@
 
 stored_definition =
     [ 'within'  >> within:[name] ';' ]
-    { final:['final'] class_definition:class_definition ';'}+;
+    { [final:'final'] class_definition:class_definition ';'}+;
     (* forcing one class with + so we get useful debugging*)
 
 (* B.2.2 Class Definition *)
 
 class_definition =
-    encapsulated:['encapsulated']
+    [encapsulated:'encapsulated']
     class_prefixes:class_prefixes
-    @:class_specifier;
+    class_specifier:class_specifier;
 
 class_prefixes =
-    partial:['partial']
+    [partial:'partial']
     type:( 'class' | 'model' | ['operator'] 'record' | 'block' 
     | ['expandable'] 'connector' | 'type' | 'package' | 
     [('pure'|'impure')] ['operator'] 
@@ -29,15 +29,15 @@ class_specifier =
 class_specifier_long =
     name:IDENT
     comment:string_comment
-    @:composition 
+    composition:composition 
     'end' >> name_check:IDENT;
 
 class_specifier_short =
     name:IDENT '='
     base_prefix:base_prefix
     base_name:name
-    subscripts:[array_subscripts]
-    modification:[class_modification]
+    [array_subscripts:array_subscripts]
+    [class_modification:class_modification]
     comment:comment;
 
 class_specifier_enum =
@@ -47,8 +47,8 @@ class_specifier_enum =
     comment:comment;
 
 class_specifier_der =
-    name:IDENT '=' 'der'  '(' name ','
-    IDENT { ',' IDENT } ')' comment:comment;
+    name:IDENT '=' 'der'  '(' var_name:name ','
+    id:IDENT { ',' id:IDENT } ')' comment:comment;
 
 class_specifier_extends =
     'extends'  name:IDENT
@@ -59,7 +59,7 @@ class_specifier_extends =
 base_prefix =
     type_prefix;
 
-enum_list = enumeration_literal { ',' enumeration_literal};
+enum_list = @:enumeration_literal { ',' @:enumeration_literal};
 
 enumeration_literal = name:IDENT comment:comment;
 
@@ -88,41 +88,42 @@ element_list =
 element =
     import_clause |
     extends_clause |
-    ['redeclare']
-    ['final']
-    ['inner']
-    ['outer']
-    ( ( class_definition | component_clause) |
-    'replaceable'
-    ( class_definition | component_clause)
+    [redeclare:'redeclare']
+    [final:'final']
+    [inner:'inner']
+    [outer:'outer']
+    ( definition:( class_definition | component_clause) |
+    replaceable:'replaceable'
+    defnition:( class_definition | component_clause)
     [constraining_clause comment:comment]) ;
 
 import_clause =
     'import' ( alias:IDENT '=' name:name | name:name ['.' ( '*' | 
-    '{' import_list '}' ) ] ) comment ;
+    '{' import:import_list '}' ) ] ) comment:comment ;
 
 import_list =
-    IDENT [ ',' import_list ] ;
+    alias:IDENT [ ',' list:import_list ] ;
 
 (* B.2.3 Extends *)
 
 extends_clause =
-    'extends'  name [class_modification] [annotation];
+    'extends'  name [class_modification:class_modification]
+    [annotation:annotation];
 
 constraining_clause =
-    'constrainedby'  name [class_modification];
+    'constrainedby'  name:name [modification:class_modification];
 
 (* B.2.4 Component Clause *)
 
 component_clause = type_prefix:type_prefix
 	type_specifier:type_specifier
-	array_subscripts:[array_subscripts]
+	[array_subscripts:array_subscripts]
     component_list:component_list;
 
 type_prefix =
-    flow_type: ['flow'|'stream']
-    value_type: ['discrete'|'parameter'|'constant']
-    io_type: ['input'|'output'];
+    [flow_type:('flow'|'stream')]
+    [value_type:('discrete'|'parameter'|'constant')]
+    [io_type:'input'|'output'];
 
 type_specifier =
     @:name;
@@ -137,19 +138,19 @@ condition_attribute =
     'if' @expression ;
 
 declaration =
-    name:IDENT array_subscripts:[array_subscripts]
-    modification:[modification] ;
+    name:IDENT [array_subscripts:array_subscripts]
+    [modification:modification] ;
 
 (* B.2.5 Modification *)
 
 modification =
     (class_modification:class_modification
-        [ '=' >> expression:expression ])
-    | '=' >> expression:expression
-    | ':=' >> expression:expression;
+        [ op:'=' >> expression:expression ])
+    | op:'=' >> expression:expression
+    | op:':=' >> expression:expression;
 
 class_modification =
-    '(' >> argument_list:[argument_list] ')';
+    '(' >> [@:argument_list] ')';
 
 argument_list =
     @:argument { ',' @:argument } ;
@@ -160,36 +161,36 @@ argument =
 
 element_modification_or_replaceable =
     each:['each'] final:['final']
-    ( element_modification:element_modification |
-      element_replaceable:element_replaceable);
+    @:(element_modification |
+     element_replaceable);
 
 element_modification =
-    name:name modification:[modification] comment:string_comment;
+    name:name @:[modification] comment:string_comment;
 
 element_redeclaration =
-    'redeclare'  each:['each'] final:['final']
-    ( ( short_class_definition:short_class_definition |
-        component_clause1:component_clause1) | 
-        element_replaceable:element_replaceable );
+    'redeclare'  [each:'each'] [final:'final']
+    @:( ( short_class_definition |
+        component_clause1) | 
+        element_replaceable );
 
 element_replaceable =
-    'replaceable'  ( short_class_definition:short_class_definition |
-    component_clause1:component_clause1)
-    constraining_clause:[constraining_clause];
+    'replaceable'  @:( short_class_definition |
+    component_clause1)
+    [constraining_clause:constraining_clause];
 
 component_clause1 =
     type_prefix:type_prefix
     type_specifier:type_specifier
-    component_declaration1:component_declaration1;
+    @:component_declaration1;
 
 component_declaration1 =
-    declaration:declaration comment:comment;
+    @:declaration comment:comment;
 
 short_class_definition =
     class_prefixes:class_prefixes IDENT '='
     ( base_prefix:base_prefix base_name:name
-    array_subscripts:[array_subscripts]
-    class_modification:[class_modification]
+    [array_subscripts:array_subscripts]
+    [@:class_modification]
     comment:comment |
     'enumeration' '(' ( [enum_list:enum_list] | ':' ) ')'
     comment:comment );
@@ -203,173 +204,173 @@ algorithm_section =
     initial:['initial'] 'algorithm' >> { statement:statement >> ';' };
 
 equation =
-    ( simple_expression '=' >> expression
-    | if_equation
-    | for_equation
-    | connect_clause
-    | when_equation
-    | name function_call_args )
+    ( lhs:simple_expression '=' >> rhs:expression
+    | @:if_equation
+    | @:for_equation
+    | @:connect_clause
+    | @:when_equation
+    | function_name:name call_args:function_call_args )
     comment ;
 
 statement =
-    ( component_reference  ( ':=' >> expression | function_call_args )
-    | '('  output_expression_list ')' ':=' >> component_reference function_call_args
+    def:( component:component_reference  ( ':=' >> expression:expression | call_args:function_call_args )
+    | '('  lhs:output_expression_list ')' ':=' >> rhs_component:component_reference rhs_call_args:function_call_args
     | 'break'
     | 'return'
     | if_statement
     | for_statement
     | while_statement
     | when_statement )
-    comment ;
+    comment:comment ;
 
 if_equation =
-    'if' expression 'then'
-    { equation  ';' }
-    { 'elseif' expression 'then'
-    { equation ';' }
+    'if' if_cond:expression 'then'
+    { if_then:equation  ';' }
+    { 'elseif' elseif_cond:expression 'then'
+    { elseif_then:equation ';' }
     }
     [ 'else'
-    { equation ';' }
+    { else_then:equation ';' }
     ]
     'end' 'if' ;
 
 if_statement =
-    'if' expression 'then'
-    { statement  ';' }
-    { 'elseif' expression 'then'
-    { statement ';' }
+    'if' if_cond:expression 'then'
+    { if_then:statement  ';' }
+    { 'elseif' elseif_cond:expression 'then'
+    { elseif_then:statement ';' }
     }
     [ 'else'
-    { statement ';' }
+    { else_then:statement ';' }
     ]
     'end' 'if';
 
 for_equation =
-    'for' for_indices 'loop'
-    { equation  ';' }
+    'for' for_indices:for_indices 'loop'
+    { equations:equation  ';' }
     'end' 'for';
 
 for_statement =
-    'for' for_indices 'loop'
-    { statement  ';' }
+    'for' for_indices:for_indices 'loop'
+    { statements:statement  ';' }
     'end' 'for';
 
 for_indices =
-    for_index {','  for_index};
+    @:for_index {','  @:for_index};
 
 for_index =
-    IDENT [ 'in' expression ];
+    @:IDENT [ 'in' in:expression ];
 
 while_statement =
-    'while' expression 'loop'
-    { statement ';' }
+    'while' while_cond:expression 'loop'
+    { while_statement:statement ';' }
     'end' 'while';
 
 when_equation =
-    'when' expression 'then'
-    { equation ';' }
-    { 'elsewhen' expression 'then'
-    { equation ';' } }
+    'when' when_cond:expression 'then'
+    { when_then:equation ';' }
+    { 'elsewhen' elsewhen_cond:expression 'then'
+    { elsewhen_then:equation ';' } }
     'end' 'when';
 
 when_statement =
-    'when' expression 'then'
-    { statement ';' }
-    { 'elsewhen' expression 'then'
-    { statement ';' } }
+    'when' when_cond:expression 'then'
+    { when_then:statement ';' }
+    { 'elsewhen' else_cond:expression 'then'
+    { elsewhen_then:statement ';' } }
     'end' 'when';
 
 connect_clause =
-    'connect' '(' component_reference ',' component_reference ')';
+    'connect' '(' connect_a:component_reference ',' connect_b:component_reference ')';
 
 (* B.2.7 Expression *)
 
 expression =
-    simple_expression
-    | ('if' expression 'then' expression
-    { 'elseif' expression 'then' expression }
-    'else' expression);
+    @:simple_expression
+    | ('if' if_cond:expression 'then' if_then:expression
+    { 'elseif' elseif_cond:expression 'then' elseif_then:expression }
+    'else' else_then:expression);
 
 simple_expression =
-    simple_expression:(logical_expression
-    [ ':' logical_expression [ ':' logical_expression ] ]);
+    (@:logical_expression
+    [ ':' @:logical_expression [ ':' @:logical_expression ] ]);
 
 logical_expression =
-    logical_expression:(logical_term { 'or' logical_term });
+    (@:logical_term { op:'or' @:logical_term });
 
 logical_term =
-    logical_term:(logical_factor { 'and' logical_factor });
+    (@:logical_factor { op:'and' @:logical_factor });
 
 logical_factor =
-    not:['not'] relation:relation;
+    [not:'not'] @:relation;
 
 relation =
-    arithmetic_expression:(arithmetic_expression [ rel_op arithmetic_expression ]);
+    (@:arithmetic_expression [ rel_op:rel_op @:arithmetic_expression ]);
 
 rel_op =
     @:('<' | '<=' | '>' | '>=' | '==' | '<>');
 
 arithmetic_expression =
-    [add_op] term { add_op term };
+    [add_op:add_op] @:term { add_op:add_op @:term };
 
 add_op =
     @:('+' | '-' | '.+' | '.-');
 
 term =
-    factor { mul_op factor };
+    @:factor { mul_op:mul_op @:factor };
 
 mul_op =
     @:('*' | '/' | '.*' | './');
 
 factor =
-    primary [ ('^' | '.^') primary ];
+    @:primary [ ('^' | '.^') exponent:primary ];
 
 primary =
-    UNSIGNED_NUMBER
-    | STRING
-    | 'false'
-    | 'true'
-    | ( name | 'der' | 'initial' ) function_call_args
-    | component_reference
-    | '(' output_expression_list ')'
-    | '[' expression_list { ';' expression_list } ']'
-    | '{' function_arguments '}'
-    | 'end';
+    @:UNSIGNED_NUMBER
+    | @:STRING
+    | @:'false'
+    | @:'true'
+    | type:( name | 'der' | 'initial' ) call_args:function_call_args
+    | @:component_reference
+    | '(' @:output_expression_list ')'
+    | '[' @:expression_list { ';' @:expression_list } ']'
+    | '{' @:function_arguments '}'
+    | @:'end';
 
 name =
     [ '.' ] @:IDENT { '.' @:IDENT };
 
 component_reference =
-    [ '.' ] IDENT [ array_subscripts ] { '.' IDENT [ array_subscripts ] };
+    [ '.' ] @:IDENT [ array_subscripts:array_subscripts ] { '.' @:IDENT [ array_subscripts:array_subscripts ] };
 
 function_call_args =
-    '(' [function_arguments] ')';
+    '(' [@:function_arguments] ')';
 
 function_arguments =
-    function_argument [ ',' function_arguments | 'for' for_indices ]
-    | named_arguments;
+    @:function_argument [ ',' @:function_arguments | 'for' @:for_indices ]
+    | @:named_arguments;
 
-named_arguments = named_argument [ ',' named_arguments ];
+named_arguments = @:named_argument [ ',' @:named_arguments ];
 
-named_argument = IDENT '=' function_argument;
+named_argument = name:IDENT '=' @:function_argument;
 
 function_argument =
-    'function' name '(' [named_arguments] ')' | expression;
+    'function' name:name '(' [@:named_arguments] ')' | @:expression;
 
 output_expression_list =
-    [expression] { ',' [expression] };
+    [@:expression] { ',' [@:expression] };
 
 expression_list =
-    expression { ',' expression };
+    @:expression { ',' @:expression };
 
 array_subscripts =
-    '[' subscript { ',' subscript } ']';
+    '[' @:subscript { ',' @:subscript } ']';
 
 subscript =
-    ':' | expression;
+    @:(':' | expression);
 
 comment =
-    comment:string_comment annotation:[annotation];
+    @:string_comment annotation:[annotation];
 
 string_comment =
     @:[ STRING { '+' STRING } ];
@@ -377,14 +378,14 @@ string_comment =
 annotation =
     'annotation' @:class_modification;
 
-re_IDENT = ?/[_a-zA-Z][_a-zA-Z0-9]*/?;
-re_STRING = ?/"[^"]+"/?;
-re_UNSIGNED_NUMBER = ?/[0-9]+([\.][0-9]+)?([eE][\+\-]?[0-9]+)?/?;
+re_IDENT = @:?/[_a-zA-Z][_a-zA-Z0-9]*/?;
+re_STRING = @:?/"[^"]+"/?;
+re_UNSIGNED_NUMBER = @:?/[0-9]+([\.][0-9]+)?([eE][\+\-]?[0-9]+)?/?;
 
 (* creating rules so whitespace skipped *)
-IDENT = re_IDENT; 
-STRING = re_STRING;
-UNSIGNED_NUMBER = re_UNSIGNED_NUMBER;
+IDENT = @:re_IDENT; 
+STRING = @:re_STRING;
+UNSIGNED_NUMBER = @:re_UNSIGNED_NUMBER;
 
 
 (*

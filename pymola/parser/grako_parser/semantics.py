@@ -31,30 +31,11 @@ class ModelicaSemantics(object):
                 '{:s} is a keywaord'.format(str(ast)))
         return ast
 
-    @staticmethod
-    def false_if_none(v):
-        if v is None:
-            v = False
-        return v
-
     def class_definition(self, ast):
-        ast.encapsulated = self.false_if_none(ast.encapsulated)
-        return ast
-
-    def class_prefixes(self, ast):
-        ast.partial = self.false_if_none(ast.encapsulated)
-        return ast
-
-    def class_specifier_long(self, ast):
-        if ast.name != ast.name_check:
-            raise FailedSemantics(
-                'class names doen\'t match'
-                ': {:s}, {:s}'.format(
-                    ast.name, ast.name_check))
-        return ast
-
-    def class_specifier_extends(self, ast):
-        if ast.name != ast.name_check:
+        print ('name: ', ast.name)
+        print ('name check: ', ast.name_check)
+        if ast.name_check is not None and \
+                ast.name != ast.name_check:
             raise FailedSemantics(
                 'class names doen\'t match'
                 ': {:s}, {:s}'.format(
