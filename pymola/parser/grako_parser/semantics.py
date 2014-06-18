@@ -31,13 +31,14 @@ class ModelicaSemantics(object):
                 '{:s} is a keywaord'.format(str(ast)))
         return ast
 
-    def class_definition(self, ast):
-        print ('name: ', ast.name)
-        print ('name check: ', ast.name_check)
+    def class_specifier(self, ast):
         if ast.name_check is not None and \
                 ast.name != ast.name_check:
             raise FailedSemantics(
                 'class names doen\'t match'
                 ': {:s}, {:s}'.format(
                     ast.name, ast.name_check))
+        return ast
+
+    def _default(self, ast):
         return ast

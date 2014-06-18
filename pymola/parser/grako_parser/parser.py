@@ -16,7 +16,7 @@ from grako.parsing import graken, Parser
 from grako.exceptions import *  # noqa
 
 
-__version__ = '2014.06.18.08.14.29.02'
+__version__ = '2014.06.18.09.21.05.02'
 
 __all__ = [
     'ModelicaParser',
@@ -34,6 +34,7 @@ class ModelicaParser(Parser):
     def _stored_definition_(self):
         with self._optional():
             self._token('within')
+            self._cut()
             with self._optional():
                 self._name_()
             self.ast['within'] = self.last_node
@@ -141,6 +142,7 @@ class ModelicaParser(Parser):
         self._composition_()
         self.ast['composition'] = self.last_node
         self._token('end')
+        self._cut()
         self._IDENT_()
         self.ast['name_check'] = self.last_node
 
@@ -237,6 +239,7 @@ class ModelicaParser(Parser):
         self._composition_()
         self.ast['composition'] = self.last_node
         self._token('end')
+        self._cut()
         self._IDENT_()
         self.ast['name_check'] = self.last_node
 
@@ -252,12 +255,12 @@ class ModelicaParser(Parser):
     @graken()
     def _enum_list_(self):
         self._enumeration_literal_()
-        self.ast['@'] = self.last_node
+        self.ast._append('@', self.last_node)
 
         def block1():
             self._token(',')
             self._enumeration_literal_()
-            self.ast['@'] = self.last_node
+            self.ast._append('@', self.last_node)
         self._closure(block1)
 
     @graken()
@@ -344,6 +347,7 @@ class ModelicaParser(Parser):
         def block0():
             self._element_()
             self.ast._append('@', self.last_node)
+            self._cut()
             self._token(';')
         self._closure(block0)
 
@@ -596,16 +600,19 @@ class ModelicaParser(Parser):
                     with self._optional():
                         self._token('=')
                         self.ast['op'] = self.last_node
+                        self._cut()
                         self._expression_()
                         self.ast['expression'] = self.last_node
             with self._option():
                 self._token('=')
                 self.ast['op'] = self.last_node
+                self._cut()
                 self._expression_()
                 self.ast['expression'] = self.last_node
             with self._option():
                 self._token(':=')
                 self.ast['op'] = self.last_node
+                self._cut()
                 self._expression_()
                 self.ast['expression'] = self.last_node
             self._error('no available options')
@@ -618,6 +625,7 @@ class ModelicaParser(Parser):
     @graken()
     def _class_modification_(self):
         self._token('(')
+        self._cut()
         with self._optional():
             self._argument_list_()
             self.ast['@'] = self.last_node
@@ -626,12 +634,12 @@ class ModelicaParser(Parser):
     @graken()
     def _argument_list_(self):
         self._argument_()
-        self.ast['@'] = self.last_node
+        self.ast._append('@', self.last_node)
 
         def block1():
             self._token(',')
             self._argument_()
-            self.ast['@'] = self.last_node
+            self.ast._append('@', self.last_node)
         self._closure(block1)
 
     @graken()
@@ -806,10 +814,12 @@ class ModelicaParser(Parser):
             self._token('initial')
         self.ast['initial'] = self.last_node
         self._token('equation')
+        self._cut()
 
         def block1():
             self._equation_()
             self.ast['equation'] = self.last_node
+            self._cut()
             self._token(';')
         self._closure(block1)
 
@@ -824,10 +834,12 @@ class ModelicaParser(Parser):
             self._token('initial')
         self.ast['initial'] = self.last_node
         self._token('algorithm')
+        self._cut()
 
         def block1():
             self._statement_()
             self.ast['statement'] = self.last_node
+            self._cut()
             self._token(';')
         self._closure(block1)
 
@@ -844,6 +856,7 @@ class ModelicaParser(Parser):
                     self._simple_expression_()
                     self.ast['lhs'] = self.last_node
                     self._token('=')
+                    self._cut()
                     self._expression_()
                     self.ast['rhs'] = self.last_node
                 with self._option():
@@ -882,6 +895,7 @@ class ModelicaParser(Parser):
                         with self._choice():
                             with self._option():
                                 self._token(':=')
+                                self._cut()
                                 self._expression_()
                                 self.ast['expression'] = self.last_node
                             with self._option():
@@ -894,6 +908,7 @@ class ModelicaParser(Parser):
                     self.ast['lhs'] = self.last_node
                     self._token(')')
                     self._token(':=')
+                    self._cut()
                     self._component_reference_()
                     self.ast['rhs_component'] = self.last_node
                     self._function_call_args_()

@@ -1,7 +1,7 @@
 (* B.2.1 Stored Definition -Within *)
 
 stored_definition =
-    [ 'within'   within:[name] ';' ]
+    [ 'within'  ~ within:[name] ';' ]
     { [final:'final'] class_definition:class_definition ';'}+;
     (* forcing one class with + so we get useful debugging*)
 
@@ -30,7 +30,7 @@ class_specifier_long =
     name:IDENT
     comment:string_comment
     composition:composition 
-    'end'  name_check:IDENT;
+    'end' ~ name_check:IDENT;
 
 class_specifier_short =
     name:IDENT '='
@@ -54,12 +54,12 @@ class_specifier_extends =
     'extends'  name:IDENT
     class_modification:[class_modification]
     comment:string_comment composition:composition
-    'end'  name_check:IDENT;
+    'end' ~ name_check:IDENT;
 
 base_prefix =
     type_prefix;
 
-enum_list = @:enumeration_literal { ',' @:enumeration_literal};
+enum_list = @+:enumeration_literal { ',' @+:enumeration_literal};
 
 enumeration_literal = name:IDENT comment:comment;
 
@@ -83,7 +83,7 @@ external_function_call =
     @+:IDENT '(' [@+:expression_list] ')' ;
 
 element_list =
-    { @+:element  ';' } ;
+    { @+:element ~ ';' } ;
 
 element =
     import_clause |
@@ -145,15 +145,15 @@ declaration =
 
 modification =
     (class_modification:class_modification
-        [ op:'='  expression:expression ])
-    | op:'='  expression:expression
-    | op:':='  expression:expression;
+        [ op:'=' ~ expression:expression ])
+    | op:'=' ~ expression:expression
+    | op:':=' ~ expression:expression;
 
 class_modification =
-    '('  [@:argument_list] ')';
+    '(' ~ [@:argument_list] ')';
 
 argument_list =
-    @:argument { ',' @:argument } ;
+    @+:argument { ',' @+:argument } ;
 
 argument =
     @:element_modification_or_replaceable
@@ -198,13 +198,13 @@ short_class_definition =
 (* B.2.6 Equations *)
 
 equation_section =
-    initial:['initial'] 'equation'  { equation:equation  ';' };
+    initial:['initial'] 'equation' ~ { equation:equation ~ ';' };
 
 algorithm_section =
-    initial:['initial'] 'algorithm'  { statement:statement  ';' };
+    initial:['initial'] 'algorithm' ~ { statement:statement ~ ';' };
 
 equation =
-    ( lhs:simple_expression '='  rhs:expression
+    ( lhs:simple_expression '=' ~ rhs:expression
     | @:if_equation
     | @:for_equation
     | @:connect_clause
@@ -213,8 +213,8 @@ equation =
     comment ;
 
 statement =
-    def:( component:component_reference  ( ':='  expression:expression | call_args:function_call_args )
-    | '('  lhs:output_expression_list ')' ':='  rhs_component:component_reference rhs_call_args:function_call_args
+    def:( component:component_reference  ( ':=' ~ expression:expression | call_args:function_call_args )
+    | '('  lhs:output_expression_list ')' ':=' ~ rhs_component:component_reference rhs_call_args:function_call_args
     | 'break'
     | 'return'
     | if_statement
