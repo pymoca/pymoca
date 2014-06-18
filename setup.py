@@ -140,7 +140,8 @@ def setup_package():
         license='GPLv3+',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
-        install_requires=['parsimonious', 'ply', 'grako', 'extras', 'enum34'],
+        install_requires=['parsimonious', 'ply',
+                          'grako >= 3.0', 'extras', 'enum34'],
         tests_require=['nose'],
         test_suite='nose.collector',
         packages=find_packages(
