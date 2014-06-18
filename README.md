@@ -105,5 +105,9 @@ The inverse dynamics should be able to be simulated with numpy and printed with 
     while sim.successfull
         sim.integrate(sim.t + dt)
 
+### Model Checking
+
+It would be very interesting to automate the process of abstracting a Modelica model into a finite state machine that can be checked using the NuSMV or other model checking language.
+
 <!--- vim:ts=4:sw=4:expandtab:
 !-->
