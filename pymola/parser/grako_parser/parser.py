@@ -13,22 +13,24 @@
 
 from __future__ import print_function, division, absolute_import, unicode_literals
 from grako.parsing import graken, Parser
-from grako.exceptions import *  # noqa
 
 
-__version__ = '2014.06.18.09.21.05.02'
+__version__ = (2015, 1, 4, 1, 59, 41, 6)
 
 __all__ = [
     'ModelicaParser',
-    'ModelicaSemanticParser',
     'ModelicaSemantics',
     'main'
 ]
 
 
 class ModelicaParser(Parser):
-    def __init__(self, whitespace=None, **kwargs):
-        super(ModelicaParser, self).__init__(whitespace=whitespace, **kwargs)
+    def __init__(self, whitespace=None, nameguard=True, **kwargs):
+        super(ModelicaParser, self).__init__(
+            whitespace=whitespace,
+            nameguard=nameguard,
+            **kwargs
+        )
 
     @graken()
     def _stored_definition_(self):
@@ -255,12 +257,12 @@ class ModelicaParser(Parser):
     @graken()
     def _enum_list_(self):
         self._enumeration_literal_()
-        self.ast._append('@', self.last_node)
+        self.ast.setlist('@', self.last_node)
 
         def block1():
             self._token(',')
             self._enumeration_literal_()
-            self.ast._append('@', self.last_node)
+            self.ast.setlist('@', self.last_node)
         self._closure(block1)
 
     @graken()
@@ -331,14 +333,14 @@ class ModelicaParser(Parser):
     def _external_function_call_(self):
         with self._optional():
             self._component_reference_()
-            self.ast._append('@', self.last_node)
+            self.ast.setlist('@', self.last_node)
             self._token('=')
         self._IDENT_()
-        self.ast._append('@', self.last_node)
+        self.ast.setlist('@', self.last_node)
         self._token('(')
         with self._optional():
             self._expression_list_()
-            self.ast._append('@', self.last_node)
+            self.ast.setlist('@', self.last_node)
         self._token(')')
 
     @graken()
@@ -346,7 +348,7 @@ class ModelicaParser(Parser):
 
         def block0():
             self._element_()
-            self.ast._append('@', self.last_node)
+            self.ast.setlist('@', self.last_node)
             self._cut()
             self._token(';')
         self._closure(block0)
@@ -634,12 +636,12 @@ class ModelicaParser(Parser):
     @graken()
     def _argument_list_(self):
         self._argument_()
-        self.ast._append('@', self.last_node)
+        self.ast.setlist('@', self.last_node)
 
         def block1():
             self._token(',')
             self._argument_()
-            self.ast._append('@', self.last_node)
+            self.ast.setlist('@', self.last_node)
         self._closure(block1)
 
     @graken()
@@ -1944,7 +1946,7 @@ class ModelicaSemantics(object):
         return ast
 
 
-def main(filename, startrule, trace=False, whitespace=None):
+def main(filename, startrule, trace=False, whitespace=None, nameguard=None):
     import json
     with open(filename) as f:
         text = f.read()
@@ -1954,7 +1956,8 @@ def main(filename, startrule, trace=False, whitespace=None):
         startrule,
         filename=filename,
         trace=trace,
-        whitespace=whitespace)
+        whitespace=whitespace,
+        nameguard=nameguard)
     print('AST:')
     print(ast)
     print()
@@ -1978,6 +1981,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Simple parser for Modelica.")
     parser.add_argument('-l', '--list', action=ListRules, nargs=0,
                         help="list all rules and exit")
+    parser.add_argument('-n', '--no-nameguard', action='store_true',
+                        dest='no_nameguard',
+                        help="disable the 'nameguard' feature")
     parser.add_argument('-t', '--trace', action='store_true',
                         help="output trace information")
     parser.add_argument('-w', '--whitespace', type=str, default=string.whitespace,
@@ -1987,5 +1993,11 @@ if __name__ == '__main__':
                         help="the start rule for parsing")
     args = parser.parse_args()
 
-    main(args.file, args.startrule, trace=args.trace, whitespace=args.whitespace)
+    main(
+        args.file,
+        args.startrule,
+        trace=args.trace,
+        whitespace=args.whitespace,
+        nameguard=not args.no_nameguard
+    )
 
