@@ -335,12 +335,13 @@ IDENT : NONDIGIT ( DIGIT | NONDIGIT )* | Q_IDENT;
 fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+;
 fragment NONDIGIT : [_a-zA-Z];
 
-STRING : '"' {S_CHAR|S_ESCAPE} '"';
-fragment S_CHAR : [A-Z]; // TODO, any member of unicode
+STRING : '\"' (S_CHAR|S_ESCAPE)* '\"';
+fragment S_CHAR : [A-Za-z\u0000-\u00FF];
 fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}|! ];
 fragment S_ESCAPE : [\'\"\?\\\a\b\f\n\r\t\v];
 fragment DIGIT :  [0-9];
 fragment UNSIGNED_INTEGER : DIGIT+;
-UNSIGNED_NUMBER : UNSIGNED_INTEGER  [ '.' UNSIGNED_NUMBER? ] [ [eE] [+-]? UNSIGNED_INTEGER;
+UNSIGNED_NUMBER : UNSIGNED_INTEGER  ( '.' UNSIGNED_NUMBER? )* ( [eE] [+-]? UNSIGNED_INTEGER)?;
+WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
 
 // vi:ts=4:sw=4:expandtab:
