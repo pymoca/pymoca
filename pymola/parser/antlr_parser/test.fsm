@@ -1,0 +1,14 @@
+STATE manual {
+	TRANSITION auto {
+		GUARD armed
+	}
+}
+
+STATE auto {
+	TRANSITION manual {
+		GUARD armed
+	}
+	TRANSITION manual {
+		GUARD armed
+	}	
+}
