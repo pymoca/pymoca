@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 """
-FSM compiler.
+DOT compiler.
 """
 from __future__ import print_function
 import sys
 import antlr4
-from generated.FSMLexer import FSMLexer
-from generated.FSMParser import FSMParser
-from generated.FSMListener import FSMListener
+from generated.DOTLexer import DOTLexer
+from generated.DOTParser import DOTParser
+from generated.DOTListener import DOTListener
 import argparse
 
-class KeyPrinter(FSMListener):
+class KeyPrinter(DOTListener):
     "Simple example"
     def exitFsm_state(self, ctx):
         "print msg when leaving state"
@@ -22,10 +22,10 @@ def main(argv):
     parser.add_argument('filename')
     args = parser.parse_args()
     text = antlr4.FileStream(args.filename)
-    lexer = FSMLexer(text)
+    lexer = DOTLexer(text)
     stream = antlr4.CommonTokenStream(lexer)
-    parser = FSMParser(stream)
-    tree = parser.fsm_main()
+    parser = DOTParser(stream)
+    tree = parser.graph()
     print(tree.toStringTree(recog=parser))
     printer = KeyPrinter()
     walker = antlr4.ParseTreeWalker()

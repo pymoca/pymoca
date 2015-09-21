@@ -11,16 +11,18 @@ class_definition :
     class_specifier;
 
 class_prefixes : 
-    'partial'? (
-        'class'
-        | 'model'
-        | 'operator'? 'record'
-        | 'block'
-        | 'expandable'? 'connector'
-        | 'type'
-        | 'package'
-        | ('pure' | 'impure')? 'operator'? 'function'
-        | 'operator');
+    partial='partial'?
+    (class_type='class'
+    | class_type='model'
+    | operator_class='operator'? class_type='record'
+    | class_type='block'
+    | expandable='expandable'? class_type='connector'
+    | class_type='type'
+    | class_type='package'
+    | purity=('pure' | 'impure')? operator_class='operator'?
+        class_type='function'
+    | class_type='operator')
+    ;
 
 class_specifier :
     IDENT string_comment composition 'end' IDENT

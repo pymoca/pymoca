@@ -1,0 +1,5 @@
+#!/bin/bash
+MY_PATH="`dirname \"$0\"`"              # relative
+MY_PATH="`( cd \"$MY_PATH\" && pwd )`"  # absolutized and normalized
+export CLASSPATH=".:${MY_PATH}/antlr-4.5.1-complete.jar:$CLASSPATH"
+java -Xmx500M -cp "${MY_PATH}/antlr-4.5.1-complete.jar:$CLASSPATH" org.antlr.v4.Tool $@

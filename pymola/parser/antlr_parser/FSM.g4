@@ -1,4 +1,4 @@
-grammar Fsm;
+grammar FSM;
 
 fsm_main: fsm_state+;
 
