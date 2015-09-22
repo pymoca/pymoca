@@ -2,26 +2,29 @@ grammar Modelica;
 
 //  B.2.1 Stored Definition - Within
 stored_definition :
-    ('within' name ';')?
-    ('final'? class_definition ';')*;
+    ('within' name? ';')?
+    ('final'? class_definition ';')*
+    ;
 
 //  B.2.2 Class Definition
 class_definition :
     'encapsulated'? class_prefixes
-    class_specifier;
+    class_specifier
+    ;
 
 class_prefixes : 
-    partial='partial'?
-    (class_type='class'
-    | class_type='model'
-    | operator_class='operator'? class_type='record'
-    | class_type='block'
-    | expandable='expandable'? class_type='connector'
-    | class_type='type'
-    | class_type='package'
-    | purity=('pure' | 'impure')? operator_class='operator'?
-        class_type='function'
-    | class_type='operator')
+    'partial'?
+    (
+        'class'
+        | 'model'
+        | 'operator'? 'record'
+        | 'block'
+        | 'expandable'? 'connector'
+        | 'type'
+        | 'package'
+        | ('pure' | 'impure')? 'operator'? 'function'
+        | 'operator'
+    )
     ;
 
 class_specifier :
@@ -31,149 +34,201 @@ class_specifier :
     | IDENT '=' 'enumeration' '(' (enum_list? | ':') ')' comment
     | IDENT '=' 'der' '(' name ',' IDENT (',' IDENT )* ')' comment
     | 'extends' IDENT class_modification? string_comment
-        composition 'end' IDENT;
+        composition 'end' IDENT
+    ;
 
 base_prefix :
-    type_prefix;
+    type_prefix
+    ;
 
 enum_list :
-    enumeration_literal (',' enumeration_literal)*;
+    enumeration_literal (',' enumeration_literal)*
+    ;
  
-enumeration_literal : IDENT comment;
+enumeration_literal :
+    IDENT comment
+    ;
 
 composition :
-    element_list (
+    element_list
+    (
         'public' element_list
         | 'protected' element_list
         | equation_section
-        | algorithm_section)*;
+        | algorithm_section
+    )*
+    ( 'external' language_specification?
+        external_function_call?
+        annotation? ':')?
+    (annotation ';')?
+    ;
 
 language_specification :
-    STRING;
+    STRING
+    ;
 
 external_function_call :
     (component_reference '=')?
-    IDENT '(' expression_list? ')';
+    IDENT '(' expression_list? ')'
+    ;
 
 element_list : 
-    (element ';')*;
+    (element ';')*
+    ;
 
 element :
     import_clause
     | extends_clause
     | 'redeclare'? 'final'? 'inner'? 'outer'?
         ((class_definition | component_clause)
-        | 'replaceable' (class_definition | component_clause)
+         | 'replaceable' (class_definition | component_clause)
+            (constraining_clause comment)?
         );
 
 import_clause :
     'import' ( IDENT '=' name
-        | name ('.' ( '*' | '{' import_list '}' ) )? ) comment;
+        | name ('.' ( '*' | '{' import_list '}' ) )? ) comment
+    ;
 
 import_list : 
-    IDENT (',' import_list);
+    IDENT (',' import_list)*
+    ;
 
 // B.2.3 Extends
 extends_clause :
-    'extends' name class_modification? annotation?;
+    'extends' name class_modification? annotation?
+    ;
 
 constraining_clause:
-    'constrainedby' name class_modification?;
+    'constrainedby' name class_modification?
+    ;
 
 // B.2.4 Component Clause
 component_clause :
-    type_prefix type_specifier array_subscripts? component_list;
+    type_prefix type_specifier array_subscripts? component_list
+    ;
 
 type_prefix :
     ('flow' | 'stream')?
     ('discrete' | 'parameter' | 'constant')?
-    ('input' | 'output')?;
+    ('input' | 'output')?
+    ;
 
 type_specifier:
-    name;
+    name
+    ;
 
 component_list:
-    component_declaration ( ',' component_declaration)*;
+    component_declaration ( ',' component_declaration)*
+    ;
 
 component_declaration :
-    declaration condition_attribute? comment;
+    declaration condition_attribute? comment
+    ;
 
 condition_attribute :
-    'if' expression;
+    'if' expression
+    ;
 
 declaration :
-    IDENT array_subscripts? modification?;
+    IDENT array_subscripts? modification?
+    ;
 
 // B.2.5 Modification
 modification :
     class_modification ('=' expression)?
     | '=' expression
-    | ':=' expression;
+    | ':=' expression
+    ;
 
 class_modification :
-    '(' argument_list? ')';
+    '(' argument_list? ')'
+    ;
 
 argument_list :
-    argument (',' argument);
+    argument (',' argument)*
+    ;
 
 argument :
     element_modification_or_replaceable
-    | element_redeclaration;
+    | element_redeclaration
+    ;
 
 element_modification_or_replaceable:
-    'each'? 'final'? (element_modification | element_replaceable);
+    'each'?
+    'final'?
+    (element_modification | element_replaceable)
+    ;
 
 element_modification :
-    name modification? string_comment;
+    name modification? string_comment
+    ;
 
 element_redeclaration :
-    'redeclare' 'each'? 'final'?
+    'redeclare'
+    'each'?
+    'final'?
     ( (short_class_definition | component_clause1)
-        | element_replaceable);
+      | element_replaceable)
+    ;
 
 element_replaceable:
-    'replaceable' (short_class_definition | component_clause1)
-    constraining_clause?;
+    'replaceable'
+    (short_class_definition | component_clause1)
+    constraining_clause?
+    ;
 
 component_clause1 :
-    type_prefix type_specifier component_declaration1;
+    type_prefix type_specifier component_declaration1
+    ;
 
 component_declaration1 :
-    declaration comment;
+    declaration comment
+    ;
 
 short_class_definition :
     class_prefixes IDENT '='
     ( base_prefix name array_subscripts?
         class_modification? comment
-        | 'enumeration' '(' (enum_list? | ':') ')' comment);
+        | 'enumeration' '(' (enum_list? | ':') ')' comment)
+    ;
 
 // B.2.6 Equations
 
 equation_section :
-    'initial'? 'equation' (equation ';')*;
+    'initial'? 'equation' (equation ';')*
+    ;
 
 algorithm_section :
-    'initial'? 'algorithm' (statement ';')*;
+    'initial'? 'algorithm' (statement ';')*
+    ;
 
 equation :
-    (simple_expression '=' expression
-    | if_equation
-    | for_equation
-    | connect_clause
-    | when_equation
-    | name function_call_args)
-    comment;
+    (
+        simple_expression '=' expression
+        | if_equation
+        | for_equation
+        | connect_clause
+        | when_equation
+        | name function_call_args
+    )
+    comment
+    ;
 
 statement :
-    ( component_reference (':=' expression | function_call_args)
-    | '(' output_expression_list ')' ':='
-        component_reference function_call_args
-    | 'break'
-    | 'return'
-    | if_statement
-    | for_statement
-    | while_statement
-    | when_statement );
+    (
+        component_reference (':=' expression | function_call_args)
+        | '(' output_expression_list ')' ':='
+            component_reference function_call_args
+        | 'break'
+        | 'return'
+        | if_statement
+        | for_statement
+        | while_statement
+        | when_statement 
+    )
+    comment
+    ;
 
 if_equation :
     'if' expression 'then'
@@ -183,8 +238,9 @@ if_equation :
     )*
     ('else'
         (equation ';')*
-    )
-    'end' 'if';
+    )?
+    'end' 'if'
+    ;
 
 if_statement :
     'if' expression 'then'
@@ -194,29 +250,35 @@ if_statement :
     )*
     ('else'
         (statement ';')*
-    )
-    'end' 'if';
+    )?
+    'end' 'if'
+    ;
 
 for_equation :
     'for' for_indices 'loop'
         (equation ';')*
-    'end' 'for';
+    'end' 'for'
+    ;
 
 for_statement :
     'for' for_indices 'loop'
         (statement ';')*
-    'end' 'for';
+    'end' 'for'
+    ;
 
 for_indices :
-    for_index (',' for_index)*;
+    for_index (',' for_index)*
+    ;
 
 for_index :
-    IDENT ('in' expression)?;
+    IDENT ('in' expression)?
+    ;
 
 while_statement:
     'while' expression 'loop'
         (statement ';')*
-    'end' 'while';
+    'end' 'while'
+    ;
 
 when_equation:
     'when' expression 'then'
@@ -224,7 +286,8 @@ when_equation:
     ('elsewhen' expression 'then'
         (equation ';')*
     )*
-    'end' 'when';
+    'end' 'when'
+    ;
 
 when_statement:
     'when' expression 'then'
@@ -232,10 +295,12 @@ when_statement:
     ('elsewhen' expression 'then'
         (statement ';')*
     )*
-    'end' 'when';
+    'end' 'when'
+    ;
 
 connect_clause :
-    'connect' '(' component_reference ',' component_reference ')';
+    'connect' '(' component_reference ',' component_reference ')'
+    ;
 
 // B.2.7 Expressions
 
@@ -243,41 +308,55 @@ expression :
     simple_expression
     | 'if' expression 'then' expression
     ( 'elseif' expression 'then' expression)*
-    'else' expression;
+    'else' expression
+    ;
 
 simple_expression :
     logical_expression (':' logical_expression
-        (':' logical_expression)?)?;
+        (':' logical_expression)?)?
+    ;
 
 logical_expression :
-    logical_term ('or' logical_term);
+    logical_term ('or' logical_term)*
+    ;
 
 logical_term :
-    logical_factor ('and' logical_factor);
+    logical_factor ('and' logical_factor)*
+    ;
 
 logical_factor :
-    'not'? relation;
+    'not'? relation
+    ;
 
 relation :
-    arithmetic_expression (rel_op arithmetic_expression)?;
+    arithmetic_expression (rel_op arithmetic_expression)?
+    ;
 
 rel_op :
-    '<' | '<=' | '>' | '>=' | '==' | '<>';
+    ('<' | '<=' | '>' | '>=' | '==' | '<>')
+    ;
 
 arithmetic_expression :
-    add_op? term (add_op term)*;
+    ops+=add_op?
+    terms+=term
+    (ops+=add_op terms+=term)*
+    ;
 
 add_op :
-    '+' | '-' | '.+' | '.-';
+    ('+' | '-' | '.+' | '.-')
+    ;
 
 term :
-    factor (mul_op factor)*;
+    factors+=factor
+    (ops+=mul_op factors+=factor)*;
 
 mul_op :
-    '*' | '/' | '.*' | './';
+    ('*' | '/' | '.*' | './')
+    ;
 
 factor :
-    primary (('^' | '.^') primary)?;
+    base=primary (op=('^' | '.^') exp=primary)?
+    ;
 
 primary :
     UNSIGNED_NUMBER
@@ -289,49 +368,64 @@ primary :
     | '(' output_expression_list ')'
     | '[' expression_list (';' expression_list)* ']'
     | '{' function_arguments '}'    
-    | 'end';
+    | 'end'
+    ;
 
 name :
-    '.'? IDENT ('.' IDENT)*;
+    '.'? IDENT ('.' IDENT)*
+    ;
 
 component_reference :
-    '.' ? IDENT array_subscripts? ('.' IDENT array_subscripts?)*;
+    '.'? IDENT array_subscripts? ('.' IDENT array_subscripts?)*
+    ;
 
 function_call_args :
-    '(' function_arguments? ')';
+    '(' function_arguments? ')'
+    ;
 
 function_arguments :
     function_argument (',' function_arguments | 'for' for_indices)?
-    | named_arguments;
+    | named_arguments
+    ;
 
-named_arguments : named_argument (',' named_arguments)?;
+named_arguments : named_argument (',' named_arguments)?
+    ;
 
-named_argument : IDENT '=' function_argument;
+named_argument : IDENT '=' function_argument
+    ;
 
 function_argument :
     'function' name '(' named_arguments? ')'
-    | expression;
+    | expression
+    ;
 
 output_expression_list :
-    expression? (',' expression)*;
+    expression? (',' expression)*
+    ;
 
 expression_list :
-    expression (',' expression)*;
+    expression (',' expression)*
+    ;
 
 array_subscripts :
-    '[' subscript (',' subscript) ']';
+    '[' subscript (',' subscript)* ']'
+    ;
 
 subscript :
-    ':' | expression;
+    ':' | expression
+    ;
 
 comment :
-    string_comment annotation?;
+    string_comment annotation?
+    ;
 
 string_comment :
-    (STRING ('+' STRING)*)?;
+    (STRING ('+' STRING)*)?
+    ;
 
 annotation :
-    'annotation' class_modification;
+    'annotation' class_modification
+    ;
 
 IDENT : NONDIGIT ( DIGIT | NONDIGIT )* | Q_IDENT;
 fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+;
@@ -344,6 +438,11 @@ fragment S_ESCAPE : [\'\"\?\\\a\b\f\n\r\t\v];
 fragment DIGIT :  [0-9];
 fragment UNSIGNED_INTEGER : DIGIT+;
 UNSIGNED_NUMBER : UNSIGNED_INTEGER  ( '.' UNSIGNED_NUMBER? )* ( [eE] [+-]? UNSIGNED_INTEGER)?;
+
+COMMENT :
+    ('/' '/' .*? '\n' | '/*' .*? '*/') -> channel(HIDDEN)
+    ;
+
 WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
 
 // vi:ts=4:sw=4:expandtab:
