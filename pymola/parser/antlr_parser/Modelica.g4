@@ -203,30 +203,34 @@ algorithm_section :
     'initial'? 'algorithm' (statement ';')*
     ;
 
+equation_options :
+    simple_expression '=' expression    # equation_simple
+    | if_equation                       # equation_if
+    | for_equation                      # equation_for
+    | connect_clause                    # equation_connect_clause
+    | when_equation                     # equation_when_clause
+    | name function_call_args           # equation_function
+    ;
+
 equation :
-    (
-        simple_expression '=' expression
-        | if_equation
-        | for_equation
-        | connect_clause
-        | when_equation
-        | name function_call_args
-    )
+    equation_options
     comment
     ;
 
+statement_options :
+    component_reference (':=' expression | function_call_args)  # statement_component_reference
+    | '(' output_expression_list ')' ':=' 
+        component_reference function_call_args                  # statement_component_function
+    | 'break'           # statement_break
+    | 'return'          # statement_return
+    | if_statement      # statement_if
+    | for_statement     # statement_for
+    | while_statement   # statement_while
+    | when_statement    # statement_when
+    ;
+
 statement :
-    (
-        component_reference (':=' expression | function_call_args)
-        | '(' output_expression_list ')' ':='
-            component_reference function_call_args
-        | 'break'
-        | 'return'
-        | if_statement
-        | for_statement
-        | while_statement
-        | when_statement 
-    )
+    statement_options
     comment
     ;
 
@@ -305,70 +309,42 @@ connect_clause :
 // B.2.7 Expressions
 
 expression :
-    simple_expression
-    | 'if' expression 'then' expression
+    simple_expression                           # expression_simple
+    | 'if' expression 'then' expression         
     ( 'elseif' expression 'then' expression)*
-    'else' expression
+    'else' expression                           # expression_if
     ;
 
 simple_expression :
-    logical_expression (':' logical_expression
-        (':' logical_expression)?)?
+    expr (':' expr
+        (':' expr)?)?
     ;
 
-logical_expression :
-    logical_term ('or' logical_term)*
-    ;
-
-logical_term :
-    logical_factor ('and' logical_factor)*
-    ;
-
-logical_factor :
-    'not'? relation
-    ;
-
-relation :
-    arithmetic_expression (rel_op arithmetic_expression)?
-    ;
-
-rel_op :
-    ('<' | '<=' | '>' | '>=' | '==' | '<>')
-    ;
-
-arithmetic_expression :
-    ops+=add_op?
-    terms+=term
-    (ops+=add_op terms+=term)*
-    ;
-
-add_op :
-    ('+' | '-' | '.+' | '.-')
-    ;
-
-term :
-    factors+=factor
-    (ops+=mul_op factors+=factor)*;
-
-mul_op :
-    ('*' | '/' | '.*' | './')
-    ;
-
-factor :
-    base=primary (op=('^' | '.^') exp=primary)?
+expr :
+    '-' expr                                                # expr_neg
+    | primary op=('^' | '.^') primary                       # expr_exp 
+    | expr op=('*' | '/' | '.*' | './') expr                # expr_mul
+    | expr  op=('+' | '-' | '.+' | '.-') expr               # expr_add
+    | expr  op=('<' | '<=' | '>' | '>=' | '==' | '<>') expr # expr_rel
+    | 'not' expr                                            # expr_not    
+    | expr  'and' expr                                      # expr_and
+    | expr  'or' expr                                       # expr_or
+    | primary                                               # expr_primary
     ;
 
 primary :
-    UNSIGNED_NUMBER
-    | STRING
-    | 'false'
-    | 'true'
-    | (name | 'der' | 'initial') function_call_args
-    | component_reference
-    | '(' output_expression_list ')'
-    | '[' expression_list (';' expression_list)* ']'
-    | '{' function_arguments '}'    
-    | 'end'
+    UNSIGNED_NUMBER                                     # primary_unsigned_number
+    | STRING                                            # primary_string
+    | 'false'                                           # primary_false
+    | 'true'                                            # primary_true
+    | name function_call_args                           # primary_function
+    | 'der' function_call_args                          # primary_derivative
+    | 'initial' function_call_args                      # primary_initial
+    | component_reference                               # primary_component_reference
+    | '(' output_expression_list ')'                    # primary_output_expression_list
+    | '[' expression_list (';' expression_list)* ']'    # primary_expression_list
+    | '{' function_arguments '}'                        # primary_function_arguments
+    | 'end'                                             # primary_end
     ;
 
 name :
