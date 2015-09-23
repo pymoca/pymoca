@@ -41,6 +41,8 @@ $(modelica_files): Modelica.g4
 build_modelica: $(modelica_files) generated/__init__.py
 test_modelica: build_modelica
 	python modelica.py ./test/BouncingBall.mo
+	cat ./test/BouncingBall.mo.py
+	python ./test/BouncingBall.mo.py
 
 # Generic
 test: test_dot test_fsm test_smc
