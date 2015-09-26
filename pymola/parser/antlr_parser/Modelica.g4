@@ -136,9 +136,9 @@ declaration :
 
 // B.2.5 Modification
 modification :
-    class_modification ('=' expression)?
-    | '=' expression
-    | ':=' expression
+    class_modification ('=' expression)?    # modification_class
+    | '=' expression                        # modification_assignment
+    | ':=' expression                       # modification_assignment2
     ;
 
 class_modification :
@@ -208,7 +208,7 @@ equation_options :
     | if_equation                       # equation_if
     | for_equation                      # equation_for
     | connect_clause                    # equation_connect_clause
-    | when_equation                     # equation_when_clause
+    | when_equation                     # equation_when
     | name function_call_args           # equation_function
     ;
 
@@ -360,19 +360,19 @@ function_call_args :
     ;
 
 function_arguments :
-    function_argument (',' function_arguments | 'for' for_indices)?
+    function_argument (',' function_argument | 'for' for_indices)*
     | named_arguments
     ;
 
-named_arguments : named_argument (',' named_arguments)?
+named_arguments : named_argument (',' named_argument)*
     ;
 
 named_argument : IDENT '=' function_argument
     ;
 
 function_argument :
-    'function' name '(' named_arguments? ')'
-    | expression
+    'function' name '(' named_arguments? ')'    # argument_function
+    | expression                                # argument_expression
     ;
 
 output_expression_list :

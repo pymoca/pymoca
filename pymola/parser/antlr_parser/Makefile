@@ -40,8 +40,8 @@ $(modelica_files): Modelica.g4
 	./antlr4 -o generated -Dlanguage=Python2 $<
 build_modelica: $(modelica_files) generated/__init__.py
 test_modelica: build_modelica
-	python modelica.py ./test/BouncingBall.mo
-	cat ./test/BouncingBall.mo.py
+	python modelica.py ./test/BouncingBall.mo -t
+#	cat ./test/BouncingBall.mo.py
 	python ./test/BouncingBall.mo.py
 
 # Generic

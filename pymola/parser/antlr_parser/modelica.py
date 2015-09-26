@@ -10,33 +10,10 @@ from generated.ModelicaLexer import ModelicaLexer
 from generated.ModelicaParser import ModelicaParser
 from generated.ModelicaListener import ModelicaListener
 import argparse
+import jinja2
 
 #pylint: disable=invalid-name, no-self-use, missing-docstring, unused-variable, protected-access
 #pylint: disable=too-many-public-methods
-
-class TraceListener(ModelicaListener):
-
-    def __init__(self, parser):
-        self._parser = parser
-        self._ctx = None
-
-    def enterEveryRule(self, ctx):
-        self._ctx = ctx
-        print(" "*ctx.depth(), "enter   " +
-              self._parser.ruleNames[ctx.getRuleIndex()] + ", LT(1)=" +
-              self._parser._input.LT(1).text)
-
-    def visitTerminal(self, node):
-        print(" "*self._ctx.depth() + "consume " + str(node.symbol) +
-              " rule " + self._parser.ruleNames[self._ctx.getRuleIndex()])
-
-    def visitErrorNode(self, node):
-        pass
-
-    def exitEveryRule(self, ctx):
-        print(" "*ctx.depth(), "exit    " + self._parser.ruleNames[ctx.getRuleIndex()] +
-              ", LT(1)=" + self._parser._input.LT(1).text)
-
 
 class SympyPrinter(ModelicaListener):
 
@@ -44,7 +21,7 @@ class SympyPrinter(ModelicaListener):
     # Setup
     #-------------------------------------------------------------------------
 
-    def __init__(self, parser):
+    def __init__(self, parser, trace):
         """
         Constructor
         """
@@ -57,19 +34,75 @@ class SympyPrinter(ModelicaListener):
             'init': {},
         }
         self._parser = parser
+        self._trace = trace
+        self.indent = "    "
+
+    @staticmethod
+    def print_indented(ldr, s):
+        if s is not None:
+            for line in s.split('\n'):
+                print(ldr, line)
 
     def setValue(self, ctx, val):
         """
         Sets tree values.
         """
-
-        self._val_dict[ctx] = val
+        if ctx.depth() == 1:
+            self.result = val
+        else:
+            self._val_dict[ctx] = val
 
     def getValue(self, ctx):
         """
         Gets tree values.
         """
-        return self._val_dict[ctx]
+        assert ctx is not None
+        if ctx.depth() == 1:
+            return self.result
+        else:
+            try:
+                return self._val_dict[ctx]
+            except KeyError:
+                return None
+
+    def enterEveryRule(self, ctx):
+        if self._trace:
+            ldr = " "*(ctx.depth()-1)
+            rule = self._parser.ruleNames[ctx.getRuleIndex()]
+
+            print(ldr, rule + "{")
+            in_str = ctx.getText()
+            if in_str > 0:
+                print(ldr, "==============================")
+                print(ldr, "INPUT\n")
+                self.print_indented(ldr, ctx.getText())
+                print(ldr, "==============================\n")
+
+    def visitTerminal(self, node):
+        pass
+
+    def visitErrorNode(self, node):
+        pass
+
+    def exitEveryRule(self, ctx):
+        rule = self._parser.ruleNames[ctx.getRuleIndex()]
+        if self._trace:
+            ldr = " "*ctx.depth()
+            lines = None
+            try:
+                lines = self.getValue(ctx)
+            except KeyError as e:
+                pass
+
+            if lines is not None:
+                print(ldr, "==============================")
+                print(ldr, "OUTPUT\n")
+                self.print_indented(ldr, lines)
+                print(ldr, "==============================\n")
+
+            print(ldr + '} //' + rule + '\n')
+        if self.getValue(ctx) is None:
+            raise RuntimeError("no value set for {:s}:\ninput:\n{:s}".format(rule, ctx.getText()))
 
     #-------------------------------------------------------------------------
     # Top Level
@@ -141,7 +174,6 @@ pl.show()
 # declaration
 {declaration:s}
 
-# equations
 {equations:s}
 """.format(**locals()))
 
@@ -155,13 +187,29 @@ pl.show()
         self.setValue(ctx, self.getValue(ctx.component_clause()))
 
     def exitEquation_section(self, ctx):
-        val = "eqs=["
+        str_eq = "eqs=["
+        str_when = ""
         for eq in ctx.equation():
             data = self.getValue(eq)
-            if data is not None:
-                val += "\n\t{:s},".format(data)
-        val += "\n\t]\n"
-        self.setValue(ctx, val)
+            if len(data) <= 0:
+                continue
+            print("eq type:", type(eq.equation_options()))
+            if isinstance(eq.equation_options(), ModelicaParser.Equation_simpleContext):
+                str_eq += "\n{self.indent:s}{data:s},".format(**locals())
+                print("SIMPLE")
+            elif isinstance(eq.equation_options(), ModelicaParser.Equation_whenContext):
+                str_when += "\n{self.indent:s}{data:s}".format(**locals())
+            else:
+                raise IOError('equation type not supported yet')
+        str_eq += "\n{self.indent:s}]\n".format(**locals())
+        str_when += ""
+        self.setValue(ctx, """
+# equations
+{str_eq:s}
+
+# when equations
+{str_when:s}
+""".format(**locals()))
 
     def exitComponent_clause(self, ctx):
         s = ""
@@ -186,6 +234,123 @@ pl.show()
                 # s += "{:s} = {:s}\n".format(name, val)
         self.setValue(ctx, s)
 
+    def exitClass_prefixes(self, ctx):
+        # don't care about prefixes for now
+        self.setValue(ctx, '')
+
+    def exitName(self, ctx):
+        self.setValue(ctx, ctx.getText())
+
+    def exitType_specifier(self, ctx):
+        self.setValue(ctx, self.getValue(ctx.name()))
+
+    def exitModification_class(self, ctx):
+        mod = self.getValue(ctx.class_modification())
+        if ctx.expression() is not None:
+            expr = self.getValue(ctx.expression())
+            self.setValue(ctx, "{:s} = {:s}".format(mod, expr))
+        else:
+            self.setValue(ctx, "{:s}".format(mod))
+
+    def exitModification_assignment(self, ctx):
+        expr = self.getValue(ctx.expression())
+        self.setValue(ctx, "= {:s}".format(expr))
+
+    def exitModification_assignment2(self, ctx):
+        # TODO how to handle := operator?, is it just assignment
+        expr = self.getValue(ctx.expression())
+        self.setValue(ctx, "= {:s}".format(expr))
+
+    def exitDeclaration(self, ctx):
+        # set above based on component type
+        self.setValue(ctx, "")
+
+    def exitComment(self, ctx):
+        self.setValue(ctx, "# {:s}".format(ctx.getText()))
+
+    def exitString_comment(self, ctx):
+        self.setValue(ctx, "# {:s}".format(ctx.getText()))
+
+    def exitComponent_declaration(self, ctx):
+        # set above based on component type
+        self.setValue(ctx, "")
+
+    def exitComponent_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitElement_modification(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitElement_modification_or_replaceable(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitType_prefix(self, ctx):
+        self.setValue(ctx, "")
+
+    def exitArgument(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitArgument_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitClass_modification(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitComponent_reference(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitFunction_arguments(self, ctx):
+        if ctx.function_argument() is not None:
+            s = ""
+            args = ctx.function_argument()
+            n = len(args)
+            for i in range(n):
+                s += "{:s}".format(self.getValue(args[i]))
+                if i < n-1:
+                    s += ", "
+            self.setValue(ctx, s)
+        elif ctx.named_arguments() is not None:
+            args = self.getValue(ctx.named_arguments())
+            self.setValue(ctx, args)
+
+    def exitArguement_function(self, ctx):
+        name = self.getValue(ctx.name())
+        if ctx.named_arguments() is not None:
+            named_arguments = self.getValue(ctx.named_arguements())
+        else:
+            named_arguments = ""
+        self.setValue(ctx, "{name:s}({named_arguments:s})")
+
+    def exitArgument_expression(self, ctx):
+        expr = self.getValue(ctx.expression())
+        self.setValue(ctx, expr)
+
+    def exitFunction_call_args(self, ctx):
+        args = ctx.function_arguments()
+        if  args is not None:
+            self.setValue(ctx, self.getValue(args))
+        else:
+            self.setValue(ctx, "")
+
+    def exitClass_specifier(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitClass_definition(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitClass_stored_definition(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
     #-------------------------------------------------------------------------
     # Equation
     #-------------------------------------------------------------------------
@@ -200,11 +365,41 @@ pl.show()
                 self.getValue(ctx.simple_expression()),
                 self.getValue(ctx.expression())))
 
-    def exitEquation_function(self, ctx):
-        self.setValue(ctx, None)
+    def exitEquation_if(self, ctx):
+        raise NotImplementedError("")
 
-    def exitEquation_when_clause(self, ctx):
-        self.setValue(ctx, None)
+    def exitEquation_for(self, ctx):
+        raise NotImplementedError("")
+
+    def exitEquation_connect_clause(self, ctx):
+        raise NotImplementedError("")
+
+    def exitEquation_function(self, ctx):
+        self.setValue(ctx, "{name:s}({args:})".format(**{
+            'name': self.getValue(ctx.name()),
+            'args': self.getValue(ctx.function_call_args())
+            }))
+
+    def exitWhen_equation(self, ctx):
+        exprs = ctx.expression()
+        eqns = ctx.equation()
+        t = jinja2.Template("""
+if {{ walker.getValue(exprs[0]) -}}:
+    {{ walker.getValue(eqns[0]) }}
+{% for i in range(1, exprs|length) %}
+elif {{ walker.getValue(exprs[i]) }}:
+    {{ walker.getValue(eqns[i]) }}
+{% endfor %}
+""")
+        # self.setValue(ctx, t.render({
+            # 'walker': self,
+            # 'exprs': exprs,
+            # 'eqns': eqns,
+            # }))
+        self.setValue(ctx, '')
+
+    def exitEquation_when(self, ctx):
+        self.setValue(ctx, self.getValue(ctx.when_equation()))
 
     #-------------------------------------------------------------------------
     # Expression
@@ -214,6 +409,7 @@ pl.show()
         self.setValue(ctx, self.getValue(ctx.simple_expression()))
 
     def exitSimple_expression(self, ctx):
+        # TODO, can have more than one expr
         self.setValue(ctx, self.getValue(ctx.expr()[0]))
 
     def exitExpr_primary(self, ctx):
@@ -224,11 +420,15 @@ pl.show()
 
     def exitExpr_rel(self, ctx):
         self.setValue(ctx, '({:s} {:s} {:s})'.format(
-            ctx.expr()[0], ctx.op, ctx.expr()[1]))
+            self.getValue(ctx.expr()[0]),
+            ctx.op.text,
+            self.getValue(ctx.expr()[1])))
 
     def exitExpr_mul(self, ctx):
         self.setValue(ctx, '({:s} {:s} {:s})'.format(
-            ctx.expr()[0], ctx.op, ctx.expr()[1]))
+            self.getValue(ctx.expr()[0]),
+            ctx.op.text,
+            self.getValue(ctx.expr()[1])))
 
     #-------------------------------------------------------------------------
     # Primary
@@ -241,7 +441,7 @@ pl.show()
         self.setValue(ctx, ctx.getText())
 
     def exitPrimary_derivative(self, ctx):
-        name = ctx.function_call_args().function_arguments().function_argument().getText()
+        name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
         self._data['variables'] += [name]
         self.setValue(ctx, '{:s}.diff(t)'.format(name))
 
@@ -256,6 +456,8 @@ def main(argv):
     "The main function"
     parser = argparse.ArgumentParser()
     parser.add_argument('filename')
+    parser.add_argument('-t', '--trace', action='store_true')
+    parser.set_defaults(trace=False)
     args = parser.parse_args()
     text = antlr4.FileStream(args.filename)
     lexer = ModelicaLexer(text)
@@ -263,7 +465,7 @@ def main(argv):
     parser = ModelicaParser(stream)
     tree = parser.stored_definition()
     # print(tree.toStringTree(recog=parser))
-    sympyPrinter = SympyPrinter(parser)
+    sympyPrinter = SympyPrinter(parser, args.trace)
     walker = antlr4.ParseTreeWalker()
     walker.walk(sympyPrinter, tree)
 
