@@ -11,7 +11,7 @@ python:
 # terminate, using q to keep build info to a
 # minumum for dependencies
 install:
-  - pip install -q coverage coveralls nose antlr4-python2-runtime
+  - pip install -q coverage coveralls nose antlr4-python2-runtime jinja2
 
 # command to run tests
 script: coverage run setup.py test
