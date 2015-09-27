@@ -1,8 +1,6 @@
 language: python
 python:
   - "2.7"
-  - "3.2"
-  - "3.3"
 # install required system libraries
 # before_install:
 #  - sudo apt-get update --fix-missing -qq
@@ -13,10 +11,7 @@ python:
 # terminate, using q to keep build info to a
 # minumum for dependencies
 install:
-  - while [[ 1 ]]; do echo "building deps"; sleep 300; done &
-  - msg_pid=$!
-  - pip install -q coverage coveralls nose control grako ply parsimonious
-  - kill $msg_pid
+  - pip install -q coverage coveralls nose antlr4-python2-runtime
 
 # command to run tests
 script: coverage run setup.py test
