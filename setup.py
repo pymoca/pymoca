@@ -13,6 +13,7 @@ import subprocess
 
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
+from setuptools.command.build_ext import build_ext
 
 MAJOR = 0
 MINOR = 0
@@ -48,12 +49,18 @@ Topic :: Software Development :: Embedded Systems
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class CustomBuildCommand(build_py):
-    """Customized setuptools build command - prints a friendly greeting."""
+    """Customized setuptools build command."""
     def run(self):
         "Run the build command"
-        print("Hello, developer, how are you? :)")
         call_antlr4('Modelica.g4')
         build_py.run(self)
+
+class CustomBuildExtCommand(build_ext):
+    """Customized setuptools build_ext command."""
+    def run(self):
+        "Run the build command"
+        call_antlr4('Modelica.g4')
+        build_ext.run(self)
 
 def call_antlr4(arg):
     "calls antlr4 on grammar file"
@@ -184,6 +191,7 @@ def setup_package():
         ),
         cmdclass={
             'build_py': CustomBuildCommand,
+            'build_ext': CustomBuildExtCommand,
         }
     )
 
