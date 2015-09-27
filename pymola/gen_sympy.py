@@ -162,7 +162,7 @@ while  sim.t < tf:
     data['t'] += [sim.t]
 
 pl.plot(data['t'], data['x'])
-pl.show()
+# pl.show()
 
 #############################################################################
 """.format(**locals())
