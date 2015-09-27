@@ -7,34 +7,6 @@ A python/modelica based simulation environment.
 
 ##Roadmap
 
-### Current Tasks
-
-* Parser Selection:
-
-    3 parsers were considered but grako was chosen as the final parser. See reasons given below.
-
-    1. ply  
-        * parser type: LALR
-        * good: fast, proven, lexer so it can parse tokens (avoid keywords as identifiers etc.)
-        * bad: BNF grammar (haved to translate EBNF standard), no 
-          attempt to separete grammar from AST handling code
-    1. grako
-        * parser type: PEG
-        * good: EBNF support, developer responsive
-        * bad: no lexer, but has semantic handling, grammar cluttered with AST storage rules
-    1. parsimonious
-        * parser type: PEG
-        * good: EBNF support
-        * bad: developer unresponsive, no lexer, doesn't integrate well with coverage testing, slight modificatin of EBNF when typing, no semantic handling
-
-    The evaluated parsers all have built in unit tests that can be run with
-
-        python setup.py test
-
-    or
-   
-        nosetests
-
 ### TODO
 
 * full hello world working prototype example with backend
