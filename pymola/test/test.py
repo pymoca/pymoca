@@ -17,5 +17,6 @@ class Test(unittest.TestCase):
         gen_sympy.main(argv=[os.path.join(TEST_DIR, "BouncingBall.mo")])
         script = os.path.join(TEST_DIR, 'BouncingBall.mo.py')
         cmd = 'python {script:s}'.format(**locals())
-        subprocess.Popen(cmd.split())
+        proc = subprocess.Popen(cmd.split())
+        proc.communicate()
 
