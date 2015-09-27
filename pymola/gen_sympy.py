@@ -455,11 +455,12 @@ def main(argv):
     #pylint: disable=unused-argument
     "The main function"
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename')
+    parser.add_argument('src')
+    parser.add_argument('out')
     parser.add_argument('-t', '--trace', action='store_true')
     parser.set_defaults(trace=False)
     args = parser.parse_args(argv)
-    text = antlr4.FileStream(args.filename)
+    text = antlr4.FileStream(args.src)
     lexer = ModelicaLexer(text)
     stream = antlr4.CommonTokenStream(lexer)
     parser = ModelicaParser(stream)
@@ -469,13 +470,10 @@ def main(argv):
     walker = antlr4.ParseTreeWalker()
     walker.walk(sympyPrinter, tree)
 
-    with open(args.filename+'.py', 'w') as f:
+    with open(args.out, 'w') as f:
         f.write(sympyPrinter.result)
 
-    # trace = TraceListener(parser)
-    # walker.walk(trace, tree)
-
 if __name__ == '__main__':
-    main(sys.argv)
+    main(sys.argv[1:])
 
 # vim: set et ft=python fenc=utf-8 ff=unix sts=0 sw=4 ts=4 :
