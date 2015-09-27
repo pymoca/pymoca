@@ -8,8 +8,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 env/
-bin/
 build/
+bin/
 develop-eggs/
 dist/
 eggs/

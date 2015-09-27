@@ -65,7 +65,7 @@ class CustomBuildExtCommand(build_ext):
 def call_antlr4(arg):
     "calls antlr4 on grammar file"
     #pylint: disable=unused-argument, unused-variable
-    antlr_path = os.path.join(ROOT_DIR, "bin", "antlr-4.5.1-complete.jar")
+    antlr_path = os.path.join(ROOT_DIR, "java", "antlr-4.5.1-complete.jar")
     classpath = ".:{:s}:$CLASSPATH".format(antlr_path)
     generated = os.path.join(ROOT_DIR, 'pymola', 'generated')
     cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
