@@ -458,7 +458,7 @@ def main(argv):
     parser.add_argument('filename')
     parser.add_argument('-t', '--trace', action='store_true')
     parser.set_defaults(trace=False)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     text = antlr4.FileStream(args.filename)
     lexer = ModelicaLexer(text)
     stream = antlr4.CommonTokenStream(lexer)

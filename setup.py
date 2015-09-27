@@ -5,19 +5,21 @@ Pymola contains a Python based compiler for the modelica language
 and enables interacting with Modelica easily in Python.
 
 """
-MAJOR = 0
-MINOR = 0
-MICRO = 3
-ISRELEASED = False
-VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
-DOCLINES = __doc__.split("\n")
-
+from __future__ import print_function
 import os
 import sys
 import subprocess
 
 from setuptools import setup, find_packages
+from setuptools.command.build_py import build_py
+
+MAJOR = 0
+MINOR = 0
+MICRO = 3
+ISRELEASED = False
+VERSION = '%d.%d+%d' % (MAJOR, MINOR, MICRO)
+DOCLINES = __doc__.split("\n")
 
 CLASSIFIERS = """\
 Development Status :: 1 - Planning
@@ -41,16 +43,41 @@ Topic :: Software Development :: Compilers
 Topic :: Software Development :: Embedded Systems
 """
 
+#pylint: disable=no-init, too-few-public-methods
 
-# Return the git revision as a string
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+class CustomBuildCommand(build_py):
+    """Customized setuptools build command - prints a friendly greeting."""
+    def run(self):
+        "Run the build command"
+        print("Hello, developer, how are you? :)")
+        call_antlr4('Modelica.g4')
+        build_py.run(self)
+
+def call_antlr4(arg):
+    "calls antlr4 on grammar file"
+    #pylint: disable=unused-argument, unused-variable
+    antlr_path = os.path.join(ROOT_DIR, "bin", "antlr-4.5.1-complete.jar")
+    classpath = ".:{:s}:$CLASSPATH".format(antlr_path)
+    generated = os.path.join(ROOT_DIR, 'pymola', 'generated')
+    cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
+            " -o {generated:s} -Dlanguage=Python2".format(**locals())
+    print(cmd)
+    proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'pymola'))
+    proc.communicate()
+    with open(os.path.join(ROOT_DIR, 'pymola', 'generated', '__init__.py'), 'w') as fid:
+        fid.write('')
+
 def git_version():
+    "Return the git revision as a string"
     def _minimal_ext_cmd(cmd):
-        # construct minimal environment
+        "construct minimal environment"
         env = {}
         for k in ['SYSTEMROOT', 'PATH']:
-            v = os.environ.get(k)
-            if v is not None:
-                env[k] = v
+            var = os.environ.get(k)
+            if var is not None:
+                env[k] = var
         # LANGUAGE is used on win32
         env['LANGUAGE'] = 'C'
         env['LANG'] = 'C'
@@ -63,38 +90,43 @@ def git_version():
 
     try:
         out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
-        GIT_REVISION = out.strip().decode('ascii')
+        git_revision = out.strip().decode('ascii')
     except OSError:
-        GIT_REVISION = "Unknown"
+        git_revision = "Unknown"
 
-    return GIT_REVISION
+    return git_revision
 
 
 def get_version_info():
-    # Adding the git rev number needs to be done inside write_version_py(),
-    # otherwise the import of package.version messes up
-    # the build under Python 3.
-    FULLVERSION = VERSION
+    """
+    Adding the git rev number needs to be done inside write_version_py(),
+    otherwise the import of package.version messes up
+    the build under Python 3.
+    """
+    full_version = VERSION
     if os.path.exists('.git'):
-        GIT_REVISION = git_version()
+        git_revision = git_version()
     elif os.path.exists('pymola/version.py'):
         # must be a source distribution, use existing version file
         try:
-            from pymola.version import git_revision as GIT_REVISION
+            from pymola.version import git_revision as git_revision
         except ImportError:
             raise ImportError("Unable to import git_revision. Try removing "
                               "pymola/version.py and the build directory "
                               "before building.")
     else:
-        GIT_REVISION = "Unknown"
+        git_revision = "Unknown"
 
     if not ISRELEASED:
-        FULLVERSION += '.dev-' + GIT_REVISION[:7]
+        full_version += '.git.' + git_revision[:7]
 
-    return FULLVERSION, GIT_REVISION
+    return full_version, git_revision
 
 
 def write_version_py(filename='pymola/version.py'):
+    """
+    Create a version.py file.
+    """
     cnt = """
 # THIS FILE IS GENERATED FROM SETUP.PY
 short_version = '%(version)s'
@@ -106,19 +138,22 @@ release = %(isrelease)s
 if not release:
     version = full_version
 """
-    FULLVERSION, GIT_REVISION = get_version_info()
+    full_version, git_revision = get_version_info()
 
-    a = open(filename, 'w')
-    try:
-        a.write(cnt % {'version': VERSION,
-                       'full_version': FULLVERSION,
-                       'git_revision': GIT_REVISION,
-                       'isrelease': str(ISRELEASED)})
-    finally:
-        a.close()
+    with open(filename, 'w') as fid:
+        try:
+            fid.write(cnt % {'version': VERSION,
+                             'full_version': full_version,
+                             'git_revision': git_revision,
+                             'isrelease': str(ISRELEASED)})
+        finally:
+            fid.close()
 
 
 def setup_package():
+    """
+    Setup the package.
+    """
     src_path = os.path.dirname(os.path.abspath(sys.argv[0]))
     old_path = os.getcwd()
     os.chdir(src_path)
@@ -140,18 +175,20 @@ def setup_package():
         license='GPLv3+',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
-        install_requires=['parsimonious', 'ply',
-                          'grako >= 3.0', 'extras', 'enum34'],
+        install_requires=['antlr4-python2-runtime'],
         tests_require=['nose'],
         test_suite='nose.collector',
         packages=find_packages(
             # choosing to distribute tests
             # exclude=['*.test']
         ),
+        cmdclass={
+            'build_py': CustomBuildCommand,
+        }
     )
 
-    FULLVERSION, GIT_REVISION = get_version_info()
-    metadata['version'] = FULLVERSION
+    full_version = get_version_info()[0]
+    metadata['version'] = full_version
 
     try:
         setup(**metadata)
