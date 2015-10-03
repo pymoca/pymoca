@@ -232,7 +232,14 @@ pl.plot(data['t'], data['x'])
                 s += "x0['{:s}'] = {:s}\n".format(name, val)
                 s += "x += [{:s}]\n".format(name)
                 # s += "{:s} = {:s}\n".format(name, val)
-        self.setValue(ctx, s)
+        self.setValue(ctx, """
+# parameters
+{str_eq:s}
+
+# start values
+{str_when:s}
+""".format(**locals()))
+
 
     def exitClass_prefixes(self, ctx):
         # don't care about prefixes for now

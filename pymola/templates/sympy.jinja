@@ -20,11 +20,6 @@ import sys
 {%- set equation_sections = class_spec.composition().equation_section() %}
 class Model(object):
 
-{%- for eqn_sect in equation_sections -%}
-    {%- for eqn in eqn_sect.equation() -%}
-    {%- endfor %}
-{%- endfor %}
-
     def __init__(self):
 
         # parameters
@@ -59,6 +54,14 @@ class Model(object):
 {%- endfor %}
         }
 
+		# equations
+		self.eqs = [
+{%- for eqn_sect in equation_sections -%}
+    {%- for eqn in eqn_sect.equation() -%}
+			{{eqn.getText()}}
+    {%- endfor %}
+{%- endfor %}
+		]
 
     def simulate(self, do_plot):
         "Simulate model."
@@ -68,7 +71,7 @@ class Model(object):
         x = sympy.Matrix(x)
         x_dot = x.diff(t)
 
-        sol = sympy.solve(eqs, x_dot)
+        sol = sympy.solve(self.eqs, x_dot)
 
         f = sympy.Matrix([sol[xi] for xi in x_dot])
 

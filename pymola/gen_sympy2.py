@@ -34,11 +34,15 @@ class SympyPrinter(ModelicaListener):
         self.result = None
 
     def exitStored_definition(self, ctx):
-        with open(os.path.join(ROOT_DIR, 'sympy.jinja')) as fid:
-            d = locals()
-            d['walker'] = d['self']
-            d.pop('self', None)
-            self.result = jinja2.Template(fid.read()).render(**d)
+        d = locals()
+        d['walker'] = d['self']
+        d.pop('self', None)
+        env = jinja2.Environment(
+            loader=jinja2.PackageLoader('pymola', 'templates'),
+            extensions=['jinja2.ext.do']
+            )   
+        template = env.get_template('sympy.jinja')
+        self.result = template.render(**d)
 
 def main(argv):
     #pylint: disable=unused-argument
