@@ -35,7 +35,7 @@ class SympyPrinter(ModelicaListener):
         }
         self._parser = parser
         self._trace = trace
-        self.indent = "    "
+        self.indent = "            "
 
     @staticmethod
     def print_indented(ldr, s):
@@ -123,71 +123,134 @@ mech.init_vprinting()
 import scipy.integrate
 import pylab as pl
 
-t = sympy.symbols('t')
+#pylint: disable=too-few-public-methods, too-many-locals, invalid-name, no-member
 
-{composition:s}
+class Model(object):
+    \"\"\"
+    Modelica Model.
+    \"\"\"
 
-x = sympy.Matrix(x)
-x_dot = x.diff(t)
+    def __init__(self):
+        \"\"\"
+        Constructor.
+        \"\"\"
+        pass
 
-sol = sympy.solve(eqs, x_dot)
+    def simulate(self):
+        \"\"\"
+        Simulation function.
+        \"\"\"
 
-f = sympy.Matrix([sol[xi] for xi in x_dot])
-print(x)
-print(f)
+        t = sympy.symbols('t')
 
-p_vect = [locals()[key] for key in p]
+        {composition:s}
 
-print(p_vect)
+        x = sympy.Matrix(x)
+        x_dot = x.diff(t)
 
-f_lam = sympy.lambdify((t,x,p_vect), f)
+        sol = sympy.solve(eqs, x_dot)
 
-x0 = [0,0]
-p0 = [1,1]
+        f = sympy.Matrix([sol[xi] for xi in x_dot])
+        print('x:', x)
+        print('f:', f)
 
-sim = scipy.integrate.ode(f_lam)
-sim.set_initial_value([0,0])
-sim.set_f_params(p0)
-tf = 10
-dt = 0.1
+        p_vect = [locals()[key] for key in p_dict.keys()]
+        p0 = [p_dict[key] for key in p_dict.keys()]
 
-data = {{
-    'x': [],
-    't': [],
-}}
+        print('p:', p_vect)
 
-while  sim.t < tf:
-    sim.integrate(sim.t + dt)
-    data['x'] += [sim.y]
-    data['t'] += [sim.t]
+        f_lam = sympy.lambdify((t, x, p_vect), f)
 
-pl.plot(data['t'], data['x'])
-# pl.show()
+        x0 = [x0_dict[key] for key in x0_dict.keys()]
+
+        sim = scipy.integrate.ode(f_lam)
+        sim.set_initial_value(x0, 0)
+        sim.set_f_params(p0)
+        tf = 30
+        dt = 0.001
+
+        data = {{
+            'x': [],
+            't': [],
+        }}
+
+        while  sim.t < tf:
+            sim.integrate(sim.t + dt)
+            velocity = sim.y[0]
+            height = sim.y[1]
+            c = p0[0]
+            t = sim.t
+            x = sim.y
+            if velocity < 0 and height < 0:
+                velocity = -c*velocity
+                height = 0
+                sim.set_initial_value([velocity, height], t)
+            data['x'] += [x]
+            data['t'] += [t]
+
+        pl.plot(data['t'], data['x'])
+        pl.show()
+
+if __name__ == "__main__":
+    model = Model()
+    model.simulate()
 
 #############################################################################
 """.format(**locals())
 
     def exitComposition(self, ctx):
-        declaration = self.getValue(ctx.element_list()[0])
+        decl = self.getValue(ctx.element_list()[0])
         equations = self.getValue(ctx.equation_section()[0])
-        self.setValue(ctx, """
-# declaration
-{declaration:s}
+        data = locals()
+        data['walker'] = self
+        data.pop('self')
+        self.setValue(ctx, jinja2.Template("""
+        {%- set params=decl.parameters -%}
+        {%- set dsyms=decl.dynamic_symbols -%}
+        {%- set start_values=decl.start_values -%}
+        # symbols
+        {{params|join(', ') }} = \\
+            sympy.symbols('{{params|join(', ')}}')
 
-{equations:s}
-""".format(**locals()))
+        # dynamic symbols
+        {{dsyms|join(', ')}} = \\
+            mech.dynamicsymbols('{{dsyms|join(', ')}}')
+
+        # parameters
+        p_dict = {
+        {%- for key in params.keys() %}
+            '{{key}}': {{params[key]}},
+        {%- endfor %}
+        }
+
+        # initial state
+        x0_dict = {
+        {%- for key in dsyms.keys() %}
+            '{{key}}': {{dsyms[key].start}},
+        {%- endfor %}
+        }
+
+        # state space
+        x = sympy.Matrix([
+            {{dsyms|join(', ')}}
+        ])
+{{equations}}
+""").render(**data))
 
     def exitElement_list(self, ctx):
-        s = "p = {}\nx0 = {}\nx = []\n"
-        for element in ctx.element():
-            s += self.getValue(element)
-        self.setValue(ctx, s)
+        d = self.getValue(ctx.element()[0])
+        for i in range(1, len(ctx.element())):
+            element = ctx.element()[i]
+            for key in d.keys():
+                d[key].update(self.getValue(element)[key])
+        self.setValue(ctx, d)
+        print("dict", d)
 
     def exitElement(self, ctx):
         self.setValue(ctx, self.getValue(ctx.component_clause()))
 
     def exitEquation_section(self, ctx):
-        str_eq = "eqs=["
+        str_eq = "eqs = ["
         str_when = ""
         for eq in ctx.equation():
             data = self.getValue(eq)
@@ -204,35 +267,39 @@ pl.plot(data['t'], data['x'])
         str_eq += "\n{self.indent:s}]\n".format(**locals())
         str_when += ""
         self.setValue(ctx, """
-# equations
-{str_eq:s}
+        # equations
+        {str_eq:s}
 
-# when equations
+        # when equations
 {str_when:s}
 """.format(**locals()))
 
     def exitComponent_clause(self, ctx):
         s = ""
+        parameters = {}
+        dynamic_symbols = {}
+
         if ctx.type_prefix().getText() == 'parameter':
             # store all parameters
             for comp in ctx.component_list().component_declaration():
                 name = comp.declaration().IDENT().getText()
                 val = comp.declaration().modification().expression().getText()
-                self._data['parameters'][name] = float(val)
-                s += "{:s} = sympy.symbols('{:s}')\n".format(name, name)
-                s += "p['{:s}'] = {:s}\n".format(name, val)
+                parameters[name] = val
         else:
             # store all variables
             for comp in ctx.component_list().component_declaration():
                 name = comp.declaration().IDENT().getText()
                 mod = comp.declaration().modification().class_modification()
-                val = mod.argument_list().getText()
-                self._data['init'][name] = val
-                s += "{:s} = mech.dynamicsymbols('{:s}')\n".format(name, name)
-                s += "x0['{:s}'] = {:s}\n".format(name, val)
-                s += "x += [{:s}]\n".format(name)
-                # s += "{:s} = {:s}\n".format(name, val)
-        self.setValue(ctx, s)
+                arg = mod.argument_list().argument()[0]
+                emod = arg.element_modification_or_replaceable().element_modification()
+                if emod.name().getText() == 'start':
+                    val = emod.modification().expression().getText()
+                    dynamic_symbols[name] = {'start': val}
+
+        self.setValue(ctx, {
+            'parameters': parameters,
+            'dynamic_symbols': dynamic_symbols,
+            })
 
     def exitClass_prefixes(self, ctx):
         # don't care about prefixes for now
