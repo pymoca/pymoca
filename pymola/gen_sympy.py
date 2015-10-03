@@ -176,16 +176,19 @@ class Model(object):
 
         while  sim.t < tf:
             sim.integrate(sim.t + dt)
+            t = sim.t
+
+            # TODO replace hardcoded when statement
+            # below
             velocity = sim.y[0]
             height = sim.y[1]
             c = p0[0]
-            t = sim.t
-            x = sim.y
             if velocity < 0 and height < 0:
                 velocity = -c*velocity
                 height = 0
                 sim.set_initial_value([velocity, height], t)
-            data['x'] += [x]
+
+            data['x'] += [[velocity, height]]
             data['t'] += [t]
 
         pl.plot(data['t'], data['x'])
