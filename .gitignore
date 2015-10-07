@@ -59,3 +59,5 @@ pymola/version.py
 
 # vi
 *.swp
+
+.ipynb_checkpoints
