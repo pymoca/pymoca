@@ -17,7 +17,7 @@ from setuptools.command.build_ext import build_ext
 
 MAJOR = 0
 MINOR = 0
-MICRO = 3
+MICRO = 4
 ISRELEASED = False
 VERSION = '%d.%d+%d' % (MAJOR, MINOR, MICRO)
 DOCLINES = __doc__.split("\n")
