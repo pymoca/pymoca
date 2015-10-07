@@ -14,12 +14,13 @@ import subprocess
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 from setuptools.command.build_ext import build_ext
+from setuptools import Command
 
 MAJOR = 0
 MINOR = 0
 MICRO = 4
 ISRELEASED = True
-VERSION = '%d.%d+%d' % (MAJOR, MINOR, MICRO)
+VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 DOCLINES = __doc__.split("\n")
 
 CLASSIFIERS = """\
@@ -48,19 +49,16 @@ Topic :: Software Development :: Embedded Systems
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-class CustomBuildCommand(build_py):
+class AntlrBuildCommand(Command):
     """Customized setuptools build command."""
+    user_options=[]
+    def initialize_options(self):
+        pass
+    def finalize_options(self):
+        pass
     def run(self):
         "Run the build command"
         call_antlr4('Modelica.g4')
-        build_py.run(self)
-
-class CustomBuildExtCommand(build_ext):
-    """Customized setuptools build_ext command."""
-    def run(self):
-        "Run the build command"
-        call_antlr4('Modelica.g4')
-        build_ext.run(self)
 
 def call_antlr4(arg):
     "calls antlr4 on grammar file"
@@ -190,8 +188,7 @@ def setup_package():
             # exclude=['*.test']
         ),
         cmdclass={
-            'build_py': CustomBuildCommand,
-            'build_ext': CustomBuildExtCommand,
+            'antlr': AntlrBuildCommand,
         }
     )
 
