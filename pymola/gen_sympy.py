@@ -27,12 +27,6 @@ class SympyPrinter(ModelicaListener):
         """
         self._val_dict = {}
         self.result = None
-        self._data = {
-            'parameters': {},
-            'variables': [],
-            'equations': [],
-            'init': {},
-        }
         self._parser = parser
         self._trace = trace
         self.indent = "            "
@@ -134,40 +128,37 @@ class Model(object):
         \"\"\"
         Constructor.
         \"\"\"
-        pass
 
-    def simulate(self):
+        self.t = sympy.symbols('t')
+
+        {composition:s}
+
+        self.x = sympy.Matrix(self.x)
+        self.x_dot = self.x.diff(self.t)
+
+        self.sol = sympy.solve(self.eqs, self.x_dot)
+
+        self.f = sympy.Matrix([self.sol[xi] for xi in self.x_dot])
+        print('x:', self.x)
+        print('f:', self.f)
+
+        self.p_vect = [locals()[key] for key in self.p_dict.keys()]
+        self.p0 = [self.p_dict[key] for key in self.p_dict.keys()]
+
+        print('p:', self.p_vect)
+
+        self.f_lam = sympy.lambdify((self.t, self.x, self.p_vect), self.f)
+
+        self.x0 = [self.x0_dict[key] for key in self.x0_dict.keys()]
+
+    def simulate(self, tf=30, dt=0.001, show=False):
         \"\"\"
         Simulation function.
         \"\"\"
 
-        t = sympy.symbols('t')
-
-        {composition:s}
-
-        x = sympy.Matrix(x)
-        x_dot = x.diff(t)
-
-        sol = sympy.solve(eqs, x_dot)
-
-        f = sympy.Matrix([sol[xi] for xi in x_dot])
-        print('x:', x)
-        print('f:', f)
-
-        p_vect = [locals()[key] for key in p_dict.keys()]
-        p0 = [p_dict[key] for key in p_dict.keys()]
-
-        print('p:', p_vect)
-
-        f_lam = sympy.lambdify((t, x, p_vect), f)
-
-        x0 = [x0_dict[key] for key in x0_dict.keys()]
-
-        sim = scipy.integrate.ode(f_lam)
-        sim.set_initial_value(x0, 0)
-        sim.set_f_params(p0)
-        tf = 30
-        dt = 0.001
+        sim = scipy.integrate.ode(self.f_lam)
+        sim.set_initial_value(self.x0, 0)
+        sim.set_f_params(self.p0)
 
         data = {{
             'x': [],
@@ -180,19 +171,23 @@ class Model(object):
 
             # TODO replace hardcoded when statement
             # below
-            velocity = sim.y[0]
-            height = sim.y[1]
-            c = p0[0]
-            if velocity < 0 and height < 0:
-                velocity = -c*velocity
-                height = 0
-                sim.set_initial_value([velocity, height], t)
+            #velocity = sim.y[0]
+            #height = sim.y[1]
+            #c = self.p0[0]
+            #if velocity < 0 and height < 0:
+            #    velocity = -c*velocity
+            #    height = 0
+            #    sim.set_initial_value([velocity, height], t)
 
-            data['x'] += [[velocity, height]]
+            # data['x'] += [[velocity, height]]
+            data['x'] += [sim.y]
             data['t'] += [t]
 
         pl.plot(data['t'], data['x'])
-        pl.show()
+        if show:
+            pl.show()
+
+        return data
 
 if __name__ == "__main__":
     model = Model()
@@ -211,30 +206,33 @@ if __name__ == "__main__":
         {%- set params=decl.parameters -%}
         {%- set dsyms=decl.dynamic_symbols -%}
         {%- set start_values=decl.start_values -%}
+
+        {% if params|length > 0 %}
         # symbols
         {{params|join(', ') }} = \\
             sympy.symbols('{{params|join(', ')}}')
+        {% endif %}
 
         # dynamic symbols
         {{dsyms|join(', ')}} = \\
             mech.dynamicsymbols('{{dsyms|join(', ')}}')
 
         # parameters
-        p_dict = {
+        self.p_dict = {
         {%- for key in params.keys() %}
             '{{key}}': {{params[key]}},
         {%- endfor %}
         }
 
-        # initial state
-        x0_dict = {
+        # initial sate
+        self.x0_dict = {
         {%- for key in dsyms.keys() %}
             '{{key}}': {{dsyms[key].start}},
         {%- endfor %}
         }
 
         # state space
-        x = sympy.Matrix([
+        self.x = sympy.Matrix([
             {{dsyms|join(', ')}}
         ])
 {{equations}}
@@ -253,7 +251,7 @@ if __name__ == "__main__":
         self.setValue(ctx, self.getValue(ctx.component_clause()))
 
     def exitEquation_section(self, ctx):
-        str_eq = "eqs = ["
+        str_eq = "self.eqs = ["
         str_when = ""
         for eq in ctx.equation():
             data = self.getValue(eq)
@@ -292,12 +290,16 @@ if __name__ == "__main__":
             # store all variables
             for comp in ctx.component_list().component_declaration():
                 name = comp.declaration().IDENT().getText()
-                mod = comp.declaration().modification().class_modification()
-                arg = mod.argument_list().argument()[0]
-                emod = arg.element_modification_or_replaceable().element_modification()
-                if emod.name().getText() == 'start':
-                    val = emod.modification().expression().getText()
-                    dynamic_symbols[name] = {'start': val}
+                dynamic_symbols[name] = {'start': 0}
+                try:
+                    mod = comp.declaration().modification().class_modification()
+                    arg = mod.argument_list().argument()[0]
+                    emod = arg.element_modification_or_replaceable().element_modification()
+                    if emod.name().getText() == 'start':
+                        val = emod.modification().expression().getText()
+                        dynamic_symbols[name]['start'] = val
+                except AttributeError:
+                    pass
 
         self.setValue(ctx, {
             'parameters': parameters,
@@ -512,8 +514,7 @@ elif {{ walker.getValue(exprs[i]) }}:
 
     def exitPrimary_derivative(self, ctx):
         name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
-        self._data['variables'] += [name]
-        self.setValue(ctx, '{:s}.diff(t)'.format(name))
+        self.setValue(ctx, '{:s}.diff(self.t)'.format(name))
 
     def exitPrimary_string(self, ctx):
         self.setValue(ctx, ctx.getText())
