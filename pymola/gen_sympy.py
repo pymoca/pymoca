@@ -525,7 +525,8 @@ elif {{ walker.getValue(exprs[i]) }}:
 
 def generate(modelica_model, trace=False):
     "The modelica model"
-    lexer = ModelicaLexer(modelica_model)
+    input_stream = antlr4.InputStream(modelica_model)
+    lexer = ModelicaLexer(input_stream)
     stream = antlr4.CommonTokenStream(lexer)
     parser = ModelicaParser(stream)
     tree = parser.stored_definition()
@@ -545,7 +546,8 @@ def main(argv):
     parser.add_argument('-t', '--trace', action='store_true')
     parser.set_defaults(trace=False)
     args = parser.parse_args(argv)
-    modelica_model = antlr4.FileStream(args.src)
+    with open(args.src, 'r') as f:
+        modelica_model = f.read()
     sympy_model = generate(modelica_model, trace=args.trace)
 
     with open(args.out, 'w') as f:
