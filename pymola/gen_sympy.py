@@ -522,6 +522,20 @@ elif {{ walker.getValue(exprs[i]) }}:
     def exitPrimary_false(self, ctx):
         self.setValue(ctx, ctx.getText())
 
+
+def generate(modelica_model, trace=False):
+    "The modelica model"
+    lexer = ModelicaLexer(modelica_model)
+    stream = antlr4.CommonTokenStream(lexer)
+    parser = ModelicaParser(stream)
+    tree = parser.stored_definition()
+    # print(tree.toStringTree(recog=parser))
+    sympyPrinter = SympyPrinter(parser, trace)
+    walker = antlr4.ParseTreeWalker()
+    walker.walk(sympyPrinter, tree)
+    return sympyPrinter.result
+
+
 def main(argv):
     #pylint: disable=unused-argument
     "The main function"
@@ -531,18 +545,11 @@ def main(argv):
     parser.add_argument('-t', '--trace', action='store_true')
     parser.set_defaults(trace=False)
     args = parser.parse_args(argv)
-    text = antlr4.FileStream(args.src)
-    lexer = ModelicaLexer(text)
-    stream = antlr4.CommonTokenStream(lexer)
-    parser = ModelicaParser(stream)
-    tree = parser.stored_definition()
-    # print(tree.toStringTree(recog=parser))
-    sympyPrinter = SympyPrinter(parser, args.trace)
-    walker = antlr4.ParseTreeWalker()
-    walker.walk(sympyPrinter, tree)
+    modelica_model = antlr4.FileStream(args.src)
+    sympy_model = generate(modelica_model, trace=args.trace)
 
     with open(args.out, 'w') as f:
-        f.write(sympyPrinter.result)
+        f.write(sympy_model)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
