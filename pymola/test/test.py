@@ -20,7 +20,9 @@ class Test(unittest.TestCase):
         gen_sympy.main(argv=[src, out])
         cmd = 'python {out:s}'.format(**locals())
         proc = subprocess.Popen(cmd.split())
-        proc.communicate()
+        stdout, stderr = proc.communicate()
+        if stderr is not None:
+            raise RuntimeError(stderr)
 
     def test_bouncing_ball2(self):
         "Test if bouncing ball simulates with visitor version"
@@ -40,6 +42,6 @@ class Test(unittest.TestCase):
         gen_sympy.main(argv=[src, out])
         cmd = 'python {out:s}'.format(**locals())
         proc = subprocess.Popen(cmd.split())
-        proc.communicate()
-
-
+        stdout, stderr = proc.communicate()
+        if stderr is not None:
+            raise RuntimeError(stderr)
