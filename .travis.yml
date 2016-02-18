@@ -3,7 +3,8 @@ python:
   - "2.7"
 # install required system libraries
 # before_install:
-#  - sudo apt-get update --fix-missing -qq
+  - sudo apt-get update --fix-missing -qq
+  - sudo apt-get install python-scipy python-numpy
 
 # command to install dependencies from source
 # note, separating requirements so that travis
