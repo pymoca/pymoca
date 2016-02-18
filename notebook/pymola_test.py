@@ -31,8 +31,8 @@ class Model(object):
         
 
         # dynamic symbols
-        x, v = \
-            mech.dynamicsymbols('x, v')
+        x, v_x, y, v_y = \
+            mech.dynamicsymbols('x, v_x, y, v_y')
 
         # parameters
         self.p_dict = {
@@ -41,19 +41,23 @@ class Model(object):
 
         # initial sate
         self.x0_dict = {
-            'x': 1,
-            'v': 1,
+            'x': 0,
+            'v_x': 0,
+            'y': 0,
+            'v_y': 0,
         }
 
         # state space
         self.x = sympy.Matrix([
-            x, v
+            x, v_x, y, v_y
         ])
 
         # equations
         self.eqs = [
-            x.diff(self.t) - v,
-            v.diff(self.t) - (-(c) * x),
+            x.diff(self.t) - v_x,
+            y.diff(self.t) - v_y,
+            v_x.diff(self.t) - (-(c) * x),
+            v_y.diff(self.t) - (-(c) * y),
             ]
 
 
@@ -71,22 +75,30 @@ class Model(object):
         print('f:', self.f)
 
         self.p_vect = [locals()[key] for key in self.p_dict.keys()]
-        self.p0 = [self.p_dict[key] for key in self.p_dict.keys()]
 
         print('p:', self.p_vect)
 
         self.f_lam = sympy.lambdify((self.t, self.x, self.p_vect), self.f)
 
-        self.x0 = [self.x0_dict[key] for key in self.x0_dict.keys()]
+    def get_p0(self):
+        return [self.p_dict[key] for key in
+            sorted(self.p_dict.keys())]
+
+    def get_x0(self):
+        return [self.x0_dict[key] for key in
+            sorted(self.x0_dict.keys())]
 
     def simulate(self, tf=30, dt=0.001, show=False):
         """
         Simulation function.
         """
 
+        p0 = self.get_p0()
+        x0 = self.get_x0()
+
         sim = scipy.integrate.ode(self.f_lam)
-        sim.set_initial_value(self.x0, 0)
-        sim.set_f_params(self.p0)
+        sim.set_initial_value(x0, 0)
+        sim.set_f_params(p0)
 
         data = {
             'x': [],

@@ -11,6 +11,7 @@ from generated.ModelicaParser import ModelicaParser
 from generated.ModelicaListener import ModelicaListener
 import argparse
 import jinja2
+from collections import OrderedDict
 
 #pylint: disable=invalid-name, no-self-use, missing-docstring, unused-variable, protected-access
 #pylint: disable=too-many-public-methods
@@ -25,7 +26,7 @@ class SympyPrinter(ModelicaListener):
         """
         Constructor
         """
-        self._val_dict = {}
+        self._val_dict = OrderedDict()
         self.result = None
         self._parser = parser
         self._trace = trace
@@ -116,6 +117,7 @@ sympy.init_printing()
 mech.init_vprinting()
 import scipy.integrate
 import pylab as pl
+from collections import OrderedDict
 
 #pylint: disable=too-few-public-methods, too-many-locals, invalid-name, no-member
 
@@ -143,22 +145,30 @@ class Model(object):
         print('f:', self.f)
 
         self.p_vect = [locals()[key] for key in self.p_dict.keys()]
-        self.p0 = [self.p_dict[key] for key in self.p_dict.keys()]
 
         print('p:', self.p_vect)
 
         self.f_lam = sympy.lambdify((self.t, self.x, self.p_vect), self.f)
 
-        self.x0 = [self.x0_dict[key] for key in self.x0_dict.keys()]
+    def get_p0(self):
+        return [self.p_dict[key] for key in
+            sorted(self.p_dict.keys())]
+
+    def get_x0(self):
+        return [self.x0_dict[key] for key in
+            sorted(self.x0_dict.keys())]
 
     def simulate(self, tf=30, dt=0.001, show=False):
         \"\"\"
         Simulation function.
         \"\"\"
 
+        p0 = self.get_p0()
+        x0 = self.get_x0()
+
         sim = scipy.integrate.ode(self.f_lam)
-        sim.set_initial_value(self.x0, 0)
-        sim.set_f_params(self.p0)
+        sim.set_initial_value(x0, 0)
+        sim.set_f_params(p0)
 
         data = {{
             'x': [],
@@ -218,18 +228,18 @@ if __name__ == "__main__":
             mech.dynamicsymbols('{{dsyms|join(', ')}}')
 
         # parameters
-        self.p_dict = {
+        self.p_dict = OrderedDict({
         {%- for key in params.keys() %}
             '{{key}}': {{params[key]}},
         {%- endfor %}
-        }
+        })
 
         # initial sate
-        self.x0_dict = {
+        self.x0_dict = OrderedDict({
         {%- for key in dsyms.keys() %}
             '{{key}}': {{dsyms[key].start}},
         {%- endfor %}
-        }
+        })
 
         # state space
         self.x = sympy.Matrix([
@@ -277,8 +287,8 @@ if __name__ == "__main__":
 
     def exitComponent_clause(self, ctx):
         s = ""
-        parameters = {}
-        dynamic_symbols = {}
+        parameters = OrderedDict()
+        dynamic_symbols = OrderedDict()
 
         if ctx.type_prefix().getText() == 'parameter':
             # store all parameters
