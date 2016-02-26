@@ -4,7 +4,6 @@ python:
 # install required system libraries
 before_install:
   - sudo apt-get update --fix-missing -qq
-  - sudo apt-get install python-scipy python-numpy
 
 # command to install dependencies from source
 # note, separating requirements so that travis
@@ -12,7 +11,7 @@ before_install:
 # terminate, using q to keep build info to a
 # minumum for dependencies
 install:
-  - pip install -q coverage coveralls nose antlr4-python2-runtime jinja2 sympy
+    - pip install coverage coveralls nose antlr4-python2-runtime jinja2 sympy scipy numpy
 
 # command to run tests
 script: coverage run setup.py test
