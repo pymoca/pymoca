@@ -1,28 +1,22 @@
 language: python
 python:
-  - 2.7
-  - 3.3
-notifications:
-  email: true
-
-# Setup anaconda
-before_install:
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda/bin:$PATH
-  - conda update --yes conda
-  # The next couple lines fix a crash with multiprocessing on Travis and are not specific to using Miniconda
-  - sudo rm -rf /dev/shm
-  - sudo ln -s /run/shm /dev/shm
-# Install packages
+    - "2.7_with_system_site_packages"
+    - "3.3"
+    - "3.4"
+sudo: false
+#addons:
+    #apt:
+        #packages:
+            #- python-opencv
+            #- python-scipy
+            #- python-scipy
 install:
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib nose dateutil pandas statsmodels
-  # Coverage packages are on my binstar channel
-  - conda install --yes -c dan_blanchard python-coveralls nose-cov
-  - python setup.py install
-
-# Run test
-script: coverage run setup.py test
+    - pip install numpy
+    - pip install scipy
+    - pip install matplotlib
+    - pip install coveralls
+    - python setup.py install
+script:
+    - nosetests --with-doctest --with-coverage --cover-package=pymola --where=pymola
 after_success:
-  - coveralls
+    - coveralls
