@@ -1,20 +1,23 @@
 language: python
 python:
-    - "2.7_with_system_site_packages"
-    - "3.2_with_system_site_packages"
+    - "2.7"
+    - "3.2"
 sudo: false
 addons:
-    apt:
-        packages:
-            - liblapack-dev
-            - libblas-dev
-            - libaltas-dev
-            - gfortran
-            - python-numpy
-            - python-scipy
-            - python-matplotlib
-            - python-tk
+  apt:
+    packages:
+    - libatlas-dev
+    - libatlas-base-dev
+    - liblapack-dev
+    - gfortran
+    - libgmp-dev
+    - libmpfr-dev
+    - ccache
+cache:
+  directories:
+    - $HOME/.ccache
 before_install:
+  - export PATH=/usr/lib/ccache:$PATH
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
 install:
