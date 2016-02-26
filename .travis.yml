@@ -23,5 +23,6 @@ script:
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
   #- coverage run setup.py test
+  #
 #after_success:
   #- coveralls
