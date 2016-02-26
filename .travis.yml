@@ -14,9 +14,11 @@ before_install:
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
 install:
-    - pip install coveralls sympy
-    - python setup.py install
+  - pip install coveralls sympy
+  - python setup.py install
+  - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then pip install -r requirements-py2.txt --use-mirrors; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then pip install -r requirements-py3.txt --use-mirrors; fi
 script:
-    - nosetests --with-doctest --with-coverage --cover-package=pymola --where=pymola
+  - nosetests --with-doctest --with-coverage --cover-package=pymola --where=pymola
 after_success:
-    - coveralls
+  - coveralls
