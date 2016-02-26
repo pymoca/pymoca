@@ -3,7 +3,7 @@ python:
     - "2.7_with_system_site_packages"
     - "3.3_with_system_site_packages"
 sudo: false
-#addons:
+addons:
     apt:
         packages:
             - liblapack-dev
