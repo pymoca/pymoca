@@ -9,6 +9,7 @@ addons:
             - python-numpy
             - python-scipy
             - python-matplotlib
+            - python-tk
 install:
     - pip install coveralls sympy
     - python setup.py install
