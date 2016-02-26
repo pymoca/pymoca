@@ -1,19 +1,16 @@
 language: python
 python:
     - "2.7_with_system_site_packages"
-    - "3.3"
-    - "3.4"
+    - "3.3_with_system_site_packages"
 sudo: false
 #addons:
-    #apt:
-        #packages:
-            #- python-opencv
-            #- python-scipy
-            #- python-scipy
+    apt:
+        packages:
+            - liblapack-dev
+            - gfortran
+            - python-numpy
+            - python-scipy
 install:
-    - pip install numpy
-    - pip install scipy
-    - pip install matplotlib
     - pip install coveralls
     - python setup.py install
 script:
