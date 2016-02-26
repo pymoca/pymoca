@@ -13,7 +13,9 @@ addons:
     - libgmp-dev
     - libmpfr-dev
     - ccache
-cache: ccache pip
+cache:
+  - ccache
+  - pip
 install:
   - pip install coveralls coverage
   - if [[ $TRAVIS_PYTHON_VERSION == 2* ]]; then travis_wait pip install -r requirements-py2.txt ; fi
@@ -23,6 +25,5 @@ script:
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
   #- coverage run setup.py test
-  #
 #after_success:
   #- coveralls
