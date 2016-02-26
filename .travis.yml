@@ -1,17 +1,14 @@
 language: python
+virtualenv:
+  system_site_packages: true
 python:
   - "2.7"
 # install required system libraries
 before_install:
   - sudo apt-get update --fix-missing -qq
-
-# command to install dependencies from source
-# note, separating requirements so that travis
-# will get output in less than 5 min and won't
-# terminate, using q to keep build info to a
-# minumum for dependencies
+  - sudo apt-get install python-scipy python-numpy
 install:
-    - pip install coverage coveralls nose antlr4-python2-runtime jinja2 sympy scipy numpy
+  - pip install coverage coveralls nose antlr4-python2-runtime jinja2 sympy
 
 # command to run tests
 script: coverage run setup.py test
