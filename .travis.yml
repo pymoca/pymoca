@@ -6,6 +6,10 @@ sudo: false
 addons:
     apt:
         packages:
+            - liblapack-dev
+            - libblas-dev
+            - libaltas-dev
+            - gfortran
             - python-numpy
             - python-scipy
             - python-matplotlib
