@@ -6,12 +6,10 @@ sudo: false
 addons:
     apt:
         packages:
-            - liblapack-dev
-            - gfortran
             - python-numpy
             - python-scipy
 install:
-    - pip install coveralls
+    - pip install coveralls sympy
     - python setup.py install
 script:
     - nosetests --with-doctest --with-coverage --cover-package=pymola --where=pymola
