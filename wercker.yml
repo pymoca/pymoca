@@ -1,23 +1,16 @@
-box: wercker/python
-services:
-    # - wercker/postgresql # Don't forget to add your databases as a service
+# use a python 2.x container
+box: python:2
 
 # Build definition
 build:
-
   # The steps that will be executed on build
   steps:
-    - virtualenv:
-        name: setup virtual environment
-
-    - pip-install:
-        requirements_file: "requirements.txt" # Optional argument.
+    # A step that executes `pip install` command
+    - pip-install
 
     # A custom script step, name value is used in the UI
     # and the code value contains the command that get executed
     - script:
-        name: echo python information
+        name: python unit test
         code: |
-          echo "python version $(python --version) running"
-          echo "pip version $(pip --version) running"
-          pip freeze
+          python setup.py test
