@@ -503,6 +503,11 @@ elif {{ walker.getValue(exprs[i]) }}:
     def exitExpr_neg(self, ctx):
         self.setValue(ctx, '-({:s})'.format(self.getValue(ctx.expr())))
 
+    def exitExpr_exp(self, ctx):
+        self.setValue(ctx, '(({:s})**({:s}))'.format(
+            self.getValue(ctx.expr()[0]),
+            self.getValue(ctx.expr()[1])))
+
     def exitExpr_rel(self, ctx):
         self.setValue(ctx, '({:s} {:s} {:s})'.format(
             self.getValue(ctx.expr()[0]),
@@ -510,6 +515,12 @@ elif {{ walker.getValue(exprs[i]) }}:
             self.getValue(ctx.expr()[1])))
 
     def exitExpr_mul(self, ctx):
+        self.setValue(ctx, '({:s} {:s} {:s})'.format(
+            self.getValue(ctx.expr()[0]),
+            ctx.op.text,
+            self.getValue(ctx.expr()[1])))
+
+    def exitExpr_add(self, ctx):
         self.setValue(ctx, '({:s} {:s} {:s})'.format(
             self.getValue(ctx.expr()[0]),
             ctx.op.text,

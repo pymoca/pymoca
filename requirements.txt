@@ -5,4 +5,3 @@ scipy >= 0.16
 numpy >= 1.9
 jinja2 >= 2.8
 enum >= 0.4.4
-collections

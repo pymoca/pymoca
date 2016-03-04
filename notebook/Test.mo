@@ -5,6 +5,6 @@ model Test
 equation
     der(x) = v_x;
     der(y) = v_y;
-    der(v_x) = -c*x;
-    der(v_y) = -c*y;
+    der(v_x) = -c*x^2;
+    der(v_y) = -c*y^2;
 end Test;
