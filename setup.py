@@ -176,7 +176,7 @@ def setup_package():
     elif sys.version_info[0] == 3:
         with open('requirements-py3.txt', 'r') as req_file:
             install_reqs += req_file.read().split('\n')
-    pprint.pprint(install_reqs)
+    # pprint.pprint(install_reqs)
 
     metadata = dict(
         name='pymola',
