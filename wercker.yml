@@ -4,10 +4,9 @@ box: python
 build:
   # The steps that will be executed on build
   steps:
+    - install-packages:
+        packages: libatlas-dev liblapack-dev gfortran libgmp-dev libmpfr-dev
     - pip-install
-
-    # A custom script step, name value is used in the UI
-    # and the code value contains the command that get executed
     - script:
         name: python unit test
         code: |
