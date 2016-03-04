@@ -4,9 +4,6 @@ box: python
 build:
   # The steps that will be executed on build
   steps:
-    - install-packages:
-        packages: virtualenvwrapper
-    - virtualenv
     - pip-install
 
     # A custom script step, name value is used in the UI
