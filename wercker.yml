@@ -1,5 +1,4 @@
-# use a python 3 scipy stack
-box: ipython/scipy-stack
+box: jupyter/notebook
 
 # Build definition
 build:
