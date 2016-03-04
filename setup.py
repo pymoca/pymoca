@@ -49,6 +49,13 @@ Topic :: Software Development :: Embedded Systems
 
 #pylint: disable=no-init, too-few-public-methods
 
+
+import sys
+python_version = '.'.join([str(i) for i in sys.version_info[:3]])
+python_version_required = '2.7.0'
+if python_version < python_version_required:
+    sys.exit("Sorry, only Python >= {:s} is supported".format(python_version_required))
+
 class AntlrBuildCommand(Command):
     """Customized setuptools build command."""
     user_options=[]
