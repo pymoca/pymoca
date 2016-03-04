@@ -4,6 +4,7 @@
 
 from __future__ import print_function, division
 import sympy
+assert sympy.__version__ >= '0.7.6.1'
 import sympy.physics.mechanics as mech
 sympy.init_printing()
 try:
@@ -40,15 +41,15 @@ class Model(object):
 
         # parameters
         self.p_dict = OrderedDict({
-            'c': 10,
+            'c': 1,
         })
 
         # initial sate
         self.x0_dict = OrderedDict({
             'x': 1,
-            'v_x': 0,
+            'v_x': 1,
             'y': 2,
-            'v_y': 0,
+            'v_y': 1,
         })
 
         # state space
@@ -58,10 +59,10 @@ class Model(object):
 
         # equations
         self.eqs = [
-            x.diff(self.t) - v_x,
             v_x.diff(self.t) - (-(c) * x),
-            y.diff(self.t) - v_y,
+            x.diff(self.t) - v_x,
             v_y.diff(self.t) - (-(c) * y),
+            y.diff(self.t) - v_y,
             ]
 
 
