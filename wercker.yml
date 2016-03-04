@@ -11,3 +11,11 @@ build:
         name: python unit test
         code: |
           python setup.py test
+deploy:
+  steps:
+    - internal/docker-push:
+        username: $USERNAME
+        password: $PASSWORD
+        tag: python3
+        repository: jgoppert/pymola
+        registry: https://registry.hub.docker.com
