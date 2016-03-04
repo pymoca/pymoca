@@ -4,7 +4,7 @@ box: jupyter/notebook
 build:
   # The steps that will be executed on build
   steps:
-    # A step that executes `pip install` command
+    - virtualenv
     - pip-install
 
     # A custom script step, name value is used in the UI
