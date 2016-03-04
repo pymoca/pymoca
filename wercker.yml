@@ -1,9 +1,11 @@
-box: python:3
+box: python
 
 # Build definition
 build:
   # The steps that will be executed on build
   steps:
+    - install-packages:
+        packages: virtualenvwrapper
     - virtualenv
     - pip-install
 
