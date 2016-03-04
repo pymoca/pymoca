@@ -112,9 +112,13 @@ class SympyPrinter(ModelicaListener):
 
 from __future__ import print_function, division
 import sympy
+assert sympy.__version__ >= '0.7.6.1'
 import sympy.physics.mechanics as mech
 sympy.init_printing()
-mech.init_vprinting()
+try:
+    mech.init_vprinting()
+except AttributeError:
+    mech.mechanics_printing()
 import scipy.integrate
 import pylab as pl
 from collections import OrderedDict

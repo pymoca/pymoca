@@ -6,7 +6,10 @@ from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
 sympy.init_printing()
-mech.init_vprinting()
+try:
+    mech.init_vprinting()
+except AttributeError:
+    mech.mechanics_printing()
 import scipy.integrate
 import pylab as pl
 from collections import OrderedDict
@@ -42,9 +45,9 @@ class Model(object):
 
         # initial sate
         self.x0_dict = OrderedDict({
-            'x': 0,
+            'x': 1,
             'v_x': 0,
-            'y': 0,
+            'y': 2,
             'v_y': 0,
         })
 
@@ -56,8 +59,8 @@ class Model(object):
         # equations
         self.eqs = [
             x.diff(self.t) - v_x,
-            y.diff(self.t) - v_y,
             v_x.diff(self.t) - (-(c) * x),
+            y.diff(self.t) - v_y,
             v_y.diff(self.t) - (-(c) * y),
             ]
 

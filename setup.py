@@ -7,10 +7,11 @@ and enables interacting with Modelica easily in Python.
 """
 
 from __future__ import print_function
+from setuptools import setup
+
 import os
 import sys
 import subprocess
-from pip.req import parse_requirements
 import pprint
 
 from setuptools import setup, find_packages
@@ -199,7 +200,7 @@ def setup_package():
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
         install_requires=install_reqs,
-        tests_require=['coverage >= 4.0', 'nose >= 1.3.7'],
+        tests_require=['coverage >= 3.7.1', 'nose >= 1.3.1'],
         test_suite='nose.collector',
         packages=find_packages(
             # choosing to distribute tests
