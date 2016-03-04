@@ -1,5 +1,0 @@
-matplotlib > 1.0
-numpy > 1.8
-scipy > 0.1
-sympy > 0.7
-antlr4-python3-runtime > 4.5

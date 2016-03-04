@@ -10,6 +10,7 @@ from __future__ import print_function
 import os
 import sys
 import subprocess
+from pip.req import parse_requirements
 
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
@@ -46,8 +47,6 @@ Topic :: Software Development :: Embedded Systems
 """
 
 #pylint: disable=no-init, too-few-public-methods
-
-ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class AntlrBuildCommand(Command):
     """Customized setuptools build command."""
@@ -180,7 +179,9 @@ def setup_package():
         license='GPLv3+',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
-        install_requires=['antlr4-python2-runtime', 'jinja2'],
+        install_requires=[
+            str(ir.req) for ir in parse_requirements(
+                'requirements.txt', session=False)],
         tests_require=['nose'],
         test_suite='nose.collector',
         packages=find_packages(
