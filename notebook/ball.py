@@ -36,8 +36,8 @@ class Model(object):
         
 
         # dynamic symbols
-        x, v_x, y, v_y = \
-            mech.dynamicsymbols('x, v_x, y, v_y')
+        F_x, x, v_x, y, v_y = \
+            mech.dynamicsymbols('F_x, x, v_x, y, v_y')
 
         # parameters
         self.p_dict = OrderedDict({
@@ -46,6 +46,7 @@ class Model(object):
 
         # initial sate
         self.x0_dict = OrderedDict({
+            'F_x': 0,
             'x': 1,
             'v_x': 1,
             'y': 2,
@@ -54,12 +55,12 @@ class Model(object):
 
         # state space
         self.x = sympy.Matrix([
-            x, v_x, y, v_y
+            F_x, x, v_x, y, v_y
         ])
 
         # equations
         self.eqs = [
-            v_x.diff(self.t) - (-(c) * x),
+            v_x.diff(self.t) - F_x,
             x.diff(self.t) - v_x,
             v_y.diff(self.t) - (-(c) * y),
             y.diff(self.t) - v_y,

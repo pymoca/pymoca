@@ -6,13 +6,12 @@ from __future__ import print_function
 import sys
 import antlr4
 import antlr4.Parser
-from generated.ModelicaLexer import ModelicaLexer
-from generated.ModelicaParser import ModelicaParser
-from generated.ModelicaListener import ModelicaListener
 import argparse
 import jinja2
 import os
-
+from .generated.ModelicaLexer import ModelicaLexer
+from .generated.ModelicaParser import ModelicaParser
+from .generated.ModelicaListener import ModelicaListener
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 

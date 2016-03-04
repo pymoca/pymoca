@@ -6,12 +6,12 @@ from __future__ import print_function
 import sys
 import antlr4
 import antlr4.Parser
-from generated.ModelicaLexer import ModelicaLexer
-from generated.ModelicaParser import ModelicaParser
-from generated.ModelicaListener import ModelicaListener
 import argparse
 import jinja2
 from collections import OrderedDict
+from .generated.ModelicaLexer import ModelicaLexer
+from .generated.ModelicaParser import ModelicaParser
+from .generated.ModelicaListener import ModelicaListener
 
 #pylint: disable=invalid-name, no-self-use, missing-docstring, unused-variable, protected-access
 #pylint: disable=too-many-public-methods
