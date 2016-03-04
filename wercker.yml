@@ -36,7 +36,8 @@ build:
     #     python_location: /usr/bin/python3.2
 
     # A step that executes `pip install` command.
-    - pip-install -r requirements-py2.txt
+    - pip-install:
+        requirements_file: "requirements-py2.txt"
 
     # # This pip-install clears the local wheel cache
     # - pip-install:
