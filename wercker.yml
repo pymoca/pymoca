@@ -1,5 +1,5 @@
-# use a python 2.x container
-box: python:2
+# use a python 3 scipy stack
+box: ipython/scipy-stack
 
 # Build definition
 build:
