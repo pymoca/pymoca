@@ -4,3 +4,4 @@ sympy >= 0.7.6.1
 jinja2 >= 2.7
 scipy >= 0.13.3
 numpy >= 1.8.2
+enum34
