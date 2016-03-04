@@ -11,6 +11,7 @@ import os
 import sys
 import subprocess
 from pip.req import parse_requirements
+import pprint
 
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
@@ -166,6 +167,17 @@ def setup_package():
     # Rewrite the version file everytime
     write_version_py()
 
+    # Install requirements
+    with open('requirements.txt', 'r') as req_file:
+        install_reqs = req_file.read().split('\n')
+    if sys.version_info[0] == 2:
+        with open('requirements-py2.txt', 'r') as req_file:
+            install_reqs += req_file.read().split('\n')
+    elif sys.version_info[0] == 3:
+        with open('requirements-py3.txt', 'r') as req_file:
+            install_reqs += req_file.read().split('\n')
+    pprint.pprint(install_reqs)
+
     metadata = dict(
         name='pymola',
         maintainer="James Goppert",
@@ -179,10 +191,8 @@ def setup_package():
         license='GPLv3+',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
-        install_requires=[
-            str(ir.req) for ir in parse_requirements(
-                'requirements.txt', session=False)],
-        tests_require=['nose'],
+        install_requires=install_reqs,
+        tests_require=['coverage >= 4.0', 'nose >= 1.3.7'],
         test_suite='nose.collector',
         packages=find_packages(
             # choosing to distribute tests

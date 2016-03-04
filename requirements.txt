@@ -1,9 +1,6 @@
-setuptools >= 20.2.2
 argparse >= 1.1
 sympy >= 0.7.6
 matplotlib >= 1.4.3
 scipy >= 0.16
 numpy >= 1.9
 jinja2 >= 2.8
-antlr4-python2-runtime; python_version < '3.0'
-antlr4-python3-runtime; python_version >= '3.0'
