@@ -803,6 +803,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitStored_definition"):
                 listener.exitStored_definition(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStored_definition"):
+                return visitor.visitStored_definition(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -881,6 +887,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitClass_definition"):
                 listener.exitClass_definition(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_definition"):
+                return visitor.visitClass_definition(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -927,6 +939,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitClass_prefixes"):
                 listener.exitClass_prefixes(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_prefixes"):
+                return visitor.visitClass_prefixes(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1039,55 +1057,185 @@ class ModelicaParser ( Parser ):
             super(ModelicaParser.Class_specifierContext, self).__init__(parent, invokingState)
             self.parser = parser
 
+
+        def getRuleIndex(self):
+            return ModelicaParser.RULE_class_specifier
+
+     
+        def copyFrom(self, ctx):
+            super(ModelicaParser.Class_specifierContext, self).copyFrom(ctx)
+
+
+
+    class Class_spec_derContext(Class_specifierContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
+            super(ModelicaParser.Class_spec_derContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
         def IDENT(self, i=None):
             if i is None:
                 return self.getTokens(ModelicaParser.IDENT)
             else:
                 return self.getToken(ModelicaParser.IDENT, i)
-
-        def string_comment(self):
-            return self.getTypedRuleContext(ModelicaParser.String_commentContext,0)
-
-
-        def composition(self):
-            return self.getTypedRuleContext(ModelicaParser.CompositionContext,0)
-
-
-        def base_prefix(self):
-            return self.getTypedRuleContext(ModelicaParser.Base_prefixContext,0)
-
-
         def name(self):
             return self.getTypedRuleContext(ModelicaParser.NameContext,0)
-
 
         def comment(self):
             return self.getTypedRuleContext(ModelicaParser.CommentContext,0)
 
 
-        def array_subscripts(self):
-            return self.getTypedRuleContext(ModelicaParser.Array_subscriptsContext,0)
+        def enterRule(self, listener):
+            if hasattr(listener, "enterClass_spec_der"):
+                listener.enterClass_spec_der(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitClass_spec_der"):
+                listener.exitClass_spec_der(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_spec_der"):
+                return visitor.visitClass_spec_der(self)
+            else:
+                return visitor.visitChildren(self)
 
 
-        def class_modification(self):
-            return self.getTypedRuleContext(ModelicaParser.Class_modificationContext,0)
+    class Class_spec_enumContext(Class_specifierContext):
 
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
+            super(ModelicaParser.Class_spec_enumContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def IDENT(self):
+            return self.getToken(ModelicaParser.IDENT, 0)
+        def comment(self):
+            return self.getTypedRuleContext(ModelicaParser.CommentContext,0)
 
         def enum_list(self):
             return self.getTypedRuleContext(ModelicaParser.Enum_listContext,0)
 
 
-        def getRuleIndex(self):
-            return ModelicaParser.RULE_class_specifier
-
         def enterRule(self, listener):
-            if hasattr(listener, "enterClass_specifier"):
-                listener.enterClass_specifier(self)
+            if hasattr(listener, "enterClass_spec_enum"):
+                listener.enterClass_spec_enum(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitClass_specifier"):
-                listener.exitClass_specifier(self)
+            if hasattr(listener, "exitClass_spec_enum"):
+                listener.exitClass_spec_enum(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_spec_enum"):
+                return visitor.visitClass_spec_enum(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Class_spec_baseContext(Class_specifierContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
+            super(ModelicaParser.Class_spec_baseContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def IDENT(self):
+            return self.getToken(ModelicaParser.IDENT, 0)
+        def base_prefix(self):
+            return self.getTypedRuleContext(ModelicaParser.Base_prefixContext,0)
+
+        def name(self):
+            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+
+        def comment(self):
+            return self.getTypedRuleContext(ModelicaParser.CommentContext,0)
+
+        def array_subscripts(self):
+            return self.getTypedRuleContext(ModelicaParser.Array_subscriptsContext,0)
+
+        def class_modification(self):
+            return self.getTypedRuleContext(ModelicaParser.Class_modificationContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterClass_spec_base"):
+                listener.enterClass_spec_base(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitClass_spec_base"):
+                listener.exitClass_spec_base(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_spec_base"):
+                return visitor.visitClass_spec_base(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Class_spec_compContext(Class_specifierContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
+            super(ModelicaParser.Class_spec_compContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def IDENT(self, i=None):
+            if i is None:
+                return self.getTokens(ModelicaParser.IDENT)
+            else:
+                return self.getToken(ModelicaParser.IDENT, i)
+        def string_comment(self):
+            return self.getTypedRuleContext(ModelicaParser.String_commentContext,0)
+
+        def composition(self):
+            return self.getTypedRuleContext(ModelicaParser.CompositionContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterClass_spec_comp"):
+                listener.enterClass_spec_comp(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitClass_spec_comp"):
+                listener.exitClass_spec_comp(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_spec_comp"):
+                return visitor.visitClass_spec_comp(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Class_spec_extendsContext(Class_specifierContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
+            super(ModelicaParser.Class_spec_extendsContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def IDENT(self, i=None):
+            if i is None:
+                return self.getTokens(ModelicaParser.IDENT)
+            else:
+                return self.getToken(ModelicaParser.IDENT, i)
+        def string_comment(self):
+            return self.getTypedRuleContext(ModelicaParser.String_commentContext,0)
+
+        def composition(self):
+            return self.getTypedRuleContext(ModelicaParser.CompositionContext,0)
+
+        def class_modification(self):
+            return self.getTypedRuleContext(ModelicaParser.Class_modificationContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterClass_spec_extends"):
+                listener.enterClass_spec_extends(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitClass_spec_extends"):
+                listener.exitClass_spec_extends(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_spec_extends"):
+                return visitor.visitClass_spec_extends(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1100,6 +1248,7 @@ class ModelicaParser ( Parser ):
             self.state = 243
             la_ = self._interp.adaptivePredict(self._input,17,self._ctx)
             if la_ == 1:
+                localctx = ModelicaParser.Class_spec_compContext(self, localctx)
                 self.enterOuterAlt(localctx, 1)
                 self.state = 186
                 self.match(ModelicaParser.IDENT)
@@ -1114,6 +1263,7 @@ class ModelicaParser ( Parser ):
                 pass
 
             elif la_ == 2:
+                localctx = ModelicaParser.Class_spec_baseContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
                 self.state = 192
                 self.match(ModelicaParser.IDENT)
@@ -1142,6 +1292,7 @@ class ModelicaParser ( Parser ):
                 pass
 
             elif la_ == 3:
+                localctx = ModelicaParser.Class_spec_enumContext(self, localctx)
                 self.enterOuterAlt(localctx, 3)
                 self.state = 204
                 self.match(ModelicaParser.IDENT)
@@ -1176,6 +1327,7 @@ class ModelicaParser ( Parser ):
                 pass
 
             elif la_ == 4:
+                localctx = ModelicaParser.Class_spec_derContext(self, localctx)
                 self.enterOuterAlt(localctx, 4)
                 self.state = 216
                 self.match(ModelicaParser.IDENT)
@@ -1210,6 +1362,7 @@ class ModelicaParser ( Parser ):
                 pass
 
             elif la_ == 5:
+                localctx = ModelicaParser.Class_spec_extendsContext(self, localctx)
                 self.enterOuterAlt(localctx, 5)
                 self.state = 233
                 self.match(ModelicaParser.T__25)
@@ -1262,6 +1415,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitBase_prefix"):
                 listener.exitBase_prefix(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitBase_prefix"):
+                return visitor.visitBase_prefix(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1304,6 +1463,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitEnum_list"):
                 listener.exitEnum_list(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEnum_list"):
+                return visitor.visitEnum_list(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1360,6 +1525,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitEnumeration_literal"):
                 listener.exitEnumeration_literal(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEnumeration_literal"):
+                return visitor.visitEnumeration_literal(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1434,6 +1605,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitComposition"):
                 listener.exitComposition(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComposition"):
+                return visitor.visitComposition(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1549,6 +1726,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitLanguage_specification"):
                 listener.exitLanguage_specification(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitLanguage_specification"):
+                return visitor.visitLanguage_specification(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1595,6 +1778,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitExternal_function_call"):
                 listener.exitExternal_function_call(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExternal_function_call"):
+                return visitor.visitExternal_function_call(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1659,6 +1848,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitElement_list"):
                 listener.exitElement_list(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitElement_list"):
+                return visitor.visitElement_list(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1730,6 +1925,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitElement"):
                 listener.exitElement(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitElement"):
+                return visitor.visitElement(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -1872,6 +2073,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitImport_clause"):
                 listener.exitImport_clause(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitImport_clause"):
+                return visitor.visitImport_clause(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -1962,6 +2169,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitImport_list"):
                 listener.exitImport_list(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitImport_list"):
+                return visitor.visitImport_list(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2023,6 +2236,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitExtends_clause"):
                 listener.exitExtends_clause(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExtends_clause"):
+                return visitor.visitExtends_clause(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2083,6 +2302,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitConstraining_clause"):
                 listener.exitConstraining_clause(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitConstraining_clause"):
+                return visitor.visitConstraining_clause(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2146,6 +2371,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitComponent_clause"):
                 listener.exitComponent_clause(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComponent_clause"):
+                return visitor.visitComponent_clause(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2194,6 +2425,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitType_prefix"):
                 listener.exitType_prefix(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitType_prefix"):
+                return visitor.visitType_prefix(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2267,6 +2504,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitType_specifier"):
                 listener.exitType_specifier(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitType_specifier"):
+                return visitor.visitType_specifier(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2309,6 +2552,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitComponent_list"):
                 listener.exitComponent_list(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComponent_list"):
+                return visitor.visitComponent_list(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2371,6 +2620,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitComponent_declaration"):
                 listener.exitComponent_declaration(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComponent_declaration"):
+                return visitor.visitComponent_declaration(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2421,6 +2676,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitCondition_attribute"):
                 listener.exitCondition_attribute(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitCondition_attribute"):
+                return visitor.visitCondition_attribute(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2469,6 +2730,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitDeclaration"):
                 listener.exitDeclaration(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitDeclaration"):
+                return visitor.visitDeclaration(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2520,44 +2787,6 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Modification_assignmentContext(ModificationContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ModificationContext)
-            super(ModelicaParser.Modification_assignmentContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def expression(self):
-            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterModification_assignment"):
-                listener.enterModification_assignment(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitModification_assignment"):
-                listener.exitModification_assignment(self)
-
-
-    class Modification_assignment2Context(ModificationContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ModificationContext)
-            super(ModelicaParser.Modification_assignment2Context, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def expression(self):
-            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterModification_assignment2"):
-                listener.enterModification_assignment2(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitModification_assignment2"):
-                listener.exitModification_assignment2(self)
-
-
     class Modification_classContext(ModificationContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ModificationContext)
@@ -2578,6 +2807,62 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitModification_class"):
                 listener.exitModification_class(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitModification_class"):
+                return visitor.visitModification_class(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Modification_assignment2Context(ModificationContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ModificationContext)
+            super(ModelicaParser.Modification_assignment2Context, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def expression(self):
+            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterModification_assignment2"):
+                listener.enterModification_assignment2(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitModification_assignment2"):
+                listener.exitModification_assignment2(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitModification_assignment2"):
+                return visitor.visitModification_assignment2(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Modification_assignmentContext(ModificationContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ModificationContext)
+            super(ModelicaParser.Modification_assignmentContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def expression(self):
+            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterModification_assignment"):
+                listener.enterModification_assignment(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitModification_assignment"):
+                listener.exitModification_assignment(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitModification_assignment"):
+                return visitor.visitModification_assignment(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2652,6 +2937,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitClass_modification"):
                 listener.exitClass_modification(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_modification"):
+                return visitor.visitClass_modification(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2704,6 +2995,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitArgument_list"):
                 listener.exitArgument_list(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitArgument_list"):
+                return visitor.visitArgument_list(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2762,6 +3059,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitArgument"):
                 listener.exitArgument(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitArgument"):
+                return visitor.visitArgument(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2817,6 +3120,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitElement_modification_or_replaceable"):
                 listener.exitElement_modification_or_replaceable(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitElement_modification_or_replaceable"):
+                return visitor.visitElement_modification_or_replaceable(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -2892,6 +3201,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitElement_modification"):
                 listener.exitElement_modification(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitElement_modification"):
+                return visitor.visitElement_modification(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -2949,6 +3264,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitElement_redeclaration"):
                 listener.exitElement_redeclaration(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitElement_redeclaration"):
+                return visitor.visitElement_redeclaration(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -3037,6 +3358,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitElement_replaceable"):
                 listener.exitElement_replaceable(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitElement_replaceable"):
+                return visitor.visitElement_replaceable(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -3106,6 +3433,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitComponent_clause1"):
                 listener.exitComponent_clause1(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComponent_clause1"):
+                return visitor.visitComponent_clause1(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -3153,6 +3486,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitComponent_declaration1"):
                 listener.exitComponent_declaration1(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComponent_declaration1"):
+                return visitor.visitComponent_declaration1(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -3222,6 +3561,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitShort_class_definition"):
                 listener.exitShort_class_definition(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitShort_class_definition"):
+                return visitor.visitShort_class_definition(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -3326,6 +3671,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitEquation_section"):
                 listener.exitEquation_section(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_section"):
+                return visitor.visitEquation_section(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -3390,6 +3741,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitAlgorithm_section"):
                 listener.exitAlgorithm_section(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitAlgorithm_section"):
+                return visitor.visitAlgorithm_section(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -3445,6 +3802,81 @@ class ModelicaParser ( Parser ):
 
 
 
+    class Equation_whenContext(Equation_optionsContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
+            super(ModelicaParser.Equation_whenContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def when_equation(self):
+            return self.getTypedRuleContext(ModelicaParser.When_equationContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterEquation_when"):
+                listener.enterEquation_when(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitEquation_when"):
+                listener.exitEquation_when(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_when"):
+                return visitor.visitEquation_when(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Equation_connect_clauseContext(Equation_optionsContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
+            super(ModelicaParser.Equation_connect_clauseContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def connect_clause(self):
+            return self.getTypedRuleContext(ModelicaParser.Connect_clauseContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterEquation_connect_clause"):
+                listener.enterEquation_connect_clause(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitEquation_connect_clause"):
+                listener.exitEquation_connect_clause(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_connect_clause"):
+                return visitor.visitEquation_connect_clause(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Equation_forContext(Equation_optionsContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
+            super(ModelicaParser.Equation_forContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def for_equation(self):
+            return self.getTypedRuleContext(ModelicaParser.For_equationContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterEquation_for"):
+                listener.enterEquation_for(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitEquation_for"):
+                listener.exitEquation_for(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_for"):
+                return visitor.visitEquation_for(self)
+            else:
+                return visitor.visitChildren(self)
+
+
     class Equation_functionContext(Equation_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
@@ -3466,43 +3898,11 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitEquation_function"):
                 listener.exitEquation_function(self)
 
-
-    class Equation_whenContext(Equation_optionsContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
-            super(ModelicaParser.Equation_whenContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def when_equation(self):
-            return self.getTypedRuleContext(ModelicaParser.When_equationContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterEquation_when"):
-                listener.enterEquation_when(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitEquation_when"):
-                listener.exitEquation_when(self)
-
-
-    class Equation_connect_clauseContext(Equation_optionsContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
-            super(ModelicaParser.Equation_connect_clauseContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def connect_clause(self):
-            return self.getTypedRuleContext(ModelicaParser.Connect_clauseContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterEquation_connect_clause"):
-                listener.enterEquation_connect_clause(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitEquation_connect_clause"):
-                listener.exitEquation_connect_clause(self)
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_function"):
+                return visitor.visitEquation_function(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Equation_simpleContext(Equation_optionsContext):
@@ -3526,24 +3926,11 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitEquation_simple"):
                 listener.exitEquation_simple(self)
 
-
-    class Equation_forContext(Equation_optionsContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
-            super(ModelicaParser.Equation_forContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def for_equation(self):
-            return self.getTypedRuleContext(ModelicaParser.For_equationContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterEquation_for"):
-                listener.enterEquation_for(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitEquation_for"):
-                listener.exitEquation_for(self)
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_simple"):
+                return visitor.visitEquation_simple(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Equation_ifContext(Equation_optionsContext):
@@ -3563,6 +3950,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitEquation_if"):
                 listener.exitEquation_if(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_if"):
+                return visitor.visitEquation_if(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -3655,6 +4048,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitEquation"):
                 listener.exitEquation(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation"):
+                return visitor.visitEquation(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -3692,64 +4091,51 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Statement_forContext(Statement_optionsContext):
+    class Statement_breakContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_forContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def for_statement(self):
-            return self.getTypedRuleContext(ModelicaParser.For_statementContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_for"):
-                listener.enterStatement_for(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_for"):
-                listener.exitStatement_for(self)
-
-
-    class Statement_returnContext(Statement_optionsContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_returnContext, self).__init__(parser)
+            super(ModelicaParser.Statement_breakContext, self).__init__(parser)
             self.copyFrom(ctx)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_return"):
-                listener.enterStatement_return(self)
+            if hasattr(listener, "enterStatement_break"):
+                listener.enterStatement_break(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_return"):
-                listener.exitStatement_return(self)
+            if hasattr(listener, "exitStatement_break"):
+                listener.exitStatement_break(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_break"):
+                return visitor.visitStatement_break(self)
+            else:
+                return visitor.visitChildren(self)
 
 
-    class Statement_component_referenceContext(Statement_optionsContext):
+    class Statement_whileContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_component_referenceContext, self).__init__(parser)
+            super(ModelicaParser.Statement_whileContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def component_reference(self):
-            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
-
-        def expression(self):
-            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
-
-        def function_call_args(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
+        def while_statement(self):
+            return self.getTypedRuleContext(ModelicaParser.While_statementContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_component_reference"):
-                listener.enterStatement_component_reference(self)
+            if hasattr(listener, "enterStatement_while"):
+                listener.enterStatement_while(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_component_reference"):
-                listener.exitStatement_component_reference(self)
+            if hasattr(listener, "exitStatement_while"):
+                listener.exitStatement_while(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_while"):
+                return visitor.visitStatement_while(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Statement_component_functionContext(Statement_optionsContext):
@@ -3776,24 +4162,58 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitStatement_component_function"):
                 listener.exitStatement_component_function(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_component_function"):
+                return visitor.visitStatement_component_function(self)
+            else:
+                return visitor.visitChildren(self)
 
-    class Statement_ifContext(Statement_optionsContext):
+
+    class Statement_returnContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_ifContext, self).__init__(parser)
+            super(ModelicaParser.Statement_returnContext, self).__init__(parser)
             self.copyFrom(ctx)
-
-        def if_statement(self):
-            return self.getTypedRuleContext(ModelicaParser.If_statementContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_if"):
-                listener.enterStatement_if(self)
+            if hasattr(listener, "enterStatement_return"):
+                listener.enterStatement_return(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_if"):
-                listener.exitStatement_if(self)
+            if hasattr(listener, "exitStatement_return"):
+                listener.exitStatement_return(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_return"):
+                return visitor.visitStatement_return(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Statement_forContext(Statement_optionsContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
+            super(ModelicaParser.Statement_forContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def for_statement(self):
+            return self.getTypedRuleContext(ModelicaParser.For_statementContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterStatement_for"):
+                listener.enterStatement_for(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitStatement_for"):
+                listener.exitStatement_for(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_for"):
+                return visitor.visitStatement_for(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Statement_whenContext(Statement_optionsContext):
@@ -3814,40 +4234,67 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitStatement_when"):
                 listener.exitStatement_when(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_when"):
+                return visitor.visitStatement_when(self)
+            else:
+                return visitor.visitChildren(self)
 
-    class Statement_whileContext(Statement_optionsContext):
+
+    class Statement_ifContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_whileContext, self).__init__(parser)
+            super(ModelicaParser.Statement_ifContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def while_statement(self):
-            return self.getTypedRuleContext(ModelicaParser.While_statementContext,0)
+        def if_statement(self):
+            return self.getTypedRuleContext(ModelicaParser.If_statementContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_while"):
-                listener.enterStatement_while(self)
+            if hasattr(listener, "enterStatement_if"):
+                listener.enterStatement_if(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_while"):
-                listener.exitStatement_while(self)
+            if hasattr(listener, "exitStatement_if"):
+                listener.exitStatement_if(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_if"):
+                return visitor.visitStatement_if(self)
+            else:
+                return visitor.visitChildren(self)
 
 
-    class Statement_breakContext(Statement_optionsContext):
+    class Statement_component_referenceContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_breakContext, self).__init__(parser)
+            super(ModelicaParser.Statement_component_referenceContext, self).__init__(parser)
             self.copyFrom(ctx)
+
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
+
+        def expression(self):
+            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
+
+        def function_call_args(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_break"):
-                listener.enterStatement_break(self)
+            if hasattr(listener, "enterStatement_component_reference"):
+                listener.enterStatement_component_reference(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_break"):
-                listener.exitStatement_break(self)
+            if hasattr(listener, "exitStatement_component_reference"):
+                listener.exitStatement_component_reference(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_component_reference"):
+                return visitor.visitStatement_component_reference(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -3967,6 +4414,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitStatement"):
                 listener.exitStatement(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement"):
+                return visitor.visitStatement(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4018,6 +4471,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitIf_equation"):
                 listener.exitIf_equation(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitIf_equation"):
+                return visitor.visitIf_equation(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -4138,6 +4597,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitIf_statement"):
                 listener.exitIf_statement(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitIf_statement"):
+                return visitor.visitIf_statement(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4251,6 +4716,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitFor_equation"):
                 listener.exitFor_equation(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitFor_equation"):
+                return visitor.visitFor_equation(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4319,6 +4790,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitFor_statement"):
                 listener.exitFor_statement(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitFor_statement"):
+                return visitor.visitFor_statement(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4383,6 +4860,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitFor_indices"):
                 listener.exitFor_indices(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitFor_indices"):
+                return visitor.visitFor_indices(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4438,6 +4921,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitFor_index"):
                 listener.exitFor_index(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitFor_index"):
+                return visitor.visitFor_index(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -4495,6 +4984,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitWhile_statement"):
                 listener.exitWhile_statement(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitWhile_statement"):
+                return visitor.visitWhile_statement(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -4566,6 +5061,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitWhen_equation"):
                 listener.exitWhen_equation(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitWhen_equation"):
+                return visitor.visitWhen_equation(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -4666,6 +5167,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitWhen_statement"):
                 listener.exitWhen_statement(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitWhen_statement"):
+                return visitor.visitWhen_statement(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4756,6 +5263,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitConnect_clause"):
                 listener.exitConnect_clause(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitConnect_clause"):
+                return visitor.visitConnect_clause(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4801,25 +5314,6 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Expression_simpleContext(ExpressionContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExpressionContext)
-            super(ModelicaParser.Expression_simpleContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def simple_expression(self):
-            return self.getTypedRuleContext(ModelicaParser.Simple_expressionContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpression_simple"):
-                listener.enterExpression_simple(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpression_simple"):
-                listener.exitExpression_simple(self)
-
-
     class Expression_ifContext(ExpressionContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ExpressionContext)
@@ -4840,6 +5334,37 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitExpression_if"):
                 listener.exitExpression_if(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpression_if"):
+                return visitor.visitExpression_if(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expression_simpleContext(ExpressionContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExpressionContext)
+            super(ModelicaParser.Expression_simpleContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def simple_expression(self):
+            return self.getTypedRuleContext(ModelicaParser.Simple_expressionContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpression_simple"):
+                listener.enterExpression_simple(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpression_simple"):
+                listener.exitExpression_simple(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpression_simple"):
+                return visitor.visitExpression_simple(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -4924,6 +5449,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitSimple_expression"):
                 listener.exitSimple_expression(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitSimple_expression"):
+                return visitor.visitSimple_expression(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -4977,92 +5508,6 @@ class ModelicaParser ( Parser ):
             super(ModelicaParser.ExprContext, self).copyFrom(ctx)
 
 
-    class Expr_orContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_orContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def expr(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
-            else:
-                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_or"):
-                listener.enterExpr_or(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_or"):
-                listener.exitExpr_or(self)
-
-
-    class Expr_primaryContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_primaryContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def primary(self):
-            return self.getTypedRuleContext(ModelicaParser.PrimaryContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_primary"):
-                listener.enterExpr_primary(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_primary"):
-                listener.exitExpr_primary(self)
-
-
-    class Expr_andContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_andContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def expr(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
-            else:
-                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_and"):
-                listener.enterExpr_and(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_and"):
-                listener.exitExpr_and(self)
-
-
-    class Expr_relContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_relContext, self).__init__(parser)
-            self.op = None # Token
-            self.copyFrom(ctx)
-
-        def expr(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
-            else:
-                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_rel"):
-                listener.enterExpr_rel(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_rel"):
-                listener.exitExpr_rel(self)
-
-
     class Expr_negContext(ExprContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
@@ -5081,47 +5526,11 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitExpr_neg"):
                 listener.exitExpr_neg(self)
 
-
-    class Expr_notContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_notContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def expr(self):
-            return self.getTypedRuleContext(ModelicaParser.ExprContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_not"):
-                listener.enterExpr_not(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_not"):
-                listener.exitExpr_not(self)
-
-
-    class Expr_mulContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_mulContext, self).__init__(parser)
-            self.op = None # Token
-            self.copyFrom(ctx)
-
-        def expr(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_neg"):
+                return visitor.visitExpr_neg(self)
             else:
-                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_mul"):
-                listener.enterExpr_mul(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_mul"):
-                listener.exitExpr_mul(self)
+                return visitor.visitChildren(self)
 
 
     class Expr_addContext(ExprContext):
@@ -5146,6 +5555,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitExpr_add"):
                 listener.exitExpr_add(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_add"):
+                return visitor.visitExpr_add(self)
+            else:
+                return visitor.visitChildren(self)
+
 
     class Expr_expContext(ExprContext):
 
@@ -5168,6 +5583,176 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitExpr_exp"):
                 listener.exitExpr_exp(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_exp"):
+                return visitor.visitExpr_exp(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_orContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_orContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def expr(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
+            else:
+                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_or"):
+                listener.enterExpr_or(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_or"):
+                listener.exitExpr_or(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_or"):
+                return visitor.visitExpr_or(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_primaryContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_primaryContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def primary(self):
+            return self.getTypedRuleContext(ModelicaParser.PrimaryContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_primary"):
+                listener.enterExpr_primary(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_primary"):
+                listener.exitExpr_primary(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_primary"):
+                return visitor.visitExpr_primary(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_andContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_andContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def expr(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
+            else:
+                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_and"):
+                listener.enterExpr_and(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_and"):
+                listener.exitExpr_and(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_and"):
+                return visitor.visitExpr_and(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_relContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_relContext, self).__init__(parser)
+            self.op = None # Token
+            self.copyFrom(ctx)
+
+        def expr(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
+            else:
+                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_rel"):
+                listener.enterExpr_rel(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_rel"):
+                listener.exitExpr_rel(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_rel"):
+                return visitor.visitExpr_rel(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_notContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_notContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def expr(self):
+            return self.getTypedRuleContext(ModelicaParser.ExprContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_not"):
+                listener.enterExpr_not(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_not"):
+                listener.exitExpr_not(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_not"):
+                return visitor.visitExpr_not(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_mulContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_mulContext, self).__init__(parser)
+            self.op = None # Token
+            self.copyFrom(ctx)
+
+        def expr(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
+            else:
+                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_mul"):
+                listener.enterExpr_mul(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_mul"):
+                listener.exitExpr_mul(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_mul"):
+                return visitor.visitExpr_mul(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -5350,42 +5935,50 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Primary_initialContext(PrimaryContext):
+    class Primary_stringContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_initialContext, self).__init__(parser)
+            super(ModelicaParser.Primary_stringContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def function_call_args(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
+        def STRING(self):
+            return self.getToken(ModelicaParser.STRING, 0)
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_string"):
+                listener.enterPrimary_string(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_string"):
+                listener.exitPrimary_string(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_string"):
+                return visitor.visitPrimary_string(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_endContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_endContext, self).__init__(parser)
+            self.copyFrom(ctx)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_initial"):
-                listener.enterPrimary_initial(self)
+            if hasattr(listener, "enterPrimary_end"):
+                listener.enterPrimary_end(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_initial"):
-                listener.exitPrimary_initial(self)
+            if hasattr(listener, "exitPrimary_end"):
+                listener.exitPrimary_end(self)
 
-
-    class Primary_derivativeContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_derivativeContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def function_call_args(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_derivative"):
-                listener.enterPrimary_derivative(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_derivative"):
-                listener.exitPrimary_derivative(self)
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_end"):
+                return visitor.visitPrimary_end(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Primary_output_expression_listContext(PrimaryContext):
@@ -5406,27 +5999,132 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitPrimary_output_expression_list"):
                 listener.exitPrimary_output_expression_list(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_output_expression_list"):
+                return visitor.visitPrimary_output_expression_list(self)
+            else:
+                return visitor.visitChildren(self)
 
-    class Primary_functionContext(PrimaryContext):
+
+    class Primary_unsigned_numberContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_functionContext, self).__init__(parser)
+            super(ModelicaParser.Primary_unsigned_numberContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+        def UNSIGNED_NUMBER(self):
+            return self.getToken(ModelicaParser.UNSIGNED_NUMBER, 0)
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_unsigned_number"):
+                listener.enterPrimary_unsigned_number(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_unsigned_number"):
+                listener.exitPrimary_unsigned_number(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_unsigned_number"):
+                return visitor.visitPrimary_unsigned_number(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_function_argumentsContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_function_argumentsContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def function_arguments(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_argumentsContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_function_arguments"):
+                listener.enterPrimary_function_arguments(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_function_arguments"):
+                listener.exitPrimary_function_arguments(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_function_arguments"):
+                return visitor.visitPrimary_function_arguments(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_falseContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_falseContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_false"):
+                listener.enterPrimary_false(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_false"):
+                listener.exitPrimary_false(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_false"):
+                return visitor.visitPrimary_false(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_derivativeContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_derivativeContext, self).__init__(parser)
+            self.copyFrom(ctx)
 
         def function_call_args(self):
             return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_function"):
-                listener.enterPrimary_function(self)
+            if hasattr(listener, "enterPrimary_derivative"):
+                listener.enterPrimary_derivative(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_function"):
-                listener.exitPrimary_function(self)
+            if hasattr(listener, "exitPrimary_derivative"):
+                listener.exitPrimary_derivative(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_derivative"):
+                return visitor.visitPrimary_derivative(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_component_referenceContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_component_referenceContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_component_reference"):
+                listener.enterPrimary_component_reference(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_component_reference"):
+                listener.exitPrimary_component_reference(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_component_reference"):
+                return visitor.visitPrimary_component_reference(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Primary_expression_listContext(PrimaryContext):
@@ -5450,56 +6148,11 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitPrimary_expression_list"):
                 listener.exitPrimary_expression_list(self)
 
-
-    class Primary_falseContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_falseContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_false"):
-                listener.enterPrimary_false(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_false"):
-                listener.exitPrimary_false(self)
-
-
-    class Primary_function_argumentsContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_function_argumentsContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def function_arguments(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_argumentsContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_function_arguments"):
-                listener.enterPrimary_function_arguments(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_function_arguments"):
-                listener.exitPrimary_function_arguments(self)
-
-
-    class Primary_endContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_endContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_end"):
-                listener.enterPrimary_end(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_end"):
-                listener.exitPrimary_end(self)
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_expression_list"):
+                return visitor.visitPrimary_expression_list(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Primary_trueContext(PrimaryContext):
@@ -5517,60 +6170,64 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitPrimary_true"):
                 listener.exitPrimary_true(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_true"):
+                return visitor.visitPrimary_true(self)
+            else:
+                return visitor.visitChildren(self)
 
-    class Primary_component_referenceContext(PrimaryContext):
+
+    class Primary_functionContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_component_referenceContext, self).__init__(parser)
+            super(ModelicaParser.Primary_functionContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def component_reference(self):
-            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
+        def name(self):
+            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+
+        def function_call_args(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_component_reference"):
-                listener.enterPrimary_component_reference(self)
+            if hasattr(listener, "enterPrimary_function"):
+                listener.enterPrimary_function(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_component_reference"):
-                listener.exitPrimary_component_reference(self)
+            if hasattr(listener, "exitPrimary_function"):
+                listener.exitPrimary_function(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_function"):
+                return visitor.visitPrimary_function(self)
+            else:
+                return visitor.visitChildren(self)
 
 
-    class Primary_stringContext(PrimaryContext):
+    class Primary_initialContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_stringContext, self).__init__(parser)
+            super(ModelicaParser.Primary_initialContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def STRING(self):
-            return self.getToken(ModelicaParser.STRING, 0)
+        def function_call_args(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
+
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_string"):
-                listener.enterPrimary_string(self)
+            if hasattr(listener, "enterPrimary_initial"):
+                listener.enterPrimary_initial(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_string"):
-                listener.exitPrimary_string(self)
+            if hasattr(listener, "exitPrimary_initial"):
+                listener.exitPrimary_initial(self)
 
-
-    class Primary_unsigned_numberContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_unsigned_numberContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def UNSIGNED_NUMBER(self):
-            return self.getToken(ModelicaParser.UNSIGNED_NUMBER, 0)
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_unsigned_number"):
-                listener.enterPrimary_unsigned_number(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_unsigned_number"):
-                listener.exitPrimary_unsigned_number(self)
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_initial"):
+                return visitor.visitPrimary_initial(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -5728,6 +6385,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitName"):
                 listener.exitName(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitName"):
+                return visitor.visitName(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -5797,6 +6460,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitComponent_reference"):
                 listener.exitComponent_reference(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComponent_reference"):
+                return visitor.visitComponent_reference(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -5873,6 +6542,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitFunction_call_args"):
                 listener.exitFunction_call_args(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitFunction_call_args"):
+                return visitor.visitFunction_call_args(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -5936,6 +6611,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitFunction_arguments"):
                 listener.exitFunction_arguments(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitFunction_arguments"):
+                return visitor.visitFunction_arguments(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -6018,6 +6699,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitNamed_arguments"):
                 listener.exitNamed_arguments(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitNamed_arguments"):
+                return visitor.visitNamed_arguments(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -6074,6 +6761,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitNamed_argument"):
                 listener.exitNamed_argument(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitNamed_argument"):
+                return visitor.visitNamed_argument(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -6113,6 +6806,31 @@ class ModelicaParser ( Parser ):
 
 
 
+    class Argument_expressionContext(Function_argumentContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Function_argumentContext)
+            super(ModelicaParser.Argument_expressionContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def expression(self):
+            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterArgument_expression"):
+                listener.enterArgument_expression(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitArgument_expression"):
+                listener.exitArgument_expression(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitArgument_expression"):
+                return visitor.visitArgument_expression(self)
+            else:
+                return visitor.visitChildren(self)
+
+
     class Argument_functionContext(Function_argumentContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Function_argumentContext)
@@ -6134,24 +6852,11 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitArgument_function"):
                 listener.exitArgument_function(self)
 
-
-    class Argument_expressionContext(Function_argumentContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Function_argumentContext)
-            super(ModelicaParser.Argument_expressionContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def expression(self):
-            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterArgument_expression"):
-                listener.enterArgument_expression(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitArgument_expression"):
-                listener.exitArgument_expression(self)
+        def accept(self, visitor):
+            if hasattr(visitor, "visitArgument_function"):
+                return visitor.visitArgument_function(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -6223,6 +6928,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitOutput_expression_list"):
                 listener.exitOutput_expression_list(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitOutput_expression_list"):
+                return visitor.visitOutput_expression_list(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -6284,6 +6995,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitExpression_list"):
                 listener.exitExpression_list(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpression_list"):
+                return visitor.visitExpression_list(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -6339,6 +7056,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitArray_subscripts"):
                 listener.exitArray_subscripts(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitArray_subscripts"):
+                return visitor.visitArray_subscripts(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -6397,6 +7120,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitSubscript"):
                 listener.exitSubscript(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitSubscript"):
+                return visitor.visitSubscript(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -6453,6 +7182,12 @@ class ModelicaParser ( Parser ):
             if hasattr(listener, "exitComment"):
                 listener.exitComment(self)
 
+        def accept(self, visitor):
+            if hasattr(visitor, "visitComment"):
+                return visitor.visitComment(self)
+            else:
+                return visitor.visitChildren(self)
+
 
 
 
@@ -6502,6 +7237,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitString_comment"):
                 listener.exitString_comment(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitString_comment"):
+                return visitor.visitString_comment(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 
@@ -6560,6 +7301,12 @@ class ModelicaParser ( Parser ):
         def exitRule(self, listener):
             if hasattr(listener, "exitAnnotation"):
                 listener.exitAnnotation(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitAnnotation"):
+                return visitor.visitAnnotation(self)
+            else:
+                return visitor.visitChildren(self)
 
 
 

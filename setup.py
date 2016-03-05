@@ -48,6 +48,9 @@ Topic :: Software Development :: Compilers
 Topic :: Software Development :: Embedded Systems
 """
 
+
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 #pylint: disable=no-init, too-few-public-methods
 
 

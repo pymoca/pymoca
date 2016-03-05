@@ -43,8 +43,8 @@ class_specifier :
         class_modification? comment                                 # class_spec_base
     | IDENT '=' 'enumeration' '(' (enum_list? | ':') ')' comment    # class_spec_enum
     | IDENT '=' 'der' '(' name ',' IDENT (',' IDENT )* ')' comment  # class_spec_der
-    | 'extends' IDENT class_modification? string_comment            # class_spec_extends
-        composition 'end' IDENT
+    | 'extends' IDENT class_modification? string_comment 
+        composition 'end' IDENT                                     # class_spec_extends
     ;
 
 // B.2.2.4 ------------------------------------------------
