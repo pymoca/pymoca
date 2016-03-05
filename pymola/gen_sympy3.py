@@ -9,9 +9,16 @@ import antlr4.Parser
 import argparse
 import jinja2
 from collections import OrderedDict
+
+# compiler
 from .generated.ModelicaLexer import ModelicaLexer
 from .generated.ModelicaParser import ModelicaParser
 from .generated.ModelicaListener import ModelicaListener
+
+# sympy runtime
+import sympy
+import sympy.physics.mechanics as mech
+from ordered_set import OrderedSet
 
 #pylint: disable=invalid-name, no-self-use, missing-docstring, unused-variable, protected-access
 #pylint: disable=too-many-public-methods
@@ -444,18 +451,23 @@ class {name:s} :
 
 # class_modification ('=' expression)?
     def exitModification_class(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        mod = self.getValue(ctx.class_modification())
+        if ctx.expression() is not None:
+            expr = self.getValue(ctx.expression())
+            self.setValue(ctx, "{:s} = {:s}".format(mod, expr))
+        else:
+            self.setValue(ctx, "{:s}".format(mod))
 
 # '=' expression
     def exitModification_assignment(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        expr = self.getValue(ctx.expression())
+        self.setValue(ctx, "= {:s}".format(expr))
 
 # ':=' expression
     def exitModification_assignment2(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        # TODO how to handle := operator?, is it just assignment
+        expr = self.getValue(ctx.expression())
+        self.setValue(ctx, "= {:s}".format(expr))
 
 # B.2.5.2 ------------------------------------------------
 # class_modification :
@@ -827,7 +839,7 @@ class {name:s} :
 #     ;
     def exitSimple_expression(self, ctx):
         # TODO rest of expressions
-        exprs = [self.getValue(e) for e in ctx.expr()]
+        exprs = ''.join([self.getValue(e) for e in ctx.expr()])
         self.setValue(ctx, exprs)
 
 
@@ -851,10 +863,10 @@ class {name:s} :
 
 # primary op=('^' | '.^') primary
     def exitExpr_exp(self, ctx):
+        # TODO handle .^
         p = ctx.primary()
-        self.setValue(ctx, '{:s} {:s} {:s}'.format(
+        self.setValue(ctx, '{:s} ** {:s}'.format(
             self.getValue(p[0]),
-            op.getText(),
             self.getValue(p[1])))
 
 # expr op=('*' | '/' | '.*' | './') expr
@@ -862,7 +874,7 @@ class {name:s} :
         e = ctx.expr()
         self.setValue(ctx, '{:s} {:s} {:s}'.format(
             self.getValue(e[0]),
-            op.getText(),
+            ctx.op.text,
             self.getValue(e[1])))
 
 # expr  op=('+' | '-' | '.+' | '.-') expr
@@ -870,7 +882,7 @@ class {name:s} :
         e = ctx.expr()
         self.setValue(ctx, '{:s} {:s} {:s}'.format(
             self.getValue(e[0]),
-            op.getText(),
+            ctx.op.text,
             self.getValue(e[1])))
 
 # expr  op=('<' | '<=' | '>' | '>=' | '==' | '<>') expr
@@ -878,7 +890,7 @@ class {name:s} :
         e = ctx.expr()
         self.setValue(ctx, '{:s} {:s} {:s}'.format(
             self.getValue(e[0]),
-            op.getText(),
+            ctx.op.text,
             self.getValue(e[1])))
 
 # 'not' expr
@@ -891,7 +903,7 @@ class {name:s} :
         e = ctx.expr()
         self.setValue(ctx, '{:s} and {:s}'.format(
             self.getValue(e[0]),
-            op.getText(),
+            ctx.op.text,
             self.getValue(e[1])))
 
 # expr  'or' expr
@@ -899,7 +911,7 @@ class {name:s} :
         e = ctx.expr()
         self.setValue(ctx, '{:s} or {:s}'.format(
             self.getValue(e[0]),
-            op.getText(),
+            ctx.op.text,
             self.getValue(e[1])))
 
 # primary
@@ -945,8 +957,8 @@ class {name:s} :
 
 # 'der' function_call_args
     def exitPrimary_derivative(self, ctx):
-        name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
-        self.setValue(ctx, '{:s}.diff(self.t)'.format(name))
+        arg = ctx.function_call_args().function_arguments().function_argument()[0].getText()
+        self.setValue(ctx, '{:s}(t).diff(t)'.format(arg))
 
 # 'initial' function_call_args
     def exitPrimary_initial(self, ctx):
@@ -986,8 +998,9 @@ class {name:s} :
 #     '.'? IDENT array_subscripts? ('.' IDENT array_subscripts?)*
 #     ;
     def exitComponent_reference(self, ctx):
-        # TODO array_subscripts and other IDENTs
-        self.setValue(ctx, [c.getText() for c in ctx.IDENT()])
+        # TODO array_subscripts
+        comp = ''.join([c.getText() for c in ctx.IDENT()])
+        self.setValue(ctx, comp)
 
 # B.2.7.7 ------------------------------------------------
 # function_call_args :
@@ -1127,6 +1140,79 @@ def main(argv):
 
     with open(args.out, 'w') as f:
         f.write(sympy_model)
+
+#=========================================================
+# Process AST
+#=========================================================
+
+def process_ast(ast):
+    # find declared symbols and parameters
+    declared_symbols = OrderedSet()
+    parameters = OrderedSet()
+    inputs = OrderedSet()
+    outputs = OrderedSet()
+    for elem in ast['elist']:
+        classdef = elem['classdef']
+        rclassdef = elem['rclassdef']
+        comp = elem['comp']
+        rcomp = elem['rcomp']
+        if classdef is not None:
+            for comp in classdef['component_list']:
+                if 'parameter' in classdef['type_prefix']:
+                    parameters.add(str(comp))
+                elif 'input' in classdef['type_prefix']:
+                    inputs.add(str(comp))
+                elif 'output' in classdef['type_prefix']:
+                    outputs.add(str(comp))
+                else:
+                    declared_symbols.add(str(comp))
+
+    # find states and symbols
+    states = OrderedSet()
+    symbols = OrderedSet()
+    for eq_section in ast['eq_section']:
+        for eq in eq_section['eqs']:
+            eq_sympy = sympy.sympify(eq)
+            for deriv in eq_sympy.atoms(sympy.Derivative):
+                states.add(str(deriv.args[0].func))
+            for sym in eq_sympy.atoms(sympy.Symbol):
+                symbols.add(str(sym))
+    # remove states from symbols
+    for state in states:
+        symbols.remove(state)
+    # remove params from symbols
+    for param in parameters:
+        symbols.remove(param)
+    symbols.remove('t')
+
+    #print('states', states)
+    #print('symbols', symbols)
+    #print('params', parameters)
+        
+    # build equations list
+    alg_eq_list = []
+    diff_eq_list = []
+    for eq_section in ast['eq_section']:
+        for eq in eq_section['eqs']:
+            for state in states:
+                eq = eq.replace('{:s}'.format(state),
+                        '{:s}(t)'.format(state))
+            for i in range(10):
+                eq = eq.replace('(t)(t)', '(t)')
+            sympy_eq = sympy.sympify(eq)
+            if len(sympy_eq.atoms(sympy.Derivative)) > 0:
+                diff_eq_list += [sympy_eq]
+            else:
+                alg_eq_list += [sympy_eq]
+            
+    f = sympy.Matrix(diff_eq_list)
+    a = sympy.Matrix(alg_eq_list)
+    u = sympy.Matrix([inputs]).T
+    x = sympy.Matrix([sympy.sympify('{:s}(t)'.format(state))
+        for state in states])
+    y = sympy.Matrix([outputs]).T
+    p = sympy.Matrix([parameters]).T
+    return locals()
 
 if __name__ == '__main__':
     main(sys.argv[1:])
