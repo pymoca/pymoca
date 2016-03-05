@@ -99,11 +99,13 @@ class SympyPrinter(ModelicaListener):
         if self.getValue(ctx) is None:
             raise RuntimeError("no value set for {:s}:\ninput:\n{:s}".format(rule, ctx.getText()))
 
-    #-------------------------------------------------------------------------
-    # Top Level
-    #-------------------------------------------------------------------------
+#=========================================================
+#  B.2.1 Stored Definition - Within
+#=========================================================
 
+    # B.2.1.1 -------------------------------------------
     def exitStored_definition(self, ctx):
+        "B.2.1.1"
         composition = self.getValue(ctx.class_definition()[0]\
                 .class_specifier().composition())
         self.result = """
@@ -213,6 +215,41 @@ if __name__ == "__main__":
 #############################################################################
 """.format(**locals())
 
+#=========================================================
+#  B.2.2 Class Definition
+#=========================================================
+
+    # B.2.2.1 -------------------------------------------
+    def exitClass_definition(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.2 -------------------------------------------
+    def exitClass_prefixes(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.3 -------------------------------------------
+    def exitClass_specifier(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.4 -------------------------------------------
+    def exitBase_prefix(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.5 -------------------------------------------
+    def exitEnum_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.6 -------------------------------------------
+    def exitEnumeration_literal(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.7 -------------------------------------------
     def exitComposition(self, ctx):
         decl = self.getValue(ctx.element_list()[0])
         equations = self.getValue(ctx.equation_section()[0])
@@ -255,43 +292,54 @@ if __name__ == "__main__":
 {{equations}}
 """).render(**data))
 
-    def exitElement_list(self, ctx):
-        d = self.getValue(ctx.element()[0])
-        for i in range(1, len(ctx.element())):
-            element = ctx.element()[i]
-            for key in d.keys():
-                d[key].update(self.getValue(element)[key])
-        self.setValue(ctx, d)
-        print("dict", d)
+    # B.2.2.8 -------------------------------------------
+    def exitLanguage_specification(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
 
+    # B.2.2.9 -------------------------------------------
+    def exitExternal_functioni_call(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.10 -------------------------------------------
+    def exitElement_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.2.11 -------------------------------------------
     def exitElement(self, ctx):
         self.setValue(ctx, self.getValue(ctx.component_clause()))
 
-    def exitEquation_section(self, ctx):
-        str_eq = "self.eqs = ["
-        str_when = ""
-        for eq in ctx.equation():
-            data = self.getValue(eq)
-            if len(data) <= 0:
-                continue
-            print("eq type:", type(eq.equation_options()))
-            if isinstance(eq.equation_options(), ModelicaParser.Equation_simpleContext):
-                str_eq += "\n{self.indent:s}{data:s},".format(**locals())
-                print("SIMPLE")
-            elif isinstance(eq.equation_options(), ModelicaParser.Equation_whenContext):
-                str_when += "\n{self.indent:s}{data:s}".format(**locals())
-            else:
-                raise IOError('equation type not supported yet')
-        str_eq += "\n{self.indent:s}]\n".format(**locals())
-        str_when += ""
-        self.setValue(ctx, """
-        # equations
-        {str_eq:s}
+    # B.2.2.12 -------------------------------------------
+    def exitImport_clause(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
 
-        # when equations
-{str_when:s}
-""".format(**locals()))
+    # B.2.2.13 -------------------------------------------
+    def exitImport_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
 
+#=========================================================
+# B.2.3 Extends
+#=========================================================
+
+    # B.2.3.1 -------------------------------------------
+    def exitExtends_clause(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.3.2 -------------------------------------------
+    def exitConstraining_clause(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+#=========================================================
+# B.2.4 Component Clause
+#=========================================================
+
+    # B.2.4.1
     def exitComponent_clause(self, ctx):
         s = ""
         parameters = OrderedDict()
@@ -323,16 +371,40 @@ if __name__ == "__main__":
             'dynamic_symbols': dynamic_symbols,
             })
 
-    def exitClass_prefixes(self, ctx):
-        # don't care about prefixes for now
-        self.setValue(ctx, '')
+    # B.2.4.2 -------------------------------------------
+    def exitType_prefix(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
 
-    def exitName(self, ctx):
-        self.setValue(ctx, ctx.getText())
-
+    # B.2.4.3 -------------------------------------------
     def exitType_specifier(self, ctx):
         self.setValue(ctx, self.getValue(ctx.name()))
 
+    # B.2.4.4 -------------------------------------------
+    def exitComponent_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.4.5 -------------------------------------------
+    def exitComponent_declaration(self, ctx):
+        # set above based on component type
+        self.setValue(ctx, "")
+
+    # B.2.4.6 -------------------------------------------
+    def exitCondition_attribute(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.4.7 -------------------------------------------
+    def exitDeclaration(self, ctx):
+        # set above based on component type
+        self.setValue(ctx, "")
+
+#=========================================================
+# B.2.5 Modification
+#=========================================================
+
+    # B.2.5.1 -------------------------------------------
     def exitModification_class(self, ctx):
         mod = self.getValue(ctx.class_modification())
         if ctx.expression() is not None:
@@ -350,102 +422,95 @@ if __name__ == "__main__":
         expr = self.getValue(ctx.expression())
         self.setValue(ctx, "= {:s}".format(expr))
 
-    def exitDeclaration(self, ctx):
-        # set above based on component type
-        self.setValue(ctx, "")
-
-    def exitComment(self, ctx):
-        self.setValue(ctx, "# {:s}".format(ctx.getText()))
-
-    def exitString_comment(self, ctx):
-        self.setValue(ctx, "# {:s}".format(ctx.getText()))
-
-    def exitComponent_declaration(self, ctx):
-        # set above based on component type
-        self.setValue(ctx, "")
-
-    def exitComponent_list(self, ctx):
-        # TODO
-        self.setValue(ctx, "")
-
-    def exitElement_modification(self, ctx):
-        # TODO
-        self.setValue(ctx, "")
-
-    def exitElement_modification_or_replaceable(self, ctx):
-        # TODO
-        self.setValue(ctx, "")
-
-    def exitType_prefix(self, ctx):
-        self.setValue(ctx, "")
-
-    def exitArgument(self, ctx):
-        # TODO
-        self.setValue(ctx, "")
-
-    def exitArgument_list(self, ctx):
-        # TODO
-        self.setValue(ctx, "")
-
+    # B.2.5.2 -------------------------------------------
     def exitClass_modification(self, ctx):
         # TODO
         self.setValue(ctx, "")
 
-    def exitComponent_reference(self, ctx):
+    # B.2.5.3 -------------------------------------------
+    def exitArgument_list(self, ctx):
         # TODO
         self.setValue(ctx, "")
 
-    def exitFunction_arguments(self, ctx):
-        if ctx.function_argument() is not None:
-            s = ""
-            args = ctx.function_argument()
-            n = len(args)
-            for i in range(n):
-                s += "{:s}".format(self.getValue(args[i]))
-                if i < n-1:
-                    s += ", "
-            self.setValue(ctx, s)
-        elif ctx.named_arguments() is not None:
-            args = self.getValue(ctx.named_arguments())
-            self.setValue(ctx, args)
-
-    def exitArguement_function(self, ctx):
-        name = self.getValue(ctx.name())
-        if ctx.named_arguments() is not None:
-            named_arguments = self.getValue(ctx.named_arguements())
-        else:
-            named_arguments = ""
-        self.setValue(ctx, "{name:s}({named_arguments:s})")
-
-    def exitArgument_expression(self, ctx):
-        expr = self.getValue(ctx.expression())
-        self.setValue(ctx, expr)
-
-    def exitFunction_call_args(self, ctx):
-        args = ctx.function_arguments()
-        if  args is not None:
-            self.setValue(ctx, self.getValue(args))
-        else:
-            self.setValue(ctx, "")
-
-    def exitClass_specifier(self, ctx):
+    # B.2.5.4 -------------------------------------------
+    def exitArgument(self, ctx):
         # TODO
         self.setValue(ctx, "")
 
-    def exitClass_definition(self, ctx):
+
+    # B.2.5.5 -------------------------------------------
+    def exitElement_modification_or_replaceable(self, ctx):
         # TODO
         self.setValue(ctx, "")
 
-    def exitClass_stored_definition(self, ctx):
+    # B.2.5.6 -------------------------------------------
+    def exitElement_modification(self, ctx):
         # TODO
         self.setValue(ctx, "")
 
-    #-------------------------------------------------------------------------
-    # Equation
-    #-------------------------------------------------------------------------
+    # B.2.5.7 -------------------------------------------
+    def exitElement_redeclaration(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
 
-    def exitEquation(self, ctx):
-        self.setValue(ctx, self.getValue(ctx.equation_options()))
+    # B.2.5.8 -------------------------------------------
+    def exitElement_replaceable(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.5.9 -------------------------------------------
+    def exitComponent_clause1(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.5.10 -------------------------------------------
+    def exitComponent_declaration1(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.5.11 -------------------------------------------
+    def exitShort_class_definition(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+#=========================================================
+# B.2.6 Equations
+#=========================================================
+
+    # B.2.6.1 -------------------------------------------
+    def exitEquation_section(self, ctx):
+        str_eq = "self.eqs = ["
+        str_when = ""
+        for eq in ctx.equation():
+            data = self.getValue(eq)
+            if len(data) <= 0:
+                continue
+            print("eq type:", type(eq.equation_options()))
+            if isinstance(eq.equation_options(), ModelicaParser.Equation_simpleContext):
+                str_eq += "\n{self.indent:s}{data:s},".format(**locals())
+                print("SIMPLE")
+            elif isinstance(eq.equation_options(), ModelicaParser.Equation_whenContext):
+                str_when += "\n{self.indent:s}{data:s}".format(**locals())
+            else:
+                raise IOError('equation type not supported yet')
+        str_eq += "\n{self.indent:s}]\n".format(**locals())
+        str_when += ""
+        self.setValue(ctx, """
+        # equations
+        {str_eq:s}
+
+        # when equations
+{str_when:s}
+""".format(**locals()))
+
+    # B.2.6.2 -------------------------------------------
+    def exitAlgorithm_section(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.3 -------------------------------------------
+    def exitEquation_options(self, ctx):
+        self.setValue(ctx, ctx)
 
     def exitEquation_simple(self, ctx):
         self.setValue(
@@ -463,12 +528,65 @@ if __name__ == "__main__":
     def exitEquation_connect_clause(self, ctx):
         raise NotImplementedError("")
 
+    def exitEquation_when(self, ctx):
+        self.setValue(ctx, self.getValue(ctx.when_equation()))
+
     def exitEquation_function(self, ctx):
         self.setValue(ctx, "{name:s}({args:})".format(**{
             'name': self.getValue(ctx.name()),
             'args': self.getValue(ctx.function_call_args())
             }))
 
+    # B.2.6.4 -------------------------------------------
+    def exitEquation(self, ctx):
+        self.setValue(ctx, self.getValue(ctx.equation_options()))
+
+    # B.2.6.5 -------------------------------------------
+    def exitStatement_options(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.6 -------------------------------------------
+    def exitStatement(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.7 -------------------------------------------
+    def exitIf_equation(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.8 -------------------------------------------
+    def exitIf_statement(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.9 -------------------------------------------
+    def exitFor_equation(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.10 -------------------------------------------
+    def exitFor_statement(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.11 -------------------------------------------
+    def exitFor_indices(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.12 -------------------------------------------
+    def exitFor_index(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.13 -------------------------------------------
+    def exitWhile_statement(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.6.14 -------------------------------------------
     def exitWhen_equation(self, ctx):
         exprs = ctx.expression()
         eqns = ctx.equation()
@@ -487,22 +605,34 @@ elif {{ walker.getValue(exprs[i]) }}:
             # }))
         self.setValue(ctx, '')
 
-    def exitEquation_when(self, ctx):
-        self.setValue(ctx, self.getValue(ctx.when_equation()))
+    # B.2.6.15 -------------------------------------------
+    def exitWhen_statement(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
 
-    #-------------------------------------------------------------------------
-    # Expression
-    #-------------------------------------------------------------------------
+    # B.2.6.16 -------------------------------------------
+    def exitConnect_clause(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
 
+#=========================================================
+# B.2.7 Expressions
+#=========================================================
+
+    # B.2.7.1  -------------------------------------------
     def exitExpression_simple(self, ctx):
         self.setValue(ctx, self.getValue(ctx.simple_expression()))
 
+    # B.2.7.2  -------------------------------------------
     def exitSimple_expression(self, ctx):
         # TODO, can have more than one expr
         self.setValue(ctx, self.getValue(ctx.expr()[0]))
 
-    def exitExpr_primary(self, ctx):
-        self.setValue(ctx, self.getValue(ctx.primary()))
+
+
+    # B.2.7.3  -------------------------------------------
+    def exitExpr(self, ctx):
+        self.setValue(ctx, ctx.getText())
 
     def exitExpr_neg(self, ctx):
         self.setValue(ctx, '-({:s})'.format(self.getValue(ctx.expr())))
@@ -511,12 +641,6 @@ elif {{ walker.getValue(exprs[i]) }}:
         self.setValue(ctx, '(({:s})**({:s}))'.format(
             self.getValue(ctx.primary()[0]),
             self.getValue(ctx.primary()[1])))
-
-    def exitExpr_rel(self, ctx):
-        self.setValue(ctx, '({:s} {:s} {:s})'.format(
-            self.getValue(ctx.expr()[0]),
-            ctx.op.text,
-            self.getValue(ctx.expr()[1])))
 
     def exitExpr_mul(self, ctx):
         self.setValue(ctx, '({:s} {:s} {:s})'.format(
@@ -530,19 +654,35 @@ elif {{ walker.getValue(exprs[i]) }}:
             ctx.op.text,
             self.getValue(ctx.expr()[1])))
 
-    #-------------------------------------------------------------------------
-    # Primary
-    #-------------------------------------------------------------------------
+    def exitExpr_rel(self, ctx):
+        self.setValue(ctx, '({:s} {:s} {:s})'.format(
+            self.getValue(ctx.expr()[0]),
+            ctx.op.text,
+            self.getValue(ctx.expr()[1])))
+
+    def exitExpr_not(self, ctx):
+        self.setValue(ctx, 'not ({:s})'.format(
+            self.getValue(ctx.expr()[0])))
+
+    def exitExpr_and(self, ctx):
+        self.setValue(ctx, '({:s} and {:s})'.format(
+            self.getValue(ctx.expr()[0]),
+            self.getValue(ctx.expr()[1])))
+
+    def exitExpr_or(self, ctx):
+        self.setValue(ctx, '({:s} or {:s})'.format(
+            self.getValue(ctx.expr()[0]),
+            self.getValue(ctx.expr()[1])))
+
+    def exitExpr_primary(self, ctx):
+        self.setValue(ctx, self.getValue(ctx.primary()))
+
+    # B.2.7.4  -------------------------------------------
+    def exitPrimary(self, ctx):
+        self.setValue(ctx, ctx.getText())
 
     def exitPrimary_unsigned_number(self, ctx):
         self.setValue(ctx, ctx.getText())
-
-    def exitPrimary_component_reference(self, ctx):
-        self.setValue(ctx, ctx.getText())
-
-    def exitPrimary_derivative(self, ctx):
-        name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
-        self.setValue(ctx, '{:s}.diff(self.t)'.format(name))
 
     def exitPrimary_string(self, ctx):
         self.setValue(ctx, ctx.getText())
@@ -550,6 +690,140 @@ elif {{ walker.getValue(exprs[i]) }}:
     def exitPrimary_false(self, ctx):
         self.setValue(ctx, ctx.getText())
 
+    def exitPrimary_true(self, ctx):
+        self.setValue(ctx, ctx.getText())
+
+    def exitPrimary_function(self, ctx):
+        raise NotImplementedError("")
+ 
+    def exitPrimary_derivative(self, ctx):
+        name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
+        self.setValue(ctx, '{:s}.diff(self.t)'.format(name))
+
+    def exitPrimary_initial(self, ctx):
+        raise NotImplementedError("")
+
+    def exitPrimary_component_reference(self, ctx):
+        self.setValue(ctx, ctx.getText())
+
+    def exitPrimary_output_expression_list(self, ctx):
+        raise NotImplementedError("")
+
+    def exitPrimary_expression_list(self, ctx):
+        raise NotImplementedError("")
+
+    def exitPrimary_function_arguments(self, ctx):
+        raise NotImplementedError("")
+
+    def exitPrimary_end(self, ctx):
+        raise NotImplementedError("")
+
+
+    # B.2.7.5  -------------------------------------------
+    def exitName(self, ctx):
+        self.setValue(ctx, ctx.getText())
+
+    # B.2.7.6  -------------------------------------------
+    def exitComponent_reference(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.7.7  -------------------------------------------
+    def exitFunction_call_args(self, ctx):
+        args = ctx.function_arguments()
+        if  args is not None:
+            self.setValue(ctx, self.getValue(args))
+        else:
+            self.setValue(ctx, "")
+
+    # B.2.7.8  -------------------------------------------
+    def exitFunction_arguments(self, ctx):
+        if ctx.function_argument() is not None:
+            s = ""
+            args = ctx.function_argument()
+            n = len(args)
+            for i in range(n):
+                s += "{:s}".format(self.getValue(args[i]))
+                if i < n-1:
+                    s += ", "
+            self.setValue(ctx, s)
+        elif ctx.named_arguments() is not None:
+            args = self.getValue(ctx.named_arguments())
+            self.setValue(ctx, args)
+
+
+    # B.2.7.9  -------------------------------------------
+    def exitNamed_arguments(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.7.10 -------------------------------------------
+    def exitNamed_argument(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.7.11 -------------------------------------------
+    def exitFunction_argument(self, ctx):
+        # TODO
+        self.setValue(ctx, ctx.getText())
+
+    def exitArguement_function(self, ctx):
+        name = self.getValue(ctx.name())
+        if ctx.named_arguments() is not None:
+            named_arguments = self.getValue(ctx.named_arguements())
+        else:
+            named_arguments = ""
+        self.setValue(ctx, "{name:s}({named_arguments:s})")
+
+    def exitArgument_expression(self, ctx):
+        expr = self.getValue(ctx.expression())
+        self.setValue(ctx, expr)
+
+    # B.2.7.12 -------------------------------------------
+    def exitOutput_expression_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.7.13 -------------------------------------------
+    def exitExpression_list(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.7.14 -------------------------------------------
+    def exitArray_subscripts(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.7.15 -------------------------------------------
+    def exitSubscript(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    # B.2.7.16 -------------------------------------------
+    def exitComment(self, ctx):
+        self.setValue(ctx, "# {:s}".format(ctx.getText()))
+
+    # B.2.7.17 -------------------------------------------
+    def exitString_comment(self, ctx):
+        self.setValue(ctx, "# {:s}".format(ctx.getText()))
+
+    # B.2.7.18 -------------------------------------------
+    def exitAnnotation(self, ctx):
+        # TODO
+        self.setValue(ctx, "")
+
+    def exitElement_list(self, ctx):
+        d = self.getValue(ctx.element()[0])
+        for i in range(1, len(ctx.element())):
+            element = ctx.element()[i]
+            for key in d.keys():
+                d[key].update(self.getValue(element)[key])
+        self.setValue(ctx, d)
+        print("dict", d)
+
+#=========================================================
+# Generator
+#=========================================================
 
 def generate(modelica_model, trace=False):
     "The modelica model"
@@ -564,6 +838,9 @@ def generate(modelica_model, trace=False):
     walker.walk(sympyPrinter, tree)
     return sympyPrinter.result
 
+#=========================================================
+# Commande Line Interface
+#=========================================================
 
 def main(argv):
     #pylint: disable=unused-argument
