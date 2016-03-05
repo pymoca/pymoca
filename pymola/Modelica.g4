@@ -66,15 +66,15 @@ enumeration_literal :
 composition :
     element_list
     (
-        'public' element_list
-        | 'protected' element_list
+        'public' epub=element_list
+        | 'protected' epro=element_list
         | equation_section
         | algorithm_section
     )*
     ( 'external' language_specification?
         external_function_call?
-        annotation? ':')?
-    (annotation ';')?
+        ext_annotation=annotation? ':')?
+    (comp_annotation=annotation ';')?
     ;
 
 // B.2.2.8 ------------------------------------------------
@@ -97,9 +97,10 @@ element_list :
 element :
     import_clause
     | extends_clause
-    | 'redeclare'? 'final'? 'inner'? 'outer'?
-        ((class_definition | component_clause)
-         | 'replaceable' (class_definition | component_clause)
+    | redeclare='redeclare'? final='final'?
+        inner='inner'? outer='outer'?
+        ((classdef=class_definition | comp=component_clause)
+         | 'replaceable' (rclassdef=class_definition | rcomp=component_clause)
             (constraining_clause comment)?
         );
 
@@ -248,12 +249,12 @@ short_class_definition :
 
 // B.2.6.1 ------------------------------------------------
 equation_section :
-    'initial'? 'equation' (equation ';')*
+    init='initial'? 'equation' (equation ';')*
     ;
 
 // B.2.6.2 ------------------------------------------------
 algorithm_section :
-    'initial'? 'algorithm' (statement ';')*
+    init='initial'? 'algorithm' (statement ';')*
     ;
 
 // B.2.6.3 ------------------------------------------------

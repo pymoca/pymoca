@@ -1558,6 +1558,10 @@ class ModelicaParser ( Parser ):
         def __init__(self, parser, parent=None, invokingState=-1):
             super(ModelicaParser.CompositionContext, self).__init__(parent, invokingState)
             self.parser = parser
+            self.epub = None # Element_listContext
+            self.epro = None # Element_listContext
+            self.ext_annotation = None # AnnotationContext
+            self.comp_annotation = None # AnnotationContext
 
         def element_list(self, i=None):
             if i is None:
@@ -1634,14 +1638,14 @@ class ModelicaParser ( Parser ):
                     self.state = 259
                     self.match(ModelicaParser.T__26)
                     self.state = 260
-                    self.element_list()
+                    localctx.epub = self.element_list()
                     pass
 
                 elif la_ == 2:
                     self.state = 261
                     self.match(ModelicaParser.T__27)
                     self.state = 262
-                    self.element_list()
+                    localctx.epro = self.element_list()
                     pass
 
                 elif la_ == 3:
@@ -1682,7 +1686,7 @@ class ModelicaParser ( Parser ):
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__86:
                     self.state = 277
-                    self.annotation()
+                    localctx.ext_annotation = self.annotation()
 
 
                 self.state = 280
@@ -1693,7 +1697,7 @@ class ModelicaParser ( Parser ):
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__86:
                 self.state = 283
-                self.annotation()
+                localctx.comp_annotation = self.annotation()
                 self.state = 284
                 self.match(ModelicaParser.T__1)
 
@@ -1890,6 +1894,14 @@ class ModelicaParser ( Parser ):
         def __init__(self, parser, parent=None, invokingState=-1):
             super(ModelicaParser.ElementContext, self).__init__(parent, invokingState)
             self.parser = parser
+            self.redeclare = None # Token
+            self.final = None # Token
+            self.inner = None # Token
+            self.outer = None # Token
+            self.classdef = None # Class_definitionContext
+            self.comp = None # Component_clauseContext
+            self.rclassdef = None # Class_definitionContext
+            self.rcomp = None # Component_clauseContext
 
         def import_clause(self):
             return self.getTypedRuleContext(ModelicaParser.Import_clauseContext,0)
@@ -1959,28 +1971,28 @@ class ModelicaParser ( Parser ):
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__29:
                     self.state = 312
-                    self.match(ModelicaParser.T__29)
+                    localctx.redeclare = self.match(ModelicaParser.T__29)
 
 
                 self.state = 316
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__2:
                     self.state = 315
-                    self.match(ModelicaParser.T__2)
+                    localctx.final = self.match(ModelicaParser.T__2)
 
 
                 self.state = 319
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__30:
                     self.state = 318
-                    self.match(ModelicaParser.T__30)
+                    localctx.inner = self.match(ModelicaParser.T__30)
 
 
                 self.state = 322
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__31:
                     self.state = 321
-                    self.match(ModelicaParser.T__31)
+                    localctx.outer = self.match(ModelicaParser.T__31)
 
 
                 self.state = 338
@@ -1990,11 +2002,11 @@ class ModelicaParser ( Parser ):
                     token = self._input.LA(1)
                     if token in [ModelicaParser.T__3, ModelicaParser.T__4, ModelicaParser.T__5, ModelicaParser.T__6, ModelicaParser.T__7, ModelicaParser.T__8, ModelicaParser.T__9, ModelicaParser.T__10, ModelicaParser.T__11, ModelicaParser.T__12, ModelicaParser.T__13, ModelicaParser.T__14, ModelicaParser.T__15, ModelicaParser.T__16]:
                         self.state = 324
-                        self.class_definition()
+                        localctx.classdef = self.class_definition()
 
                     elif token in [ModelicaParser.T__34, ModelicaParser.T__39, ModelicaParser.T__40, ModelicaParser.T__41, ModelicaParser.T__42, ModelicaParser.T__43, ModelicaParser.T__44, ModelicaParser.T__45, ModelicaParser.IDENT]:
                         self.state = 325
-                        self.component_clause()
+                        localctx.comp = self.component_clause()
 
                     else:
                         raise NoViableAltException(self)
@@ -2007,11 +2019,11 @@ class ModelicaParser ( Parser ):
                     token = self._input.LA(1)
                     if token in [ModelicaParser.T__3, ModelicaParser.T__4, ModelicaParser.T__5, ModelicaParser.T__6, ModelicaParser.T__7, ModelicaParser.T__8, ModelicaParser.T__9, ModelicaParser.T__10, ModelicaParser.T__11, ModelicaParser.T__12, ModelicaParser.T__13, ModelicaParser.T__14, ModelicaParser.T__15, ModelicaParser.T__16]:
                         self.state = 329
-                        self.class_definition()
+                        localctx.rclassdef = self.class_definition()
 
                     elif token in [ModelicaParser.T__34, ModelicaParser.T__39, ModelicaParser.T__40, ModelicaParser.T__41, ModelicaParser.T__42, ModelicaParser.T__43, ModelicaParser.T__44, ModelicaParser.T__45, ModelicaParser.IDENT]:
                         self.state = 330
-                        self.component_clause()
+                        localctx.rcomp = self.component_clause()
 
                     else:
                         raise NoViableAltException(self)
@@ -3652,6 +3664,7 @@ class ModelicaParser ( Parser ):
         def __init__(self, parser, parent=None, invokingState=-1):
             super(ModelicaParser.Equation_sectionContext, self).__init__(parent, invokingState)
             self.parser = parser
+            self.init = None # Token
 
         def equation(self, i=None):
             if i is None:
@@ -3691,7 +3704,7 @@ class ModelicaParser ( Parser ):
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__49:
                 self.state = 523
-                self.match(ModelicaParser.T__49)
+                localctx.init = self.match(ModelicaParser.T__49)
 
 
             self.state = 526
@@ -3722,6 +3735,7 @@ class ModelicaParser ( Parser ):
         def __init__(self, parser, parent=None, invokingState=-1):
             super(ModelicaParser.Algorithm_sectionContext, self).__init__(parent, invokingState)
             self.parser = parser
+            self.init = None # Token
 
         def statement(self, i=None):
             if i is None:
@@ -3761,7 +3775,7 @@ class ModelicaParser ( Parser ):
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__49:
                 self.state = 535
-                self.match(ModelicaParser.T__49)
+                localctx.init = self.match(ModelicaParser.T__49)
 
 
             self.state = 538
