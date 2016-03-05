@@ -31,7 +31,7 @@ class SympyPrinter(ModelicaListener):
     @staticmethod
     def print_indented(ldr, s):
         if s is not None:
-            for line in s.split('\n'):
+            for line in str(s).split('\n'):
                 print(ldr, line)
 
     def setValue(self, ctx, val):
@@ -154,12 +154,12 @@ class SympyPrinter(ModelicaListener):
         composition = self.getValue(ctx.composition())
         result = """
 class {name:s} :
-\"\"\"
-{comment:s}
-\"\"\"
+    \"\"\"
+    {comment:s}
+    \"\"\"
 
-    __init__(self):
-        {composition:s}
+    def __init__(self):
+        self.data = {composition:s}
         pass
 
 """.format(**locals())
@@ -583,8 +583,10 @@ class {name:s} :
 
 # simple_expression '=' expression
     def exitEquation_simple(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        self.setValue(ctx,
+            '{:s} - {:s}'.format(
+                self.getValue(ctx.simple_expression()),
+                self.getValue(ctx.expression())))
 
 # if_equation
     def exitEquation_if(self, ctx):
@@ -608,6 +610,7 @@ class {name:s} :
 
 # name function_call_args
     def exitEquation_function(self, ctx):
+        self.setValue(ctx, self.getValue(ctx.function_call_args()))
         # TODO
         raise NotImplementedError("")
 
@@ -617,8 +620,8 @@ class {name:s} :
 #     comment
 #     ;
     def exitEquation(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        # TODO comment
+        self.setValue(ctx, self.getValue(ctx.equation_options()))
 
 # B.2.6.5 ------------------------------------------------
 # statement_options :
@@ -808,8 +811,7 @@ class {name:s} :
 
 # simple_expression
     def exitExpression_simple(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        self.setValue(ctx, self.getValue(ctx.simple_expression()))
 
 # 'if' expression 'then' expression         
 #     ( 'elseif' expression 'then' expression)*
@@ -824,8 +826,9 @@ class {name:s} :
 #         (':' expr)?)?
 #     ;
     def exitSimple_expression(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        # TODO rest of expressions
+        exprs = [self.getValue(e) for e in ctx.expr()]
+        self.setValue(ctx, exprs)
 
 
 # B.2.7.3 ------------------------------------------------
@@ -942,8 +945,8 @@ class {name:s} :
 
 # 'der' function_call_args
     def exitPrimary_derivative(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
+        self.setValue(ctx, '{:s}.diff(self.t)'.format(name))
 
 # 'initial' function_call_args
     def exitPrimary_initial(self, ctx):
@@ -953,7 +956,8 @@ class {name:s} :
 # component_reference
     def exitPrimary_component_reference(self, ctx):
         # TODO
-        raise NotImplementedError("")
+        self.setValue(ctx,
+                self.getValue(ctx.component_reference()))
 
 # '[' expression_list (';' expression_list)* ']'
     def exitPrimary_output_expression_list(self, ctx):
@@ -982,16 +986,19 @@ class {name:s} :
 #     '.'? IDENT array_subscripts? ('.' IDENT array_subscripts?)*
 #     ;
     def exitComponent_reference(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        # TODO array_subscripts and other IDENTs
+        self.setValue(ctx, [c.getText() for c in ctx.IDENT()])
 
 # B.2.7.7 ------------------------------------------------
 # function_call_args :
 #     '(' function_arguments? ')'
 #     ;
     def exitFunction_call_args(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        args = ctx.function_arguments()
+        if  args is not None:
+            self.setValue(ctx, self.getValue(args))
+        else:
+            self.setValue(ctx, "")
 
 # B.2.7.8 ------------------------------------------------
 # function_arguments :
@@ -999,8 +1006,9 @@ class {name:s} :
 #     | named_arguments
 #     ;
     def exitFunction_arguments(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        # TODO for_indices and named_arguments
+        self.setValue(ctx,
+            [self.getValue(arg) for arg in ctx.function_argument()])
 
 # B.2.7.9 ------------------------------------------------
 # named_arguments : named_argument (',' named_argument)*
