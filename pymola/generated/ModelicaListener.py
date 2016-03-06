@@ -13,6 +13,15 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ModelicaParser#stored_definition_class.
+    def enterStored_definition_class(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#stored_definition_class.
+    def exitStored_definition_class(self, ctx):
+        pass
+
+
     # Enter a parse tree produced by ModelicaParser#class_definition.
     def enterClass_definition(self, ctx):
         pass
@@ -28,6 +37,15 @@ class ModelicaListener(ParseTreeListener):
 
     # Exit a parse tree produced by ModelicaParser#class_prefixes.
     def exitClass_prefixes(self, ctx):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#class_type.
+    def enterClass_type(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#class_type.
+    def exitClass_type(self, ctx):
         pass
 
 

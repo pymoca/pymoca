@@ -9,7 +9,7 @@ equation
     der(v_x) = a_x;
     der(v_y) = a_y;
     der(v_z) = a_z;
-    a_x = -c*x + f_x;
+    a_x = -c*x + f_x*f_y;
     a_y = -c*y + f_y;
     a_z = -c*z + f_z;
     der(v_y) = a_y;

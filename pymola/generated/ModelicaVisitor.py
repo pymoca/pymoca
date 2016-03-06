@@ -10,6 +10,11 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by ModelicaParser#stored_definition_class.
+    def visitStored_definition_class(self, ctx):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by ModelicaParser#class_definition.
     def visitClass_definition(self, ctx):
         return self.visitChildren(ctx)
@@ -17,6 +22,11 @@ class ModelicaVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by ModelicaParser#class_prefixes.
     def visitClass_prefixes(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#class_type.
+    def visitClass_type(self, ctx):
         return self.visitChildren(ctx)
 
 

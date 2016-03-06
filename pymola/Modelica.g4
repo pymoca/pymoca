@@ -6,8 +6,12 @@ grammar Modelica;
 
 // B.2.1.1 ------------------------------------------------
 stored_definition :
-    ('within' name? ';')?
-    ('final'? class_definition ';')*
+    (WITHIN name? ';')?
+    (stored_definition_class)*
+    ;
+
+stored_definition_class :
+    FINAL? class_definition ';'
     ;
 
 //=========================================================
@@ -16,15 +20,18 @@ stored_definition :
 
 // B.2.2.1 ------------------------------------------------
 class_definition :
-    'encapsulated'? class_prefixes
+    ENCAPSULATED? class_prefixes
     class_specifier
     ;
 
 // B.2.2.2 ------------------------------------------------
 class_prefixes : 
-    'partial'?
-    (
-        'class'
+    PARTIAL?
+    class_type
+    ;
+
+class_type:
+    'class'
         | 'model'
         | 'operator'? 'record'
         | 'block'
@@ -33,7 +40,6 @@ class_prefixes :
         | 'package'
         | ('pure' | 'impure')? 'operator'? 'function'
         | 'operator'
-    )
     ;
 
 // B.2.2.3 ------------------------------------------------
@@ -97,8 +103,8 @@ element_list :
 element :
     import_clause
     | extends_clause
-    | redeclare='redeclare'? final='final'?
-        inner='inner'? outer='outer'?
+    | REDECLARE? FINAL?
+        INNER? OUTER?
         ((classdef=class_definition | comp=component_clause)
          | 'replaceable' (rclassdef=class_definition | rcomp=component_clause)
             (constraining_clause comment)?
@@ -199,8 +205,8 @@ argument :
 
 // B.2.5.5 ------------------------------------------------
 element_modification_or_replaceable:
-    'each'?
-    'final'?
+    EACH?
+    FINAL?
     (element_modification | element_replaceable)
     ;
 
@@ -211,9 +217,9 @@ element_modification :
 
 // B.2.5.7 ------------------------------------------------
 element_redeclaration :
-    'redeclare'
-    'each'?
-    'final'?
+    REDECLARE
+    EACH?
+    FINAL?
     ( (short_class_definition | component_clause1)
       | element_replaceable)
     ;
@@ -249,12 +255,12 @@ short_class_definition :
 
 // B.2.6.1 ------------------------------------------------
 equation_section :
-    init='initial'? 'equation' (equation ';')*
+    INITIAL? 'equation' (equation ';')*
     ;
 
 // B.2.6.2 ------------------------------------------------
 algorithm_section :
-    init='initial'? 'algorithm' (statement ';')*
+    INITIAL? 'algorithm' (statement ';')*
     ;
 
 // B.2.6.3 ------------------------------------------------
@@ -492,24 +498,33 @@ annotation :
     ;
 
 //=========================================================
+// Keywords
+//=========================================================
+EACH : 'each';
+PARTIAL : 'partial';
+FINAL : 'final';
+WITHIN : 'within';
+ENCAPSULATED : 'encapsulated';
+REDECLARE : 'redeclare';
+INNER : 'inner';
+OUTER : 'outer';
+INITIAL : 'initial';
+IDENT : NONDIGIT ( DIGIT | NONDIGIT )* | Q_IDENT;
+STRING : '\"' (S_CHAR|S_ESCAPE)* '\"';
+UNSIGNED_NUMBER : UNSIGNED_INTEGER  ( '.' UNSIGNED_NUMBER? )* ( [eE] [+-]? UNSIGNED_INTEGER)?;
+COMMENT :
+    ('/' '/' .*? '\n' | '/*' .*? '*/') -> channel(HIDDEN)
+    ;
+WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
+
+//=========================================================
 // Fragments
 //=========================================================
-IDENT : NONDIGIT ( DIGIT | NONDIGIT )* | Q_IDENT;
 fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+;
 fragment NONDIGIT : [_a-zA-Z];
-
-STRING : '\"' (S_CHAR|S_ESCAPE)* '\"';
 fragment S_CHAR : [A-Za-z\u0000-\u00FF];
 fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}|! ];
 fragment S_ESCAPE : [\'\"\?\\\a\b\f\n\r\t\v];
 fragment DIGIT :  [0-9];
 fragment UNSIGNED_INTEGER : DIGIT+;
-UNSIGNED_NUMBER : UNSIGNED_INTEGER  ( '.' UNSIGNED_NUMBER? )* ( [eE] [+-]? UNSIGNED_INTEGER)?;
-
-COMMENT :
-    ('/' '/' .*? '\n' | '/*' .*? '*/') -> channel(HIDDEN)
-    ;
-
-WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
-
 // vi:ts=4:sw=4:expandtab:

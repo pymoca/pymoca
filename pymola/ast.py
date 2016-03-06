@@ -94,16 +94,31 @@ class AstBuilder(ModelicaListener):
 #=========================================================
 
 # B.2.1.1 ------------------------------------------------
-# stored_definition :
-#     ('within' name? ';')?
-#     ('final'? class_definition ';')*
-#     ;
+#stored_definition :
+#    (within name? ';')?
+#    (stored_definition_class)*
+#    ;
     def exitStored_definition(self, ctx):
         # TODO within/ final
-        result = []
-        for cls in ctx.class_definition():
-            result += [self.getValue(cls)]
-        self.result = result
+        if ctx.WITHIN() == None:
+            within = None
+        else:
+            within = self.getValue(ctx.name())
+        classes = [self.getValue(e)
+            for e in ctx.stored_definition_class()]
+        self.result = {
+            'within': within,
+            'classes': classes
+        }
+
+#stored_definition_class :
+#    final? class_definition ';'
+#    ;
+    def exitStored_definition_class(self, ctx):
+        self.setValue(ctx, {
+            'final': ctx.FINAL() != None,
+            'class_definition': self.getValue(ctx.class_definition()),
+        })
 
 #=========================================================
 #  B.2.2 Class Definition
@@ -111,17 +126,29 @@ class AstBuilder(ModelicaListener):
 
 # B.2.2.1 ------------------------------------------------
 # class_definition :
-#     'encapsulated'? class_prefixes
+#     ENCAPSULATED? class_prefixes
 #     class_specifier
 #     ;
     def exitClass_definition(self, ctx):
-        # TODO encapsulated/ class_prefixes
-        self.setValue(ctx, self.getValue(ctx.class_specifier()))
+        self.setValue(ctx, {
+            'encapsulated': ctx.ENCAPSULATED() != None,
+            'class_prefixes': self.getValue(ctx.class_prefixes()),
+            'class_specifier': self.getValue(ctx.class_specifier()),
+        })
 
 # B.2.2.2 ------------------------------------------------
 # class_prefixes : 
-#     'partial'?
+#     PARTIAL?
+#     class_type
+#     ;
 #     (
+    def exitClass_prefixes(self, ctx):
+        self.setValue(ctx, {
+            'partial': ctx.PARTIAL() != None,
+            'class_type': ctx.class_type().getText()
+        })
+
+# class_type : 
 #         'class'
 #         | 'model'
 #         | 'operator'? 'record'
@@ -131,10 +158,9 @@ class AstBuilder(ModelicaListener):
 #         | 'package'
 #         | ('pure' | 'impure')? 'operator'? 'function'
 #         | 'operator'
-#     )
 #     ;
-    def exitClass_prefixes(self, ctx):
-        self.setValue(ctx, [c.getText() for c in ctx.getChildren()])
+    def exitClass_type(self, ctx):
+        self.setValue(ctx, ctx.getText())
 
 # B.2.2.3 ------------------------------------------------
 # class_specifier :
@@ -147,6 +173,7 @@ class AstBuilder(ModelicaListener):
 #         composition 'end' IDENT
 #     ;
 
+#     IDENT string_comment composition 'end' IDENT                    # class_spec_comp
     def exitClass_spec_comp(self, ctx):
         if str(ctx.IDENT()[0]) != str(ctx.IDENT()[1]):
             raise SyntaxError('class names must match {:s}, {:s}'.format(ctx.IDENT()[0], ctx.IDENT()[1]))
@@ -160,18 +187,24 @@ class AstBuilder(ModelicaListener):
         }
         self.setValue(ctx, result)
 
+#     | IDENT '=' base_prefix name array_subscripts?
+#         class_modification? comment                                 # class_spec_base
     def exitClass_spec_base(self, ctx):
         # TODO
         raise NotImplementedError("")
 
+#     | IDENT '=' 'enumeration' '(' (enum_list? | ':') ')' comment    # class_spec_enum
     def exitClass_spec_enum(self, ctx):
         # TODO
         raise NotImplementedError("")
 
+#     | IDENT '=' 'der' '(' name ',' IDENT (',' IDENT )* ')' comment  # class_spec_der
     def exitClass_spec_der(self, ctx):
         # TODO
         raise NotImplementedError("")
 
+#     | 'extends' IDENT class_modification? string_comment            # class_spec_extends
+#         composition 'end' IDENT
     def exitClass_spec_extends(self, ctx):
         # TODO
         raise NotImplementedError("")
@@ -181,8 +214,7 @@ class AstBuilder(ModelicaListener):
 #     type_prefix
 #     ;
     def exitBase_prefix(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        self.setValue(ctx, self.getValue(ctx.type_prefix()))
 
 
 # B.2.2.5 ------------------------------------------------
@@ -190,16 +222,17 @@ class AstBuilder(ModelicaListener):
 #     enumeration_literal (',' enumeration_literal)*
 #     ;
     def exitEnum_list(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        self.setValue(ctx, [self.getValue(e) for e in ctx.enumeration_literal()])
 
 # B.2.2.6 ------------------------------------------------
 # enumeration_literal :
 #     IDENT comment
 #     ;
     def exitEnumeration_literal(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        self.setValue(ctx, {
+            'name': ctx.IDENT.text,
+            'comment': ctx.comment()
+        })
 
 # B.2.2.7 ------------------------------------------------
 # composition :
@@ -309,10 +342,10 @@ class AstBuilder(ModelicaListener):
             if ctx.comment() != None:
                 comment = self.getValue(ctx.comment())
             self.setValue(ctx, {
-                'redeclare': ctx.redeclare != None,
-                'final': ctx.final != None,
-                'inner': ctx.inner != None,
-                'outer': ctx.outer != None,
+                'redeclare': ctx.REDECLARE() != None,
+                'final': ctx.FINAL() != None,
+                'inner': ctx.INNER() != None,
+                'outer': ctx.OUTER() != None,
                 'classdef': classdef,
                 'rclassdef': rclassdef,
                 'rcomp': rcomp,
@@ -560,7 +593,7 @@ class AstBuilder(ModelicaListener):
     def exitEquation_section(self, ctx):
         eqs = [self.getValue(e) for e in ctx.equation()]
         self.setValue(ctx, {
-            'init': ctx.init != None,
+            'initiial': ctx.INITIAL() != None,
             'eqs': eqs})
 
 # B.2.6.2 ------------------------------------------------
@@ -1039,32 +1072,29 @@ class AstBuilder(ModelicaListener):
 #     expression? (',' expression)*
 #     ;
     def exitOutput_expression_list(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        set.setValue(ctx, [self.getValue(e) for e in ctx.expression()])
 
 # B.2.7.13 -----------------------------------------------
 # expression_list :
 #     expression (',' expression)*
 #     ;
     def exitExpression_list(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        set.setValue(ctx, [self.getValue(e) for e in ctx.expression()])
 
 # B.2.7.14 -----------------------------------------------
 # array_subscripts :
 #     '[' subscript (',' subscript)* ']'
 #     ;
     def exitArray_subscripts(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        set.setValue(ctx, [self.getValue(e) for e in ctx.subscript()])
 
 # B.2.7.15 -----------------------------------------------
 # subscript :
 #     ':' | expression
 #     ;
     def exitSubscript(ctx):
-        # TODO
-        raise NotImplementedError("")
+        # TODO is this correct?
+        set.setValue(ctx, self.getValue(expression))
 
 # B.2.7.16 -----------------------------------------------
 # comment :
@@ -1089,8 +1119,7 @@ class AstBuilder(ModelicaListener):
 #     'annotation' class_modification
 #     ;
     def exitAnnotation(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        self.setValue(ctx, self.getValue(ctx.class_modification()))
 
 #=========================================================
 # Generator
