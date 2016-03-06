@@ -99,7 +99,6 @@ class AstBuilder(ModelicaListener):
 #    (stored_definition_class)*
 #    ;
     def exitStored_definition(self, ctx):
-        # TODO within/ final
         if ctx.WITHIN() == None:
             within = None
         else:
