@@ -1,3 +1,19 @@
+model Accelerometer
+    input Real a_x;
+    input Real a_y;
+    input Real a_z;
+    output Real m_a_x;
+    output Real m_a_y;
+    output Real m_a_z;
+    parameter Real b_x = 1e-5 "bias x";
+    parameter Real b_y = 1e-5 "bias y";
+    parameter Real b_z = 1e-5 "bias z";
+equation
+    m_a_x = a_x + bias_x;
+    m_a_y = a_y + bias_y;
+    m_a_z = a_z + bias_z;
+end Accel;
+
 model RigidBody "body"
     input Real F_x "force x";
     input Real F_y "force y";
@@ -38,3 +54,12 @@ equation
     J_y*alpha_y = M_y;
     J_z*alpha_z = M_z;
 end RigidBody;
+
+model Aircraft
+    RigidBody body;
+    Accelerometer accel;
+equation
+    connect(body.a_x, accel.a_x);
+    connect(body.a_y, accel.a_y);
+    connect(body.a_z, accel.a_z);
+end Aircraft;
