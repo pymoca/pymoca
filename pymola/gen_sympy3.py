@@ -7,6 +7,7 @@ import sys
 import antlr4
 import antlr4.Parser
 import argparse
+import re
 
 # compiler
 from .generated.ModelicaLexer import ModelicaLexer
@@ -81,7 +82,8 @@ def process_ast(ast):
     # remove known variables to find algebraic variables
     for var_list in [states, parameters, inputs]:
         for var in var_list:
-            symbols.remove(var)
+            if var in symbols:
+                symbols.remove(var)
 
     symbols.remove('t')
 
@@ -95,10 +97,14 @@ def process_ast(ast):
     for eq_section in ast['eq_section']:
         for eq in eq_section['eqs']:
             for state in states:
-                eq = eq.replace('{:s}'.format(state),
-                        '{:s}(t)'.format(state))
-            for i in range(10):
-                eq = eq.replace('(t)(t)', '(t)')
+                eq = re.sub(
+                    r'(^|[^\w])({:s})'.format(state),
+                    r'\g<1>\g<2>(t)', eq)
+            # eq = re.sub(
+                # r'(t)(t)*',
+                # r'(t)', eq)
+
+            print(eq)
             sympy_eq = sympy.sympify(eq)
             if len(sympy_eq.atoms(sympy.Derivative)) > 0:
                 diff_eq_list += [sympy_eq]

@@ -18,7 +18,13 @@ from .generated.ModelicaListener import ModelicaListener
 #pylint: disable=invalid-name, no-self-use, missing-docstring, unused-variable, protected-access
 #pylint: disable=too-many-public-methods
 
-class DaeModel(object):
+class SimulationModel(object):
+
+    def __init__(self):
+        self.objects = []
+        self.connections = []
+
+class ObjectModel(object):
 
     def __init__(self):
         self.diff_eqs = []
@@ -33,11 +39,8 @@ class AstBuilder(ModelicaListener):
         """
         Constructor
         """
-        self._val_dict = OrderedDict()
-        self.result = None
         self._parser = parser
         self._trace = trace
-        self.indent = "            "
 
     @staticmethod
     def print_indented(ldr, s):
@@ -45,20 +48,7 @@ class AstBuilder(ModelicaListener):
             for line in str(s).split('\n'):
                 print(ldr, line)
 
-    def setValue(self, ctx, val):
-        """
-        Sets tree values.
-        """
-        self._val_dict[ctx] = val
-
-    def getValue(self, ctx):
-        """
-        Gets tree values.
-        """
-        return self._val_dict[ctx]
-
     def enterEveryRule(self, ctx):
-        self.setValue(ctx, None)
         if self._trace:
             ldr = " "*(ctx.depth()-1)
             rule = self._parser.ruleNames[ctx.getRuleIndex()]
@@ -109,25 +99,13 @@ class AstBuilder(ModelicaListener):
 #    (stored_definition_class)*
 #    ;
     def exitStored_definition(self, ctx):
-        if ctx.WITHIN() == None:
-            within = None
-        else:
-            within = self.getValue(ctx.name())
-        classes = [self.getValue(e)
-            for e in ctx.stored_definition_class()]
-        self.result = {
-            'within': within,
-            'classes': classes
-        }
+        pass
 
 #stored_definition_class :
 #    final? class_definition ';'
 #    ;
     def exitStored_definition_class(self, ctx):
-        self.setValue(ctx, {
-            'final': ctx.FINAL() != None,
-            'class_definition': self.getValue(ctx.class_definition()),
-        })
+        pass
 
 #=========================================================
 #  B.2.2 Class Definition
@@ -139,11 +117,7 @@ class AstBuilder(ModelicaListener):
 #     class_specifier
 #     ;
     def exitClass_definition(self, ctx):
-        self.setValue(ctx, {
-            'encapsulated': ctx.ENCAPSULATED() != None,
-            'class_prefixes': self.getValue(ctx.class_prefixes()),
-            'class_specifier': self.getValue(ctx.class_specifier()),
-        })
+        pass
 
 # B.2.2.2 ------------------------------------------------
 # class_prefixes : 
@@ -152,10 +126,7 @@ class AstBuilder(ModelicaListener):
 #     ;
 #     (
     def exitClass_prefixes(self, ctx):
-        self.setValue(ctx, {
-            'partial': ctx.PARTIAL() != None,
-            'class_type': ctx.class_type().getText()
-        })
+        pass
 
 # class_type : 
 #         'class'
@@ -169,7 +140,7 @@ class AstBuilder(ModelicaListener):
 #         | 'operator'
 #     ;
     def exitClass_type(self, ctx):
-        self.setValue(ctx, ctx.getText())
+        pass
 
 # B.2.2.3 ------------------------------------------------
 # class_specifier :
@@ -184,46 +155,32 @@ class AstBuilder(ModelicaListener):
 
 #     IDENT string_comment composition 'end' IDENT                    # class_spec_comp
     def exitClass_spec_comp(self, ctx):
-        if str(ctx.IDENT()[0]) != str(ctx.IDENT()[1]):
-            raise SyntaxError('class names must match {:s}, {:s}'.format(ctx.IDENT()[0], ctx.IDENT()[1]))
-        name = ctx.IDENT()[0].getText()
-        comment = self.getValue(ctx.string_comment())
-        composition = self.getValue(ctx.composition())
-        result = {
-            'composition': composition,
-            'name': name,
-            'comment': comment
-        }
-        self.setValue(ctx, result)
+        pass
 
 #     | IDENT '=' base_prefix name array_subscripts?
 #         class_modification? comment                                 # class_spec_base
     def exitClass_spec_base(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 #     | IDENT '=' 'enumeration' '(' (enum_list? | ':') ')' comment    # class_spec_enum
     def exitClass_spec_enum(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 #     | IDENT '=' 'der' '(' name ',' IDENT (',' IDENT )* ')' comment  # class_spec_der
     def exitClass_spec_der(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 #     | 'extends' IDENT class_modification? string_comment            # class_spec_extends
 #         composition 'end' IDENT
     def exitClass_spec_extends(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.2.4 ------------------------------------------------
 # base_prefix :
 #     type_prefix
 #     ;
     def exitBase_prefix(self, ctx):
-        self.setValue(ctx, self.getValue(ctx.type_prefix()))
+        pass
 
 
 # B.2.2.5 ------------------------------------------------
@@ -231,17 +188,14 @@ class AstBuilder(ModelicaListener):
 #     enumeration_literal (',' enumeration_literal)*
 #     ;
     def exitEnum_list(self, ctx):
-        self.setValue(ctx, [self.getValue(e) for e in ctx.enumeration_literal()])
+        pass
 
 # B.2.2.6 ------------------------------------------------
 # enumeration_literal :
 #     IDENT comment
 #     ;
     def exitEnumeration_literal(self, ctx):
-        self.setValue(ctx, {
-            'name': ctx.IDENT.text,
-            'comment': ctx.comment()
-        })
+        pass
 
 # B.2.2.7 ------------------------------------------------
 # composition :
@@ -258,46 +212,14 @@ class AstBuilder(ModelicaListener):
 #     (comp_annotation=annotation ';')?
 #     ;
     def exitComposition(self, ctx):
-        elist = self.getValue(ctx.element_list()[0])
-        elist_public = []
-        elist_protected = []
-        eq_section = []
-        alg_section = []
-        language_spec = None
-        ext_func_call = None
-        ext_annotation = None
-        comp_annotation = None
-        if ctx.epub is not None:
-            elist_public = [self.getValue(e) for e in ctx.epub()]
-        if ctx.epro is not None:
-            elist_protected = [self.getValue(e) for e in ctx.epro()]
-        eq_section = [self.getValue(e) for e in ctx.equation_section()]
-        alg_section = [self.getValue(e) for e in ctx.algorithm_section()]
-        if ctx.language_specification() is not None:
-            language_spec = self.getValue(ctx.language_specification()),
-        if ctx.external_function_call() is not None:
-            ext_func_call = self.getValue(ctx.external_function_call()),
-        if ctx.ext_annotation is not None:
-            ext_annotation =  self.getValue(ctx.ext_annotation()),
-        if ctx.comp_annotation is not None:
-            comp_annotation =  self.getValue(ctx.comp())
-        self.setValue(ctx, {
-            'elist': elist,
-            'elist_public': elist_public,
-            'elist_protected': elist_protected,
-            'eq_section': eq_section,
-            'alg_section': alg_section,
-            'language_spec': language_spec,
-            'ext_func_call': ext_func_call,
-            'ext_annotation': ext_annotation,
-            'comp_annotation': comp_annotation})
+        pass
 
 # B.2.2.8 ------------------------------------------------
 # language_specification :
 #     STRING
 #     ;
     def exitLanguage_specification(self, ctx):
-        self.setValue(ctx, ctx.STRING().getText()[1:-1])
+        pass
 
 # B.2.2.9 ------------------------------------------------
 # external_function_call :
@@ -305,15 +227,14 @@ class AstBuilder(ModelicaListener):
 #     IDENT '(' expression_list? ')'
 #     ;
     def exitExternal_functioni_call(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.2.10 -----------------------------------------------
 # element_list : 
 #     (element ';')*
 #     ;
     def exitElement_list(self, ctx):
-        self.setValue(ctx, [self.getValue(e) for e in ctx.element()])
+        pass
 
 # B.2.2.11 -----------------------------------------------
 # element :
@@ -326,42 +247,7 @@ class AstBuilder(ModelicaListener):
 #             (constraining_clause comment)?
 #         );
     def exitElement(self, ctx):
-        if ctx.import_clause() is not None:
-            self.setValue(ctx, self.getValue(ctx.imports_clause()))
-        elif ctx.extends_clause() is not None:
-            self.setValue(ctx, self.getValue(ctx.extends_clause()))
-        else:
-            classdef = None
-            comp = None
-            rclassdef = None
-            rcomp = None
-            exitConstraining_clause = None
-            comment = None
-            constraining_clause = None
-            if ctx.rclassdef != None:
-                rclassdef = self.getValue(ctx.rclass)
-            if ctx.rcomp != None:
-                rcomp = self.getValue(ctx.rcomp)
-            if ctx.classdef != None:
-                classdef = self.getValue(ctx.classdef)
-            if ctx.comp != None:
-                classdef = self.getValue(ctx.comp)
-            if ctx.constraining_clause() != None:
-                constraining_clause = self.getValue(ctx.constraining_clause())
-            if ctx.comment() != None:
-                comment = self.getValue(ctx.comment())
-            self.setValue(ctx, {
-                'redeclare': ctx.REDECLARE() != None,
-                'final': ctx.FINAL() != None,
-                'inner': ctx.INNER() != None,
-                'outer': ctx.OUTER() != None,
-                'classdef': classdef,
-                'rclassdef': rclassdef,
-                'rcomp': rcomp,
-                'comp': comp,
-                'constraining_clause': constraining_clause,
-                'comment': comment
-            })
+        pass
 
 # B.2.2.12 -----------------------------------------------
 # import_clause :
@@ -369,16 +255,14 @@ class AstBuilder(ModelicaListener):
 #         | name ('.' ( '*' | '{' import_list '}' ) )? ) comment
 #     ;
     def exitImport_clause(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.2.13 -----------------------------------------------
 # import_list : 
 #     IDENT (',' import_list)*
 #     ;
     def exitImport_list(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 #=========================================================
 # B.2.3 Extends
@@ -389,16 +273,14 @@ class AstBuilder(ModelicaListener):
 #     'extends' name class_modification? annotation?
 #     ;
     def exitExtends_clause(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.3.2 ------------------------------------------------
 # constraining_clause:
 #     'constrainedby' name class_modification?
 #     ;
     def exitConstraining_clause(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 #=========================================================
 # B.2.4 Component Clause
@@ -409,16 +291,7 @@ class AstBuilder(ModelicaListener):
 #     type_prefix type_specifier array_subscripts? component_list
 #     ;
     def exitComponent_clause(self, ctx):
-        if ctx.array_subscripts() is not None:
-            array_subscripts = self.getValue(ctx.array_subscripts())
-        else:
-            array_subscripts = None
-        self.setValue(ctx, {
-            'type_prefix': self.getValue(ctx.type_prefix()),
-            'type_specifier': self.getValue(ctx.type_specifier()),
-            'array_subscripts': array_subscripts,
-            'component_list': self.getValue(ctx.component_list())
-            })
+        pass
 
 # B.2.4.2 ------------------------------------------------
 # type_prefix :
@@ -427,46 +300,42 @@ class AstBuilder(ModelicaListener):
 #     ('input' | 'output')?
 #     ;
     def exitType_prefix(self, ctx):
-        self.setValue(ctx, [c.getText() for c in ctx.getChildren()])
+        pass
 
 # B.2.4.3 ------------------------------------------------
 # type_specifier:
 #     name
 #     ;
     def exitType_specifier(self, ctx):
-        self.setValue(ctx, self.getValue(ctx.name()))
+        pass
 
 # B.2.4.4 ------------------------------------------------
 # component_list:
 #     component_declaration ( ',' component_declaration)*
 #     ;
     def exitComponent_list(self, ctx):
-        self.setValue(ctx,
-            [self.getValue(c) for c in ctx.component_declaration()])
+        pass
 
 # B.2.4.5 ------------------------------------------------
 # component_declaration :
 #     declaration condition_attribute? comment
 #     ;
     def exitComponent_declaration(self, ctx):
-        # TODO condition_attribute, comment
-        self.setValue(ctx, self.getValue(ctx.declaration()))
+        pass
 
 # B.2.4.6 ------------------------------------------------
 # condition_attribute :
 #     'if' expression
 #     ;
     def exitCondition_attribute(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.4.7 ------------------------------------------------
 # declaration :
 #     IDENT array_subscripts? modification?
 #     ;
     def exitDeclaration(self, ctx):
-        # TODO array subscripts and modification
-        self.setValue(ctx, '{:s}'.format(ctx.IDENT().getText()))
+        pass
 
 #=========================================================
 # B.2.5 Modification
@@ -481,39 +350,29 @@ class AstBuilder(ModelicaListener):
 
 # class_modification ('=' expression)?
     def exitModification_class(self, ctx):
-        mod = self.getValue(ctx.class_modification())
-        if ctx.expression() is not None:
-            expr = self.getValue(ctx.expression())
-            self.setValue(ctx, "{:s} = {:s}".format(mod, expr))
-        else:
-            self.setValue(ctx, "{:s}".format(mod))
+        pass
 
 # '=' expression
     def exitModification_assignment(self, ctx):
-        expr = self.getValue(ctx.expression())
-        self.setValue(ctx, "= {:s}".format(expr))
+        pass
 
 # ':=' expression
     def exitModification_assignment2(self, ctx):
-        # TODO how to handle := operator?, is it just assignment
-        expr = self.getValue(ctx.expression())
-        self.setValue(ctx, "= {:s}".format(expr))
+        pass
 
 # B.2.5.2 ------------------------------------------------
 # class_modification :
 #     '(' argument_list? ')'
 #     ;
     def exitClass_modification(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.5.3 ------------------------------------------------
 # argument_list :
 #     argument (',' argument)*
 #     ;
     def exitArgument_list(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.5.4 ------------------------------------------------
 # argument :
@@ -521,8 +380,7 @@ class AstBuilder(ModelicaListener):
 #     | element_redeclaration
 #     ;
     def exitArgument(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.5.5 ------------------------------------------------
 # element_modification_or_replaceable:
@@ -531,16 +389,14 @@ class AstBuilder(ModelicaListener):
 #     (element_modification | element_replaceable)
 #     ;
     def exitElement_modification_or_replaceable(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.5.6 ------------------------------------------------
 # element_modification :
 #     name modification? string_comment
 #     ;
     def exitElement_modification(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.5.7 ------------------------------------------------
 # element_redeclaration :
@@ -551,8 +407,7 @@ class AstBuilder(ModelicaListener):
 #       | element_replaceable)
 #     ;
     def exitElement_redeclaration(self, ctx):
-        # TODO
-        raise NotImplementedError("")
+        pass
 
 # B.2.5.8 ------------------------------------------------
 # element_replaceable:

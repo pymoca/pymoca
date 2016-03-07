@@ -510,7 +510,8 @@ INNER : 'inner';
 OUTER : 'outer';
 INITIAL : 'initial';
 IDENT : NONDIGIT ( DIGIT | NONDIGIT )* | Q_IDENT;
-STRING : '\"' (S_CHAR|S_ESCAPE)* '\"';
+STRING : '"' ('\\"' | ~('"'))* '"';
+//STRING : '"' (S_CHAR | S_ESCAPE | ' ')* '"';
 UNSIGNED_NUMBER : UNSIGNED_INTEGER  ( '.' UNSIGNED_NUMBER? )* ( [eE] [+-]? UNSIGNED_INTEGER)?;
 COMMENT :
     ('/' '/' .*? '\n' | '/*' .*? '*/') -> channel(HIDDEN)
@@ -524,7 +525,8 @@ fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+;
 fragment NONDIGIT : [_a-zA-Z];
 fragment S_CHAR : [A-Za-z\u0000-\u00FF];
 fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}|! ];
-fragment S_ESCAPE : [\'\"\?\\\a\b\f\n\r\t\v];
+fragment S_ESCAPE : ('\\\'' | '\\"' | '\\\\' | '\\?' | '\\b' |
+    '\\f' | '\\n' | '\\r' | '\\t' | '\\v' | '\\a');
 fragment DIGIT :  [0-9];
 fragment UNSIGNED_INTEGER : DIGIT+;
 // vi:ts=4:sw=4:expandtab:
