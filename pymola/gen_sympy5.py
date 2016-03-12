@@ -6,37 +6,77 @@ from __future__ import print_function
 import sys
 import antlr4
 import antlr4.Parser
-import pprint
+import json
+import pyast as ast
+import pyast.dump.js
 
 # compiler
 from generated.ModelicaLexer import ModelicaLexer
 from generated.ModelicaParser import ModelicaParser
 from generated.ModelicaListener import ModelicaListener
 
-class Ast(object):
+def handle_walk(var, listener):
+    if isinstance(var, Node):
+        var.walk(listener)
+    elif isinstance(var, ast.TypedDict):
+        for k in var.keys():
+            handle_walk(var[k], listener)
+    elif isinstance(var, ast.TypedList):
+        for c in var:
+            handle_walk(c, listener)
+    else:
+        pass
 
-    @staticmethod
-    def file_node():
-        return {
-            '_ast' : 'file',
-            'classes': {},
-        }
+class Node(ast.Node):
 
-    @staticmethod
-    def class_node():
-        return {
-            '_ast' : 'class',
-            'symbols': {},
-            'equations': [],
-        }
+    def __repr__(self):
+        return pyast.dump.js.dump(self)
 
-    @staticmethod
-    def symbol_node():
-        return {
-            '_ast' : 'symbol',
-            'type': None,
-            'prefix' : None,
-        }
+    def get_children(self):
+        return [self.__dict__[field] for field in self._fields]
+
+    def walk(self, listener):
+        name = self.__class__.__name__
+        if hasattr(listener, 'enter_' + name):
+            listener.__getattribute__('enter_' + name)(self)
+        for child in self.get_children():
+            handle_walk(child, listener)
+        if hasattr(listener, 'exit_' + name):
+            listener.__getattribute__('exit_' + name)(self)
+
+    def visit(self, visitor):
+        name = self.__class__.__name__
+        if hasattr(visitor, 'visit_' + name):
+            return visitor.__getattribute__('visit_' + name)(self)
+        else:
+            res = []
+            for child in self.get_children():
+                if isinstance(child, Node):
+                    res += [child.visit(visitor)]
+            return res
+
+class Operator(Node):
+    token = ast.field(('+', '=', '-', '==', '!=', '>', '<'))
+
+class Expression(Node):
+    operator = ast.field(Operator)
+    operands = ast.seq(Node)
+
+class Equation(Node):
+    left = ast.field(str, null=True) # TODO switch to expr
+    right = ast.field(str, null=True)
+
+class Symbol(Node):
+    type =  ast.field((str, unicode))
+    prefixes = ast.seq((str, unicode), null=True)
+
+class Class(Node):
+    symbols = ast.dict(Symbol, null=True)
+    equations = ast.seq(Equation, null=True)
+
+class File(Node):
+    classes = ast.dict(Class, null=True)
+
 
 class DAEListener(ModelicaListener):
 
@@ -50,15 +90,15 @@ class DAEListener(ModelicaListener):
         """
         Create a new stored definition context.
         """
-        self.file = Ast.file_node()
+        self.file = File()
 
     def enterClass_spec_comp(self, ctx):
         """
         Create a new class context.
         """
         class_name = ctx.IDENT()[0].getText()
-        self.class_node = Ast.class_node()
-        self.file['classes'][class_name] = self.class_node
+        self.class_node = Class()
+        self.file.classes[class_name] = self.class_node
 
     def enterComponent_clause(self, ctx):
         """
@@ -75,16 +115,16 @@ class DAEListener(ModelicaListener):
         """
         name = str(ctx.IDENT().getText())
         type = self.comp_clause['type']
-        prefix = self.comp_clause['prefix'].split()
-        assert name not in self.class_node['symbols'].keys()
-        comp_decl_node = Ast.symbol_node()
-        comp_decl_node['type'] = type
-        comp_decl_node['prefix'] = prefix
-        self.class_node['symbols'][name] = comp_decl_node
-        self.comp_decl_node = comp_decl_node
+        prefixes = self.comp_clause['prefix'].split()
+        assert name not in self.class_node.symbols.keys()
+        sym = Symbol(type=type, prefixes=prefixes)
+        self.class_node.symbols[name] = sym
+        self.comp_decl_node = sym
 
     def exitEquation_simple(self, ctx):
-        self.class_node['equations'] += [str(ctx.getText())]
+        self.class_node.equations += [Equation(
+            str(ctx.simple_expression().getText()),
+            str(ctx.expression().getText()))]
 
 input_stream = antlr4.FileStream('./test/Aircraft.mo')
 lexer = ModelicaLexer(input_stream)
@@ -97,32 +137,54 @@ walker = antlr4.ParseTreeWalker()
 walker.walk(daeListener, tree)
 
 def flatten(file_node, main_class_name):
-    res = Ast.class_node()
-    root = file_node['classes'][main_class_name]
-    res['equations'] += root['equations']
-    res['symbols'].update(root['symbols'])
-
-    for sym_key in root['symbols'].keys():
-        for class_type in file_node['classes'].keys():
-            if root['symbols'][sym_key]['type'] == class_type:
-                class_def = file_node['classes'][class_type]
-                for cls_sym_key in class_def['symbols'].keys():
+    res = Class()
+    root = file_node.classes[main_class_name]
+    res.equations = root.equations
+    res.symbols = root.symbols
+    for sym_key in root.symbols.keys():
+        for class_type in file_node.classes.keys():
+            if root.symbols[sym_key].type == class_type:
+                class_def = file_node.classes[class_type]
+                for cls_sym_key in class_def.symbols.keys():
                     new_name = '{:s}.{:s}'.format(sym_key, cls_sym_key)
-                    res['symbols'][new_name] = class_def['symbols'][cls_sym_key]
+                    res.symbols[new_name] = class_def.symbols[cls_sym_key]
                     for key in ['input', 'output']:
-                        if key in res['symbols'][new_name]['prefix']:
-                            res['symbols'][new_name]['prefix'].remove(key)
+                        if key in res.symbols[new_name].prefixes:
+                            res.symbols[new_name].prefixes.remove(key)
 
                 #TODO need to make replacement more intelligent by using context
-                for eq in class_def['equations']:
-                    for cls_sym_key in class_def['symbols'].keys():
+                for eq in class_def.equations:
+                    for cls_sym_key in class_def.symbols.keys():
                         new_name = '{:s}.{:s}'.format(sym_key, cls_sym_key)
                         #eq = eq.replace(cls_sym_key, new_name)
-                    res['equations'] += [eq]
-                print('res_keys', res['symbols'].keys())
-                res['symbols'].pop(sym_key)
+                    res.equations += [eq]
+                res.symbols.pop(sym_key)
     return res
 
-pprint.pprint(daeListener.file)
+tree = daeListener.file
 flat_tree = flatten(daeListener.file, 'Aircraft')
-pprint.pprint(flat_tree)
+print(flat_tree)
+
+class Listener(object):
+
+    def enter_File(self, tree):
+        print('enter file')
+
+    def exit_File(self, tree):
+        print('exit file')
+
+    def enter_Class(self, tree):
+        print('enter class')
+
+    def exit_Class(self, tree):
+        print('exit class')
+
+    def enter_Experssion(self, tree):
+        print('enter expr')
+
+    def exit_Expression(self, tree):
+        print('exit expr')
+
+
+listener = Listener()
+tree.walk(listener)
