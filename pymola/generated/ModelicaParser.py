@@ -5929,6 +5929,7 @@ class ModelicaParser ( Parser ):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
             super(ModelicaParser.Expr_negContext, self).__init__(parser)
+            self.op = None # Token
             self.copyFrom(ctx)
 
         def expr(self):
@@ -6081,7 +6082,7 @@ class ModelicaParser ( Parser ):
                 _prevctx = localctx
 
                 self.state = 844
-                self.match(ModelicaParser.T__55)
+                localctx.op = self.match(ModelicaParser.T__55)
                 self.state = 845
                 self.expr(9)
                 pass

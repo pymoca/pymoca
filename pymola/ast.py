@@ -56,19 +56,20 @@ class Node(ast.Node):
                     res += [child.visit(visitor)]
             return res
 
+class Expression(Node):
+    pass
 
-class Operator(Node):
-    token = ast.field(('+', '=', '-', '==', '!=', '>', '<'))
-
+class Primary(Node):
+    value =  ast.field((str, unicode), null=True)
 
 class Expression(Node):
-    operator = ast.field(Operator)
-    operands = ast.seq(Node)
+    operator = ast.field((str, unicode), null=True)
+    operands = ast.seq((Primary, Expression), null=True)
 
 
 class Equation(Node):
-    left = ast.field(str, null=True) # TODO switch to expr
-    right = ast.field(str, null=True)
+    left = ast.field((Expression, Node), null=True) # TODO switch to expr
+    right = ast.field((Expression, Node), null=True)
 
 
 class ConnectClause(Node):
@@ -194,20 +195,49 @@ class DAEListener(ModelicaListener):
     def exitEquation(self, ctx):
         self.ast[ctx] = self.ast[ctx.equation_options()]
 
-    def enterEquation_simple(self, ctx):
+    def exitEquation_simple(self, ctx):
+        print(type(self.ast[ctx.simple_expression()]))
         self.ast[ctx] = Equation(
-            left=str(ctx.simple_expression().getText()),
-            right=str(ctx.expression().getText()),
+            left=self.ast[ctx.simple_expression()],
+            right=self.ast[ctx.expression()],
             comment=self.eq_comment)
 
     def exitEquation_connect_clause(self, ctx):
         self.ast[ctx] = self.ast[ctx.connect_clause()]
 
-    def enterConnect_clause(self, ctx):
+    def exitConnect_clause(self, ctx):
         self.ast[ctx] = ConnectClause(
             left=str(ctx.component_reference()[0].getText()),
             right=str(ctx.component_reference()[1].getText()),
             comment=self.eq_comment)
+
+    def exitSimple_expression(self, ctx):
+        #TODO only using first expression
+        self.ast[ctx] = self.ast[ctx.expr()[0]]
+
+    def exitExpression_simple(self, ctx):
+        self.ast[ctx] = self.ast[ctx.simple_expression()]
+
+    def enterExpr_primary(self, ctx):
+        self.ast[ctx] = Primary(ctx.getText())
+
+    def exitExpr_add(self, ctx):
+        self.ast[ctx] = Expression(
+            operator=str(ctx.op.text),
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
+
+    def exitExpr_mul(self, ctx):
+        self.ast[ctx] = Expression(
+            operator=str(ctx.op.text),
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
+
+    def exitExpr_neg(self, ctx):
+        self.ast[ctx] = Expression(
+            operator=str(ctx.op.text),
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
 
     def exitElement_list(self, ctx):
         self.ast[ctx] = [self.ast[e] for e in ctx.element()]
