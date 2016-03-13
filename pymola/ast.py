@@ -86,6 +86,7 @@ class Symbol(Node):
     inner =  ast.field(bool, default=False)
     outer =  ast.field(bool, default=False)
     dimensions =  ast.seq(int, null=True)
+    comment = ast.field((str, unicode), default='')
 
 
 # This class is just an intermediate AST step
@@ -94,7 +95,7 @@ class ComponentClause(Node):
     type =  ast.field((str, unicode), null=True)
     array_subscripts =  ast.seq(int, null=True)
     dimensions =  ast.seq(int, null=True)
-    comment = ast.field(str, default='')
+    comment = ast.field((str, unicode), default='')
     symbol_list = ast.seq(Symbol, null=True)
 
 
@@ -120,7 +121,7 @@ class File(Node):
     classes = ast.dict(Class, null=True)
 
 
-class DAEListener(ModelicaListener):
+class ASTListener(ModelicaListener):
 
     def __init__(self):
         self.ast = {}
@@ -196,7 +197,6 @@ class DAEListener(ModelicaListener):
         self.ast[ctx] = self.ast[ctx.equation_options()]
 
     def exitEquation_simple(self, ctx):
-        print(type(self.ast[ctx.simple_expression()]))
         self.ast[ctx] = Equation(
             left=self.ast[ctx.simple_expression()],
             right=self.ast[ctx.expression()],
@@ -218,7 +218,28 @@ class DAEListener(ModelicaListener):
     def exitExpression_simple(self, ctx):
         self.ast[ctx] = self.ast[ctx.simple_expression()]
 
-    def enterExpr_primary(self, ctx):
+    def exitExpr_primary(self, ctx):
+        self.ast[ctx] = self.ast[ctx.primary()]
+
+    def exitPrimary_unsigned_number(self, ctx):
+        self.ast[ctx] = Primary(ctx.getText())
+
+    def exitPrimary_string(self, ctx):
+        self.ast[ctx] = Primary(ctx.getText())
+
+    def exitPrimary_false(self, ctx):
+        self.ast[ctx] = Primary(ctx.getText())
+
+    def exitPrimary_true(self, ctx):
+        self.ast[ctx] = Primary(ctx.getText())
+
+    def exitPrimary_function(self, ctx):
+        self.ast[ctx] = Primary(ctx.getText())
+
+    def exitPrimary_derivative(self, ctx):
+        self.ast[ctx] = Primary(ctx.getText())
+
+    def exitPrimary_component_reference(self, ctx):
         self.ast[ctx] = Primary(ctx.getText())
 
     def exitExpr_add(self, ctx):
@@ -265,8 +286,15 @@ class DAEListener(ModelicaListener):
     def exitComponent_list(self, ctx):
         self.ast[ctx] = [self.ast[e] for e in ctx.component_declaration()]
 
-    def exitComponent_declaration(self, ctx):
-        self.ast[ctx] = self.ast[ctx.declaration()]
+    def enterComponent_declaration(self, ctx):
+        sym = Symbol(
+            name='',
+            type=self.comp_clause.type,
+            prefixes=self.comp_clause.prefixes,
+            comment=ctx.comment().getText()
+        )
+        self.symbol_node = sym
+        self.ast[ctx] = sym
 
     def enterDeclaration(self, ctx):
         dimensions = None
@@ -274,13 +302,8 @@ class DAEListener(ModelicaListener):
             dimensions = [int(s) for s in ctx.array_subscripts().subscript().getText()]
         elif self.comp_clause.dimensions is not None:
             dimensions = self.comp_clause.dimensions
-        sym = Symbol(
-            name=ctx.IDENT().getText(),
-            dimensions=dimensions,
-            type=self.comp_clause.type,
-            prefixes=self.comp_clause.prefixes
-        )
-        self.ast[ctx] = sym
+        self.symbol_node.name = ctx.IDENT().getText()
+        self.symbol_node.dimensions = dimensions
 
 def flatten(file_node, main_class_name):
     res = Class()
@@ -307,26 +330,6 @@ def flatten(file_node, main_class_name):
                 res.symbols.pop(sym_key)
     return res
 
-
-class Listener(object):
-
-    def enter_File(self, tree):
-        print('enter file')
-
-    def exit_File(self, tree):
-        print('exit file')
-
-    def enter_Class(self, tree):
-        print('enter class')
-
-    def exit_Class(self, tree):
-        print('exit class')
-
-    def enter_Experssion(self, tree):
-        print('enter expr')
-
-    def exit_Expression(self, tree):
-        print('exit expr')
 
 def flatten(root, class_name, instance_name=''):
     """
@@ -368,6 +371,28 @@ def flatten(root, class_name, instance_name=''):
             flat_class.symbols[instance_name + sym_name] = sym
     return flat_class
 
+
+class Listener(object):
+
+    def enter_File(self, tree):
+        print('enter file')
+
+    def exit_File(self, tree):
+        print('exit file')
+
+    def enter_Class(self, tree):
+        print('enter class')
+
+    def exit_Class(self, tree):
+        print('exit class')
+
+    def enter_Experssion(self, tree):
+        print('enter expr')
+
+    def exit_Expression(self, tree):
+        print('exit expr')
+
+
 if __name__ == "__main__":
 
     input_stream = antlr4.FileStream('./test/Aircraft.mo')
@@ -376,14 +401,14 @@ if __name__ == "__main__":
     parser = ModelicaParser(stream)
     tree = parser.stored_definition()
     #print(tree.toStringTree(recog=parser))
-    daeListener = DAEListener()
+    astListener = ASTListener()
     walker = antlr4.ParseTreeWalker()
-    walker.walk(daeListener, tree)
+    walker.walk(astListener, tree)
 
-    tree = daeListener.ast_result
-    #print(tree)
-    flat_tree = flatten(daeListener.ast_result, 'Aircraft')
-    print(flat_tree)
+    ast = astListener.ast_result
+    #print(ast)
+    flat_ast = flatten(ast, 'Aircraft')
+    #print(flat_ast)
 
     #listener = Listener()
     #tree.walk(listener)
