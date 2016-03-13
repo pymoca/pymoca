@@ -61,3 +61,6 @@ pymola/version.py
 *.swp
 
 .ipynb_checkpoints
+
+# pycharm
+.idea/workspace.xml
