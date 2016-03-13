@@ -18,15 +18,16 @@ equation
 end RigidBody;
 
 model Accelerometer "an accelerometer"
-    parameter Real b_x=1.0;
-    parameter Real b_y=1.0;
-    parameter Real b_z=1.0;
+    Bias b_x, b_y, b_z;
     input Real a_x, a_y, a_z;
     output Real ma_x, ma_y, ma_z;
 equation
-    ma_x = a_x + b_x;
-    ma_y = a_y + b_y;
-    ma_z = a_z + b_z;
+    connect(b_x.u, a_x);
+    connect(b_y.u, a_y);
+    connect(b_z.u, a_z);
+    ma_x = b_x.y;
+    ma_y = b_y.y;
+    ma_z = b_z.y;
 end Accelerometer;
 
 model Aircraft "the aircraft"
@@ -37,3 +38,11 @@ equation
     connect(body.a_y, accel.a_y);
     connect(body.a_z, accel.a_z);
 end Aircraft;
+
+model Bias "bias model"
+    parameter Real b = 0.0;
+    input Real u;
+    output Real y;
+equation
+    y = u + b;
+end Bias;

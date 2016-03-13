@@ -25,7 +25,7 @@ class_definition :
     ;
 
 // B.2.2.2 ------------------------------------------------
-class_prefixes : 
+class_prefixes :
     PARTIAL?
     class_type
     ;
@@ -49,7 +49,7 @@ class_specifier :
         class_modification? comment                                 # class_spec_base
     | IDENT '=' 'enumeration' '(' (enum_list? | ':') ')' comment    # class_spec_enum
     | IDENT '=' 'der' '(' name ',' IDENT (',' IDENT )* ')' comment  # class_spec_der
-    | 'extends' IDENT class_modification? string_comment 
+    | 'extends' IDENT class_modification? string_comment
         composition 'end' IDENT                                     # class_spec_extends
     ;
 
@@ -62,7 +62,7 @@ base_prefix :
 enum_list :
     enumeration_literal (',' enumeration_literal)*
     ;
- 
+
 // B.2.2.6 ------------------------------------------------
 enumeration_literal :
     IDENT comment
@@ -70,7 +70,7 @@ enumeration_literal :
 
 // B.2.2.7 ------------------------------------------------
 composition :
-    element_list
+    epriv=element_list
     (
         'public' epub=element_list
         | 'protected' epro=element_list
@@ -95,7 +95,7 @@ external_function_call :
     ;
 
 // B.2.2.10 ------------------------------------------------
-element_list : 
+element_list :
     (element ';')*
     ;
 
@@ -103,12 +103,20 @@ element_list :
 element :
     import_clause
     | extends_clause
-    | REDECLARE? FINAL?
-        INNER? OUTER?
-        ((classdef=class_definition | comp=component_clause)
-         | 'replaceable' (rclassdef=class_definition | rcomp=component_clause)
-            (constraining_clause comment)?
-        );
+    | regular_element
+    | replaceable_element
+    ;
+
+regular_element:
+    REDECLARE? FINAL? INNER? OUTER?
+    (class_elem=class_definition | comp_elem=component_clause)
+    ;
+
+replaceable_element:
+    REDECLARE? FINAL? INNER? OUTER? 'replaceable'
+    (class_elem=class_definition | comp_elem=component_clause)
+    (constraining_clause comment)?
+    ;
 
 // B.2.2.12 ------------------------------------------------
 import_clause :
@@ -117,7 +125,7 @@ import_clause :
     ;
 
 // B.2.2.13 ------------------------------------------------
-import_list : 
+import_list :
     IDENT (',' import_list)*
     ;
 
@@ -205,8 +213,7 @@ argument :
 
 // B.2.5.5 ------------------------------------------------
 element_modification_or_replaceable:
-    EACH?
-    FINAL?
+    EACH? FINAL?
     (element_modification | element_replaceable)
     ;
 
@@ -217,9 +224,7 @@ element_modification :
 
 // B.2.5.7 ------------------------------------------------
 element_redeclaration :
-    REDECLARE
-    EACH?
-    FINAL?
+    REDECLARE EACH? FINAL?
     ( (short_class_definition | component_clause1)
       | element_replaceable)
     ;
@@ -282,7 +287,7 @@ equation :
 // B.2.6.5 ------------------------------------------------
 statement_options :
     component_reference (':=' expression | function_call_args)  # statement_component_reference
-    | '(' output_expression_list ')' ':=' 
+    | '(' output_expression_list ')' ':='
         component_reference function_call_args                  # statement_component_function
     | 'break'           # statement_break
     | 'return'          # statement_return
@@ -387,7 +392,7 @@ connect_clause :
 // B.2.7.1 ------------------------------------------------
 expression :
     simple_expression                           # expression_simple
-    | 'if' expression 'then' expression         
+    | 'if' expression 'then' expression
     ( 'elseif' expression 'then' expression)*
     'else' expression                           # expression_if
     ;
@@ -401,11 +406,11 @@ simple_expression :
 // B.2.7.3 ------------------------------------------------
 expr :
     '-' expr                                                # expr_neg
-    | primary op=('^' | '.^') primary                       # expr_exp 
+    | primary op=('^' | '.^') primary                       # expr_exp
     | expr op=('*' | '/' | '.*' | './') expr                # expr_mul
     | expr  op=('+' | '-' | '.+' | '.-') expr               # expr_add
     | expr  op=('<' | '<=' | '>' | '>=' | '==' | '<>') expr # expr_rel
-    | 'not' expr                                            # expr_not    
+    | 'not' expr                                            # expr_not
     | expr  'and' expr                                      # expr_and
     | expr  'or' expr                                       # expr_or
     | primary                                               # expr_primary

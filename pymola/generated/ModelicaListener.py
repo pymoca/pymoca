@@ -166,6 +166,24 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ModelicaParser#regular_element.
+    def enterRegular_element(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#regular_element.
+    def exitRegular_element(self, ctx):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#replaceable_element.
+    def enterReplaceable_element(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#replaceable_element.
+    def exitReplaceable_element(self, ctx):
+        pass
+
+
     # Enter a parse tree produced by ModelicaParser#import_clause.
     def enterImport_clause(self, ctx):
         pass

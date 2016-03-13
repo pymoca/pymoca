@@ -95,6 +95,16 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by ModelicaParser#regular_element.
+    def visitRegular_element(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#replaceable_element.
+    def visitReplaceable_element(self, ctx):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by ModelicaParser#import_clause.
     def visitImport_clause(self, ctx):
         return self.visitChildren(ctx)
