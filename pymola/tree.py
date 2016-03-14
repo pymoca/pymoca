@@ -88,7 +88,6 @@ class TreeListener(object):
     def exitExpression(self, tree):
         pass
 
-
 def flatten(root, class_name, instance_name=''):
     """
     This function takes and flattens it so that all subclasses instances

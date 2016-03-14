@@ -3,16 +3,15 @@
 Modelica parse Tree to AST tree.
 """
 from __future__ import print_function, absolute_import, division, print_function, unicode_literals
-import sys
+
 import antlr4
 import antlr4.Parser
 import yaml
 
-from .generated.ModelicaLexer import ModelicaLexer
-from .generated.ModelicaParser import ModelicaParser
-from .generated.ModelicaListener import ModelicaListener
-
 from . import ast
+from .generated.ModelicaLexer import ModelicaLexer
+from .generated.ModelicaListener import ModelicaListener
+from .generated.ModelicaParser import ModelicaParser
 
 
 class ASTListener(ModelicaListener):
@@ -30,8 +29,11 @@ class ASTListener(ModelicaListener):
     # FILE ===========================================================
 
     def enterStored_definition(self, ctx):
+        within = ''
+        if ctx.WITHIN() != None:
+            within = ctx.WITHIN().getText()
         file_node = ast.File()
-        file_node.within = ctx.WITHIN() != None
+        file_node.within = within
         self.ast[ctx] = file_node
         self.file_node = file_node
 
@@ -70,15 +72,15 @@ class ASTListener(ModelicaListener):
         for elist in [ctx.epriv, ctx.epub, ctx.epro]:
             if elist is not None:
                 for e in [self.ast[e] for e in elist.element()]:
-                    elist_comb += e.symbol_list
-        for symbol in elist_comb:
-            self.class_node.symbols[symbol.name] = symbol
+                    for s in e.symbol_list:
+                        self.class_node.symbols[s.name] = s
 
-        eqlist_comb = []
         for eqlist in [self.ast[e] for e in ctx.equation_section()]:
             if eqlist is not None:
-                eqlist_comb += eqlist.equation_list
-        self.class_node.equations += eqlist_comb
+                if eqlist.initial:
+                    self.class_node.initial_equations += eqlist.equations
+                else:
+                    self.class_node.equations += eqlist.equations
 
     def enterEquation_section(self, ctx):
         eq_sect = ast.EquationSection(
@@ -90,7 +92,10 @@ class ASTListener(ModelicaListener):
 
     def exitEquation_section(self, ctx):
         eq_sect = self.ast[ctx]
-        eq_sect.equation_list += [self.ast[e] for e in ctx.equation()]
+        if eq_sect.initial:
+            eq_sect.equations += [self.ast[e] for e in ctx.equation()]
+        else:
+            eq_sect.equations += [self.ast[e] for e in ctx.equation()]
 
     # EQUATION ===========================================================
 

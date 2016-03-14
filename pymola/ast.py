@@ -3,8 +3,12 @@
 Modelica AST definitions
 """
 from __future__ import print_function, absolute_import, division, print_function, unicode_literals
-import json
 
+import copy
+import json
+import sys
+
+VALIDATE_AST = True
 
 def to_json(var):
     if isinstance(var, list):
@@ -18,15 +22,45 @@ def to_json(var):
     return res
 
 
-def field(types, default=None):
-    if types == list and default is None:
-        default = list()
-    elif types == dict and default is None:
-        default = dict()
-    return {
-        'types': types,
-        'default': default,
-    }
+class Field(object):
+    def __init__(self, types, default=None):
+        if default == None:
+            if types == dict:
+                default = {}
+            elif types == list:
+                default = []
+        if type(types) is type or not hasattr(types, '__iter__'):
+            types = [types]
+        types = list(types)
+        if sys.version_info < (3,):
+            if str in types:
+                types += [unicode]
+        self.types = types
+        self.default = default
+
+    def validate(self, name, key, val, throw=True):
+        if not type(val) in self.types:
+            if throw:
+                raise IOError('{:s}.{:s} requires types {:s}, but got {:s}'.format(
+                    name, key, self.types, type(val)))
+            else:
+                return False
+        else:
+            return True
+
+
+class List(list):
+    def __init__(self, types):
+        super(List, self).__init__()
+        if not isinstance(types, list):
+            types = list([types])
+        self.types = types
+
+    def __add__(self, other):
+        if other in self.types:
+            super(List, self).__add__(other)
+        else:
+            raise IOError('List requires elements of type', self.types)
 
 
 class Node(object):
@@ -34,36 +68,23 @@ class Node(object):
 
     def __init__(self, **kwargs):
         for key in self.ast_spec.keys():
-            default = self.ast_spec[key]['default']
-            types = self.ast_spec[key]['types']
-            # make sure we create new lists nad dicts for each class
-            # so they don't share the something passed as default
-            if types == list:
-                self.__dict__[key] = list(default)
-            elif types == dict:
-                self.__dict__[key] = dict(default)
-            else:
-                self.__dict__[key] = default
+            # make sure we don't share ast_spec default data by using deep copy
+            self.__dict__[key] = copy.deepcopy(self.ast_spec[key].default)
         for key in kwargs.keys():
-            types = self.ast_spec[key]['types']
+            types = self.ast_spec[key].types
             val = kwargs[key]
-            if key in self.ast_spec.keys():
-                # make sure we create new lists nad dicts for each class
-                # so they don't share the something passed as default
-                if types == list:
-                    self.__dict__[key] = list(val)
-                elif types == dict:
-                    self.__dict__[key] = dict(val)
-                else:
-                    self.__dict__[key] = val
-            else:
-                raise IOError('{:s} not a child of {:s}'.format(key, self.__class__.__name__))
+            self.set_field(key, val)
+
+    def set_field(self, key, value):
+        if VALIDATE_AST:
+            name = self.__class__.__name__
+            if key not in self.ast_spec.keys():
+                raise IOError('{:s} not a child of {:s}'.format(key, name))
+            self.ast_spec[key].validate(name, key, value)
+        self.__dict__[key] = value
 
     def __setattr__(self, key, value):
-        if key not in self.ast_spec:
-            raise IOError('{:s} not a child of {:s}'.format(key, self.__class__.__name__))
-        else:
-            super(Node, self).__setattr__(key, value)
+        self.set_field(key, value)
 
     def __repr__(self):
         return json.dumps(to_json(self), indent=2, sort_keys=True)
@@ -73,7 +94,7 @@ class Node(object):
 
 class Primary(Node):
     ast_spec = {
-        'value': field((bool, float, int, str))
+        'value': Field((bool, float, int, str))
     }
 
     def __init__(self, **kwargs):
@@ -82,7 +103,7 @@ class Primary(Node):
 
 class ComponentRef(Node):
     ast_spec = {
-        'name': field(str),
+        'name': Field(str),
     }
 
     def __init__(self, **kwargs):
@@ -97,8 +118,8 @@ class Expression(Node):
 # noinspection PyRedeclaration
 class Expression(Node):
     ast_spec = {
-        'operator': field(str),
-        'operands': field((Expression, Primary, ComponentRef)),
+        'operator': Field(str),
+        'operands': Field(list),
     }
 
     def __init__(self, **kwargs):
@@ -107,9 +128,9 @@ class Expression(Node):
 
 class Equation(Node):
     ast_spec = {
-        'left': field((Expression, Primary, ComponentRef)),
-        'right': field((Expression, Primary, ComponentRef)),
-        'comment': field(str),
+        'left': Field((Expression, Primary, ComponentRef)),
+        'right': Field((Expression, Primary, ComponentRef)),
+        'comment': Field(str),
     }
 
     def __init__(self, **kwargs):
@@ -118,9 +139,9 @@ class Equation(Node):
 
 class ConnectClause(Node):
     ast_spec = {
-        'left': field(ComponentRef),
-        'right': field(ComponentRef),
-        'comment': field(str),
+        'left': Field(ComponentRef),
+        'right': Field(ComponentRef),
+        'comment': Field(str),
     }
 
     def __init__(self, **kwargs):
@@ -129,15 +150,15 @@ class ConnectClause(Node):
 
 class Symbol(Node):
     ast_spec = {
-        'name': field(str, ''),
-        'type': field(str, ''),
-        'prefixes': field(list, []),
-        'redeclare': field(bool, False),
-        'final': field(bool, False),
-        'inner': field(bool, False),
-        'outer': field(bool, False),
-        'dimensions': field(list, [1]),
-        'comment': field(str, ''),
+        'name': Field(str, ''),
+        'type': Field(str, ''),
+        'prefixes': Field(list, []),
+        'redeclare': Field(bool, False),
+        'final': Field(bool, False),
+        'inner': Field(bool, False),
+        'outer': Field(bool, False),
+        'dimensions': Field(list, [1]),
+        'comment': Field(str, ''),
     }
 
     def __init__(self, **kwargs):
@@ -146,11 +167,11 @@ class Symbol(Node):
 
 class ComponentClause(Node):
     ast_spec = {
-        'prefixes': field(list, []),
-        'type': field(str, ''),
-        'dimensions': field(list, [1]),
-        'comment': field(str, ''),
-        'symbol_list': field(list, []),
+        'prefixes': Field(list, []),
+        'type': Field(str, ''),
+        'dimensions': Field(list, [1]),
+        'comment': Field(str, ''),
+        'symbol_list': Field(list, []),
     }
 
     def __init__(self, **kwargs):
@@ -159,8 +180,8 @@ class ComponentClause(Node):
 
 class EquationSection(Node):
     ast_spec = {
-        'initial': field(bool, False),
-        'equation_list': field(list, []),
+        'initial': Field(bool, False),
+        'equations': Field(list, []),
     }
 
     def __init__(self, **kwargs):
@@ -169,19 +190,20 @@ class EquationSection(Node):
 
 class Class(Node):
     ast_spec = {
-        'name': field(str),
-        'encapsulated': field(bool, False),
-        'partial': field(bool, False),
-        'final': field(bool, False),
-        'type': field(str, ''),
-        'comment': field(str, ''),
-        'symbols': field(dict, {}),
-        'equations': field(list, []),
-        'parameters': field(list, []),
-        'constants': field(list, []),
-        'inputs': field(list, []),
-        'outputs': field(list, []),
-        'states': field(list, []),
+        'name': Field(str),
+        'encapsulated': Field(bool, False),
+        'partial': Field(bool, False),
+        'final': Field(bool, False),
+        'type': Field(str, ''),
+        'comment': Field(str, ''),
+        'symbols': Field(dict, {}),
+        'initial_equations': Field(list, []),
+        'equations': Field(list, []),
+        'parameters': Field(list, []),
+        'constants': Field(list, []),
+        'inputs': Field(list, []),
+        'outputs': Field(list, []),
+        'states': Field(list, []),
     }
 
     def __init__(self, **kwargs):
@@ -190,8 +212,8 @@ class Class(Node):
 
 class File(Node):
     ast_spec = {
-        'within': field(str),
-        'classes': field(dict),
+        'within': Field(str),
+        'classes': Field(dict),
     }
 
     def __init__(self, **kwargs):
