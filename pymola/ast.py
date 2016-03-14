@@ -10,6 +10,20 @@ import sys
 
 VALIDATE_AST = True
 
+"""
+AST Node Type Hierarchy
+
+File
+    Class
+        Equation
+            ComponentRef
+            Expression
+            Primary
+        ConnectClause
+            ComponentRef
+        Symbol
+"""
+
 def to_json(var):
     if isinstance(var, list):
         res = [to_json(item) for item in var]
