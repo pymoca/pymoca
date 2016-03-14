@@ -63,4 +63,4 @@ pymola/version.py
 .ipynb_checkpoints
 
 # pycharm
-.idea/workspace.xml
+.idea
