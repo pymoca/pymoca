@@ -49,6 +49,7 @@ class Field(object):
             return True
 
 
+# TODO, need to finish implementing this for list type checking
 class List(list):
     def __init__(self, types):
         super(List, self).__init__()
@@ -119,7 +120,7 @@ class Expression(Node):
 class Expression(Node):
     ast_spec = {
         'operator': Field(str),
-        'operands': Field(list),
+        'operands': Field(list),  # list of Expressions
     }
 
     def __init__(self, **kwargs):
@@ -152,12 +153,12 @@ class Symbol(Node):
     ast_spec = {
         'name': Field(str, ''),
         'type': Field(str, ''),
-        'prefixes': Field(list, []),
+        'prefixes': Field(list, []),  # (str)
         'redeclare': Field(bool, False),
         'final': Field(bool, False),
         'inner': Field(bool, False),
         'outer': Field(bool, False),
-        'dimensions': Field(list, [1]),
+        'dimensions': Field(list, [1]),  # (int)
         'comment': Field(str, ''),
     }
 
@@ -167,11 +168,11 @@ class Symbol(Node):
 
 class ComponentClause(Node):
     ast_spec = {
-        'prefixes': Field(list, []),
+        'prefixes': Field(list, []),  # (str)
         'type': Field(str, ''),
-        'dimensions': Field(list, [1]),
+        'dimensions': Field(list, [1]),  # (int)
         'comment': Field(str, ''),
-        'symbol_list': Field(list, []),
+        'symbol_list': Field(list, []),  # (Symbol)
     }
 
     def __init__(self, **kwargs):
@@ -181,7 +182,7 @@ class ComponentClause(Node):
 class EquationSection(Node):
     ast_spec = {
         'initial': Field(bool, False),
-        'equations': Field(list, []),
+        'equations': Field(list, []),  # (Equation)
     }
 
     def __init__(self, **kwargs):
@@ -196,14 +197,14 @@ class Class(Node):
         'final': Field(bool, False),
         'type': Field(str, ''),
         'comment': Field(str, ''),
-        'symbols': Field(dict, {}),
+        'symbols': Field(dict, {}),  # (Symbol)
         'initial_equations': Field(list, []),
-        'equations': Field(list, []),
-        'parameters': Field(list, []),
-        'constants': Field(list, []),
-        'inputs': Field(list, []),
-        'outputs': Field(list, []),
-        'states': Field(list, []),
+        'equations': Field(list, []),  # (Equation)
+        'parameters': Field(list, []),  # (ComponentRef)
+        'constants': Field(list, []),  # (ComponentRef)
+        'inputs': Field(list, []),  # (ComponentRef)
+        'outputs': Field(list, []),  # (ComponentRef)
+        'states': Field(list, []),  # (ComponentRef)
     }
 
     def __init__(self, **kwargs):
