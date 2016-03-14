@@ -3,11 +3,12 @@
 Tools for tree walking and visiting etc.
 """
 
+from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+
 from . import ast
 
 
 class TreeWalker(object):
-
     def walk(self, listener, tree):
         name = tree.__class__.__name__
         if hasattr(listener, 'enterEvery'):
@@ -46,22 +47,22 @@ class TreeVisitor(object):
             return visitor.__getattribute__('visit' + name)(tree)
         else:
             res = []
-            for child in self.getChildren():
-                res += [self.handle_visit(child, visitor)]
+            for k in tree.ast_spec.keys():
+                res += [self.handle_visit(visitor, tree[k])]
             if len(res) == 1:
                 res = res[0]
             return res
 
     @classmethod
-    def handle_visit(cls, var, visitor):
+    def handle_visit(cls, visitor, tree):
         res = []
-        if isinstance(var, ast.Node):
-            res += var.visit(visitor)
-        elif isinstance(var, dict):
-            for k in var.keys():
-                res += [cls.handle_visit(var[k], visitor)]
-        elif isinstance(var, list):
-            for c in var:
+        if isinstance(tree, ast.Node):
+            res += visitor.visit(visitor, tree)
+        elif isinstance(tree, dict):
+            for k in tree.keys():
+                res += [cls.handle_visit(tree[k], visitor)]
+        elif isinstance(tree, list):
+            for c in tree:
                 res += [cls.handle_visit(c, visitor)]
         if len(res) == 1:
             res = res[0]
@@ -69,7 +70,6 @@ class TreeVisitor(object):
 
 
 class TreeListener(object):
-
     def enterFile(self, tree):
         print('walked file')
 
@@ -82,12 +82,11 @@ class TreeListener(object):
     def exitClass(self, tree):
         pass
 
-    def enterExperssion(self, tree):
+    def enterExpression(self, tree):
         pass
 
     def exitExpression(self, tree):
         pass
-
 
 
 def flatten(root, class_name, instance_name=''):
@@ -106,7 +105,6 @@ def flatten(root, class_name, instance_name=''):
 
     # create the returned class
     flat_class = ast.Class(
-        symbols=[],
         equations=orig_class.equations
     )
 
@@ -133,12 +131,8 @@ def flatten(root, class_name, instance_name=''):
 
 
 class ComponentRenameListener(object):
-
     def __init__(self, prefix):
         self.prefix = prefix
-
-    def enterClass(self, tree):
-        print('class', tree.name)
 
     def enterSymbol(self, tree):
         tree.name = '{:s}.{:s}'.format(self.prefix, tree.name)

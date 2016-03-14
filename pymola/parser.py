@@ -2,7 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import print_function
+from __future__ import print_function, absolute_import, division, print_function, unicode_literals
 import sys
 import antlr4
 import antlr4.Parser
@@ -27,6 +27,8 @@ class ASTListener(ModelicaListener):
         self.symbol_node = None
         self.eq_comment = None
 
+    # FILE ===========================================================
+
     def enterStored_definition(self, ctx):
         file_node = ast.File()
         file_node.within = ctx.WITHIN() != None
@@ -37,6 +39,8 @@ class ASTListener(ModelicaListener):
         for class_node in [self.ast[e] for e in ctx.stored_definition_class()]:
             self.ast[ctx].classes[class_node.name] = class_node
         self.ast_result = self.ast[ctx]
+
+    # CLASS ===========================================================
 
     def enterStored_definition_class(self, ctx):
         class_node = ast.Class()
@@ -51,12 +55,15 @@ class ASTListener(ModelicaListener):
         class_node = self.class_node
         class_node.encapsulated = ctx.ENCAPSULATED() != None
         class_node.partial = ctx.class_prefixes().PARTIAL() != None
-        class_node.type = str(ctx.class_prefixes().class_type().getText())
+        class_node.type = ctx.class_prefixes().class_type().getText()
 
     def enterClass_spec_comp(self, ctx):
         class_node = self.class_node
-        class_node.name = str(ctx.IDENT()[0].getText())
-        class_node.comment = str(ctx.string_comment().getText()[1:-1])
+        class_node.name = ctx.IDENT()[0].getText()
+
+    def exitClass_spec_comp(self, ctx):
+        class_node = self.class_node
+        class_node.comment = self.ast[ctx.string_comment()]
 
     def exitComposition(self, ctx):
         elist_comb = []
@@ -80,30 +87,37 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = eq_sect
         self.eq_sect = eq_sect
 
+
     def exitEquation_section(self, ctx):
         eq_sect = self.ast[ctx]
         eq_sect.equation_list += [self.ast[e] for e in ctx.equation()]
 
+    # EQUATION ===========================================================
+
     def enterEquation(self, ctx):
-        self.eq_comment = str(ctx.comment().getText())
+        pass
 
     def exitEquation(self, ctx):
         self.ast[ctx] = self.ast[ctx.equation_options()]
+        try:
+            self.ast[ctx].comment = self.ast[ctx.comment()]
+        except AttributeError:
+            pass
 
     def exitEquation_simple(self, ctx):
         self.ast[ctx] = ast.Equation(
             left=self.ast[ctx.simple_expression()],
-            right=self.ast[ctx.expression()],
-            comment=self.eq_comment)
+            right=self.ast[ctx.expression()])
 
     def exitEquation_connect_clause(self, ctx):
         self.ast[ctx] = self.ast[ctx.connect_clause()]
 
     def exitConnect_clause(self, ctx):
         self.ast[ctx] = ast.ConnectClause(
-            left=str(ctx.component_reference()[0].getText()),
-            right=str(ctx.component_reference()[1].getText()),
-            comment=self.eq_comment)
+            left= self.ast[ctx.component_reference()[0]],
+            right= self.ast[ctx.component_reference()[1]])
+
+    # EXPRESSIONS ===========================================================
 
     def exitSimple_expression(self, ctx):
         #TODO only using first expression
@@ -114,6 +128,33 @@ class ASTListener(ModelicaListener):
 
     def exitExpr_primary(self, ctx):
         self.ast[ctx] = self.ast[ctx.primary()]
+
+    def exitExpr_add(self, ctx):
+        self.ast[ctx] = ast.Expression(
+            operator=ctx.op.text,
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
+
+    def exitExpr_mul(self, ctx):
+        self.ast[ctx] = ast.Expression(
+            operator=ctx.op.text,
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
+
+    def exitExpr_rel(self, ctx):
+        self.ast[ctx] = ast.Expression(
+            operator=ctx.op.text,
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
+
+    def exitExpr_neg(self, ctx):
+        self.ast[ctx] = ast.Expression(
+            operator=ctx.op.text,
+            operands=[self.ast[ctx.expr()]]
+        )
+
+
+    # PRIMARY ===========================================================
 
     def exitPrimary_unsigned_number(self, ctx):
         self.ast[ctx] = yaml.load(ctx.getText())
@@ -132,36 +173,35 @@ class ASTListener(ModelicaListener):
 
     def exitPrimary_derivative(self, ctx):
         self.ast[ctx] = ast.Primary(value=ctx.getText())
-
+        comp_name =  ctx.function_call_args().function_arguments().function_argument()[0].getText()
         self.ast[ctx] = ast.Expression(
             operator='der',
-            operands=[ast.ComponentRef(
-                name=str(ctx.function_call_args().function_arguments().function_argument()[0].getText()))]
+            operands=[ast.ComponentRef(name=comp_name)]
         )
-        self.class_node.states += self.ast[ctx].operands
+
+        # every symbols that is differentiated is a state
+        self.class_node.states += [ast.ComponentRef(name=comp_name)]
+
+    def exitComponent_reference(self, ctx):
+        # TODO handle other idents
+        self.ast[ctx] = ast.ComponentRef(
+            name=ctx.IDENT()[0].getText()
+        )
 
     def exitPrimary_component_reference(self, ctx):
         self.ast[ctx] = ast.ComponentRef(
-            name=str(ctx.getText())
+            name=ctx.getText()
         )
 
-    def exitExpr_add(self, ctx):
-        self.ast[ctx] = ast.Expression(
-            operator=str(ctx.op.text),
-            operands=[self.ast[e] for e in ctx.expr()]
-        )
+    def exitEquation_function(self, ctx):
+        # TODO, add function ast
+        self.ast[ctx] = ctx.getText()
 
-    def exitExpr_mul(self, ctx):
-        self.ast[ctx] = ast.Expression(
-            operator=str(ctx.op.text),
-            operands=[self.ast[e] for e in ctx.expr()]
-        )
+    def exitEquation_when(self, ctx):
+        # TODO, add when ast
+        self.ast[ctx] = ctx.getText()
 
-    def exitExpr_neg(self, ctx):
-        self.ast[ctx] = ast.Expression(
-            operator=str(ctx.op.text),
-            operands=[self.ast[e] for e in ctx.expr()]
-        )
+    # COMPONENTS ===========================================================
 
     def exitElement_list(self, ctx):
         self.ast[ctx] = [self.ast[e] for e in ctx.element()]
@@ -173,11 +213,12 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = self.ast[ctx.comp_elem]
 
     def enterComponent_clause(self, ctx):
-        dimensions = None
         if ctx.array_subscripts() is not None:
             dimensions=[int(s) for s in ctx.array_subscripts().subscript().getText()]
+        else:
+            dimensions = [1]
         self.ast[ctx] = ast.ComponentClause(
-            prefixes=str(ctx.type_prefix().getText()).split(' '),
+            prefixes=ctx.type_prefix().getText().split(' '),
             type=ctx.type_specifier().getText(),
             dimensions=dimensions
         )
@@ -194,10 +235,12 @@ class ASTListener(ModelicaListener):
             name='',
             type=self.comp_clause.type,
             prefixes=self.comp_clause.prefixes,
-            comment=ctx.comment().getText()
         )
         self.symbol_node = sym
         self.ast[ctx] = sym
+
+    def exitComponent_declaration(self, ctx):
+        self.ast[ctx].comment = self.ast[ctx.comment()]
 
     def enterDeclaration(self, ctx):
         sym = self.symbol_node
@@ -209,12 +252,22 @@ class ASTListener(ModelicaListener):
         sym.name = ctx.IDENT().getText()
         sym.dimensions = dimensions
         if 'input' in sym.prefixes:
-            self.class_node.inputs += [ast.ComponentRef(name=str(sym.name))]
+            self.class_node.inputs += [ast.ComponentRef(name=sym.name)]
         elif 'output' in sym.prefixes:
-            self.class_node.outputs += [ast.ComponentRef(name=str(sym.name))]
+            self.class_node.outputs += [ast.ComponentRef(name=sym.name)]
         elif 'constant' in sym.prefixes:
-            self.class_node.constants += [ast.ComponentRef(name=str(sym.name))]
+            self.class_node.constants += [ast.ComponentRef(name=sym.name)]
 
+    # COMMENTS ==============================================================
+
+    def exitComment(self, ctx):
+        # TODO handle annotation
+        self.ast[ctx] = self.ast[ctx.string_comment()]
+
+    def exitString_comment(self, ctx):
+        self.ast[ctx] = ctx.getText()[1:-1]
+
+# UTILITY FUNCTIONS =========================================================
 
 def parse(file):
     input_stream = antlr4.FileStream(file)
