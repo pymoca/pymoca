@@ -71,7 +71,7 @@ class TreeVisitor(object):
 
 class TreeListener(object):
     def enterFile(self, tree):
-        print('walked file')
+        pass
 
     def exitFile(self, tree):
         pass
@@ -86,6 +86,18 @@ class TreeListener(object):
         pass
 
     def exitExpression(self, tree):
+        pass
+
+    def exitConnectClause(self, tree):
+        pass
+
+    def exitSymbol(self, tree):
+        pass
+
+    def exitComponentClause(self, tree):
+        pass
+
+    def exitPrimary(self, tree):
         pass
 
 def flatten(root, class_name, instance_name=''):

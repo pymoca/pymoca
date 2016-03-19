@@ -51,7 +51,16 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = class_node
 
     def exitStored_definition_class(self, ctx):
-        pass
+        cls = self.class_node
+        for sym_key, sym in cls.symbols.items():
+            if ((sym.name not in cls.inputs) and
+                    (sym.name not in [c.name for c in cls.outputs]) and
+                    (sym.name not in [c.name for c in cls.states]) and
+                    (sym.name not in [c.name for c in cls.constants]) and
+                    (sym.name not in [c.name for c in cls.parameters])):
+                cls.variables +=  [ast.ComponentRef(
+                    name=sym.name
+                )]
 
     def enterClass_definition(self, ctx):
         class_node = self.class_node
@@ -185,6 +194,10 @@ class ASTListener(ModelicaListener):
         )
 
         # every symbols that is differentiated is a state
+        # make sure it isn't already a state
+        for state in self.class_node.states:
+            if state == comp_name:
+                return
         self.class_node.states += [ast.ComponentRef(name=comp_name)]
 
     def exitComponent_reference(self, ctx):
@@ -262,6 +275,8 @@ class ASTListener(ModelicaListener):
             self.class_node.outputs += [ast.ComponentRef(name=sym.name)]
         elif 'constant' in sym.prefixes:
             self.class_node.constants += [ast.ComponentRef(name=sym.name)]
+        elif 'parameter' in sym.prefixes:
+            self.class_node.parameters += [ast.ComponentRef(name=sym.name)]
 
     # COMMENTS ==============================================================
 

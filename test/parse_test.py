@@ -13,7 +13,7 @@ from pymola import tree
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
-class Test(unittest.TestCase):
+class ParseTest(unittest.TestCase):
     "Testing"
 
     def test_aircraft(self):

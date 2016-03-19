@@ -219,6 +219,7 @@ class Class(Node):
         'inputs': Field(list, []),  # (ComponentRef)
         'outputs': Field(list, []),  # (ComponentRef)
         'states': Field(list, []),  # (ComponentRef)
+        'variables': Field(list, []),  # (ComponentRef)
     }
 
     def __init__(self, **kwargs):
