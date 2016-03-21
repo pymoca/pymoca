@@ -26,6 +26,7 @@ class SympyGenerator(tree.TreeListener):
 from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
+from pymola.sympy_runtime import DaeModel
 
 {%- for class_key, class in tree.classes.items() %}
 {{ render.src[class] }}
@@ -37,89 +38,84 @@ import sympy.physics.mechanics as mech
         })
 
     def exitClass(self, tree):
+
+        states_str = ', '.join([self.src[s] for s in tree.states])
+        inputs_str = ', '.join([self.src[s] for s in tree.inputs])
+        outputs_str = ', '.join([self.src[s] for s in tree.outputs])
+        constants_str = ', '.join([self.src[s] for s in tree.constants])
+        parameters_str = ', '.join([self.src[s] for s in tree.parameters])
+        variables_str = ', '.join([self.src[s] for s in tree.variables])
+
+        d = locals();
+        d.pop('self')
+        d['render'] = self
+
         template = jinja2.Template('''
-class {{tree.name}}:
+class {{tree.name}}(DaeModel):
 
     def __init__(self):
 
-        self.t = sympy.Symbol('t')
+        super({{tree.name}}, self).__init__()
 
         # states
-        {%- for state in tree.states %}
-        {{ state.name }} = mech.dynamicsymbols('{{ state.name }}')
-        {%- endfor %}
-        self.x = sympy.Matrix([
-            {%- for state in tree.states -%}
-            {{ state.name }},
-            {%- endfor -%}
-        ])
+        {% if states_str|length > 0 -%}
+        {{ states_str }} = mech.dynamicsymbols('{{ states_str|replace('__', '.') }}')
+        {% endif -%}
+        self.x = sympy.Matrix([{{ states_str }}])
 
         # inputs
-        {%- for input in tree.inputs %}
-        {{ input.name }} = sympy.Symbol('{{ input.name }}')
-        {%- endfor %}
-        self.u = sympy.Matrix([
-            {%- for input in tree.inputs -%}
-            {{ input.name }},
-            {%- endfor -%}
-        ])
-
+        {% if inputs_str|length > 0 -%}
+        {{ inputs_str }} = sympy.symbols('{{ inputs_str|replace('__', '.') }}')
+        {% endif -%}
+        self.u = sympy.Matrix([{{ inputs_str }}])
+        
         # outputs
-        {%- for output in tree.outputs %}
-        {{ output.name }} = sympy.Symbol('{{ output.name }}')
-        {%- endfor %}
-        self.y = sympy.Matrix([
-            {%- for output in tree.outputs -%}
-            {{ output.name }},
-            {%- endfor -%}
-        ])
-
+        {% if outputs_str|length > 0 -%}
+        {{ outputs_str }} = sympy.symbols('{{ outputs_str|replace('__', '.') }}')
+        {% endif -%}
+        self.y = sympy.Matrix([{{ outputs_str }}])
+        
         # constants
-        {%- for constant in tree.constants %}
-        {{ constant.name }} = sympy.Symbol('{{ constant.name }}')
-        {%- endfor %}
-
+        {% if constants_str|length > 0 -%}
+        {{ constants_str }} = sympy.symbols('{{ constants_str|replace('__', '.') }}')
+        {% endif -%}
+        self.c = sympy.Matrix([{{ constants_str }}])
+        
         # parameters
-        {%- for param in tree.parameters %}
-        {{ param.name }} = sympy.Symbol('{{ param.name }}')
-        {%- endfor %}
-        self.p = sympy.Matrix([
-            {%- for param in tree.parameters -%}
-            {{ param.name }},
-            {%- endfor -%}
-        ])
+        {% if parameters_str|length > 0 -%}
+        {{ parameters_str }} = sympy.symbols('{{ parameters_str|replace('__', '.') }}')
+        {% endif -%}
+        self.y = sympy.Matrix([{{ parameters_str }}])
 
         # variables
-        {%- for var in tree.variables %}
-        {{ var.name }} = sympy.Symbol('{{ var.name }}')
-        {%- endfor %}
-
+        {% if variables_str|length > 0 -%}
+        {{ variables_str }} = sympy.symbols('{{ variables_str|replace('__', '.') }}')
+        {% endif -%}
+        self.v = sympy.Matrix([{{ variables_str }}])
+      
         # equations
         self.eqs = [
-        {%- for eq in tree.equations %}
+            {% for eq in tree.equations -%}
             {{ render.src[eq] }},
-        {% endfor -%}
-            ]
-
-    def get_fg(self):
-        fg_sol = sympy.solve(self.eqs, self.x.diff(self.t))
-        f = self.x.diff(self.t).subs(fg_sol)
-        g = self.y.subs(fg_sol)
-        return f, g
+            {% endfor -%}
+        ]
     ''')
-        self.src[tree] = template.render({
-            'tree': tree,
-            'render': self,
-        })
+        self.src[tree] = template.render(d)
 
     def exitExpression(self, tree):
         op = str(tree.operator)
         if op == 'der':
-            src = '({tree.operands[0].name:s}).diff(self.t)'.format(**locals())
+            src = '({var:s}).diff(self.t)'.format(
+                var=self.src[tree.operands[0]])
+        elif op in ['*', '+', '-', '/']:
+            src = '{left:s} {op:s} {right:s}'.format(
+                op=op,
+                left=self.src[tree.operands[0]],
+                right=self.src[tree.operands[1]])
         else:
             src = "({operator:s} ".format(**tree.__dict__)
             for operand in tree.operands:
-                src +=  self.src[operand]
+                src +=  ' ' + self.src[operand]
             src += ")"
         self.src[tree] = src
 
@@ -127,10 +123,10 @@ class {{tree.name}}:
         self.src[tree] = "{value:s".format(**tree.__dict__)
 
     def exitComponentRef(self, tree):
-        self.src[tree] = "{name:s}".format(**tree.__dict__)
+        self.src[tree] = "{name:s}".format(name=tree.name.replace('.','__'))
 
     def exitSymbol(self, tree):
-        self.src[tree] = "{name:s} = sympy.symbols('{name:s}')".format(**tree.__dict__)
+        self.src[tree] = "{name:s}".format(name=tree.name.replace('.','__'))
 
     def exitEquation(self, tree):
         self.src[tree] = "{left:s} - ({right:s})".format(

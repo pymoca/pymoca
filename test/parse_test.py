@@ -7,6 +7,7 @@ from __future__ import print_function, absolute_import, division, print_function
 import os
 import sys
 import unittest
+import time
 
 from pymola import parser
 from pymola import tree
@@ -16,32 +17,36 @@ TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 class ParseTest(unittest.TestCase):
     "Testing"
 
+    def setUp(self):
+        sys.stdout.flush()
+
     def test_aircraft(self):
         ast_tree = parser.parse(os.path.join(TEST_DIR, './Aircraft.mo'))
 
-        ast_walker = tree.TreeWalker()
-        ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
+        #ast_walker = tree.TreeWalker()
+        #ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
 
-        for cls_name, cls in ast_tree.classes.items():
-            print('class', cls_name)
-            for sym_name, sym in cls.symbols.items():
-                print('\tsymbol', sym.name)
+        #for cls_name, cls in ast_tree.classes.items():
+        #    print('class', cls_name)
+        #    for sym_name, sym in cls.symbols.items():
+        #        print('\tsymbol', sym.name)
 
         print(ast_tree)
         flat_tree = tree.flatten(ast_tree, 'Aircraft')
         print(flat_tree)
+        time.sleep(1)
         sys.stdout.flush()
 
     def test_bouncing_ball(self):
         ast_tree = parser.parse(os.path.join(TEST_DIR, './BouncingBall.mo'))
 
-        ast_walker = tree.TreeWalker()
-        ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
+        #ast_walker = tree.TreeWalker()
+        #ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
 
-        for cls_name, cls in ast_tree.classes.items():
-            print('class', cls_name)
-            for sym_name, sym in cls.symbols.items():
-                print('\tsymbol', sym.name)
+        #for cls_name, cls in ast_tree.classes.items():
+        #    print('class', cls_name)
+        #    for sym_name, sym in cls.symbols.items():
+        #        print('\tsymbol', sym.name)#
 
         print(ast_tree)
         flat_tree = tree.flatten(ast_tree, 'BouncingBall')

@@ -1,9 +1,9 @@
 model RigidBody "the rigid body"
     parameter Real g=9.81; //gravitational acc.
     parameter Real c=0.90; //elasticity constant.
-    input Real f_xz;
-    output Real x;
-    output Real v_x;
+    parameter Real m=1.0; //mass
+    input Real f_x;
+    output Real x, v_x, a_x;
 equation
     der(x) = v_x;
     der(v_x) = a_x;

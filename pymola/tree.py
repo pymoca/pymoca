@@ -116,29 +116,57 @@ def flatten(root, class_name, instance_name=''):
 
     # create the returned class
     flat_class = ast.Class(
-        equations=orig_class.equations
+        name=class_name,
+        equations=orig_class.equations,
+        states = orig_class.states,
+        inputs = orig_class.inputs,
+        outputs = orig_class.outputs,
+        parameters = orig_class.parameters,
+        constants = orig_class.constants,
+        variables = orig_class.variables,
     )
+
+    # flat file
+    flat_file = ast.File()
+    flat_file.classes[class_name] = flat_class
 
     # append period to non empty instance_name
     if instance_name != '':
-        instance_name += '.'
+        instance_prefix = instance_name + '.'
+    else:
+        instance_prefix = instance_name
 
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
         if sym.type in root.classes:
             # recursively call flatten on the sub class
-            flat_sub_class = flatten(root, sym.type, instance_name=sym_name)
+            flat_sub_file = flatten(root, sym.type, instance_name=sym_name)
+            flat_sub_class = flat_sub_file.classes[sym.type]
+
             # add sub_class members symbols and equations
             for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
-                flat_class.symbols[instance_name + sub_sym_name] = sub_sym
+                flat_class.symbols[instance_prefix + sub_sym_name] = sub_sym
             flat_class.equations += flat_sub_class.equations
+            flat_class.states += flat_sub_class.states
+            #flat_class.inputs += flat_sub_class.inputs
+            #flat_class.outputs += flat_sub_class.outputs
+            flat_class.variables += flat_sub_class.variables
+            flat_class.parameters += flat_sub_class.parameters
+            flat_class.constants += flat_sub_class.constants
 
         # else if the symbols is not a class name
         else:
             # append original symbol to flat class
-            flat_class.symbols[instance_name + sym_name] = sym
-    return flat_class
+            flat_class.symbols[instance_prefix + sym_name] = sym
+
+
+    # walker for renaming components
+    if instance_name != '':
+        ast_walker = TreeWalker()
+        ast_walker.walk(ComponentRenameListener(instance_name), flat_class)
+
+    return flat_file
 
 
 class ComponentRenameListener(object):

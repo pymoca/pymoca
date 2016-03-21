@@ -47,14 +47,35 @@ class GenSympyTest(unittest.TestCase):
     def test_estimator(self):
         ast_tree = parser.parse(os.path.join(TEST_DIR, './Estimator.mo'))
         ast_walker = tree.TreeWalker()
-        #flat_tree = tree.flatten(ast_tree, 'Estimator')
-        flat_tree = ast_tree
+        flat_tree = tree.flatten(ast_tree, 'Estimator')
         sympy_gen = gen_sympy.SympyGenerator()
         ast_walker.walk(sympy_gen, flat_tree)
         #print(flat_tree)
-        print('generated source:\n', sympy_gen.src[flat_tree])
+        print(sympy_gen.src[flat_tree])
         with open(os.path.join(TEST_DIR, 'generated/Estimator.py'), 'w') as f:
            f.write(sympy_gen.src[flat_tree])
+        from generated.Estimator import Estimator as Estimator
+        e = Estimator()
+        f, g = e.get_fg()
+        print('linearization', e.linearize())
+        sys.stdout.flush()
+
+    @unittest.skip('known failure in equations')
+    def test_aircraft(self):
+        ast_tree = parser.parse(os.path.join(TEST_DIR, './Aircraft.mo'))
+        ast_walker = tree.TreeWalker()
+        flat_tree = tree.flatten(ast_tree, 'Aircraft')
+        sympy_gen = gen_sympy.SympyGenerator()
+        ast_walker.walk(sympy_gen, flat_tree)
+        print(flat_tree)
+        print(sympy_gen.src[flat_tree])
+        with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+           f.write(sympy_gen.src[flat_tree])
+        from generated.Aircraft import Aircraft as Aircraft
+        #e = Aircraft()
+        #print(e.x.shape)
+        #f, g = e.get_fg()
+        #print(e.linearize())
         sys.stdout.flush()
 
 
