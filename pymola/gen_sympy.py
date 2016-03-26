@@ -26,7 +26,7 @@ class SympyGenerator(tree.TreeListener):
 from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
-from pymola.sympy_runtime import DaeModel
+from pymola.sympy_runtime import OdeModel
 
 {%- for class_key, class in tree.classes.items() %}
 {{ render.src[class] }}
@@ -51,7 +51,7 @@ from pymola.sympy_runtime import DaeModel
         d['render'] = self
 
         template = jinja2.Template('''
-class {{tree.name}}(DaeModel):
+class {{tree.name}}(OdeModel):
 
     def __init__(self):
 
@@ -85,7 +85,7 @@ class {{tree.name}}(DaeModel):
         {% if parameters_str|length > 0 -%}
         {{ parameters_str }} = sympy.symbols('{{ parameters_str|replace('__', '.') }}')
         {% endif -%}
-        self.y = sympy.Matrix([{{ parameters_str }}])
+        self.p = sympy.Matrix([{{ parameters_str }}])
 
         # variables
         {% if variables_str|length > 0 -%}
@@ -99,19 +99,26 @@ class {{tree.name}}(DaeModel):
             {{ render.src[eq] }},
             {% endfor -%}
         ]
+
+        self.compute_fg()
     ''')
         self.src[tree] = template.render(d)
 
     def exitExpression(self, tree):
         op = str(tree.operator)
+        n_operands = len(tree.operands)
         if op == 'der':
             src = '({var:s}).diff(self.t)'.format(
                 var=self.src[tree.operands[0]])
-        elif op in ['*', '+', '-', '/']:
+        elif op in ['*', '+', '-', '/'] and n_operands == 2:
             src = '{left:s} {op:s} {right:s}'.format(
                 op=op,
                 left=self.src[tree.operands[0]],
                 right=self.src[tree.operands[1]])
+        elif op in ['+', '-'] and n_operands == 1:
+            src = '{op:s} {expr:s}'.format(
+                op=op,
+                expr=self.src[tree.operands[0]])
         else:
             src = "({operator:s} ".format(**tree.__dict__)
             for operand in tree.operands:
@@ -120,7 +127,7 @@ class {{tree.name}}(DaeModel):
         self.src[tree] = src
 
     def exitPrimary(self, tree):
-        self.src[tree] = "{value:s".format(**tree.__dict__)
+        self.src[tree] = "{value:s}".format(**tree.__dict__)
 
     def exitComponentRef(self, tree):
         self.src[tree] = "{name:s}".format(name=tree.name.replace('.','__'))

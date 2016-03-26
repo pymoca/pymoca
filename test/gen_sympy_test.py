@@ -56,8 +56,9 @@ class GenSympyTest(unittest.TestCase):
            f.write(sympy_gen.src[flat_tree])
         from generated.Estimator import Estimator as Estimator
         e = Estimator()
-        f, g = e.get_fg()
         print('linearization', e.linearize())
+        res = e.simulate(x0=[1])
+        print('output', res)
         sys.stdout.flush()
 
     @unittest.skip('known failure in equations')

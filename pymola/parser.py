@@ -171,7 +171,7 @@ class ASTListener(ModelicaListener):
     # PRIMARY ===========================================================
 
     def exitPrimary_unsigned_number(self, ctx):
-        self.ast[ctx] = yaml.load(ctx.getText())
+        self.ast[ctx] = ast.Primary(value=str(yaml.load(ctx.getText())))
 
     def exitPrimary_string(self, ctx):
         self.ast[ctx] = ast.Primary(value=ctx.getText())

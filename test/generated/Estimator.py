@@ -4,9 +4,9 @@
 from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
-from pymola.sympy_runtime import DaeModel
+from pymola.sympy_runtime import OdeModel
 
-class Estimator(DaeModel):
+class Estimator(OdeModel):
 
     def __init__(self):
 
@@ -20,20 +20,23 @@ class Estimator(DaeModel):
         self.u = sympy.Matrix([])
         
         # outputs
-        self.y = sympy.Matrix([])
+        y = sympy.symbols('y')
+        self.y = sympy.Matrix([y])
         
         # constants
         self.c = sympy.Matrix([])
         
         # parameters
-        v_x = sympy.symbols('v_x')
-        self.y = sympy.Matrix([v_x])
+        self.p = sympy.Matrix([])
 
         # variables
         self.v = sympy.Matrix([])
       
         # equations
         self.eqs = [
-            (x).diff(self.t) - (v_x),
+            (x).diff(self.t) - (- x),
+            y - (x),
             ]
+
+        self.compute_fg()
     

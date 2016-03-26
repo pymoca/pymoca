@@ -1,6 +1,7 @@
 model Estimator "a position estimator"
-	parameter Real v_x=1 "velocity";
     Real x "position";
+    output = Real y;
 equation
-	der(x) = v_x "the deriv of position is velocity";
+	der(x) = -x "the deriv of position is velocity";
+	y = x;
 end BouncingBall;
