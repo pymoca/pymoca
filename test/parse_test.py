@@ -21,7 +21,7 @@ class ParseTest(unittest.TestCase):
         sys.stdout.flush()
 
     def test_aircraft(self):
-        ast_tree = parser.parse(os.path.join(TEST_DIR, './Aircraft.mo'))
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
 
         #ast_walker = tree.TreeWalker()
         #ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
@@ -38,7 +38,7 @@ class ParseTest(unittest.TestCase):
         sys.stdout.flush()
 
     def test_bouncing_ball(self):
-        ast_tree = parser.parse(os.path.join(TEST_DIR, './BouncingBall.mo'))
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './BouncingBall.mo'), 'r').read())
 
         #ast_walker = tree.TreeWalker()
         #ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
@@ -55,7 +55,7 @@ class ParseTest(unittest.TestCase):
 
 
     def test_estimator(self):
-        ast_tree = parser.parse(os.path.join(TEST_DIR, './Estimator.mo'))
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Estimator.mo'), 'r').read())
 
         ast_walker = tree.TreeWalker()
         ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)

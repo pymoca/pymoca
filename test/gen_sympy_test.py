@@ -45,7 +45,7 @@ class GenSympyTest(unittest.TestCase):
     #     #sys.stdout.flush()
 
     def test_estimator(self):
-        ast_tree = parser.parse(os.path.join(TEST_DIR, './Estimator.mo'))
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Estimator.mo'), 'r').read())
         ast_walker = tree.TreeWalker()
         flat_tree = tree.flatten(ast_tree, 'Estimator')
         sympy_gen = gen_sympy.SympyGenerator()
@@ -63,7 +63,7 @@ class GenSympyTest(unittest.TestCase):
 
     @unittest.skip('known failure in equations')
     def test_aircraft(self):
-        ast_tree = parser.parse(os.path.join(TEST_DIR, './Aircraft.mo'))
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
         ast_walker = tree.TreeWalker()
         flat_tree = tree.flatten(ast_tree, 'Aircraft')
         sympy_gen = gen_sympy.SympyGenerator()

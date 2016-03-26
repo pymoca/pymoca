@@ -139,3 +139,10 @@ class {{tree.name}}(OdeModel):
         self.src[tree] = "{left:s} - ({right:s})".format(
             left=self.src[tree.left],
             right=self.src[tree.right])
+
+def generate(ast_tree, model_name):
+    ast_walker = tree.TreeWalker()
+    flat_tree = tree.flatten(ast_tree, model_name)
+    sympy_gen = SympyGenerator()
+    ast_walker.walk(sympy_gen, flat_tree)
+    return sympy_gen.src[flat_tree]

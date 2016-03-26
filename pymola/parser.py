@@ -289,8 +289,9 @@ class ASTListener(ModelicaListener):
 
 # UTILITY FUNCTIONS =========================================================
 
-def parse(file):
-    input_stream = antlr4.FileStream(file)
+def parse(text):
+    antlr4.InputStream
+    input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
     stream = antlr4.CommonTokenStream(lexer)
     parser = ModelicaParser(stream)
