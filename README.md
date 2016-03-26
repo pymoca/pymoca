@@ -6,7 +6,7 @@ A python/modelica based simulation environment.
 [![Coverage Status](https://img.shields.io/coveralls/jgoppert/pymola.svg)](https://coveralls.io/r/jgoppert/pymola)
 
 ## Examples
-[Simple IPython Notebook Example](notebook/Simple.ipynb)
+[Simple IPython Notebook Example](test/Spring.ipynb)
 
 ##Roadmap
 
