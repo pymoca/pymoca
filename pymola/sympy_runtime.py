@@ -71,6 +71,7 @@ class OdeModel(object):
         # create g (measurement) lambda function
         g_lam = sympy.lambdify((self.t, x_sym, u_sym), self.g.subs(ss_subs))
         res = pl.array(g_lam(0, pl.zeros(len(self.x)), pl.zeros(len(self.u))), dtype=float)
+        print('size check', res.shape[1], len(self.y))
         if res.shape[1] != len(self.y):
             raise IOError("g doesn't return correct size", res, self.y)
 

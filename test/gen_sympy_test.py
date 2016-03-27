@@ -49,7 +49,7 @@ class GenSympyTest(unittest.TestCase):
            f.write(text)
         from generated.Spring import Spring as Spring
         e = Spring()
-        res = e.simulate(x0=[1, 11])
+        res = e.simulate(x0=[1, 1])
         sys.stdout.flush()
         sys.stderr.flush()
 
