@@ -49,6 +49,13 @@ class ParseTest(unittest.TestCase):
         sys.stdout.flush()
         sys.stderr.flush()
 
+    def test_spring(self):
+        sys.stdout.flush()
+        sys.stderr.flush()
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Spring.mo'), 'r').read())
+        flat_tree = tree.flatten(ast_tree, 'Spring')
+        sys.stdout.flush()
+        sys.stderr.flush()
 
 
 if __name__ == "__main__":

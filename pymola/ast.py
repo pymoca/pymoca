@@ -174,6 +174,7 @@ class Symbol(Node):
         'outer': Field(bool, False),
         'dimensions': Field(list, [1]),  # (int)
         'comment': Field(str, ''),
+        'start': Field(Primary, ''),
     }
 
     def __init__(self, **kwargs):

@@ -50,9 +50,12 @@ class OdeModel(object):
         u_sym = sympy.DeferredVector('u')
         ss_subs = {self.x[i]: x_sym[i] for i in range(len(self.x))}
         ss_subs.update({self.u[i]: u_sym[i] for i in range(len(self.u))})
+        ss_subs.update(self.p0)
+        ss_subs.update(self.c0)
+        print(ss_subs)
         f_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.subs(ss_subs))
         if len(self.x) > 0 and len(self.f) > 0:
-            jac_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.jacobian(self.x))
+            jac_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.jacobian(self.x).subs(ss_subs))
         else:
             jac_lam = None
         g_lam = sympy.lambdify((self.t, x_sym, u_sym), self.g.subs(ss_subs))

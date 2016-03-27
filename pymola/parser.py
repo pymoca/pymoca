@@ -269,6 +269,8 @@ class ASTListener(ModelicaListener):
             dimensions = self.comp_clause.dimensions
         sym.name = ctx.IDENT().getText()
         sym.dimensions = dimensions
+        #if ctx.modification() is not None:
+        #    sym.start = self.ast[ctx.modification()]
         if 'input' in sym.prefixes:
             self.class_node.inputs += [ast.ComponentRef(name=sym.name)]
         elif 'output' in sym.prefixes:
@@ -277,6 +279,15 @@ class ASTListener(ModelicaListener):
             self.class_node.constants += [ast.ComponentRef(name=sym.name)]
         elif 'parameter' in sym.prefixes:
             self.class_node.parameters += [ast.ComponentRef(name=sym.name)]
+
+    def exitElement_modification(self, ctx):
+        sym = self.symbol_node
+        if ctx.name().getText() == 'start':
+            sym.start = self.ast[ctx.modification().expression()]
+
+    def exitModification_assignment(self, ctx):
+        sym = self.symbol_node
+        sym.start = self.ast[ctx.expression()]
 
     # COMMENTS ==============================================================
 

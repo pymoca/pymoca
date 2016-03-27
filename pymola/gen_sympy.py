@@ -68,24 +68,32 @@ class {{tree.name}}(OdeModel):
         {{ inputs_str }} = sympy.symbols('{{ inputs_str|replace('__', '.') }}')
         {% endif -%}
         self.u = sympy.Matrix([{{ inputs_str }}])
-        
+
         # outputs
         {% if outputs_str|length > 0 -%}
         {{ outputs_str }} = sympy.symbols('{{ outputs_str|replace('__', '.') }}')
         {% endif -%}
         self.y = sympy.Matrix([{{ outputs_str }}])
-        
+
         # constants
         {% if constants_str|length > 0 -%}
         {{ constants_str }} = sympy.symbols('{{ constants_str|replace('__', '.') }}')
         {% endif -%}
         self.c = sympy.Matrix([{{ constants_str }}])
-        
+        self.c0 = {
+            {% for s in tree.constants -%}
+            '{{ s.name }}' : {{tree.symbols[s.name].start.value}},
+            {% endfor -%}}
+
         # parameters
         {% if parameters_str|length > 0 -%}
         {{ parameters_str }} = sympy.symbols('{{ parameters_str|replace('__', '.') }}')
         {% endif -%}
         self.p = sympy.Matrix([{{ parameters_str }}])
+        self.p0 = {
+            {% for s in tree.parameters -%}
+            '{{ s.name }}' : {{tree.symbols[s.name].start.value}},
+            {% endfor -%}}
 
         # variables
         {% if variables_str|length > 0 -%}

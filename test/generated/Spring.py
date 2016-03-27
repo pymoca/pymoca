@@ -6,22 +6,21 @@ import sympy
 import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
 
-class Estimator(OdeModel):
+class Spring(OdeModel):
 
     def __init__(self):
 
-        super(Estimator, self).__init__()
+        super(Spring, self).__init__()
 
         # states
-        x = mech.dynamicsymbols('x')
-        self.x = sympy.Matrix([x])
+        x, v_x = mech.dynamicsymbols('x, v_x')
+        self.x = sympy.Matrix([x, v_x])
 
         # inputs
         self.u = sympy.Matrix([])
 
         # outputs
-        y = sympy.symbols('y')
-        self.y = sympy.Matrix([y])
+        self.y = sympy.Matrix([])
 
         # constants
         self.c = sympy.Matrix([])
@@ -29,8 +28,11 @@ class Estimator(OdeModel):
             }
 
         # parameters
-        self.p = sympy.Matrix([])
+        c, k = sympy.symbols('c, k')
+        self.p = sympy.Matrix([c, k])
         self.p0 = {
+            'c' : 0.1,
+            'k' : 2,
             }
 
         # variables
@@ -38,8 +40,8 @@ class Estimator(OdeModel):
       
         # equations
         self.eqs = [
-            (x).diff(self.t) - (- x),
-            y - (x),
+            (x).diff(self.t) - (v_x),
+            (v_x).diff(self.t) - (- k * x - c * v_x),
             ]
 
         self.compute_fg()

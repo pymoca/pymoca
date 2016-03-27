@@ -207,14 +207,14 @@ argument_list :
 
 // B.2.5.4 ------------------------------------------------
 argument :
-    element_modification_or_replaceable
-    | element_redeclaration
+    arg=element_modification_or_replaceable
+    | arg=element_redeclaration
     ;
 
 // B.2.5.5 ------------------------------------------------
 element_modification_or_replaceable:
     EACH? FINAL?
-    (element_modification | element_replaceable)
+    (elem=element_modification | elem=element_replaceable)
     ;
 
 // B.2.5.6 ------------------------------------------------

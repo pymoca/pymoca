@@ -40,6 +40,19 @@ class GenSympyTest(unittest.TestCase):
         sys.stdout.flush()
         sys.stderr.flush()
 
+    def test_spring(self):
+        sys.stdout.flush()
+        sys.stderr.flush()
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Spring.mo'), 'r').read())
+        text = gen_sympy.generate(ast_tree, 'Spring')
+        with open(os.path.join(TEST_DIR, 'generated/Spring.py'), 'w') as f:
+           f.write(text)
+        from generated.Spring import Spring as Spring
+        e = Spring()
+        res = e.simulate(x0=[1, 11])
+        sys.stdout.flush()
+        sys.stderr.flush()
+
     def test_aircraft(self):
         sys.stdout.flush()
         sys.stderr.flush()
