@@ -4,13 +4,13 @@
 from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
-from pymola.sympy_runtime import DaeModel
+from pymola.sympy_runtime import OdeModel
 
-class Aircraft(DaeModel):
+class Aircraft(OdeModel):
 
     def __init__(self):
 
-        self.t = sympy.Symbol('t')
+        super(Aircraft, self).__init__()
 
         # states
         body__x, body__v_x = mech.dynamicsymbols('body.x, body.v_x')
@@ -27,7 +27,7 @@ class Aircraft(DaeModel):
         
         # parameters
         body__g, body__c, body__m, accel__b_x__b = sympy.symbols('body.g, body.c, body.m, accel.b_x.b')
-        self.y = sympy.Matrix([body__g, body__c, body__m, accel__b_x__b])
+        self.p = sympy.Matrix([body__g, body__c, body__m, accel__b_x__b])
 
         # variables
         body, accel, body__f_x, accel__b_x, accel__a_x, accel__b_x__u = sympy.symbols('body, accel, body.f_x, accel.b_x, accel.a_x, accel.b_x.u')
@@ -43,4 +43,6 @@ class Aircraft(DaeModel):
             accel__ma_x - (accel__b_x__y),
             accel__b_x__y - (accel__b_x__u + accel__b_x__b),
             ]
+
+        self.compute_fg()
     

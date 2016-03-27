@@ -19,65 +19,39 @@ TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 class GenSympyTest(unittest.TestCase):
     "Testing"
 
-    # def test_estimator(self):
-    #     ast_tree = parser.parse(os.path.join(TEST_DIR, './Estimator.mo'))
-    #     ast_walker = tree.TreeWalker()
-    #     #flat_tree = tree.flatten(ast_tree, 'Estimator')
-    #     flat_tree = ast_tree
-    #     sympy_gen = gen_sympy.SympyGenerator()
-    #     ast_walker.walk(sympy_gen, flat_tree)
-    #     #print(flat_tree)
-    #     print(sympy_gen.src[flat_tree])
-    #     with open(os.path.join(TEST_DIR, 'generated/Estimator.py'), 'w') as f:
-    #         f.write(sympy_gen.src[flat_tree])
-    #     sys.stdout.flush()
-    #
-    # def test_aircraft(self):
-    #     ast_tree = parser.parse(os.path.join(TEST_DIR, './Aircraft.mo'))
-    #     ast_walker = tree.TreeWalker()
-    #     flat_tree = tree.flatten(ast_tree, 'Aircraft')
-    #     #sympy_gen = gen_sympy.SympyGenerator()
-    #     #ast_walker.walk(sympy_gen, flat_tree)
-    #     #print(flat_tree)
-    #     #print(sympy_gen.src[flat_tree])
-    #     #with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
-    #     #    f.write(sympy_gen.src[flat_tree])
-    #     #sys.stdout.flush()
+    def setUp(self):
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+    def tearDown(self):
+        sys.stdout.flush()
+        sys.stderr.flush()
 
     def test_estimator(self):
+        sys.stdout.flush()
+        sys.stderr.flush()
         ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Estimator.mo'), 'r').read())
-        ast_walker = tree.TreeWalker()
-        flat_tree = tree.flatten(ast_tree, 'Estimator')
-        sympy_gen = gen_sympy.SympyGenerator()
-        ast_walker.walk(sympy_gen, flat_tree)
-        #print(flat_tree)
-        print(sympy_gen.src[flat_tree])
+        text = gen_sympy.generate(ast_tree, 'Estimator')
         with open(os.path.join(TEST_DIR, 'generated/Estimator.py'), 'w') as f:
-           f.write(sympy_gen.src[flat_tree])
+           f.write(text)
         from generated.Estimator import Estimator as Estimator
         e = Estimator()
-        print('linearization', e.linearize())
         res = e.simulate(x0=[1])
-        print('output', res)
         sys.stdout.flush()
+        sys.stderr.flush()
 
-    @unittest.skip('known failure in equations')
     def test_aircraft(self):
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
-        ast_walker = tree.TreeWalker()
-        flat_tree = tree.flatten(ast_tree, 'Aircraft')
-        sympy_gen = gen_sympy.SympyGenerator()
-        ast_walker.walk(sympy_gen, flat_tree)
-        print(flat_tree)
-        print(sympy_gen.src[flat_tree])
-        with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
-           f.write(sympy_gen.src[flat_tree])
-        from generated.Aircraft import Aircraft as Aircraft
-        #e = Aircraft()
-        #print(e.x.shape)
-        #f, g = e.get_fg()
-        #print(e.linearize())
         sys.stdout.flush()
+        sys.stderr.flush()
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
+        text = gen_sympy.generate(ast_tree, 'Aircraft')
+        #with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+        #   f.write(text)
+        #from generated.Aircraft import Aircraft as Aircraft
+        #e = Aircraft()
+        #res = e.simulate()
+        sys.stdout.flush()
+        sys.stderr.flush()
 
 
 if __name__ == "__main__":

@@ -19,56 +19,35 @@ class ParseTest(unittest.TestCase):
 
     def setUp(self):
         sys.stdout.flush()
+        sys.stderr.flush()
+
+    def tearDown(self):
+        sys.stdout.flush()
+        sys.stderr.flush()
 
     def test_aircraft(self):
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
-
-        #ast_walker = tree.TreeWalker()
-        #ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
-
-        #for cls_name, cls in ast_tree.classes.items():
-        #    print('class', cls_name)
-        #    for sym_name, sym in cls.symbols.items():
-        #        print('\tsymbol', sym.name)
-
-        print(ast_tree)
-        flat_tree = tree.flatten(ast_tree, 'Aircraft')
-        print(flat_tree)
-        time.sleep(1)
         sys.stdout.flush()
+        sys.stderr.flush()
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
+        flat_tree = tree.flatten(ast_tree, 'Aircraft')
+        sys.stdout.flush()
+        sys.stderr.flush()
 
     def test_bouncing_ball(self):
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './BouncingBall.mo'), 'r').read())
-
-        #ast_walker = tree.TreeWalker()
-        #ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
-
-        #for cls_name, cls in ast_tree.classes.items():
-        #    print('class', cls_name)
-        #    for sym_name, sym in cls.symbols.items():
-        #        print('\tsymbol', sym.name)#
-
-        print(ast_tree)
-        flat_tree = tree.flatten(ast_tree, 'BouncingBall')
-        print(flat_tree)
         sys.stdout.flush()
-
+        sys.stderr.flush()
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './BouncingBall.mo'), 'r').read())
+        flat_tree = tree.flatten(ast_tree, 'BouncingBall')
+        sys.stdout.flush()
+        sys.stderr.flush()
 
     def test_estimator(self):
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Estimator.mo'), 'r').read())
-
-        ast_walker = tree.TreeWalker()
-        ast_walker.walk(tree.ComponentRenameListener("blah"), ast_tree)
-
-        for cls_name, cls in ast_tree.classes.items():
-            print('class', cls_name)
-            for sym_name, sym in cls.symbols.items():
-                print('\tsymbol', sym.name)
-
-        print(ast_tree)
-        flat_tree = tree.flatten(ast_tree, 'Estimator')
-        print(flat_tree)
         sys.stdout.flush()
+        sys.stderr.flush()
+        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Estimator.mo'), 'r').read())
+        flat_tree = tree.flatten(ast_tree, 'Estimator')
+        sys.stdout.flush()
+        sys.stderr.flush()
 
 
 

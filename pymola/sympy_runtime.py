@@ -20,7 +20,7 @@ class OdeModel(object):
         self.eqs = []
 
     def compute_fg(self):
-        fg_sol = sympy.solve(self.eqs, self.x.diff(self.t))
+        fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.y))
         self.f = self.x.diff(self.t).subs(fg_sol)
         assert(len(self.x) == len(self.f))
         self.g = self.y.subs(fg_sol)
@@ -46,6 +46,7 @@ class OdeModel(object):
 
     def simulate(self, x0=None, t0=0, tf=10, dt=0.01):
         x_sym = sympy.DeferredVector('x')
+        y_sym = sympy.DeferredVector('y')
         u_sym = sympy.DeferredVector('u')
         ss_subs = {self.x[i]: x_sym[i] for i in range(len(self.x))}
         ss_subs.update({self.u[i]: u_sym[i] for i in range(len(self.u))})
