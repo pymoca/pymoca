@@ -20,7 +20,7 @@ class OdeModel(object):
         self.eqs = []
 
     def compute_fg(self):
-        fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.y))
+        fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.y) +  list(self.v))
         self.f = self.x.diff(self.t).subs(fg_sol)
         assert(len(self.x) == len(self.f))
         self.g = self.y.subs(fg_sol)
@@ -52,16 +52,28 @@ class OdeModel(object):
         ss_subs.update({self.u[i]: u_sym[i] for i in range(len(self.u))})
         ss_subs.update(self.p0)
         ss_subs.update(self.c0)
-        print(ss_subs)
+
+        # create f (dynamics) lambda function
         f_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.subs(ss_subs))
+        res = pl.array(f_lam(0, pl.zeros(len(self.x)), pl.zeros(len(self.u))), dtype=float)
+        if len(res) != len(self.x):
+            raise IOError("f doesn't return correct size", res, self.x)
+
+        # create jacobian lambda function
         if len(self.x) > 0 and len(self.f) > 0:
             jac_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.jacobian(self.x).subs(ss_subs))
         else:
             jac_lam = None
+        res = pl.array(jac_lam(0, pl.zeros(len(self.x)), pl.zeros(len(self.u))), dtype=float)
+        if res.shape[1] != len(self.x):
+            raise IOError("jacobian doesn't return correct size", res. self.f)
+
+        # create g (measurement) lambda function
         g_lam = sympy.lambdify((self.t, x_sym, u_sym), self.g.subs(ss_subs))
-        res = f_lam(0, pl.zeros(len(self.x)), len(self.u))
-        if len(res) != len(self.x):
-            raise IOError("f doesn't return correct size", res)
+        res = pl.array(g_lam(0, pl.zeros(len(self.x)), pl.zeros(len(self.u))), dtype=float)
+        if res.shape[1] != len(self.y):
+            raise IOError("g doesn't return correct size", res, self.y)
+
         ode = scipy.integrate.ode(f_lam, jac_lam)
         if x0 is None:
             x0 = pl.zeros(len(self.x))
