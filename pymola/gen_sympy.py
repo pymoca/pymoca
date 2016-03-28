@@ -3,6 +3,7 @@ from __future__ import print_function, absolute_import, division, print_function
 import jinja2
 import os
 import sys
+import copy
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -149,8 +150,9 @@ class {{tree.name}}(OdeModel):
             right=self.src[tree.right])
 
 def generate(ast_tree, model_name):
+    ast_tree_new = copy.deepcopy(ast_tree)
     ast_walker = tree.TreeWalker()
-    flat_tree = tree.flatten(ast_tree, model_name)
+    flat_tree = tree.flatten(ast_tree_new, model_name)
     sympy_gen = SympyGenerator()
     ast_walker.walk(sympy_gen, flat_tree)
     return sympy_gen.src[flat_tree]
