@@ -1,0 +1,7 @@
+include requirements.txt
+include requirements-py2.txt
+include requirements-py3.txt
+include LICENSE
+include README.md
+recursive-include doc *
+recursive-include java *

@@ -21,7 +21,7 @@ from setuptools import Command
 
 MAJOR = 0
 MINOR = 1
-MICRO = 1
+MICRO = 3
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 DOCLINES = __doc__.split("\n")
@@ -30,7 +30,7 @@ CLASSIFIERS = """\
 Development Status :: 1 - Planning
 Intended Audience :: Science/Research
 Intended Audience :: Developers
-License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
+License :: OSI Approved :: BSD License
 Programming Language :: Python
 Programming Language :: Python :: 3
 Programming Language :: Other
@@ -199,7 +199,7 @@ def setup_package():
         author='James Goppert',
         author_email='james.goppert@gmail.com',
         download_url='https://github.com/jgoppert/pymola',
-        license='GPLv3+',
+        license='BSD',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
         install_requires=install_reqs,
