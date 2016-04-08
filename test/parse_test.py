@@ -28,7 +28,9 @@ class ParseTest(unittest.TestCase):
     def test_aircraft(self):
         sys.stdout.flush()
         sys.stderr.flush()
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
+        with open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, 'Aircraft')
         sys.stdout.flush()
         sys.stderr.flush()
@@ -36,7 +38,9 @@ class ParseTest(unittest.TestCase):
     def test_bouncing_ball(self):
         sys.stdout.flush()
         sys.stderr.flush()
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './BouncingBall.mo'), 'r').read())
+        with open(os.path.join(TEST_DIR, './BouncingBall.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, 'BouncingBall')
         sys.stdout.flush()
         sys.stderr.flush()
@@ -44,7 +48,9 @@ class ParseTest(unittest.TestCase):
     def test_estimator(self):
         sys.stdout.flush()
         sys.stderr.flush()
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Estimator.mo'), 'r').read())
+        with open(os.path.join(TEST_DIR, './Estimator.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, 'Estimator')
         sys.stdout.flush()
         sys.stderr.flush()
@@ -52,7 +58,9 @@ class ParseTest(unittest.TestCase):
     def test_spring(self):
         sys.stdout.flush()
         sys.stderr.flush()
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Spring.mo'), 'r').read())
+        with open(os.path.join(TEST_DIR, './Spring.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, 'Spring')
         sys.stdout.flush()
         sys.stderr.flush()

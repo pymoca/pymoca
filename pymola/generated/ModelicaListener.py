@@ -679,6 +679,33 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ModelicaParser#expr_neg.
+    def enterExpr_neg(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#expr_neg.
+    def exitExpr_neg(self, ctx):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#expr_add.
+    def enterExpr_add(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#expr_add.
+    def exitExpr_add(self, ctx):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#expr_exp.
+    def enterExpr_exp(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#expr_exp.
+    def exitExpr_exp(self, ctx):
+        pass
+
+
     # Enter a parse tree produced by ModelicaParser#expr_or.
     def enterExpr_or(self, ctx):
         pass
@@ -724,39 +751,12 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by ModelicaParser#expr_neg.
-    def enterExpr_neg(self, ctx):
-        pass
-
-    # Exit a parse tree produced by ModelicaParser#expr_neg.
-    def exitExpr_neg(self, ctx):
-        pass
-
-
-    # Enter a parse tree produced by ModelicaParser#expr_add.
-    def enterExpr_add(self, ctx):
-        pass
-
-    # Exit a parse tree produced by ModelicaParser#expr_add.
-    def exitExpr_add(self, ctx):
-        pass
-
-
     # Enter a parse tree produced by ModelicaParser#expr_mul.
     def enterExpr_mul(self, ctx):
         pass
 
     # Exit a parse tree produced by ModelicaParser#expr_mul.
     def exitExpr_mul(self, ctx):
-        pass
-
-
-    # Enter a parse tree produced by ModelicaParser#expr_exp.
-    def enterExpr_exp(self, ctx):
-        pass
-
-    # Exit a parse tree produced by ModelicaParser#expr_exp.
-    def exitExpr_exp(self, ctx):
         pass
 
 

@@ -225,10 +225,19 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = [self.ast[e] for e in ctx.element()]
 
     def exitElement(self, ctx):
-        self.ast[ctx] = self.ast[ctx.regular_element()]
+        self.ast[ctx] = self.ast[ctx.elem]
+
+    def exitImport_clause(self, ctx):
+        self.ast[ctx] = 'TODO'
+
+    def exitExtends_clause(self, ctx):
+        self.ast[ctx] = 'TODO'
 
     def exitRegular_element(self, ctx):
         self.ast[ctx] = self.ast[ctx.comp_elem]
+
+    def exitReplaceable_element(self, ctx):
+        self.ast[ctx] = 'TODO'
 
     def enterComponent_clause(self, ctx):
         if ctx.array_subscripts() is not None:

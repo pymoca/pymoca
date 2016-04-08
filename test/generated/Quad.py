@@ -5,6 +5,7 @@ from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
+from sympy import sin, cos, tan
 
 class Quad(OdeModel):
 
@@ -13,8 +14,8 @@ class Quad(OdeModel):
         super(Quad, self).__init__()
 
         # states
-        x, y, z, v_x, v_y, v_z = mech.dynamicsymbols('x, y, z, v_x, v_y, v_z')
-        self.x = sympy.Matrix([x, y, z, v_x, v_y, v_z])
+        x, y, z, R, Q, U, R, P, V, Q, P, W, phi, theta, psi, P, Q, R = mech.dynamicsymbols('x, y, z, R, Q, U, R, P, V, Q, P, W, phi, theta, psi, P, Q, R')
+        self.x = sympy.Matrix([x, y, z, R, Q, U, R, P, V, Q, P, W, phi, theta, psi, P, Q, R])
 
         # inputs
         self.u = sympy.Matrix([])
@@ -38,20 +39,29 @@ class Quad(OdeModel):
             }
 
         # variables
-        F_x, F_y, F_z = sympy.symbols('F_x, F_y, F_z')
-        self.v = sympy.Matrix([F_x, F_y, F_z])
+        F_y, F_z, F_x, M_z, M_y, M_x = sympy.symbols('F_y, F_z, F_x, M_z, M_y, M_x')
+        self.v = sympy.Matrix([F_y, F_z, F_x, M_z, M_y, M_x])
       
         # equations
         self.eqs = [
+            M_x - (- P - phi),
+            M_y - (- Q - theta),
+            M_z - (- R - psi),
             F_x - (- x),
             F_y - (- y),
             F_z - (- z),
-            (x).diff(self.t) - (v_x),
-            (y).diff(self.t) - (v_y),
-            (z).diff(self.t) - (v_z),
-            m * (v_x).diff(self.t) - (F_x),
-            m * (v_y).diff(self.t) - (F_y),
-            m * (v_z).diff(self.t) - (F_z),
+            (x).diff(self.t) - (U),
+            (y).diff(self.t) - (V),
+            (z).diff(self.t) - (W),
+            - m * V * (R).diff(self.t) + m * W * (Q).diff(self.t) + m * (U).diff(self.t) - (F_x),
+            m * U * (R).diff(self.t) - m * W * (P).diff(self.t) + m * (V).diff(self.t) - (F_y),
+            - m * U * (Q).diff(self.t) + m * V * (P).diff(self.t) + m * (W).diff(self.t) - (F_z),
+            (phi).diff(self.t) - (P + Q * sin(phi) * tan(theta) + R * cos(phi) * tan(theta)),
+            (theta).diff(self.t) - (Q * cos(phi) - R * sin(phi)),
+            cos(theta) * (psi).diff(self.t) - (Q * sin(phi) + R * cos(phi)),
+            (P).diff(self.t) - (M_x),
+            (Q).diff(self.t) - (M_y),
+            (R).diff(self.t) - (M_z),
             ]
 
         self.compute_fg()

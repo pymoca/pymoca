@@ -5,6 +5,7 @@ from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
+from sympy import sin, cos, tan
 
 class Aircraft(OdeModel):
 
@@ -18,20 +19,28 @@ class Aircraft(OdeModel):
 
         # inputs
         self.u = sympy.Matrix([])
-        
+
         # outputs
         self.y = sympy.Matrix([])
-        
+
         # constants
         self.c = sympy.Matrix([])
-        
+        self.c0 = {
+            }
+
         # parameters
         body__g, body__c, body__m, accel__b_x__b = sympy.symbols('body.g, body.c, body.m, accel.b_x.b')
         self.p = sympy.Matrix([body__g, body__c, body__m, accel__b_x__b])
+        self.p0 = {
+            'body.g' : 9.81,
+            'body.c' : 0.9,
+            'body.m' : 1.0,
+            'accel.b_x.b' : 0.0,
+            }
 
         # variables
-        body, accel, body__f_x, accel__b_x, accel__a_x, accel__b_x__u = sympy.symbols('body, accel, body.f_x, accel.b_x, accel.a_x, accel.b_x.u')
-        self.v = sympy.Matrix([body, accel, body__f_x, accel__b_x, accel__a_x, accel__b_x__u])
+        body, accel, body__f_x, accel__a_x, accel__b_x, accel__b_x__u = sympy.symbols('body, accel, body.f_x, accel.a_x, accel.b_x, accel.b_x.u')
+        self.v = sympy.Matrix([body, accel, body__f_x, accel__a_x, accel__b_x, accel__b_x__u])
       
         # equations
         self.eqs = [

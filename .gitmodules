@@ -1,0 +1,3 @@
+[submodule "Modelica"]
+	path = Modelica
+	url = https://github.com/modelica/Modelica.git

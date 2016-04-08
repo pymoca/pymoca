@@ -30,7 +30,9 @@ class GenSympyTest(unittest.TestCase):
     def test_estimator(self):
         sys.stdout.flush()
         sys.stderr.flush()
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Estimator.mo'), 'r').read())
+        with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, 'Estimator')
         with open(os.path.join(TEST_DIR, 'generated/Estimator.py'), 'w') as f:
            f.write(text)
@@ -43,7 +45,9 @@ class GenSympyTest(unittest.TestCase):
     def test_spring(self):
         sys.stdout.flush()
         sys.stderr.flush()
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Spring.mo'), 'r').read())
+        with open(os.path.join(TEST_DIR, 'Spring.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, 'Spring')
         with open(os.path.join(TEST_DIR, 'generated/Spring.py'), 'w') as f:
            f.write(text)
@@ -56,11 +60,13 @@ class GenSympyTest(unittest.TestCase):
     def test_aircraft(self):
         sys.stdout.flush()
         sys.stderr.flush()
-        ast_tree = parser.parse(open(os.path.join(TEST_DIR, './Aircraft.mo'), 'r').read())
+        with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, 'Aircraft')
-        #with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
-        #   f.write(text)
-        #from generated.Aircraft import Aircraft as Aircraft
+        # with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+          # f.write(text)
+        # from generated.Aircraft import Aircraft as Aircraft
         #e = Aircraft()
         #res = e.simulate()
         sys.stdout.flush()

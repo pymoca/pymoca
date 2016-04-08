@@ -101,10 +101,10 @@ element_list :
 
 // B.2.2.11 ------------------------------------------------
 element :
-    import_clause
-    | extends_clause
-    | regular_element
-    | replaceable_element
+    elem=import_clause
+    | elem=extends_clause
+    | elem=regular_element
+    | elem=replaceable_element
     ;
 
 regular_element:
