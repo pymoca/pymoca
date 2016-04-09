@@ -7,6 +7,7 @@ from __future__ import print_function, absolute_import, division, print_function
 import os
 import sys
 import unittest
+import time
 
 from pymola import parser
 from pymola import tree
@@ -20,16 +21,17 @@ class GenSympyTest(unittest.TestCase):
     "Testing"
 
     def setUp(self):
-        sys.stdout.flush()
-        sys.stderr.flush()
+        pass
 
     def tearDown(self):
+        pass
+
+    def flush(self):
         sys.stdout.flush()
-        sys.stderr.flush()
+        sys.stdout.flush()
+        time.sleep(0.01)
 
     def test_estimator(self):
-        sys.stdout.flush()
-        sys.stderr.flush()
         with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
@@ -39,12 +41,9 @@ class GenSympyTest(unittest.TestCase):
         from generated.Estimator import Estimator as Estimator
         e = Estimator()
         res = e.simulate(x0=[1])
-        sys.stdout.flush()
-        sys.stderr.flush()
+        self.flush()
 
     def test_spring(self):
-        sys.stdout.flush()
-        sys.stderr.flush()
         with open(os.path.join(TEST_DIR, 'Spring.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
@@ -54,12 +53,9 @@ class GenSympyTest(unittest.TestCase):
         from generated.Spring import Spring as Spring
         e = Spring()
         res = e.simulate(x0=[1, 1])
-        sys.stdout.flush()
-        sys.stderr.flush()
+        self.flush()
 
     def test_aircraft(self):
-        sys.stdout.flush()
-        sys.stderr.flush()
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
@@ -69,9 +65,7 @@ class GenSympyTest(unittest.TestCase):
         # from generated.Aircraft import Aircraft as Aircraft
         #e = Aircraft()
         #res = e.simulate()
-        sys.stdout.flush()
-        sys.stderr.flush()
-
+        self.flush()
 
 if __name__ == "__main__":
     unittest.main()

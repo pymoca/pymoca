@@ -196,7 +196,7 @@ class ASTListener(ModelicaListener):
         # every symbols that is differentiated is a state
         # make sure it isn't already a state
         for state in self.class_node.states:
-            if state == comp_name:
+            if state.name == comp_name:
                 return
         self.class_node.states += [ast.ComponentRef(name=comp_name)]
 
