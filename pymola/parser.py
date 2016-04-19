@@ -21,7 +21,7 @@ class ASTListener(ModelicaListener):
         self.ast_result = None
         self.file_node = None
         self.class_node = None
-        self.comp_clause_node = None
+        self.comp_clause = None
         self.eq_sect = None
         self.symbol_node = None
         self.eq_comment = None
@@ -30,7 +30,7 @@ class ASTListener(ModelicaListener):
 
     def enterStored_definition(self, ctx):
         within = ''
-        if ctx.WITHIN() != None:
+        if ctx.WITHIN() is not None:
             within = ctx.WITHIN().getText()
         file_node = ast.File()
         file_node.within = within
@@ -46,7 +46,7 @@ class ASTListener(ModelicaListener):
 
     def enterStored_definition_class(self, ctx):
         class_node = ast.Class()
-        class_node.final = ctx.FINAL() != None
+        class_node.final = ctx.FINAL() is not None
         self.class_node = class_node
         self.ast[ctx] = class_node
 
@@ -58,14 +58,14 @@ class ASTListener(ModelicaListener):
                     (sym.name not in [c.name for c in cls.states]) and
                     (sym.name not in [c.name for c in cls.constants]) and
                     (sym.name not in [c.name for c in cls.parameters])):
-                cls.variables +=  [ast.ComponentRef(
+                cls.variables += [ast.ComponentRef(
                     name=sym.name
                 )]
 
     def enterClass_definition(self, ctx):
         class_node = self.class_node
-        class_node.encapsulated = ctx.ENCAPSULATED() != None
-        class_node.partial = ctx.class_prefixes().PARTIAL() != None
+        class_node.encapsulated = ctx.ENCAPSULATED() is not None
+        class_node.partial = ctx.class_prefixes().PARTIAL() is not None
         class_node.type = ctx.class_prefixes().class_type().getText()
 
     def enterClass_spec_comp(self, ctx):
@@ -77,7 +77,6 @@ class ASTListener(ModelicaListener):
         class_node.comment = self.ast[ctx.string_comment()]
 
     def exitComposition(self, ctx):
-        elist_comb = []
         for elist in [ctx.epriv, ctx.epub, ctx.epro]:
             if elist is not None:
                 for e in [self.ast[e] for e in elist.element()]:
@@ -93,11 +92,10 @@ class ASTListener(ModelicaListener):
 
     def enterEquation_section(self, ctx):
         eq_sect = ast.EquationSection(
-            initial=ctx.INITIAL() != None
+            initial=ctx.INITIAL() is not None
         )
         self.ast[ctx] = eq_sect
         self.eq_sect = eq_sect
-
 
     def exitEquation_section(self, ctx):
         eq_sect = self.ast[ctx]
@@ -128,13 +126,13 @@ class ASTListener(ModelicaListener):
 
     def exitConnect_clause(self, ctx):
         self.ast[ctx] = ast.ConnectClause(
-            left= self.ast[ctx.component_reference()[0]],
-            right= self.ast[ctx.component_reference()[1]])
+            left=self.ast[ctx.component_reference()[0]],
+            right=self.ast[ctx.component_reference()[1]])
 
     # EXPRESSIONS ===========================================================
 
     def exitSimple_expression(self, ctx):
-        #TODO only using first expression
+        # TODO only using first expression
         self.ast[ctx] = self.ast[ctx.expr()[0]]
 
     def exitExpression_simple(self, ctx):
@@ -167,7 +165,6 @@ class ASTListener(ModelicaListener):
             operands=[self.ast[ctx.expr()]]
         )
 
-
     # PRIMARY ===========================================================
 
     def exitPrimary_unsigned_number(self, ctx):
@@ -187,7 +184,7 @@ class ASTListener(ModelicaListener):
 
     def exitPrimary_derivative(self, ctx):
         self.ast[ctx] = ast.Primary(value=ctx.getText())
-        comp_name =  ctx.function_call_args().function_arguments().function_argument()[0].getText()
+        comp_name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
         self.ast[ctx] = ast.Expression(
             operator='der',
             operands=[ast.ComponentRef(name=comp_name)]
@@ -241,7 +238,7 @@ class ASTListener(ModelicaListener):
 
     def enterComponent_clause(self, ctx):
         if ctx.array_subscripts() is not None:
-            dimensions=[int(s) for s in ctx.array_subscripts().subscript().getText()]
+            dimensions = [int(s) for s in ctx.array_subscripts().subscript().getText()]
         else:
             dimensions = [1]
         self.ast[ctx] = ast.ComponentClause(
@@ -278,7 +275,7 @@ class ASTListener(ModelicaListener):
             dimensions = self.comp_clause.dimensions
         sym.name = ctx.IDENT().getText()
         sym.dimensions = dimensions
-        #if ctx.modification() is not None:
+        # if ctx.modification() is not None:
         #    sym.start = self.ast[ctx.modification()]
         if 'input' in sym.prefixes:
             self.class_node.inputs += [ast.ComponentRef(name=sym.name)]
@@ -307,17 +304,17 @@ class ASTListener(ModelicaListener):
     def exitString_comment(self, ctx):
         self.ast[ctx] = ctx.getText()[1:-1]
 
-# UTILITY FUNCTIONS =========================================================
+
+# UTILITY FUNCTIONS ========================================================
 
 def parse(text):
-    antlr4.InputStream
     input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
     stream = antlr4.CommonTokenStream(lexer)
     parser = ModelicaParser(stream)
     parse_tree = parser.stored_definition()
-    astListener = ASTListener()
+    ast_listener = ASTListener()
     parse_walker = antlr4.ParseTreeWalker()
-    parse_walker.walk(astListener, parse_tree)
-    ast_tree = astListener.ast_result
+    parse_walker.walk(ast_listener, parse_tree)
+    ast_tree = ast_listener.ast_result
     return ast_tree
