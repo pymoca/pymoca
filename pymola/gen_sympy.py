@@ -1,4 +1,5 @@
 from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from . import tree
 
 import jinja2
 import os
@@ -7,11 +8,8 @@ import copy
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
-from . import tree
-
 
 class SympyGenerator(tree.TreeListener):
-    indent='    '
 
     def __init__(self):
         self.src = {}
@@ -48,7 +46,7 @@ from sympy import sin, cos, tan
         parameters_str = ', '.join([self.src[s] for s in tree.parameters])
         variables_str = ', '.join([self.src[s] for s in tree.variables])
 
-        d = locals();
+        d = locals()
         d.pop('self')
         d['render'] = self
 
@@ -149,6 +147,7 @@ class {{tree.name}}(OdeModel):
         self.src[tree] = "{left:s} - ({right:s})".format(
             left=self.src[tree.left],
             right=self.src[tree.right])
+
 
 def generate(ast_tree, model_name):
     ast_tree_new = copy.deepcopy(ast_tree)

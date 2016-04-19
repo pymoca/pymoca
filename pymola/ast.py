@@ -24,6 +24,7 @@ File
         Symbol
 """
 
+
 def to_json(var):
     if isinstance(var, list):
         res = [to_json(item) for item in var]
@@ -38,7 +39,7 @@ def to_json(var):
 
 class Field(object):
     def __init__(self, types, default=None):
-        if default == None:
+        if default is None:
             if types == dict:
                 default = {}
             elif types == list:
@@ -86,7 +87,7 @@ class Node(object):
             # make sure we don't share ast_spec default data by using deep copy
             self.__dict__[key] = copy.deepcopy(self.ast_spec[key].default)
         for key in kwargs.keys():
-            types = self.ast_spec[key].types
+            # types = self.ast_spec[key].types
             val = kwargs[key]
             self.set_field(key, val)
 

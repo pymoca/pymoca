@@ -149,8 +149,8 @@ def flatten(root, class_name, instance_name=''):
                 flat_class.symbols[instance_prefix + sub_sym_name] = sub_sym
             flat_class.equations += flat_sub_class.equations
             flat_class.states += flat_sub_class.states
-            #flat_class.inputs += flat_sub_class.inputs
-            #flat_class.outputs += flat_sub_class.outputs
+            # flat_class.inputs += flat_sub_class.inputs
+            # flat_class.outputs += flat_sub_class.outputs
             flat_class.variables += flat_sub_class.variables
             flat_class.parameters += flat_sub_class.parameters
             flat_class.constants += flat_sub_class.constants
@@ -159,7 +159,6 @@ def flatten(root, class_name, instance_name=''):
         else:
             # append original symbol to flat class
             flat_class.symbols[instance_prefix + sym_name] = sym
-
 
     # walker for renaming components
     if instance_name != '':
