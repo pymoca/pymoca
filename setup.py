@@ -187,6 +187,8 @@ def setup_package():
     elif sys.version_info[0] == 3:
         with open('requirements-py3.txt', 'r') as req_file:
             install_reqs += req_file.read().split('\n')
+    if sys.version_info < (3, 4, 0):
+        install_reqs += ['enum34']
     # pprint.pprint(install_reqs)
 
     metadata = dict(
