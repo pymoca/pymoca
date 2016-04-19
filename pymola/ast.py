@@ -176,6 +176,7 @@ class Symbol(Node):
         'dimensions': Field(list, [1]),  # (int)
         'comment': Field(str, ''),
         'start': Field(Primary, ''),
+        'id': Field(int),
     }
 
     def __init__(self, **kwargs):
@@ -216,12 +217,6 @@ class Class(Node):
         'symbols': Field(dict, {}),  # (Symbol)
         'initial_equations': Field(list, []),
         'equations': Field(list, []),  # (Equation)
-        'parameters': Field(list, []),  # (ComponentRef)
-        'constants': Field(list, []),  # (ComponentRef)
-        'inputs': Field(list, []),  # (ComponentRef)
-        'outputs': Field(list, []),  # (ComponentRef)
-        'states': Field(list, []),  # (ComponentRef)
-        'variables': Field(list, []),  # (ComponentRef)
     }
 
     def __init__(self, **kwargs):

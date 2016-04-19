@@ -60,8 +60,8 @@ class GenSympyTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, 'Aircraft')
-        # with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
-          # f.write(text)
+        with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+          f.write(text)
         # from generated.Aircraft import Aircraft as Aircraft
         #e = Aircraft()
         #res = e.simulate()

@@ -32,50 +32,57 @@ class ParseTest(unittest.TestCase):
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        print('AST TREE\n', ast_tree)
         flat_tree = tree.flatten(ast_tree, 'Aircraft')
+        print('AST TREE FLAT\n', flat_tree)
         self.flush()
 
     def test_bouncing_ball(self):
         with open(os.path.join(TEST_DIR, 'BouncingBall.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        print('AST TREE\n', ast_tree)
         flat_tree = tree.flatten(ast_tree, 'BouncingBall')
+        print(flat_tree)
+        print('AST TREE FLAT\n', flat_tree)
         self.flush()
 
     def test_estimator(self):
         with open(os.path.join(TEST_DIR, './Estimator.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        print('AST TREE\n', ast_tree)
         flat_tree = tree.flatten(ast_tree, 'Estimator')
+        print('AST TREE FLAT\n', flat_tree)
         self.flush()
 
     def test_spring(self):
         with open(os.path.join(TEST_DIR, 'Spring.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        print('AST TREE\n', ast_tree)
         flat_tree = tree.flatten(ast_tree, 'Spring')
+        print('AST TREE FLAT\n', flat_tree)
         self.flush()
 
     def test_duplicate_state(self):
         with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        states = ast_tree.classes['DuplicateState'].states
-        names = sorted([state.name for state in states])
-        names_set = sorted(list(set(names)))
-        if names != names_set:
-            raise IOError('{:s} != {:s}'.format(str(names), str(names_set)))
+        print('AST TREE\n', ast_tree)
+        flat_tree = tree.flatten(ast_tree, 'DuplicateState')
+        print('AST TREE FLAT\n', flat_tree)
         self.flush()
 
     def test_connector(self):
         with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        states = ast_tree.classes['Aircraft'].states
-        names = sorted([state.name for state in states])
-        names_set = sorted(list(set(names)))
-        if names != names_set:
-            raise IOError('{:s} != {:s}'.format(str(names), str(names_set)))
+        # states = ast_tree.classes['Aircraft'].states
+        # names = sorted([state.name for state in states])
+        # names_set = sorted(list(set(names)))
+        # if names != names_set:
+        #     raise IOError('{:s} != {:s}'.format(str(names), str(names_set)))
         self.flush()
 
 if __name__ == "__main__":

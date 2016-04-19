@@ -51,16 +51,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = class_node
 
     def exitStored_definition_class(self, ctx):
-        cls = self.class_node
-        for sym_key, sym in cls.symbols.items():
-            if ((sym.name not in cls.inputs) and
-                    (sym.name not in [c.name for c in cls.outputs]) and
-                    (sym.name not in [c.name for c in cls.states]) and
-                    (sym.name not in [c.name for c in cls.constants]) and
-                    (sym.name not in [c.name for c in cls.parameters])):
-                cls.variables += [ast.ComponentRef(
-                    name=sym.name
-                )]
+        pass
 
     def enterClass_definition(self, ctx):
         class_node = self.class_node
@@ -77,11 +68,6 @@ class ASTListener(ModelicaListener):
         class_node.comment = self.ast[ctx.string_comment()]
 
     def exitComposition(self, ctx):
-        for elist in [ctx.epriv, ctx.epub, ctx.epro]:
-            if elist is not None:
-                for e in [self.ast[e] for e in elist.element()]:
-                    for s in e.symbol_list:
-                        self.class_node.symbols[s.name] = s
 
         for eqlist in [self.ast[e] for e in ctx.equation_section()]:
             if eqlist is not None:
@@ -189,13 +175,8 @@ class ASTListener(ModelicaListener):
             operator='der',
             operands=[ast.ComponentRef(name=comp_name)]
         )
-
-        # every symbols that is differentiated is a state
-        # make sure it isn't already a state
-        for state in self.class_node.states:
-            if state.name == comp_name:
-                return
-        self.class_node.states += [ast.ComponentRef(name=comp_name)]
+        if 'state' not in self.class_node.symbols[comp_name].prefixes:
+            self.class_node.symbols[comp_name].prefixes += ['state']
 
     def exitComponent_reference(self, ctx):
         # TODO handle other idents
@@ -248,20 +229,10 @@ class ASTListener(ModelicaListener):
         )
         self.comp_clause = self.ast[ctx]
 
-    def exitComponent_clause(self, ctx):
-        self.ast[ctx].symbol_list = self.ast[ctx.component_list()]
-
-    def exitComponent_list(self, ctx):
-        self.ast[ctx] = [self.ast[e] for e in ctx.component_declaration()]
-
     def enterComponent_declaration(self, ctx):
-        sym = ast.Symbol(
-            name='',
-            type=self.comp_clause.type,
-            prefixes=self.comp_clause.prefixes,
-        )
-        self.symbol_node = sym
+        sym = ast.Symbol()
         self.ast[ctx] = sym
+        self.symbol_node = sym
 
     def exitComponent_declaration(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]
@@ -275,16 +246,14 @@ class ASTListener(ModelicaListener):
             dimensions = self.comp_clause.dimensions
         sym.name = ctx.IDENT().getText()
         sym.dimensions = dimensions
+        sym.prefixes = self.comp_clause.prefixes
+        sym.type = self.comp_clause.type
+        if sym.name in self.class_node.symbols:
+            raise IOError(sym.name, 'already defined')
+        self.class_node.symbols[sym.name] = sym
+        self.symbol_node = sym
         # if ctx.modification() is not None:
         #    sym.start = self.ast[ctx.modification()]
-        if 'input' in sym.prefixes:
-            self.class_node.inputs += [ast.ComponentRef(name=sym.name)]
-        elif 'output' in sym.prefixes:
-            self.class_node.outputs += [ast.ComponentRef(name=sym.name)]
-        elif 'constant' in sym.prefixes:
-            self.class_node.constants += [ast.ComponentRef(name=sym.name)]
-        elif 'parameter' in sym.prefixes:
-            self.class_node.parameters += [ast.ComponentRef(name=sym.name)]
 
     def exitElement_modification(self, ctx):
         sym = self.symbol_node

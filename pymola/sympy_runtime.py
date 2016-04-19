@@ -62,11 +62,12 @@ class OdeModel(object):
         # create jacobian lambda function
         if len(self.x) > 0 and len(self.f) > 0:
             jac_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.jacobian(self.x).subs(ss_subs))
+            res = pl.array(jac_lam(0, pl.zeros(len(self.x)), pl.zeros(len(self.u))), dtype=float)
+            if len(res.shape) == 2 and res.shape[1] != len(self.x):
+                raise IOError("jacobian doesn't return correct size", res. self.f)
         else:
             jac_lam = None
-        res = pl.array(jac_lam(0, pl.zeros(len(self.x)), pl.zeros(len(self.u))), dtype=float)
-        if len(res.shape) == 2 and res.shape[1] != len(self.x):
-            raise IOError("jacobian doesn't return correct size", res. self.f)
+
 
         # create g (measurement) lambda function
         g_lam = sympy.lambdify((self.t, x_sym, u_sym), self.g.subs(ss_subs))

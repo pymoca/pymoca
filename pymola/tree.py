@@ -136,12 +136,6 @@ def flatten(root, class_name, instance_name=''):
     flat_class = ast.Class(
         name=class_name,
         equations=orig_class.equations,
-        states = orig_class.states,
-        inputs = orig_class.inputs,
-        outputs = orig_class.outputs,
-        parameters = orig_class.parameters,
-        constants = orig_class.constants,
-        variables = orig_class.variables,
     )
 
     # flat file
@@ -166,12 +160,6 @@ def flatten(root, class_name, instance_name=''):
             for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
                 flat_class.symbols[instance_prefix + sub_sym_name] = sub_sym
             flat_class.equations += flat_sub_class.equations
-            flat_class.states += flat_sub_class.states
-            # flat_class.inputs += flat_sub_class.inputs
-            # flat_class.outputs += flat_sub_class.outputs
-            flat_class.variables += flat_sub_class.variables
-            flat_class.parameters += flat_sub_class.parameters
-            flat_class.constants += flat_sub_class.constants
 
         # else if the symbols is not a class name
         else:

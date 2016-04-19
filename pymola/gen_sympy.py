@@ -28,6 +28,7 @@ import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
 from sympy import sin, cos, tan
 
+
 {%- for class_key, class in tree.classes.items() %}
 {{ render.src[class] }}
 {%- endfor %}
@@ -38,13 +39,32 @@ from sympy import sin, cos, tan
         })
 
     def exitClass(self, tree):
+        states = []
+        inputs = []
+        outputs = []
+        constants = []
+        parameters = []
+        variables = []
+        for name, s in iter(tree.symbols.items()):
+            if 'state' in s.prefixes:
+                states += [s]
+            elif 'input' in s.prefixes:
+                inputs += [s]
+            elif 'output' in s.prefixes:
+                outputs += [s]
+            elif 'constant' in s.prefixes:
+                constants += [s]
+            elif 'parameter' in s.prefixes:
+                parameters += [s]
+            else:
+                variables += [s]
 
-        states_str = ', '.join([self.src[s] for s in tree.states])
-        inputs_str = ', '.join([self.src[s] for s in tree.inputs])
-        outputs_str = ', '.join([self.src[s] for s in tree.outputs])
-        constants_str = ', '.join([self.src[s] for s in tree.constants])
-        parameters_str = ', '.join([self.src[s] for s in tree.parameters])
-        variables_str = ', '.join([self.src[s] for s in tree.variables])
+        states_str = ', '.join([self.src[s] for s in states])
+        inputs_str = ', '.join([self.src[s] for s in inputs])
+        outputs_str = ', '.join([self.src[s] for s in outputs])
+        constants_str = ', '.join([self.src[s] for s in constants])
+        parameters_str = ', '.join([self.src[s] for s in parameters])
+        variables_str = ', '.join([self.src[s] for s in variables])
 
         d = locals()
         d.pop('self')
@@ -81,7 +101,7 @@ class {{tree.name}}(OdeModel):
         {% endif -%}
         self.c = sympy.Matrix([{{ constants_str }}])
         self.c0 = {
-            {% for s in tree.constants -%}
+            {% for s in constants -%}
             '{{ s.name }}' : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
@@ -91,7 +111,7 @@ class {{tree.name}}(OdeModel):
         {% endif -%}
         self.p = sympy.Matrix([{{ parameters_str }}])
         self.p0 = {
-            {% for s in tree.parameters -%}
+            {% for s in parameters -%}
             '{{ s.name }}' : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 

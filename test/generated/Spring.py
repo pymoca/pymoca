@@ -29,11 +29,11 @@ class Spring(OdeModel):
             }
 
         # parameters
-        c, k = sympy.symbols('c, k')
-        self.p = sympy.Matrix([c, k])
+        k, c = sympy.symbols('k, c')
+        self.p = sympy.Matrix([k, c])
         self.p0 = {
-            'c' : 0.1,
             'k' : 2,
+            'c' : 0.1,
             }
 
         # variables
