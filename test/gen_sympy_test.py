@@ -71,6 +71,11 @@ class GenSympyTest(unittest.TestCase):
         with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        # print(ast_tree)
+
+        flat_tree = tree.flatten(ast_tree, 'Aircraft')
+        print(flat_tree)
+
         text = gen_sympy.generate(ast_tree, 'Aircraft')
         print(text)
         self.flush()

@@ -88,16 +88,34 @@ class TreeListener(object):
     def exitExpression(self, tree):
         pass
 
+    def enterConnectClause(self, tree):
+        pass
+
     def exitConnectClause(self, tree):
+        pass
+
+    def enterSymbol(self, tree):
         pass
 
     def exitSymbol(self, tree):
         pass
 
+    def enterComponentClause(self, tree):
+        pass
+
     def exitComponentClause(self, tree):
         pass
 
+    def enterPrimary(self, tree):
+        pass
+
     def exitPrimary(self, tree):
+        pass
+
+    def enterComponentRef(self, tree):
+        pass
+
+    def exitComponentRef(self, tree):
         pass
 
 def flatten(root, class_name, instance_name=''):
@@ -168,7 +186,7 @@ def flatten(root, class_name, instance_name=''):
     return flat_file
 
 
-class ComponentRenameListener(object):
+class ComponentRenameListener(TreeListener):
     def __init__(self, prefix):
         self.prefix = prefix
 

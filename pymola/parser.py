@@ -200,7 +200,7 @@ class ASTListener(ModelicaListener):
     def exitComponent_reference(self, ctx):
         # TODO handle other idents
         self.ast[ctx] = ast.ComponentRef(
-            name=ctx.IDENT()[0].getText()
+            name=ctx.getText()
         )
 
     def exitPrimary_component_reference(self, ctx):

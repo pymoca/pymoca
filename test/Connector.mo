@@ -10,6 +10,6 @@ model Aircraft
     Link link;
     RigidBody body;
 equation
-    connect(link.force, body.link.force);
+    connect(link, body.link);
 end Aircraft;
 
