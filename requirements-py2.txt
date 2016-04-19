@@ -1,1 +1,3 @@
 antlr4-python2-runtime  > 4.5
+enum34
+argparse
