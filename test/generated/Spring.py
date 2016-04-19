@@ -7,6 +7,7 @@ import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
 from sympy import sin, cos, tan
 
+
 class Spring(OdeModel):
 
     def __init__(self):
@@ -46,4 +47,3 @@ class Spring(OdeModel):
             ]
 
         self.compute_fg()
-    

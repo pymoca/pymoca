@@ -27,8 +27,6 @@ import sympy
 import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
 from sympy import sin, cos, tan
-
-
 {%- for class_key, class in tree.classes.items() %}
 {{ render.src[class] }}
 {%- endfor %}
@@ -71,6 +69,7 @@ from sympy import sin, cos, tan
         d['render'] = self
 
         template = jinja2.Template('''
+
 class {{tree.name}}(OdeModel):
 
     def __init__(self):
@@ -129,7 +128,7 @@ class {{tree.name}}(OdeModel):
         ]
 
         self.compute_fg()
-    ''')
+''')
         self.src[tree] = template.render(d)
 
     def exitExpression(self, tree):

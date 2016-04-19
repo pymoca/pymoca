@@ -7,6 +7,7 @@ import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
 from sympy import sin, cos, tan
 
+
 class Estimator(OdeModel):
 
     def __init__(self):
@@ -44,4 +45,3 @@ class Estimator(OdeModel):
             ]
 
         self.compute_fg()
-    

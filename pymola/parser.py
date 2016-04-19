@@ -252,8 +252,6 @@ class ASTListener(ModelicaListener):
             raise IOError(sym.name, 'already defined')
         self.class_node.symbols[sym.name] = sym
         self.symbol_node = sym
-        # if ctx.modification() is not None:
-        #    sym.start = self.ast[ctx.modification()]
 
     def exitElement_modification(self, ctx):
         sym = self.symbol_node
