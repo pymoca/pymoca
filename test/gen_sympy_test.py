@@ -67,5 +67,13 @@ class GenSympyTest(unittest.TestCase):
         #res = e.simulate()
         self.flush()
 
+    def test_connector(self):
+        with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        text = gen_sympy.generate(ast_tree, 'Aircraft')
+        print(text)
+        self.flush()
+
 if __name__ == "__main__":
     unittest.main()

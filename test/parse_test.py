@@ -67,5 +67,16 @@ class ParseTest(unittest.TestCase):
             raise IOError('{:s} != {:s}'.format(str(names), str(names_set)))
         self.flush()
 
+    def test_connector(self):
+        with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        states = ast_tree.classes['Aircraft'].states
+        names = sorted([state.name for state in states])
+        names_set = sorted(list(set(names)))
+        if names != names_set:
+            raise IOError('{:s} != {:s}'.format(str(names), str(names_set)))
+        self.flush()
+
 if __name__ == "__main__":
     unittest.main()
