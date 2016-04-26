@@ -43,7 +43,8 @@ from sympy import sin, cos, tan
         constants = []
         parameters = []
         variables = []
-        for name, s in iter(tree.symbols.items()):
+        symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
+        for s in symbols:
             if 'state' in s.prefixes:
                 states += [s]
             elif 'input' in s.prefixes:
@@ -81,12 +82,20 @@ class {{tree.name}}(OdeModel):
         {{ states_str }} = mech.dynamicsymbols('{{ states_str|replace('__', '.') }}')
         {% endif -%}
         self.x = sympy.Matrix([{{ states_str }}])
+        self.x0 = {
+            {% for s in states -%}
+            {{s.name}} : {{tree.symbols[s.name].start.value}},
+            {% endfor -%}}
 
         # inputs
         {% if inputs_str|length > 0 -%}
         {{ inputs_str }} = sympy.symbols('{{ inputs_str|replace('__', '.') }}')
         {% endif -%}
         self.u = sympy.Matrix([{{ inputs_str }}])
+        self.u0 = {
+            {% for s in inputs -%}
+            {{s.name}} : {{tree.symbols[s.name].start.value}},
+            {% endfor -%}}
 
         # outputs
         {% if outputs_str|length > 0 -%}
@@ -101,7 +110,7 @@ class {{tree.name}}(OdeModel):
         self.c = sympy.Matrix([{{ constants_str }}])
         self.c0 = {
             {% for s in constants -%}
-            '{{ s.name }}' : {{tree.symbols[s.name].start.value}},
+            {{s.name}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # parameters
@@ -111,7 +120,7 @@ class {{tree.name}}(OdeModel):
         self.p = sympy.Matrix([{{ parameters_str }}])
         self.p0 = {
             {% for s in parameters -%}
-            '{{ s.name }}' : {{tree.symbols[s.name].start.value}},
+            {{s.name}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # variables
@@ -154,7 +163,8 @@ class {{tree.name}}(OdeModel):
         self.src[tree] = src
 
     def exitPrimary(self, tree):
-        self.src[tree] = "{value:s}".format(**tree.__dict__)
+        val = str(tree.value)
+        self.src[tree] = "{:s}".format(val)
 
     def exitComponentRef(self, tree):
         self.src[tree] = "{name:s}".format(name=tree.name.replace('.','__'))

@@ -17,9 +17,14 @@ class Estimator(OdeModel):
         # states
         x = mech.dynamicsymbols('x')
         self.x = sympy.Matrix([x])
+        self.x0 = {
+            x : 0.0,
+            }
 
         # inputs
         self.u = sympy.Matrix([])
+        self.u0 = {
+            }
 
         # outputs
         y = sympy.symbols('y')

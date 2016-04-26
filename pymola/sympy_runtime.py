@@ -17,6 +17,10 @@ class OdeModel(object):
         self.p = sympy.Matrix([])
         self.c = sympy.Matrix([])
         self.v = sympy.Matrix([])
+        self.x0 = {}
+        self.u0 = {}
+        self.p0 = {}
+        self.c0 = {}
         self.eqs = []
 
     def compute_fg(self):
@@ -26,7 +30,7 @@ class OdeModel(object):
         self.g = self.y.subs(fg_sol)
         assert(len(self.g) == len(self.y))
 
-    def linearize(self):
+    def linearize_symbolic(self):
         A = sympy.Matrix([])
         B = sympy.Matrix([])
         C = sympy.Matrix([])
@@ -43,8 +47,21 @@ class OdeModel(object):
                 D = self.g.jacobian(self.u)
         return (A, B, C, D)
 
+    def linearize(self, x0=None, u0=None):
+        ss = self.linearize_symbolic()
+        ss_eval = []
+        ss_subs = {}
+        ss_subs.update(self.p0)
+        ss_subs.update(self.c0)
+        if x0 is None:
+            x0 = self.x.subs(self.x0)[:]
+        if u0 is None:
+            u0 = self.x.subs(self.u0)[:]
+        for i in range(len(ss)):
+            ss_eval += [pl.matrix(ss[i].subs(ss_subs)).astype(float)]
+        return ss_eval
 
-    def simulate(self, x0=None, t0=0, tf=10, dt=0.01):
+    def simulate(self, x0=None, u0=None, t0=0, tf=10, dt=0.01):
         x_sym = sympy.DeferredVector('x')
         y_sym = sympy.DeferredVector('y')
         u_sym = sympy.DeferredVector('u')
@@ -76,10 +93,14 @@ class OdeModel(object):
             raise IOError("g doesn't return correct size", res, self.y)
 
         ode = scipy.integrate.ode(f_lam, jac_lam)
+        ss_subs.update(self.x0)
+        ss_subs.update(self.u0)
         if x0 is None:
-            x0 = pl.zeros(len(self.x))
+            x0 = self.x.subs(self.x0)[:]
+        if u0 is None:
+            u0 = self.u.subs(self.u0)[:]
+        print('x0', x0)
         ode.set_initial_value(x0, t0)
-        u0 = pl.zeros(len(self.u))
         y0 = g_lam(0, x0, u0)
         data = {
             't': [t0],

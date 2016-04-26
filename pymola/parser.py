@@ -25,6 +25,7 @@ class ASTListener(ModelicaListener):
         self.eq_sect = None
         self.symbol_node = None
         self.eq_comment = None
+        self.sym_count = 0
 
     # FILE ===========================================================
 
@@ -230,7 +231,8 @@ class ASTListener(ModelicaListener):
         self.comp_clause = self.ast[ctx]
 
     def enterComponent_declaration(self, ctx):
-        sym = ast.Symbol()
+        sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
+        self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
 

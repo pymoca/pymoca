@@ -56,8 +56,8 @@ class Field(object):
     def validate(self, name, key, val, throw=True):
         if not type(val) in self.types:
             if throw:
-                raise IOError('{:s}.{:s} requires types {:s}, but got {:s}'.format(
-                    name, key, self.types, type(val)))
+                raise IOError('{:s}.{:s} requires types ({:s}), but got {:s}'.format(
+                    name, key, ','.join([t.__name__ for t in self.types]), type(val).__name__))
             else:
                 return False
         else:
@@ -175,8 +175,9 @@ class Symbol(Node):
         'outer': Field(bool, False),
         'dimensions': Field(list, [1]),  # (int)
         'comment': Field(str, ''),
-        'start': Field(Primary, ''),
+        'start': Field(Primary),
         'id': Field(int),
+        'order': Field(int),
     }
 
     def __init__(self, **kwargs):

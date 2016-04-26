@@ -15,16 +15,26 @@ class Aircraft(OdeModel):
         super(Aircraft, self).__init__()
 
         # states
-        body__a_x, body__v_x, body__x = mech.dynamicsymbols('body.a_x, body.v_x, body.x')
-        self.x = sympy.Matrix([body__a_x, body__v_x, body__x])
+        body__x, body__v_x, body__a_x = mech.dynamicsymbols('body.x, body.v_x, body.a_x')
+        self.x = sympy.Matrix([body__x, body__v_x, body__a_x])
+        self.x0 = {
+            body.x : 0.0,
+            body.v_x : 0.0,
+            body.a_x : 0.0,
+            }
 
         # inputs
-        body__f_x, accel__b_x__u, accel__a_x = sympy.symbols('body.f_x, accel.b_x.u, accel.a_x')
-        self.u = sympy.Matrix([body__f_x, accel__b_x__u, accel__a_x])
+        body__f_x, accel__a_x, accel__b_x__u = sympy.symbols('body.f_x, accel.a_x, accel.b_x.u')
+        self.u = sympy.Matrix([body__f_x, accel__a_x, accel__b_x__u])
+        self.u0 = {
+            body.f_x : 0.0,
+            accel.a_x : 0.0,
+            accel.b_x.u : 0.0,
+            }
 
         # outputs
-        accel__b_x__y, accel__ma_x = sympy.symbols('accel.b_x.y, accel.ma_x')
-        self.y = sympy.Matrix([accel__b_x__y, accel__ma_x])
+        accel__ma_x, accel__b_x__y = sympy.symbols('accel.ma_x, accel.b_x.y')
+        self.y = sympy.Matrix([accel__ma_x, accel__b_x__y])
 
         # constants
         self.c = sympy.Matrix([])
@@ -32,13 +42,13 @@ class Aircraft(OdeModel):
             }
 
         # parameters
-        body__m, body__g, body__c, accel__b_x__b = sympy.symbols('body.m, body.g, body.c, accel.b_x.b')
-        self.p = sympy.Matrix([body__m, body__g, body__c, accel__b_x__b])
+        body__g, body__c, body__m, accel__b_x__b = sympy.symbols('body.g, body.c, body.m, accel.b_x.b')
+        self.p = sympy.Matrix([body__g, body__c, body__m, accel__b_x__b])
         self.p0 = {
-            'body.m' : 1.0,
-            'body.g' : 9.81,
-            'body.c' : 0.9,
-            'accel.b_x.b' : 0.0,
+            body.g : 9.81,
+            body.c : 0.9,
+            body.m : 1.0,
+            accel.b_x.b : 0.0,
             }
 
         # variables

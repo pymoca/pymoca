@@ -17,9 +17,15 @@ class Spring(OdeModel):
         # states
         x, v_x = mech.dynamicsymbols('x, v_x')
         self.x = sympy.Matrix([x, v_x])
+        self.x0 = {
+            x : 0.0,
+            v_x : 0.0,
+            }
 
         # inputs
         self.u = sympy.Matrix([])
+        self.u0 = {
+            }
 
         # outputs
         self.y = sympy.Matrix([])
@@ -30,11 +36,11 @@ class Spring(OdeModel):
             }
 
         # parameters
-        k, c = sympy.symbols('k, c')
-        self.p = sympy.Matrix([k, c])
+        c, k = sympy.symbols('c, k')
+        self.p = sympy.Matrix([c, k])
         self.p0 = {
-            'k' : 2,
-            'c' : 0.1,
+            c : 0.1,
+            k : 2,
             }
 
         # variables

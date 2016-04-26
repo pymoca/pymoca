@@ -8,7 +8,7 @@ import os
 import sys
 import unittest
 import time
-
+import pylab as pl
 from pymola import parser
 from pymola import tree
 from pymola import gen_sympy
