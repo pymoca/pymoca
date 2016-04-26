@@ -99,7 +99,6 @@ class OdeModel(object):
             x0 = self.x.subs(self.x0)[:]
         if u0 is None:
             u0 = self.u.subs(self.u0)[:]
-        print('x0', x0)
         ode.set_initial_value(x0, t0)
         y0 = g_lam(0, x0, u0)
         data = {

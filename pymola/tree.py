@@ -4,6 +4,7 @@ Tools for tree walking and visiting etc.
 """
 
 from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+import copy
 
 from . import ast
 
@@ -135,7 +136,7 @@ def flatten(root, class_name, instance_name=''):
     # create the returned class
     flat_class = ast.Class(
         name=class_name,
-        equations=orig_class.equations,
+        equations=copy.deepcopy(orig_class.equations),
     )
 
     # flat file
@@ -158,13 +159,13 @@ def flatten(root, class_name, instance_name=''):
 
             # add sub_class members symbols and equations
             for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
-                flat_class.symbols[instance_prefix + sub_sym_name] = sub_sym
-            flat_class.equations += flat_sub_class.equations
+                flat_class.symbols[instance_prefix + sub_sym_name] = copy.deepcopy(sub_sym)
+            flat_class.equations += copy.deepcopy(flat_sub_class.equations)
 
         # else if the symbols is not a class name
         else:
             # append original symbol to flat class
-            flat_class.symbols[instance_prefix + sym_name] = sym
+            flat_class.symbols[instance_prefix + sym_name] = copy.deepcopy(sym)
 
     # walker for renaming components
     if instance_name != '':
