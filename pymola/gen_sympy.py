@@ -84,7 +84,7 @@ class {{tree.name}}(OdeModel):
         self.x = sympy.Matrix([{{ states_str }}])
         self.x0 = {
             {% for s in states -%}
-            {{s.name}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # inputs
@@ -94,7 +94,7 @@ class {{tree.name}}(OdeModel):
         self.u = sympy.Matrix([{{ inputs_str }}])
         self.u0 = {
             {% for s in inputs -%}
-            {{s.name}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # outputs
@@ -110,7 +110,7 @@ class {{tree.name}}(OdeModel):
         self.c = sympy.Matrix([{{ constants_str }}])
         self.c0 = {
             {% for s in constants -%}
-            {{s.name}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # parameters
@@ -120,7 +120,7 @@ class {{tree.name}}(OdeModel):
         self.p = sympy.Matrix([{{ parameters_str }}])
         self.p0 = {
             {% for s in parameters -%}
-            {{s.name}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # variables

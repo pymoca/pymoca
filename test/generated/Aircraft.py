@@ -18,18 +18,18 @@ class Aircraft(OdeModel):
         body__x, body__v_x, body__a_x = mech.dynamicsymbols('body.x, body.v_x, body.a_x')
         self.x = sympy.Matrix([body__x, body__v_x, body__a_x])
         self.x0 = {
-            body.x : 0.0,
-            body.v_x : 0.0,
-            body.a_x : 0.0,
+            body__x : 0.0,
+            body__v_x : 0.0,
+            body__a_x : 0.0,
             }
 
         # inputs
         body__f_x, accel__a_x, accel__b_x__u = sympy.symbols('body.f_x, accel.a_x, accel.b_x.u')
         self.u = sympy.Matrix([body__f_x, accel__a_x, accel__b_x__u])
         self.u0 = {
-            body.f_x : 0.0,
-            accel.a_x : 0.0,
-            accel.b_x.u : 0.0,
+            body__f_x : 0.0,
+            accel__a_x : 0.0,
+            accel__b_x__u : 0.0,
             }
 
         # outputs
@@ -45,10 +45,10 @@ class Aircraft(OdeModel):
         body__g, body__c, body__m, accel__b_x__b = sympy.symbols('body.g, body.c, body.m, accel.b_x.b')
         self.p = sympy.Matrix([body__g, body__c, body__m, accel__b_x__b])
         self.p0 = {
-            body.g : 9.81,
-            body.c : 0.9,
-            body.m : 1.0,
-            accel.b_x.b : 0.0,
+            body__g : 9.81,
+            body__c : 0.9,
+            body__m : 1.0,
+            accel__b_x__b : 0.0,
             }
 
         # variables
@@ -57,12 +57,12 @@ class Aircraft(OdeModel):
         # equations
         self.eqs = [
             ,
-            (body__x).diff(self.t) - (body__v_x),
-            (body__v_x).diff(self.t) - (body__a_x),
-            body__f_x - (body__m * body__a_x),
             ,
             accel__ma_x - (accel__b_x__y),
             accel__b_x__y - (accel__b_x__u + accel__b_x__b),
+            (body__x).diff(self.t) - (body__v_x),
+            (body__v_x).diff(self.t) - (body__a_x),
+            body__f_x - (body__m * body__a_x),
             ]
 
         self.compute_fg()
