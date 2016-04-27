@@ -185,7 +185,6 @@ class {{tree.name}}(OdeModel):
             right=self.src[tree.right])
 
     def exitConnectClause(self, tree):
-        print('left', tree.left.name)
         #print('class context', type(self.context['Class'].symbols[tree.left.name]))
         self.src[tree] = "{left:s} - ({right:s})".format(
             left=self.src[tree.left],

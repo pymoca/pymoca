@@ -26,7 +26,7 @@ class ParseTest(unittest.TestCase):
     def flush(self):
         sys.stdout.flush()
         sys.stdout.flush()
-        time.sleep(0.01)
+        time.sleep(0.1)
 
     def test_aircraft(self):
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:

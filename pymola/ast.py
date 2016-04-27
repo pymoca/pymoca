@@ -130,7 +130,6 @@ class FieldDict(dict):
     def __setitem__(self, key, value):
         if VALIDATE_AST:
             if not type(value) in self.types:
-                print('type', type(value))
                 raise IOError('{:s} requires dict values of type ({:s}), but got {:s}'.format(
                     key, ','.join([t.__name__ for t in self.types]), type(value).__name__))
         super(FieldDict, self).__setitem__(key, value)

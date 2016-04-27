@@ -198,7 +198,7 @@ class ConnectExpanderListener(TreeListener):
         super(ConnectExpanderListener, self).__init__()
 
     def exitConnectClause(self, tree):
-        print('tree', tree.left.name, tree.right.name)
+        pass
 
 
 class ComponentRenameListener(TreeListener):
