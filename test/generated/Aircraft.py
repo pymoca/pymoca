@@ -57,13 +57,13 @@ class Aircraft(OdeModel):
 
         # equations
         self.eqs = [
-            ,
-            ,
-            accel__ma_x - (accel__b_x__y),
-            accel__b_x__y - (accel__b_x__u + accel__b_x__b),
+            body__a_x - (accel__a_x),
             (body__x).diff(self.t) - (body__v_x),
             (body__v_x).diff(self.t) - (body__a_x),
             body__f_x - (body__m * body__a_x),
+            accel__b_x__u - (accel__a_x),
+            accel__ma_x - (accel__b_x__y),
+            accel__b_x__y - (accel__b_x__u + accel__b_x__b),
             ]
 
         self.compute_fg()

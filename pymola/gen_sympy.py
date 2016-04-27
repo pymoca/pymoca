@@ -12,6 +12,7 @@ FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 class SympyGenerator(tree.TreeListener):
 
     def __init__(self):
+        super(SympyGenerator, self).__init__()
         self.src = {}
 
     def exitFile(self, tree):
@@ -179,6 +180,13 @@ class {{tree.name}}(OdeModel):
         self.src[tree] = "{name:s}".format(name=tree.name.replace('.','__'))
 
     def exitEquation(self, tree):
+        self.src[tree] = "{left:s} - ({right:s})".format(
+            left=self.src[tree.left],
+            right=self.src[tree.right])
+
+    def exitConnectClause(self, tree):
+        print('left', tree.left.name)
+        #print('class context', type(self.context['Class'].symbols[tree.left.name]))
         self.src[tree] = "{left:s} - ({right:s})".format(
             left=self.src[tree.left],
             right=self.src[tree.right])

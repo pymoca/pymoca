@@ -78,6 +78,11 @@ class GenSympyTest(unittest.TestCase):
 
         text = gen_sympy.generate(ast_tree, 'Aircraft')
         print(text)
+        with open(os.path.join(TEST_DIR, 'generated/Connect.py'), 'w') as f:
+            f.write(text)
+        #from generated.Connect import Aircraft as Aircraft
+        #e = Aircraft()
+        #res = e.simulate()
         self.flush()
 
 if __name__ == "__main__":

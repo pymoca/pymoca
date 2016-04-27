@@ -10,6 +10,7 @@ from . import ast
 
 
 class TreeWalker(object):
+
     def walk(self, listener, tree):
         name = tree.__class__.__name__
         if hasattr(listener, 'enterEvery'):
@@ -71,6 +72,16 @@ class TreeVisitor(object):
 
 
 class TreeListener(object):
+
+    def __init__(self):
+        self.context = {}
+
+    def enterEvery(self, tree):
+        self.context[type(tree).__name__] = tree
+
+    def exitEvery(self, tree):
+        self.context[type(tree).__name__] = None
+
     def enterFile(self, tree):
         pass
 
@@ -149,6 +160,12 @@ def flatten(root, class_name, instance_name=''):
     else:
         instance_prefix = instance_name
 
+    # create a walker
+    ast_walker = TreeWalker()
+
+    # walker for expanding connect equations
+    ast_walker.walk(ConnectExpanderListener(), flat_class)
+
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
@@ -175,8 +192,19 @@ def flatten(root, class_name, instance_name=''):
     return flat_file
 
 
+class ConnectExpanderListener(TreeListener):
+
+    def __init__(self):
+        super(ConnectExpanderListener, self).__init__()
+
+    def exitConnectClause(self, tree):
+        print('tree', tree.left.name, tree.right.name)
+
+
 class ComponentRenameListener(TreeListener):
+
     def __init__(self, prefix):
+        super(ComponentRenameListener, self).__init__()
         self.prefix = prefix
 
     def enterSymbol(self, tree):
