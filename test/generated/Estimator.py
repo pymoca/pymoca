@@ -21,14 +21,9 @@ class Estimator(OdeModel):
             x : 0.0,
             }
 
-        # inputs
-        self.u = sympy.Matrix([])
-        self.u0 = {
-            }
-
-        # outputs
-        y = sympy.symbols('y')
-        self.y = sympy.Matrix([y])
+        # variables
+        y = mech.dynamicsymbols('y')
+        self.v = sympy.Matrix([y])
 
         # constants
         self.c = sympy.Matrix([])
@@ -40,9 +35,15 @@ class Estimator(OdeModel):
         self.p0 = {
             }
 
-        # variables
-        self.v = sympy.Matrix([])
-      
+        # inputs
+        self.u = sympy.Matrix([])
+        self.u0 = {
+            }
+
+        # outputs
+        y = mech.dynamicsymbols('y')
+        self.y = sympy.Matrix([y])
+
         # equations
         self.eqs = [
             (x).diff(self.t) - (- x),

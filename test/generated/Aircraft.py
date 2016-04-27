@@ -23,18 +23,9 @@ class Aircraft(OdeModel):
             body__a_x : 0.0,
             }
 
-        # inputs
-        body__f_x, accel__a_x, accel__b_x__u = sympy.symbols('body.f_x, accel.a_x, accel.b_x.u')
-        self.u = sympy.Matrix([body__f_x, accel__a_x, accel__b_x__u])
-        self.u0 = {
-            body__f_x : 0.0,
-            accel__a_x : 0.0,
-            accel__b_x__u : 0.0,
-            }
-
-        # outputs
-        accel__ma_x, accel__b_x__y = sympy.symbols('accel.ma_x, accel.b_x.y')
-        self.y = sympy.Matrix([accel__ma_x, accel__b_x__y])
+        # variables
+        accel__ma_x, accel__b_x__y = mech.dynamicsymbols('accel.ma_x, accel.b_x.y')
+        self.v = sympy.Matrix([accel__ma_x, accel__b_x__y])
 
         # constants
         self.c = sympy.Matrix([])
@@ -51,9 +42,19 @@ class Aircraft(OdeModel):
             accel__b_x__b : 0.0,
             }
 
-        # variables
-        self.v = sympy.Matrix([])
-      
+        # inputs
+        body__f_x, accel__a_x, accel__b_x__u = mech.dynamicsymbols('body.f_x, accel.a_x, accel.b_x.u')
+        self.u = sympy.Matrix([body__f_x, accel__a_x, accel__b_x__u])
+        self.u0 = {
+            body__f_x : 0.0,
+            accel__a_x : 0.0,
+            accel__b_x__u : 0.0,
+            }
+
+        # outputs
+        body__x, body__v_x, body__a_x, accel__ma_x, accel__b_x__y = mech.dynamicsymbols('body.x, body.v_x, body.a_x, accel.ma_x, accel.b_x.y')
+        self.y = sympy.Matrix([body__x, body__v_x, body__a_x, accel__ma_x, accel__b_x__y])
+
         # equations
         self.eqs = [
             ,

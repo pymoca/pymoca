@@ -22,13 +22,8 @@ class Spring(OdeModel):
             v_x : 0.0,
             }
 
-        # inputs
-        self.u = sympy.Matrix([])
-        self.u0 = {
-            }
-
-        # outputs
-        self.y = sympy.Matrix([])
+        # variables
+        self.v = sympy.Matrix([])
 
         # constants
         self.c = sympy.Matrix([])
@@ -43,9 +38,14 @@ class Spring(OdeModel):
             k : 2,
             }
 
-        # variables
-        self.v = sympy.Matrix([])
-      
+        # inputs
+        self.u = sympy.Matrix([])
+        self.u0 = {
+            }
+
+        # outputs
+        self.y = sympy.Matrix([])
+
         # equations
         self.eqs = [
             (x).diff(self.t) - (v_x),
