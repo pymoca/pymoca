@@ -39,11 +39,6 @@ def to_json(var):
 
 class Field(object):
     def __init__(self, types, default=None):
-        if default is None:
-            if types == dict:
-                default = {}
-            elif types == list:
-                default = []
         if type(types) is type or not hasattr(types, '__iter__'):
             types = [types]
         types = list(types)
@@ -64,9 +59,9 @@ class Field(object):
             return True
 
 
-class List(list):
+class FieldList(list):
     def __init__(self, types, default=[]):
-        super(List, self).__init__()
+        super(FieldList, self).__init__()
         if type(types) is type or not hasattr(types, '__iter__'):
             types = [types]
         types = list(types)
@@ -79,8 +74,8 @@ class List(list):
     def validate(self, name, key, val_list, throw=True):
         if type(val_list) != list:
             if throw:
-                raise IOError('{:s}.{:s} requires types ({:s}), but got {:s}'.format(
-                name, key, 'list', type(val).__name__))
+                raise IOError('{:s}.{:s} requires types {:s}, but got {:s}'.format(
+                name, key, 'list', type(val_list).__name__))
             else:
                 return False
 
@@ -96,14 +91,15 @@ class List(list):
 
     def __add__(self, other):
         if other in self.types:
-            super(List, self).__add__(other)
+            super(FieldList, self).__add__(other)
         else:
             raise IOError('List requires elements of type', self.types)
 
 
-class Dict(dict):
-    def __init__(self, types, default=[]):
-        super(Dict, self).__init__()
+# TODO get dict validation working
+class FieldDict(dict):
+    def __init__(self, types, default):
+        super(FieldDict, self).__init__()
         if type(types) is type or not hasattr(types, '__iter__'):
             types = [types]
         types = list(types)
@@ -122,7 +118,6 @@ class Dict(dict):
                 return False
 
         for val in val_dict.values():
-            print('dict val', val)
             if not type(val) in self.types:
                 if throw:
                     raise IOError('{:s}.{:s} requires list items of type ({:s}), but got {:s}'.format(
@@ -132,6 +127,14 @@ class Dict(dict):
             else:
                 return True
 
+    def __setitem__(self, key, value):
+        if VALIDATE_AST:
+            if not type(value) in self.types:
+                print('type', type(value))
+                raise IOError('{:s} requires dict values of type ({:s}), but got {:s}'.format(
+                    key, ','.join([t.__name__ for t in self.types]), type(value).__name__))
+        super(FieldDict, self).__setitem__(key, value)
+
 
 class Node(object):
     ast_spec = {}
@@ -139,7 +142,9 @@ class Node(object):
     def __init__(self, **kwargs):
         for key in self.ast_spec.keys():
             # make sure we don't share ast_spec default data by using deep copy
-            self.__dict__[key] = copy.deepcopy(self.ast_spec[key].default)
+            field_type = type(self.ast_spec[key])
+            default = self.ast_spec[key].default
+            self.__dict__[key] = copy.deepcopy(default)
         for key in kwargs.keys():
             # types = self.ast_spec[key].types
             val = kwargs[key]
@@ -163,31 +168,26 @@ class Node(object):
 
 
 class Primary(Node):
-
     def __init__(self, **kwargs):
         super(Primary, self).__init__(**kwargs)
 
 
 class ComponentRef(Node):
-
     def __init__(self, **kwargs):
         super(ComponentRef, self).__init__(**kwargs)
 
 
 class Expression(Node):
-
     def __init__(self, **kwargs):
         super(Expression, self).__init__(**kwargs)
 
 
 class Equation(Node):
-
     def __init__(self, **kwargs):
         super(Equation, self).__init__(**kwargs)
 
 
 class ConnectClause(Node):
-
     def __init__(self, **kwargs):
         super(ConnectClause, self).__init__(**kwargs)
 
@@ -224,73 +224,73 @@ class File(Node):
 # possible when initially declaring a class in python
 
 Primary.ast_spec = {
-    'value': Field((bool, float, int, str))
+    'value': Field([bool, float, int, str])
 }
 
 ComponentRef.ast_spec = {
-    'name': Field(str),
+    'name': Field([str]),
 }
 
 Expression.ast_spec = {
-    'operator': Field(str),
-    'operands': List((Expression, ComponentRef)),
+    'operator': Field([str]),
+    'operands': FieldList([Expression, ComponentRef]),
 }
 
 Equation.ast_spec = {
-    'left': Field((Expression, Primary, ComponentRef)),
-    'right': Field((Expression, Primary, ComponentRef)),
-    'comment': Field(str),
+    'left': Field([Expression, Primary, ComponentRef]),
+    'right': Field([Expression, Primary, ComponentRef]),
+    'comment': Field([str]),
 }
 
 ConnectClause.ast_spec = {
-    'left': Field(ComponentRef),
-    'right': Field(ComponentRef),
-    'comment': Field(str),
+    'left': Field([ComponentRef]),
+    'right': Field([ComponentRef]),
+    'comment': Field([str]),
 }
 
 Symbol.ast_spec = {
-    'name': Field(str, ''),
-    'type': Field(str, ''),
-    'prefixes': List((str), []),
-    'redeclare': Field(bool, False),
-    'final': Field(bool, False),
-    'inner': Field(bool, False),
-    'outer': Field(bool, False),
-    'dimensions': Field(list, [1]),
-    'comment': Field(str, ''),
-    'start': Field(Primary),
-    'id': Field(int),
-    'order': Field(int),
+    'name': Field([str], ''),
+    'type': Field([str], ''),
+    'prefixes': FieldList([str], []),
+    'redeclare': Field([bool], False),
+    'final': Field([bool], False),
+    'inner': Field([bool], False),
+    'outer': Field([bool], False),
+    'dimensions': FieldList([int], [1]),
+    'comment': Field([str], ''),
+    'start': Field([Primary], Primary(value=0)),
+    'id': Field([int], 0),
+    'order': Field([int], 0),
 }
 
 ComponentClause.ast_spec = {
-    'prefixes': Field(list, []),
-    'type': Field(str, ''),
-    'dimensions': List((int), [1]),
-    'comment': List((str), []),
-    'symbol_list': List((Symbol), []),
+    'prefixes': FieldList([str], []),
+    'type': Field([str], ''),
+    'dimensions': FieldList([int], [1]),
+    'comment': FieldList([str], []),
+    'symbol_list': FieldList([Symbol], []),
 }
 
 EquationSection.ast_spec = {
-    'initial': Field(bool, False),
-    'equations': List((Equation, ConnectClause), []),
+    'initial': Field([bool], False),
+    'equations': FieldList([Equation, ConnectClause], []),
 }
 
 Class.ast_spec = {
     'name': Field(str),
-    'encapsulated': Field(bool, False),
-    'partial': Field(bool, False),
-    'final': Field(bool, False),
-    'type': Field(str, ''),
+    'encapsulated': Field([bool], False),
+    'partial': Field([bool], False),
+    'final': Field([bool], False),
+    'type': Field([str], ''),
     'comment': Field(str, ''),
-    'symbols': Dict((ComponentClause), {}),
-    'initial_equations': List((Equation), []),
-    'equations': List((Equation, ConnectClause), []),
+    'symbols': FieldDict([Symbol], {}),
+    'initial_equations': FieldList([Equation], []),
+    'equations': FieldList([Equation, ConnectClause], []),
 }
 
 File.ast_spec = {
-    'within': Field(str),
-    'classes': Dict((Class), {}),
+    'within': Field([str], ''),
+    'classes': FieldDict([Class], {}),
 }
 
 
