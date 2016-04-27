@@ -223,8 +223,11 @@ class ASTListener(ModelicaListener):
             dimensions = [int(s) for s in ctx.array_subscripts().subscript().getText()]
         else:
             dimensions = [1]
+        prefixes = ctx.type_prefix().getText().split(' ')
+        if prefixes[0] == '':
+            prefixes = []
         self.ast[ctx] = ast.ComponentClause(
-            prefixes=ctx.type_prefix().getText().split(' '),
+            prefixes=prefixes,
             type=ctx.type_specifier().getText(),
             dimensions=dimensions
         )

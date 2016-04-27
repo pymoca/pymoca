@@ -45,17 +45,23 @@ from sympy import sin, cos, tan
         variables = []
         symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
         for s in symbols:
-            if 'state' in s.prefixes:
-                states += [s]
-            elif 'input' in s.prefixes:
-                inputs += [s]
-            elif 'output' in s.prefixes:
-                outputs += [s]
-            elif 'constant' in s.prefixes:
-                constants += [s]
-            elif 'parameter' in s.prefixes:
-                parameters += [s]
+            if len(s.prefixes) == 0:
+                variables += [s]
             else:
+                for prefix in s.prefixes:
+                    if prefix == 'state':
+                        states += [s]
+                    elif prefix == 'constant':
+                        constants += [s]
+                    elif prefix == 'parameter':
+                        parameters += [s]
+                    elif prefix == 'input':
+                        inputs += [s]
+                    elif prefix == 'output':
+                        outputs += [s]
+
+        for s in outputs:
+            if s not in states:
                 variables += [s]
 
         states_str = ', '.join([self.src[s] for s in states])
@@ -87,21 +93,11 @@ class {{tree.name}}(OdeModel):
             {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
-        # inputs
-        {% if inputs_str|length > 0 -%}
-        {{ inputs_str }} = sympy.symbols('{{ inputs_str|replace('__', '.') }}')
+        # variables
+        {% if variables_str|length > 0 -%}
+        {{ variables_str }} = mech.dynamicsymbols('{{ variables_str|replace('__', '.') }}')
         {% endif -%}
-        self.u = sympy.Matrix([{{ inputs_str }}])
-        self.u0 = {
-            {% for s in inputs -%}
-            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
-            {% endfor -%}}
-
-        # outputs
-        {% if outputs_str|length > 0 -%}
-        {{ outputs_str }} = sympy.symbols('{{ outputs_str|replace('__', '.') }}')
-        {% endif -%}
-        self.y = sympy.Matrix([{{ outputs_str }}])
+        self.v = sympy.Matrix([{{ variables_str }}])
 
         # constants
         {% if constants_str|length > 0 -%}
@@ -123,12 +119,22 @@ class {{tree.name}}(OdeModel):
             {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
-        # variables
-        {% if variables_str|length > 0 -%}
-        {{ variables_str }} = sympy.symbols('{{ variables_str|replace('__', '.') }}')
+        # inputs
+        {% if inputs_str|length > 0 -%}
+        {{ inputs_str }} = mech.dynamicsymbols('{{ inputs_str|replace('__', '.') }}')
         {% endif -%}
-        self.v = sympy.Matrix([{{ variables_str }}])
-      
+        self.u = sympy.Matrix([{{ inputs_str }}])
+        self.u0 = {
+            {% for s in inputs -%}
+            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
+            {% endfor -%}}
+
+        # outputs
+        {% if outputs_str|length > 0 -%}
+        {{ outputs_str }} = mech.dynamicsymbols('{{ outputs_str|replace('__', '.') }}')
+        {% endif -%}
+        self.y = sympy.Matrix([{{ outputs_str }}])
+
         # equations
         self.eqs = [
             {% for eq in tree.equations -%}

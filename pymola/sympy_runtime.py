@@ -24,7 +24,7 @@ class OdeModel(object):
         self.eqs = []
 
     def compute_fg(self):
-        fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.y) +  list(self.v))
+        fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.v))
         self.f = self.x.diff(self.t).subs(fg_sol)
         assert(len(self.x) == len(self.f))
         self.g = self.y.subs(fg_sol)
