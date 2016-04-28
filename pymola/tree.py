@@ -230,9 +230,6 @@ class Instatiator(TreeListener):
             sym = copy.deepcopy(tree)
             self.new_class.symbols[scoped_name] = sym
 
-    def enterComponentRef(self, tree):
-        tree.name = '{:s}.{:s}'.format(self.prefix, tree.name)
-
     def exitClass(self, tree):
         pass
 
