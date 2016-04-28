@@ -20,8 +20,7 @@ class Aircraft(OdeModel):
             }
 
         # variables
-        body__link__force, link__force = mech.dynamicsymbols('body.link.force, link.force')
-        self.v = sympy.Matrix([body__link__force, link__force])
+        self.v = sympy.Matrix([])
 
         # constants
         self.c = sympy.Matrix([])
@@ -43,7 +42,7 @@ class Aircraft(OdeModel):
 
         # equations
         self.eqs = [
-            link - (body__link),
+            ,
             ]
 
         self.compute_fg()

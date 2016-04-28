@@ -4,6 +4,9 @@ end Link;
 
 model RigidBody
     Link link;
+    Real x;
+equation
+    der(x) = link.force;
 end RigidBody;
 
 model Aircraft

@@ -100,6 +100,12 @@ class TreeListener(object):
     def exitExpression(self, tree):
         pass
 
+    def enterEquation(self, tree):
+        pass
+
+    def exitEquation(self, tree):
+        pass
+
     def enterConnectClause(self, tree):
         pass
 
@@ -163,13 +169,14 @@ def flatten(root, class_name, instance_name=''):
     # create a walker
     ast_walker = TreeWalker()
 
-    # walker for expanding connect equations
-    ast_walker.walk(ConnectExpanderListener(), flat_class)
-
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
         if sym.type in root.classes:
+            class_data = root.classes[sym.type]
+            if class_data.type == 'connector':
+                continue
+
             # recursively call flatten on the sub class
             flat_sub_file = flatten(root, sym.type, instance_name=sym_name)
             flat_sub_class = flat_sub_file.classes[sym.type]
@@ -184,27 +191,78 @@ def flatten(root, class_name, instance_name=''):
             # append original symbol to flat class
             flat_class.symbols[instance_prefix + sym_name] = copy.deepcopy(sym)
 
-    # walker for renaming components
-    if instance_name != '':
-        ast_walker = TreeWalker()
-        ast_walker.walk(ComponentRenameListener(instance_name), flat_class)
+
+    # walker for expanding connect equations
+    # ast_walker.walk(ConnectExpanderListener(), flat_class)
 
     return flat_file
 
 
-class ConnectExpanderListener(TreeListener):
+# TODO switch to using ctx dict
+class Instatiator(TreeListener):
 
-    def __init__(self):
-        super(ConnectExpanderListener, self).__init__()
+    def __init__(self, classes, scope=[]):
+        super(Instatiator, self).__init__()
+        self.new_class = ast.Class()
+        self.classes = classes
+        self.scope = scope
+        self.ctx = {}
+
+    def enterSymbol(self, tree):
+        scope = copy.deepcopy(self.scope)
+        scope += [str(tree.name)]
+        scoped_name = '.'.join(scope)
+        walker = TreeWalker()
+        if tree.type in self.classes:
+            sym_class = self.classes[tree.type]
+            if sym_class.type == 'connector':
+                sym = copy.deepcopy(tree)
+                sym.name = scoped_name
+                self.new_class.symbols[scoped_name] = sym
+            else:
+                instantiator = Instatiator(
+                    classes=self.classes,
+                    scope=scope)
+                walker.walk(instantiator, sym_class)
+                self.new_class.symbols.update(
+                    instantiator.new_class.symbols)
+        else:
+            sym = copy.deepcopy(tree)
+            self.new_class.symbols[scoped_name] = sym
+
+    def enterComponentRef(self, tree):
+        tree.name = '{:s}.{:s}'.format(self.prefix, tree.name)
+
+    def exitClass(self, tree):
+        pass
 
     def exitConnectClause(self, tree):
         pass
 
 
-class ComponentRenameListener(TreeListener):
+class ConnectExpander(TreeListener):
+
+    def __init__(self, classes):
+        super(ConnectExpander, self).__init__()
+        self.scope = []
+        self.classes = classes
+
+    def enterConnectClause(self, tree):
+        print('hello')
+        left_class = self.context['Class'].symbols[tree.left.name]
+        right_class =self.context['Class'].symbols[tree.right.name]
+        assert left_class.type == 'connector'
+        assert right_class.type == 'connector'
+        assert left_class == right_class
+
+        for sym in left_class.symbols:
+            print('sym', sym)
+
+
+class ComponentRenamer(TreeListener):
 
     def __init__(self, prefix):
-        super(ComponentRenameListener, self).__init__()
+        super(ComponentRenamer, self).__init__()
         self.prefix = prefix
 
     def enterSymbol(self, tree):

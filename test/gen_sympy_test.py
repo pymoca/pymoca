@@ -59,9 +59,9 @@ class GenSympyTest(unittest.TestCase):
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Aircraft')
-        with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
-          f.write(text)
+        #text = gen_sympy.generate(ast_tree, 'Aircraft')
+        #with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+        #  f.write(text)
         # from generated.Aircraft import Aircraft as Aircraft
         #e = Aircraft()
         #res = e.simulate()
@@ -71,15 +71,32 @@ class GenSympyTest(unittest.TestCase):
         with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        # print(ast_tree)
+        #print(ast_tree)
 
         flat_tree = tree.flatten(ast_tree, 'Aircraft')
-        print(flat_tree)
+        #print(flat_tree)
 
-        text = gen_sympy.generate(ast_tree, 'Aircraft')
-        print(text)
-        with open(os.path.join(TEST_DIR, 'generated/Connect.py'), 'w') as f:
-            f.write(text)
+        walker = tree.TreeWalker()
+        classes = ast_tree.classes
+        root = ast_tree.classes['Aircraft']
+
+        instantiator = tree.Instatiator(classes=classes)
+        walker.walk(instantiator, root)
+
+        print('INSTANTIATOR\n-----------\n\n')
+        print(instantiator.new_class)
+
+        connectExpander = tree.ConnectExpander(classes=classes)
+        walker.walk(connectExpander, instantiator.new_class)
+
+        print('CONNECT EXPANDER\n-----------\n\n')
+        #print(connectExpander.new_class)
+
+        #text = gen_sympy.generate(ast_tree, 'Aircraft')
+        #print(text)
+        #with open(os.path.join(TEST_DIR, 'generated/Connect.py'), 'w') as f:
+        #    f.write(text)
+
         #from generated.Connect import Aircraft as Aircraft
         #e = Aircraft()
         #res = e.simulate()

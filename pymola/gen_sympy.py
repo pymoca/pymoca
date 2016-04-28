@@ -184,12 +184,6 @@ class {{tree.name}}(OdeModel):
             left=self.src[tree.left],
             right=self.src[tree.right])
 
-    def exitConnectClause(self, tree):
-        #print('class context', type(self.context['Class'].symbols[tree.left.name]))
-        self.src[tree] = "{left:s} - ({right:s})".format(
-            left=self.src[tree.left],
-            right=self.src[tree.right])
-
 
 def generate(ast_tree, model_name):
     ast_tree_new = copy.deepcopy(ast_tree)
