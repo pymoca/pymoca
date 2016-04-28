@@ -198,43 +198,69 @@ def flatten(root, class_name, instance_name=''):
     return flat_file
 
 
-# TODO switch to using ctx dict
 class Instatiator(TreeListener):
+    """
+    Instantiates all classes that are not connectors.
+    """
 
     def __init__(self, classes, scope=[]):
         super(Instatiator, self).__init__()
-        self.new_class = ast.Class()
         self.classes = classes
+        self.res = {}
         self.scope = scope
-        self.ctx = {}
 
-    def enterSymbol(self, tree):
-        scope = copy.deepcopy(self.scope)
-        scope += [str(tree.name)]
-        scoped_name = '.'.join(scope)
-        walker = TreeWalker()
+    @staticmethod
+    def get_scoped_name(scope, name):
+        scope = copy.deepcopy(scope)
+        scope += [str(name)]
+        return '.'.join(scope)
+
+    def enterComponentRef(self, tree):
+        name = self.get_scoped_name(self.scope, tree.name)
+        tree.name = name
+
+    def exitSymbol(self, tree):
+        """
+        Set the result of classes to their definitions if it is
+        not a connector, otherwise set the result to the symbol
+        """
         if tree.type in self.classes:
-            sym_class = self.classes[tree.type]
-            if sym_class.type == 'connector':
-                sym = copy.deepcopy(tree)
-                sym.name = scoped_name
-                self.new_class.symbols[scoped_name] = sym
+            class_def = self.classes[tree.type]
+            if class_def.type == 'connector':
+                self.res[tree] = tree
             else:
-                instantiator = Instatiator(
-                    classes=self.classes,
-                    scope=scope)
-                walker.walk(instantiator, sym_class)
-                self.new_class.symbols.update(
-                    instantiator.new_class.symbols)
+                self.res[tree] = class_def
         else:
-            sym = copy.deepcopy(tree)
-            self.new_class.symbols[scoped_name] = sym
+            self.res[tree] = tree
+
+    def exitEquation(self, tree):
+        self.res[tree] = tree
 
     def exitClass(self, tree):
-        pass
-
-    def exitConnectClause(self, tree):
-        pass
+        """
+        For each nested class definition, expand its attributes,
+        fore each equation and symbol, copy them to the result
+        """
+        c = ast.Class()
+        for key, val in tree.symbols.items():
+            name = self.get_scoped_name(self.scope, key)
+            root = self.res[val]
+            if type(root) == ast.Class:
+                walker = TreeWalker()
+                instantiator = Instatiator(
+                    classes=self.classes,
+                    scope=self.scope + [key]
+                )
+                walker.walk(instantiator, root)
+                c.symbols.update(instantiator.res[root].symbols)
+                c.equations.extend(instantiator.res[root].equations)
+            elif type(root) == ast.Symbol:
+                root.name = name
+                c.symbols[name] = root
+            else:
+                raise RuntimeError('unhandled type', type(root))
+        c.equations.extend(tree.equations)
+        self.res[tree] = c
 
 
 class ConnectExpander(TreeListener):
@@ -245,25 +271,8 @@ class ConnectExpander(TreeListener):
         self.classes = classes
 
     def enterConnectClause(self, tree):
-        print('hello')
         left_class = self.context['Class'].symbols[tree.left.name]
         right_class =self.context['Class'].symbols[tree.right.name]
         assert left_class.type == 'connector'
         assert right_class.type == 'connector'
         assert left_class == right_class
-
-        for sym in left_class.symbols:
-            print('sym', sym)
-
-
-class ComponentRenamer(TreeListener):
-
-    def __init__(self, prefix):
-        super(ComponentRenamer, self).__init__()
-        self.prefix = prefix
-
-    def enterSymbol(self, tree):
-        tree.name = '{:s}.{:s}'.format(self.prefix, tree.name)
-
-    def enterComponentRef(self, tree):
-        tree.name = '{:s}.{:s}'.format(self.prefix, tree.name)

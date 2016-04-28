@@ -82,14 +82,16 @@ class GenSympyTest(unittest.TestCase):
 
         instantiator = tree.Instatiator(classes=classes)
         walker.walk(instantiator, root)
+        print(instantiator.res[root].symbols.keys())
+        print(instantiator.res[root])
 
-        print('INSTANTIATOR\n-----------\n\n')
-        print(instantiator.new_class)
+        #print('INSTANTIATOR\n-----------\n\n')
+        #print(instantiator.res[root])
 
-        connectExpander = tree.ConnectExpander(classes=classes)
-        walker.walk(connectExpander, instantiator.new_class)
+        #connectExpander = tree.ConnectExpander(classes=classes)
+        #walker.walk(connectExpander, instantiator.res[root])
 
-        print('CONNECT EXPANDER\n-----------\n\n')
+        #print('CONNECT EXPANDER\n-----------\n\n')
         #print(connectExpander.new_class)
 
         #text = gen_sympy.generate(ast_tree, 'Aircraft')
