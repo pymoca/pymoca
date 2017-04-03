@@ -15,7 +15,8 @@ from .generated.ModelicaParser import ModelicaParser
 
 # TODO
 #  - ':' as array index
-#  - Check for parsing
+#  - Check 'for' parsing
+#  - Functions
 
 
 class ASTListener(ModelicaListener):
@@ -111,6 +112,11 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.Equation(
             left=self.ast[ctx.simple_expression()],
             right=self.ast[ctx.expression()])
+
+    def exitEquation_if(self, ctx):
+        self.ast[ctx] = ast.IfEquation(
+            expressions=[self.ast[s] for s in ctx.if_equation().expression()],
+            equations=[self.ast[s] for s in ctx.if_equation().equation()])
 
     def exitEquation_for(self, ctx):
         self.ast[ctx] = ast.ForEquation(

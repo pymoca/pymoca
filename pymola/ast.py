@@ -188,6 +188,11 @@ class Equation(Node):
         super(Equation, self).__init__(**kwargs)
 
 
+class IfEquation(Node):
+    def __init__(self, **kwargs):
+        super(IfEquation, self).__init__(**kwargs)
+
+
 class ForIndex(Node):
     def __init__(self, **kwargs):
         super(ForIndex, self).__init__(**kwargs)
@@ -250,6 +255,12 @@ Expression.ast_spec = {
 Equation.ast_spec = {
     'left': Field([Expression, Primary, ComponentRef]),
     'right': Field([Expression, Primary, ComponentRef]),
+    'comment': Field([str]),
+}
+
+IfEquation.ast_spec = {
+    'expressions': FieldList([Expression, Primary, ComponentRef]),
+    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
     'comment': Field([str]),
 }
 
