@@ -143,6 +143,12 @@ class ASTListener(ModelicaListener):
             operands=[self.ast[e] for e in ctx.expr()]
         )
 
+    def exitExpr_exp(self, ctx):
+        self.ast[ctx] = ast.Expression(
+            operator=ctx.op.text,
+            operands=[self.ast[e] for e in ctx.primary()]
+        )
+
     def exitExpr_mul(self, ctx):
         self.ast[ctx] = ast.Expression(
             operator=ctx.op.text,
