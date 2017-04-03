@@ -19,7 +19,11 @@ File
             ComponentRef
             Expression
             Primary
+        IfEquation
+            Expression
+            Equation
         ForEquation
+            Expression
             Equation
         ConnectClause
             ComponentRef
