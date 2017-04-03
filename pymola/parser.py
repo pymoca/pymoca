@@ -152,6 +152,12 @@ class ASTListener(ModelicaListener):
             operands=[self.ast[ctx.expr()]]
         )
 
+    def exitSubscript(self, ctx):
+        self.ast[ctx] = self.ast[ctx.expression()]
+
+    def exitArray_subscripts(self, ctx):
+        self.ast[ctx] = [self.ast[s] for s in ctx.subscript()]
+
     # PRIMARY ===========================================================
 
     def exitPrimary_unsigned_number(self, ctx):
@@ -219,19 +225,20 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = 'TODO'
 
     def enterComponent_clause(self, ctx):
-        if ctx.array_subscripts() is not None:
-            dimensions = [int(s) for s in ctx.array_subscripts().subscript().getText()]
-        else:
-            dimensions = [1]
         prefixes = ctx.type_prefix().getText().split(' ')
         if prefixes[0] == '':
             prefixes = []
         self.ast[ctx] = ast.ComponentClause(
             prefixes=prefixes,
             type=ctx.type_specifier().getText(),
-            dimensions=dimensions
+            dimensions=[1]
         )
         self.comp_clause = self.ast[ctx]
+
+    def exitComponent_clause(self, ctx):
+        clause = self.ast[ctx]
+        if ctx.array_subscripts() is not None:
+            clause.dimensions = self.ast[ctx.array_subscripts()]
 
     def enterComponent_declaration(self, ctx):
         sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
@@ -251,9 +258,7 @@ class ASTListener(ModelicaListener):
     def enterDeclaration(self, ctx):
         sym = self.symbol_node
         dimensions = None
-        if ctx.array_subscripts() is not None:
-            dimensions = [int(s.getText()) for s in ctx.array_subscripts().subscript()]
-        elif self.comp_clause.dimensions is not None:
+        if self.comp_clause.dimensions is not None:
             dimensions = self.comp_clause.dimensions
         sym.name = ctx.IDENT().getText()
         sym.dimensions = dimensions
@@ -263,6 +268,11 @@ class ASTListener(ModelicaListener):
             raise IOError(sym.name, 'already defined')
         self.class_node.symbols[sym.name] = sym
         self.symbol_node = sym
+
+    def exitDeclaration(self, ctx):
+        sym = self.symbol_node
+        if ctx.array_subscripts() is not None:
+            sym.dimensions = self.ast[ctx.array_subscripts()]
 
     def exitElement_modification(self, ctx):
         sym = self.symbol_node

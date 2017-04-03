@@ -1,4 +1,4 @@
-# Generated from Modelica.g4 by ANTLR 4.5.1
+# Generated from Modelica.g4 by ANTLR 4.7
 from antlr4 import *
 
 # This class defines a complete generic visitor for a parse tree produced by ModelicaParser.
@@ -380,6 +380,21 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by ModelicaParser#expr_neg.
+    def visitExpr_neg(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#expr_add.
+    def visitExpr_add(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#expr_exp.
+    def visitExpr_exp(self, ctx):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by ModelicaParser#expr_or.
     def visitExpr_or(self, ctx):
         return self.visitChildren(ctx)
@@ -405,23 +420,8 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by ModelicaParser#expr_neg.
-    def visitExpr_neg(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by ModelicaParser#expr_add.
-    def visitExpr_add(self, ctx):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by ModelicaParser#expr_mul.
     def visitExpr_mul(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by ModelicaParser#expr_exp.
-    def visitExpr_exp(self, ctx):
         return self.visitChildren(ctx)
 
 

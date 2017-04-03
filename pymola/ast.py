@@ -255,7 +255,7 @@ Symbol.ast_spec = {
     'final': Field([bool], False),
     'inner': Field([bool], False),
     'outer': Field([bool], False),
-    'dimensions': FieldList([int], [1]),
+    'dimensions': FieldList([int, ComponentRef], [1]),
     'comment': Field([str], ''),
     'start': Field([Primary, ComponentRef], Primary(value=0)),
     'id': Field([int], 0),
@@ -265,7 +265,7 @@ Symbol.ast_spec = {
 ComponentClause.ast_spec = {
     'prefixes': FieldList([str], []),
     'type': Field([str], ''),
-    'dimensions': FieldList([int], [1]),
+    'dimensions': FieldList([int, ComponentRef], [1]),
     'comment': FieldList([str], []),
     'symbol_list': FieldList([Symbol], []),
 }

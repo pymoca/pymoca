@@ -1,12 +1,13 @@
-# Generated from Modelica.g4 by ANTLR 4.5.1
+# Generated from Modelica.g4 by ANTLR 4.7
 # encoding: utf-8
 from __future__ import print_function
 from antlr4 import *
 from io import StringIO
+import sys
 
 def serializedATN():
     with StringIO() as buf:
-        buf.write(u"\3\u0430\ud6d1\u8206\uad2d\u4417\uaef1\u8d80\uaadd\3")
+        buf.write(u"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3")
         buf.write(u"^\u040c\4\2\t\2\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t")
         buf.write(u"\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t\13\4\f\t\f\4\r\t\r")
         buf.write(u"\4\16\t\16\4\17\t\17\4\20\t\20\4\21\t\21\4\22\t\22\4")
@@ -108,8 +109,8 @@ def serializedATN():
         buf.write(u"$&(*,.\60\62\64\668:<>@BDFHJLNPRTVXZ\\^`bdfhjlnprtvx")
         buf.write(u"z|~\u0080\u0082\u0084\u0086\u0088\u008a\u008c\u008e\u0090")
         buf.write(u"\2\n\3\2\r\16\3\2#$\3\2%\'\3\2()\3\2;<\4\2\37\37=?\4")
-        buf.write(u"\2::@B\3\2CH\u0472\2\u0097\3\2\2\2\4\u00a0\3\2\2\2\6")
-        buf.write(u"\u00a6\3\2\2\2\b\u00ac\3\2\2\2\n\u00c5\3\2\2\2\f\u0100")
+        buf.write(u"\2::@B\3\2CH\2\u0472\2\u0097\3\2\2\2\4\u00a0\3\2\2\2")
+        buf.write(u"\6\u00a6\3\2\2\2\b\u00ac\3\2\2\2\n\u00c5\3\2\2\2\f\u0100")
         buf.write(u"\3\2\2\2\16\u0102\3\2\2\2\20\u0104\3\2\2\2\22\u010c\3")
         buf.write(u"\2\2\2\24\u010f\3\2\2\2\26\u012d\3\2\2\2\30\u0132\3\2")
         buf.write(u"\2\2\32\u0140\3\2\2\2\34\u0147\3\2\2\2\36\u014a\3\2\2")
@@ -436,16 +437,16 @@ def serializedATN():
         buf.write(u"\u0347\3\2\2\2\u0349\u034a\3\2\2\2\u034a\u034c\3\2\2")
         buf.write(u"\2\u034b\u0345\3\2\2\2\u034b\u034c\3\2\2\2\u034cq\3\2")
         buf.write(u"\2\2\u034d\u034e\b:\1\2\u034e\u034f\7:\2\2\u034f\u0358")
-        buf.write(u"\5r:\13\u0350\u0351\7I\2\2\u0351\u0358\5r:\6\u0352\u0353")
-        buf.write(u"\5t;\2\u0353\u0354\t\6\2\2\u0354\u0355\5t;\2\u0355\u0358")
-        buf.write(u"\3\2\2\2\u0356\u0358\5t;\2\u0357\u034d\3\2\2\2\u0357")
-        buf.write(u"\u0350\3\2\2\2\u0357\u0352\3\2\2\2\u0357\u0356\3\2\2")
-        buf.write(u"\2\u0358\u036a\3\2\2\2\u0359\u035a\f\t\2\2\u035a\u035b")
-        buf.write(u"\t\7\2\2\u035b\u0369\5r:\n\u035c\u035d\f\b\2\2\u035d")
-        buf.write(u"\u035e\t\b\2\2\u035e\u0369\5r:\t\u035f\u0360\f\7\2\2")
-        buf.write(u"\u0360\u0361\t\t\2\2\u0361\u0369\5r:\b\u0362\u0363\f")
-        buf.write(u"\5\2\2\u0363\u0364\7J\2\2\u0364\u0369\5r:\6\u0365\u0366")
-        buf.write(u"\f\4\2\2\u0366\u0367\7K\2\2\u0367\u0369\5r:\5\u0368\u0359")
+        buf.write(u"\5r:\13\u0350\u0351\5t;\2\u0351\u0352\t\6\2\2\u0352\u0353")
+        buf.write(u"\5t;\2\u0353\u0358\3\2\2\2\u0354\u0355\7I\2\2\u0355\u0358")
+        buf.write(u"\5r:\6\u0356\u0358\5t;\2\u0357\u034d\3\2\2\2\u0357\u0350")
+        buf.write(u"\3\2\2\2\u0357\u0354\3\2\2\2\u0357\u0356\3\2\2\2\u0358")
+        buf.write(u"\u036a\3\2\2\2\u0359\u035a\f\t\2\2\u035a\u035b\t\7\2")
+        buf.write(u"\2\u035b\u0369\5r:\n\u035c\u035d\f\b\2\2\u035d\u035e")
+        buf.write(u"\t\b\2\2\u035e\u0369\5r:\t\u035f\u0360\f\7\2\2\u0360")
+        buf.write(u"\u0361\t\t\2\2\u0361\u0369\5r:\b\u0362\u0363\f\5\2\2")
+        buf.write(u"\u0363\u0364\7J\2\2\u0364\u0369\5r:\6\u0365\u0366\f\4")
+        buf.write(u"\2\2\u0366\u0367\7K\2\2\u0367\u0369\5r:\5\u0368\u0359")
         buf.write(u"\3\2\2\2\u0368\u035c\3\2\2\2\u0368\u035f\3\2\2\2\u0368")
         buf.write(u"\u0362\3\2\2\2\u0368\u0365\3\2\2\2\u0369\u036c\3\2\2")
         buf.write(u"\2\u036a\u0368\3\2\2\2\u036a\u036b\3\2\2\2\u036bs\3\2")
@@ -783,9 +784,9 @@ class ModelicaParser ( Parser ):
     COMMENT=91
     WS=92
 
-    def __init__(self, input):
-        super(ModelicaParser, self).__init__(input)
-        self.checkVersion("4.5.1")
+    def __init__(self, input, output=sys.stdout):
+        super(ModelicaParser, self).__init__(input, output=output)
+        self.checkVersion("4.7")
         self._interp = ParserATNSimulator(self, self.atn, self.decisionsToDFA, self.sharedContextCache)
         self._predicates = None
 
@@ -839,11 +840,13 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 149
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.WITHIN:
                 self.state = 144
                 self.match(ModelicaParser.WITHIN)
                 self.state = 146
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__27 or _la==ModelicaParser.IDENT:
                     self.state = 145
@@ -913,6 +916,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 158
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.FINAL:
                 self.state = 157
@@ -976,6 +980,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 164
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.ENCAPSULATED:
                 self.state = 163
@@ -1035,6 +1040,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 170
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.PARTIAL:
                 self.state = 169
@@ -1085,6 +1091,7 @@ class ModelicaParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.state = 195
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,10,self._ctx)
             if la_ == 1:
                 self.enterOuterAlt(localctx, 1)
@@ -1101,6 +1108,7 @@ class ModelicaParser ( Parser ):
             elif la_ == 3:
                 self.enterOuterAlt(localctx, 3)
                 self.state = 177
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__3:
                     self.state = 176
@@ -1120,6 +1128,7 @@ class ModelicaParser ( Parser ):
             elif la_ == 5:
                 self.enterOuterAlt(localctx, 5)
                 self.state = 182
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__6:
                     self.state = 181
@@ -1145,6 +1154,7 @@ class ModelicaParser ( Parser ):
             elif la_ == 8:
                 self.enterOuterAlt(localctx, 8)
                 self.state = 188
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__10 or _la==ModelicaParser.T__11:
                     self.state = 187
@@ -1152,10 +1162,12 @@ class ModelicaParser ( Parser ):
                     if not(_la==ModelicaParser.T__10 or _la==ModelicaParser.T__11):
                         self._errHandler.recoverInline(self)
                     else:
+                        self._errHandler.reportMatch(self)
                         self.consume()
 
 
                 self.state = 191
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__3:
                     self.state = 190
@@ -1197,72 +1209,6 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Class_spec_enumContext(Class_specifierContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
-            super(ModelicaParser.Class_spec_enumContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def IDENT(self):
-            return self.getToken(ModelicaParser.IDENT, 0)
-        def comment(self):
-            return self.getTypedRuleContext(ModelicaParser.CommentContext,0)
-
-        def enum_list(self):
-            return self.getTypedRuleContext(ModelicaParser.Enum_listContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterClass_spec_enum"):
-                listener.enterClass_spec_enum(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitClass_spec_enum"):
-                listener.exitClass_spec_enum(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitClass_spec_enum"):
-                return visitor.visitClass_spec_enum(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-    class Class_spec_extendsContext(Class_specifierContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
-            super(ModelicaParser.Class_spec_extendsContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def IDENT(self, i=None):
-            if i is None:
-                return self.getTokens(ModelicaParser.IDENT)
-            else:
-                return self.getToken(ModelicaParser.IDENT, i)
-        def string_comment(self):
-            return self.getTypedRuleContext(ModelicaParser.String_commentContext,0)
-
-        def composition(self):
-            return self.getTypedRuleContext(ModelicaParser.CompositionContext,0)
-
-        def class_modification(self):
-            return self.getTypedRuleContext(ModelicaParser.Class_modificationContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterClass_spec_extends"):
-                listener.enterClass_spec_extends(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitClass_spec_extends"):
-                listener.exitClass_spec_extends(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitClass_spec_extends"):
-                return visitor.visitClass_spec_extends(self)
-            else:
-                return visitor.visitChildren(self)
-
-
     class Class_spec_derContext(Class_specifierContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
@@ -1292,6 +1238,36 @@ class ModelicaParser ( Parser ):
         def accept(self, visitor):
             if hasattr(visitor, "visitClass_spec_der"):
                 return visitor.visitClass_spec_der(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Class_spec_enumContext(Class_specifierContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
+            super(ModelicaParser.Class_spec_enumContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def IDENT(self):
+            return self.getToken(ModelicaParser.IDENT, 0)
+        def comment(self):
+            return self.getTypedRuleContext(ModelicaParser.CommentContext,0)
+
+        def enum_list(self):
+            return self.getTypedRuleContext(ModelicaParser.Enum_listContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterClass_spec_enum"):
+                listener.enterClass_spec_enum(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitClass_spec_enum"):
+                listener.exitClass_spec_enum(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_spec_enum"):
+                return visitor.visitClass_spec_enum(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -1368,6 +1344,42 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
+    class Class_spec_extendsContext(Class_specifierContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Class_specifierContext)
+            super(ModelicaParser.Class_spec_extendsContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def IDENT(self, i=None):
+            if i is None:
+                return self.getTokens(ModelicaParser.IDENT)
+            else:
+                return self.getToken(ModelicaParser.IDENT, i)
+        def string_comment(self):
+            return self.getTypedRuleContext(ModelicaParser.String_commentContext,0)
+
+        def composition(self):
+            return self.getTypedRuleContext(ModelicaParser.CompositionContext,0)
+
+        def class_modification(self):
+            return self.getTypedRuleContext(ModelicaParser.Class_modificationContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterClass_spec_extends"):
+                listener.enterClass_spec_extends(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitClass_spec_extends"):
+                listener.exitClass_spec_extends(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitClass_spec_extends"):
+                return visitor.visitClass_spec_extends(self)
+            else:
+                return visitor.visitChildren(self)
+
+
 
     def class_specifier(self):
 
@@ -1376,6 +1388,7 @@ class ModelicaParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.state = 254
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,17,self._ctx)
             if la_ == 1:
                 localctx = ModelicaParser.Class_spec_compContext(self, localctx)
@@ -1404,6 +1417,7 @@ class ModelicaParser ( Parser ):
                 self.state = 206
                 self.name()
                 self.state = 208
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__75:
                     self.state = 207
@@ -1411,6 +1425,7 @@ class ModelicaParser ( Parser ):
 
 
                 self.state = 211
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__16:
                     self.state = 210
@@ -1433,20 +1448,22 @@ class ModelicaParser ( Parser ):
                 self.state = 218
                 self.match(ModelicaParser.T__16)
                 self.state = 223
+                self._errHandler.sync(self)
                 token = self._input.LA(1)
                 if token in [ModelicaParser.T__18, ModelicaParser.IDENT]:
                     self.state = 220
+                    self._errHandler.sync(self)
                     _la = self._input.LA(1)
                     if _la==ModelicaParser.IDENT:
                         self.state = 219
                         self.enum_list()
 
 
-
+                    pass
                 elif token in [ModelicaParser.T__17]:
                     self.state = 222
                     self.match(ModelicaParser.T__17)
-
+                    pass
                 else:
                     raise NoViableAltException(self)
 
@@ -1499,6 +1516,7 @@ class ModelicaParser ( Parser ):
                 self.state = 245
                 self.match(ModelicaParser.IDENT)
                 self.state = 247
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__16:
                     self.state = 246
@@ -1764,6 +1782,7 @@ class ModelicaParser ( Parser ):
             _la = self._input.LA(1)
             while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__22) | (1 << ModelicaParser.T__23) | (1 << ModelicaParser.T__41) | (1 << ModelicaParser.T__42))) != 0) or _la==ModelicaParser.INITIAL:
                 self.state = 276
+                self._errHandler.sync(self)
                 la_ = self._interp.adaptivePredict(self._input,19,self._ctx)
                 if la_ == 1:
                     self.state = 270
@@ -1795,11 +1814,13 @@ class ModelicaParser ( Parser ):
                 _la = self._input.LA(1)
 
             self.state = 292
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__24:
                 self.state = 281
                 self.match(ModelicaParser.T__24)
                 self.state = 283
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.STRING:
                     self.state = 282
@@ -1807,6 +1828,7 @@ class ModelicaParser ( Parser ):
 
 
                 self.state = 286
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__27 or _la==ModelicaParser.IDENT:
                     self.state = 285
@@ -1814,6 +1836,7 @@ class ModelicaParser ( Parser ):
 
 
                 self.state = 289
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__77:
                     self.state = 288
@@ -1825,6 +1848,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 297
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__77:
                 self.state = 294
@@ -1931,6 +1955,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 304
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,26,self._ctx)
             if la_ == 1:
                 self.state = 301
@@ -1944,6 +1969,7 @@ class ModelicaParser ( Parser ):
             self.state = 307
             self.match(ModelicaParser.T__16)
             self.state = 309
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__13) | (1 << ModelicaParser.T__16) | (1 << ModelicaParser.T__19) | (1 << ModelicaParser.T__27) | (1 << ModelicaParser.T__29) | (1 << ModelicaParser.T__39) | (1 << ModelicaParser.T__55))) != 0) or ((((_la - 71)) & ~0x3f) == 0 and ((1 << (_la - 71)) & ((1 << (ModelicaParser.T__70 - 71)) | (1 << (ModelicaParser.T__73 - 71)) | (1 << (ModelicaParser.T__74 - 71)) | (1 << (ModelicaParser.T__75 - 71)) | (1 << (ModelicaParser.INITIAL - 71)) | (1 << (ModelicaParser.IDENT - 71)) | (1 << (ModelicaParser.STRING - 71)) | (1 << (ModelicaParser.UNSIGNED_NUMBER - 71)))) != 0):
                 self.state = 308
@@ -2025,7 +2051,6 @@ class ModelicaParser ( Parser ):
         def __init__(self, parser, parent=None, invokingState=-1):
             super(ModelicaParser.ElementContext, self).__init__(parent, invokingState)
             self.parser = parser
-            self.elem = None # Import_clauseContext
 
         def import_clause(self):
             return self.getTypedRuleContext(ModelicaParser.Import_clauseContext,0)
@@ -2069,29 +2094,30 @@ class ModelicaParser ( Parser ):
         self.enterRule(localctx, 26, self.RULE_element)
         try:
             self.state = 325
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,29,self._ctx)
             if la_ == 1:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 321
-                localctx.elem = self.import_clause()
+                self.import_clause()
                 pass
 
             elif la_ == 2:
                 self.enterOuterAlt(localctx, 2)
                 self.state = 322
-                localctx.elem = self.extends_clause()
+                self.extends_clause()
                 pass
 
             elif la_ == 3:
                 self.enterOuterAlt(localctx, 3)
                 self.state = 323
-                localctx.elem = self.regular_element()
+                self.regular_element()
                 pass
 
             elif la_ == 4:
                 self.enterOuterAlt(localctx, 4)
                 self.state = 324
-                localctx.elem = self.replaceable_element()
+                self.replaceable_element()
                 pass
 
 
@@ -2159,6 +2185,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 328
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.REDECLARE:
                 self.state = 327
@@ -2166,6 +2193,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 331
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.FINAL:
                 self.state = 330
@@ -2173,6 +2201,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 334
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.INNER:
                 self.state = 333
@@ -2180,6 +2209,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 337
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.OUTER:
                 self.state = 336
@@ -2187,15 +2217,16 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 341
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__1, ModelicaParser.T__2, ModelicaParser.T__3, ModelicaParser.T__4, ModelicaParser.T__5, ModelicaParser.T__6, ModelicaParser.T__7, ModelicaParser.T__8, ModelicaParser.T__9, ModelicaParser.T__10, ModelicaParser.T__11, ModelicaParser.T__12, ModelicaParser.PARTIAL, ModelicaParser.ENCAPSULATED]:
                 self.state = 339
                 localctx.class_elem = self.class_definition()
-
+                pass
             elif token in [ModelicaParser.T__27, ModelicaParser.T__32, ModelicaParser.T__33, ModelicaParser.T__34, ModelicaParser.T__35, ModelicaParser.T__36, ModelicaParser.T__37, ModelicaParser.T__38, ModelicaParser.IDENT]:
                 self.state = 340
                 localctx.comp_elem = self.component_clause()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -2271,6 +2302,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 344
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.REDECLARE:
                 self.state = 343
@@ -2278,6 +2310,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 347
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.FINAL:
                 self.state = 346
@@ -2285,6 +2318,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 350
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.INNER:
                 self.state = 349
@@ -2292,6 +2326,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 353
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.OUTER:
                 self.state = 352
@@ -2301,19 +2336,21 @@ class ModelicaParser ( Parser ):
             self.state = 355
             self.match(ModelicaParser.T__25)
             self.state = 358
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__1, ModelicaParser.T__2, ModelicaParser.T__3, ModelicaParser.T__4, ModelicaParser.T__5, ModelicaParser.T__6, ModelicaParser.T__7, ModelicaParser.T__8, ModelicaParser.T__9, ModelicaParser.T__10, ModelicaParser.T__11, ModelicaParser.T__12, ModelicaParser.PARTIAL, ModelicaParser.ENCAPSULATED]:
                 self.state = 356
                 localctx.class_elem = self.class_definition()
-
+                pass
             elif token in [ModelicaParser.T__27, ModelicaParser.T__32, ModelicaParser.T__33, ModelicaParser.T__34, ModelicaParser.T__35, ModelicaParser.T__36, ModelicaParser.T__37, ModelicaParser.T__38, ModelicaParser.IDENT]:
                 self.state = 357
                 localctx.comp_elem = self.component_clause()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
             self.state = 363
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__31:
                 self.state = 360
@@ -2381,6 +2418,7 @@ class ModelicaParser ( Parser ):
             self.state = 365
             self.match(ModelicaParser.T__26)
             self.state = 380
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,43,self._ctx)
             if la_ == 1:
                 self.state = 366
@@ -2395,16 +2433,18 @@ class ModelicaParser ( Parser ):
                 self.state = 369
                 self.name()
                 self.state = 378
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__27:
                     self.state = 370
                     self.match(ModelicaParser.T__27)
                     self.state = 376
+                    self._errHandler.sync(self)
                     token = self._input.LA(1)
                     if token in [ModelicaParser.T__28]:
                         self.state = 371
                         self.match(ModelicaParser.T__28)
-
+                        pass
                     elif token in [ModelicaParser.T__29]:
                         self.state = 372
                         self.match(ModelicaParser.T__29)
@@ -2412,7 +2452,7 @@ class ModelicaParser ( Parser ):
                         self.import_list()
                         self.state = 374
                         self.match(ModelicaParser.T__30)
-
+                        pass
                     else:
                         raise NoViableAltException(self)
 
@@ -2546,6 +2586,7 @@ class ModelicaParser ( Parser ):
             self.state = 393
             self.name()
             self.state = 395
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__16:
                 self.state = 394
@@ -2553,6 +2594,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 398
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__77:
                 self.state = 397
@@ -2613,6 +2655,7 @@ class ModelicaParser ( Parser ):
             self.state = 401
             self.name()
             self.state = 403
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__16:
                 self.state = 402
@@ -2681,6 +2724,7 @@ class ModelicaParser ( Parser ):
             self.state = 406
             self.type_specifier()
             self.state = 408
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__75:
                 self.state = 407
@@ -2732,6 +2776,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 413
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__32 or _la==ModelicaParser.T__33:
                 self.state = 412
@@ -2739,10 +2784,12 @@ class ModelicaParser ( Parser ):
                 if not(_la==ModelicaParser.T__32 or _la==ModelicaParser.T__33):
                     self._errHandler.recoverInline(self)
                 else:
+                    self._errHandler.reportMatch(self)
                     self.consume()
 
 
             self.state = 416
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__34) | (1 << ModelicaParser.T__35) | (1 << ModelicaParser.T__36))) != 0):
                 self.state = 415
@@ -2750,10 +2797,12 @@ class ModelicaParser ( Parser ):
                 if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__34) | (1 << ModelicaParser.T__35) | (1 << ModelicaParser.T__36))) != 0)):
                     self._errHandler.recoverInline(self)
                 else:
+                    self._errHandler.reportMatch(self)
                     self.consume()
 
 
             self.state = 419
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__37 or _la==ModelicaParser.T__38:
                 self.state = 418
@@ -2761,6 +2810,7 @@ class ModelicaParser ( Parser ):
                 if not(_la==ModelicaParser.T__37 or _la==ModelicaParser.T__38):
                     self._errHandler.recoverInline(self)
                 else:
+                    self._errHandler.reportMatch(self)
                     self.consume()
 
 
@@ -2928,6 +2978,7 @@ class ModelicaParser ( Parser ):
             self.state = 431
             self.declaration()
             self.state = 433
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__39:
                 self.state = 432
@@ -3039,6 +3090,7 @@ class ModelicaParser ( Parser ):
             self.state = 440
             self.match(ModelicaParser.IDENT)
             self.state = 442
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__75:
                 self.state = 441
@@ -3046,6 +3098,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 445
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__14) | (1 << ModelicaParser.T__16) | (1 << ModelicaParser.T__40))) != 0):
                 self.state = 444
@@ -3076,27 +3129,30 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Modification_assignmentContext(ModificationContext):
+    class Modification_classContext(ModificationContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ModificationContext)
-            super(ModelicaParser.Modification_assignmentContext, self).__init__(parser)
+            super(ModelicaParser.Modification_classContext, self).__init__(parser)
             self.copyFrom(ctx)
+
+        def class_modification(self):
+            return self.getTypedRuleContext(ModelicaParser.Class_modificationContext,0)
 
         def expression(self):
             return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterModification_assignment"):
-                listener.enterModification_assignment(self)
+            if hasattr(listener, "enterModification_class"):
+                listener.enterModification_class(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitModification_assignment"):
-                listener.exitModification_assignment(self)
+            if hasattr(listener, "exitModification_class"):
+                listener.exitModification_class(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitModification_assignment"):
-                return visitor.visitModification_assignment(self)
+            if hasattr(visitor, "visitModification_class"):
+                return visitor.visitModification_class(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -3126,30 +3182,27 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Modification_classContext(ModificationContext):
+    class Modification_assignmentContext(ModificationContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ModificationContext)
-            super(ModelicaParser.Modification_classContext, self).__init__(parser)
+            super(ModelicaParser.Modification_assignmentContext, self).__init__(parser)
             self.copyFrom(ctx)
-
-        def class_modification(self):
-            return self.getTypedRuleContext(ModelicaParser.Class_modificationContext,0)
 
         def expression(self):
             return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterModification_class"):
-                listener.enterModification_class(self)
+            if hasattr(listener, "enterModification_assignment"):
+                listener.enterModification_assignment(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitModification_class"):
-                listener.exitModification_class(self)
+            if hasattr(listener, "exitModification_assignment"):
+                listener.exitModification_assignment(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitModification_class"):
-                return visitor.visitModification_class(self)
+            if hasattr(visitor, "visitModification_assignment"):
+                return visitor.visitModification_assignment(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -3162,6 +3215,7 @@ class ModelicaParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.state = 456
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__16]:
                 localctx = ModelicaParser.Modification_classContext(self, localctx)
@@ -3169,6 +3223,7 @@ class ModelicaParser ( Parser ):
                 self.state = 447
                 self.class_modification()
                 self.state = 450
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__14:
                     self.state = 448
@@ -3177,7 +3232,7 @@ class ModelicaParser ( Parser ):
                     self.expression()
 
 
-
+                pass
             elif token in [ModelicaParser.T__14]:
                 localctx = ModelicaParser.Modification_assignmentContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
@@ -3185,7 +3240,7 @@ class ModelicaParser ( Parser ):
                 self.match(ModelicaParser.T__14)
                 self.state = 453
                 self.expression()
-
+                pass
             elif token in [ModelicaParser.T__40]:
                 localctx = ModelicaParser.Modification_assignment2Context(self, localctx)
                 self.enterOuterAlt(localctx, 3)
@@ -3193,7 +3248,7 @@ class ModelicaParser ( Parser ):
                 self.match(ModelicaParser.T__40)
                 self.state = 455
                 self.expression()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -3245,6 +3300,7 @@ class ModelicaParser ( Parser ):
             self.state = 458
             self.match(ModelicaParser.T__16)
             self.state = 460
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if ((((_la - 26)) & ~0x3f) == 0 and ((1 << (_la - 26)) & ((1 << (ModelicaParser.T__25 - 26)) | (1 << (ModelicaParser.T__27 - 26)) | (1 << (ModelicaParser.EACH - 26)) | (1 << (ModelicaParser.FINAL - 26)) | (1 << (ModelicaParser.REDECLARE - 26)) | (1 << (ModelicaParser.IDENT - 26)))) != 0):
                 self.state = 459
@@ -3328,7 +3384,6 @@ class ModelicaParser ( Parser ):
         def __init__(self, parser, parent=None, invokingState=-1):
             super(ModelicaParser.ArgumentContext, self).__init__(parent, invokingState)
             self.parser = parser
-            self.arg = None # Element_modification_or_replaceableContext
 
         def element_modification_or_replaceable(self):
             return self.getTypedRuleContext(ModelicaParser.Element_modification_or_replaceableContext,0)
@@ -3364,17 +3419,18 @@ class ModelicaParser ( Parser ):
         self.enterRule(localctx, 60, self.RULE_argument)
         try:
             self.state = 474
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__25, ModelicaParser.T__27, ModelicaParser.EACH, ModelicaParser.FINAL, ModelicaParser.IDENT]:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 472
-                localctx.arg = self.element_modification_or_replaceable()
-
+                self.element_modification_or_replaceable()
+                pass
             elif token in [ModelicaParser.REDECLARE]:
                 self.enterOuterAlt(localctx, 2)
                 self.state = 473
-                localctx.arg = self.element_redeclaration()
-
+                self.element_redeclaration()
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -3391,13 +3447,6 @@ class ModelicaParser ( Parser ):
         def __init__(self, parser, parent=None, invokingState=-1):
             super(ModelicaParser.Element_modification_or_replaceableContext, self).__init__(parent, invokingState)
             self.parser = parser
-            self.elem = None # Element_modificationContext
-
-        def EACH(self):
-            return self.getToken(ModelicaParser.EACH, 0)
-
-        def FINAL(self):
-            return self.getToken(ModelicaParser.FINAL, 0)
 
         def element_modification(self):
             return self.getTypedRuleContext(ModelicaParser.Element_modificationContext,0)
@@ -3406,6 +3455,12 @@ class ModelicaParser ( Parser ):
         def element_replaceable(self):
             return self.getTypedRuleContext(ModelicaParser.Element_replaceableContext,0)
 
+
+        def EACH(self):
+            return self.getToken(ModelicaParser.EACH, 0)
+
+        def FINAL(self):
+            return self.getToken(ModelicaParser.FINAL, 0)
 
         def getRuleIndex(self):
             return ModelicaParser.RULE_element_modification_or_replaceable
@@ -3435,6 +3490,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 477
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.EACH:
                 self.state = 476
@@ -3442,6 +3498,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 480
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.FINAL:
                 self.state = 479
@@ -3449,15 +3506,16 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 484
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__27, ModelicaParser.IDENT]:
                 self.state = 482
-                localctx.elem = self.element_modification()
-
+                self.element_modification()
+                pass
             elif token in [ModelicaParser.T__25]:
                 self.state = 483
-                localctx.elem = self.element_replaceable()
-
+                self.element_replaceable()
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -3517,6 +3575,7 @@ class ModelicaParser ( Parser ):
             self.state = 486
             self.name()
             self.state = 488
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__14) | (1 << ModelicaParser.T__16) | (1 << ModelicaParser.T__40))) != 0):
                 self.state = 487
@@ -3590,6 +3649,7 @@ class ModelicaParser ( Parser ):
             self.state = 492
             self.match(ModelicaParser.REDECLARE)
             self.state = 494
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.EACH:
                 self.state = 493
@@ -3597,6 +3657,7 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 497
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.FINAL:
                 self.state = 496
@@ -3604,26 +3665,28 @@ class ModelicaParser ( Parser ):
 
 
             self.state = 504
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__1, ModelicaParser.T__2, ModelicaParser.T__3, ModelicaParser.T__4, ModelicaParser.T__5, ModelicaParser.T__6, ModelicaParser.T__7, ModelicaParser.T__8, ModelicaParser.T__9, ModelicaParser.T__10, ModelicaParser.T__11, ModelicaParser.T__12, ModelicaParser.T__27, ModelicaParser.T__32, ModelicaParser.T__33, ModelicaParser.T__34, ModelicaParser.T__35, ModelicaParser.T__36, ModelicaParser.T__37, ModelicaParser.T__38, ModelicaParser.PARTIAL, ModelicaParser.IDENT]:
                 self.state = 501
+                self._errHandler.sync(self)
                 token = self._input.LA(1)
                 if token in [ModelicaParser.T__1, ModelicaParser.T__2, ModelicaParser.T__3, ModelicaParser.T__4, ModelicaParser.T__5, ModelicaParser.T__6, ModelicaParser.T__7, ModelicaParser.T__8, ModelicaParser.T__9, ModelicaParser.T__10, ModelicaParser.T__11, ModelicaParser.T__12, ModelicaParser.PARTIAL]:
                     self.state = 499
                     self.short_class_definition()
-
+                    pass
                 elif token in [ModelicaParser.T__27, ModelicaParser.T__32, ModelicaParser.T__33, ModelicaParser.T__34, ModelicaParser.T__35, ModelicaParser.T__36, ModelicaParser.T__37, ModelicaParser.T__38, ModelicaParser.IDENT]:
                     self.state = 500
                     self.component_clause1()
-
+                    pass
                 else:
                     raise NoViableAltException(self)
 
-
+                pass
             elif token in [ModelicaParser.T__25]:
                 self.state = 503
                 self.element_replaceable()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -3683,19 +3746,21 @@ class ModelicaParser ( Parser ):
             self.state = 506
             self.match(ModelicaParser.T__25)
             self.state = 509
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__1, ModelicaParser.T__2, ModelicaParser.T__3, ModelicaParser.T__4, ModelicaParser.T__5, ModelicaParser.T__6, ModelicaParser.T__7, ModelicaParser.T__8, ModelicaParser.T__9, ModelicaParser.T__10, ModelicaParser.T__11, ModelicaParser.T__12, ModelicaParser.PARTIAL]:
                 self.state = 507
                 self.short_class_definition()
-
+                pass
             elif token in [ModelicaParser.T__27, ModelicaParser.T__32, ModelicaParser.T__33, ModelicaParser.T__34, ModelicaParser.T__35, ModelicaParser.T__36, ModelicaParser.T__37, ModelicaParser.T__38, ModelicaParser.IDENT]:
                 self.state = 508
                 self.component_clause1()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
             self.state = 512
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__31:
                 self.state = 511
@@ -3891,6 +3956,7 @@ class ModelicaParser ( Parser ):
             self.state = 523
             self.match(ModelicaParser.T__14)
             self.state = 544
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__27, ModelicaParser.T__32, ModelicaParser.T__33, ModelicaParser.T__34, ModelicaParser.T__35, ModelicaParser.T__36, ModelicaParser.T__37, ModelicaParser.T__38, ModelicaParser.IDENT]:
                 self.state = 524
@@ -3898,6 +3964,7 @@ class ModelicaParser ( Parser ):
                 self.state = 525
                 self.name()
                 self.state = 527
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__75:
                     self.state = 526
@@ -3905,6 +3972,7 @@ class ModelicaParser ( Parser ):
 
 
                 self.state = 530
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__16:
                     self.state = 529
@@ -3913,27 +3981,29 @@ class ModelicaParser ( Parser ):
 
                 self.state = 532
                 self.comment()
-
+                pass
             elif token in [ModelicaParser.T__15]:
                 self.state = 534
                 self.match(ModelicaParser.T__15)
                 self.state = 535
                 self.match(ModelicaParser.T__16)
                 self.state = 540
+                self._errHandler.sync(self)
                 token = self._input.LA(1)
                 if token in [ModelicaParser.T__18, ModelicaParser.IDENT]:
                     self.state = 537
+                    self._errHandler.sync(self)
                     _la = self._input.LA(1)
                     if _la==ModelicaParser.IDENT:
                         self.state = 536
                         self.enum_list()
 
 
-
+                    pass
                 elif token in [ModelicaParser.T__17]:
                     self.state = 539
                     self.match(ModelicaParser.T__17)
-
+                    pass
                 else:
                     raise NoViableAltException(self)
 
@@ -3941,7 +4011,7 @@ class ModelicaParser ( Parser ):
                 self.match(ModelicaParser.T__18)
                 self.state = 543
                 self.comment()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -3997,6 +4067,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 547
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.INITIAL:
                 self.state = 546
@@ -4070,6 +4141,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 559
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.INITIAL:
                 self.state = 558
@@ -4112,34 +4184,6 @@ class ModelicaParser ( Parser ):
         def copyFrom(self, ctx):
             super(ModelicaParser.Equation_optionsContext, self).copyFrom(ctx)
 
-
-
-    class Equation_functionContext(Equation_optionsContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
-            super(ModelicaParser.Equation_functionContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
-
-        def function_call_args(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterEquation_function"):
-                listener.enterEquation_function(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitEquation_function"):
-                listener.exitEquation_function(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitEquation_function"):
-                return visitor.visitEquation_function(self)
-            else:
-                return visitor.visitChildren(self)
 
 
     class Equation_whenContext(Equation_optionsContext):
@@ -4192,6 +4236,59 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
+    class Equation_forContext(Equation_optionsContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
+            super(ModelicaParser.Equation_forContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def for_equation(self):
+            return self.getTypedRuleContext(ModelicaParser.For_equationContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterEquation_for"):
+                listener.enterEquation_for(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitEquation_for"):
+                listener.exitEquation_for(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_for"):
+                return visitor.visitEquation_for(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Equation_functionContext(Equation_optionsContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
+            super(ModelicaParser.Equation_functionContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def name(self):
+            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+
+        def function_call_args(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterEquation_function"):
+                listener.enterEquation_function(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitEquation_function"):
+                listener.exitEquation_function(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitEquation_function"):
+                return visitor.visitEquation_function(self)
+            else:
+                return visitor.visitChildren(self)
+
+
     class Equation_simpleContext(Equation_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
@@ -4216,31 +4313,6 @@ class ModelicaParser ( Parser ):
         def accept(self, visitor):
             if hasattr(visitor, "visitEquation_simple"):
                 return visitor.visitEquation_simple(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-    class Equation_forContext(Equation_optionsContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Equation_optionsContext)
-            super(ModelicaParser.Equation_forContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def for_equation(self):
-            return self.getTypedRuleContext(ModelicaParser.For_equationContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterEquation_for"):
-                listener.enterEquation_for(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitEquation_for"):
-                listener.exitEquation_for(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitEquation_for"):
-                return visitor.visitEquation_for(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -4277,6 +4349,7 @@ class ModelicaParser ( Parser ):
         self.enterRule(localctx, 80, self.RULE_equation_options)
         try:
             self.state = 581
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,80,self._ctx)
             if la_ == 1:
                 localctx = ModelicaParser.Equation_simpleContext(self, localctx)
@@ -4403,80 +4476,49 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Statement_forContext(Statement_optionsContext):
+    class Statement_breakContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_forContext, self).__init__(parser)
+            super(ModelicaParser.Statement_breakContext, self).__init__(parser)
             self.copyFrom(ctx)
-
-        def for_statement(self):
-            return self.getTypedRuleContext(ModelicaParser.For_statementContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_for"):
-                listener.enterStatement_for(self)
+            if hasattr(listener, "enterStatement_break"):
+                listener.enterStatement_break(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_for"):
-                listener.exitStatement_for(self)
+            if hasattr(listener, "exitStatement_break"):
+                listener.exitStatement_break(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitStatement_for"):
-                return visitor.visitStatement_for(self)
+            if hasattr(visitor, "visitStatement_break"):
+                return visitor.visitStatement_break(self)
             else:
                 return visitor.visitChildren(self)
 
 
-    class Statement_returnContext(Statement_optionsContext):
+    class Statement_whileContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_returnContext, self).__init__(parser)
+            super(ModelicaParser.Statement_whileContext, self).__init__(parser)
             self.copyFrom(ctx)
+
+        def while_statement(self):
+            return self.getTypedRuleContext(ModelicaParser.While_statementContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_return"):
-                listener.enterStatement_return(self)
+            if hasattr(listener, "enterStatement_while"):
+                listener.enterStatement_while(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_return"):
-                listener.exitStatement_return(self)
+            if hasattr(listener, "exitStatement_while"):
+                listener.exitStatement_while(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitStatement_return"):
-                return visitor.visitStatement_return(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-    class Statement_component_referenceContext(Statement_optionsContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_component_referenceContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def component_reference(self):
-            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
-
-        def expression(self):
-            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
-
-        def function_call_args(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_component_reference"):
-                listener.enterStatement_component_reference(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_component_reference"):
-                listener.exitStatement_component_reference(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitStatement_component_reference"):
-                return visitor.visitStatement_component_reference(self)
+            if hasattr(visitor, "visitStatement_while"):
+                return visitor.visitStatement_while(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -4512,27 +4554,49 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Statement_ifContext(Statement_optionsContext):
+    class Statement_returnContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_ifContext, self).__init__(parser)
+            super(ModelicaParser.Statement_returnContext, self).__init__(parser)
             self.copyFrom(ctx)
-
-        def if_statement(self):
-            return self.getTypedRuleContext(ModelicaParser.If_statementContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_if"):
-                listener.enterStatement_if(self)
+            if hasattr(listener, "enterStatement_return"):
+                listener.enterStatement_return(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_if"):
-                listener.exitStatement_if(self)
+            if hasattr(listener, "exitStatement_return"):
+                listener.exitStatement_return(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitStatement_if"):
-                return visitor.visitStatement_if(self)
+            if hasattr(visitor, "visitStatement_return"):
+                return visitor.visitStatement_return(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Statement_forContext(Statement_optionsContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
+            super(ModelicaParser.Statement_forContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def for_statement(self):
+            return self.getTypedRuleContext(ModelicaParser.For_statementContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterStatement_for"):
+                listener.enterStatement_for(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitStatement_for"):
+                listener.exitStatement_for(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitStatement_for"):
+                return visitor.visitStatement_for(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -4562,49 +4626,58 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Statement_whileContext(Statement_optionsContext):
+    class Statement_ifContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_whileContext, self).__init__(parser)
+            super(ModelicaParser.Statement_ifContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def while_statement(self):
-            return self.getTypedRuleContext(ModelicaParser.While_statementContext,0)
+        def if_statement(self):
+            return self.getTypedRuleContext(ModelicaParser.If_statementContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_while"):
-                listener.enterStatement_while(self)
+            if hasattr(listener, "enterStatement_if"):
+                listener.enterStatement_if(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_while"):
-                listener.exitStatement_while(self)
+            if hasattr(listener, "exitStatement_if"):
+                listener.exitStatement_if(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitStatement_while"):
-                return visitor.visitStatement_while(self)
+            if hasattr(visitor, "visitStatement_if"):
+                return visitor.visitStatement_if(self)
             else:
                 return visitor.visitChildren(self)
 
 
-    class Statement_breakContext(Statement_optionsContext):
+    class Statement_component_referenceContext(Statement_optionsContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Statement_optionsContext)
-            super(ModelicaParser.Statement_breakContext, self).__init__(parser)
+            super(ModelicaParser.Statement_component_referenceContext, self).__init__(parser)
             self.copyFrom(ctx)
+
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
+
+        def expression(self):
+            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
+
+        def function_call_args(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterStatement_break"):
-                listener.enterStatement_break(self)
+            if hasattr(listener, "enterStatement_component_reference"):
+                listener.enterStatement_component_reference(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitStatement_break"):
-                listener.exitStatement_break(self)
+            if hasattr(listener, "exitStatement_component_reference"):
+                listener.exitStatement_component_reference(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitStatement_break"):
-                return visitor.visitStatement_break(self)
+            if hasattr(visitor, "visitStatement_component_reference"):
+                return visitor.visitStatement_component_reference(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -4616,6 +4689,7 @@ class ModelicaParser ( Parser ):
         self.enterRule(localctx, 84, self.RULE_statement_options)
         try:
             self.state = 605
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__27, ModelicaParser.IDENT]:
                 localctx = ModelicaParser.Statement_component_referenceContext(self, localctx)
@@ -4623,21 +4697,22 @@ class ModelicaParser ( Parser ):
                 self.state = 586
                 self.component_reference()
                 self.state = 590
+                self._errHandler.sync(self)
                 token = self._input.LA(1)
                 if token in [ModelicaParser.T__40]:
                     self.state = 587
                     self.match(ModelicaParser.T__40)
                     self.state = 588
                     self.expression()
-
+                    pass
                 elif token in [ModelicaParser.T__16]:
                     self.state = 589
                     self.function_call_args()
-
+                    pass
                 else:
                     raise NoViableAltException(self)
 
-
+                pass
             elif token in [ModelicaParser.T__16]:
                 localctx = ModelicaParser.Statement_component_functionContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
@@ -4653,43 +4728,43 @@ class ModelicaParser ( Parser ):
                 self.component_reference()
                 self.state = 597
                 self.function_call_args()
-
+                pass
             elif token in [ModelicaParser.T__43]:
                 localctx = ModelicaParser.Statement_breakContext(self, localctx)
                 self.enterOuterAlt(localctx, 3)
                 self.state = 599
                 self.match(ModelicaParser.T__43)
-
+                pass
             elif token in [ModelicaParser.T__44]:
                 localctx = ModelicaParser.Statement_returnContext(self, localctx)
                 self.enterOuterAlt(localctx, 4)
                 self.state = 600
                 self.match(ModelicaParser.T__44)
-
+                pass
             elif token in [ModelicaParser.T__39]:
                 localctx = ModelicaParser.Statement_ifContext(self, localctx)
                 self.enterOuterAlt(localctx, 5)
                 self.state = 601
                 self.if_statement()
-
+                pass
             elif token in [ModelicaParser.T__48]:
                 localctx = ModelicaParser.Statement_forContext(self, localctx)
                 self.enterOuterAlt(localctx, 6)
                 self.state = 602
                 self.for_statement()
-
+                pass
             elif token in [ModelicaParser.T__51]:
                 localctx = ModelicaParser.Statement_whileContext(self, localctx)
                 self.enterOuterAlt(localctx, 7)
                 self.state = 603
                 self.while_statement()
-
+                pass
             elif token in [ModelicaParser.T__52]:
                 localctx = ModelicaParser.Statement_whenContext(self, localctx)
                 self.enterOuterAlt(localctx, 8)
                 self.state = 604
                 self.when_statement()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -4847,6 +4922,7 @@ class ModelicaParser ( Parser ):
                 _la = self._input.LA(1)
 
             self.state = 646
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__47:
                 self.state = 637
@@ -4970,6 +5046,7 @@ class ModelicaParser ( Parser ):
                 _la = self._input.LA(1)
 
             self.state = 687
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__47:
                 self.state = 678
@@ -5253,6 +5330,7 @@ class ModelicaParser ( Parser ):
             self.state = 728
             self.match(ModelicaParser.IDENT)
             self.state = 731
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__50:
                 self.state = 729
@@ -5626,31 +5704,6 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Expression_simpleContext(ExpressionContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExpressionContext)
-            super(ModelicaParser.Expression_simpleContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def simple_expression(self):
-            return self.getTypedRuleContext(ModelicaParser.Simple_expressionContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpression_simple"):
-                listener.enterExpression_simple(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpression_simple"):
-                listener.exitExpression_simple(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitExpression_simple"):
-                return visitor.visitExpression_simple(self)
-            else:
-                return visitor.visitChildren(self)
-
-
     class Expression_ifContext(ExpressionContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ExpressionContext)
@@ -5679,6 +5732,31 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
+    class Expression_simpleContext(ExpressionContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExpressionContext)
+            super(ModelicaParser.Expression_simpleContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def simple_expression(self):
+            return self.getTypedRuleContext(ModelicaParser.Simple_expressionContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpression_simple"):
+                listener.enterExpression_simple(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpression_simple"):
+                listener.exitExpression_simple(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpression_simple"):
+                return visitor.visitExpression_simple(self)
+            else:
+                return visitor.visitChildren(self)
+
+
 
     def expression(self):
 
@@ -5687,13 +5765,14 @@ class ModelicaParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.state = 832
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__13, ModelicaParser.T__16, ModelicaParser.T__19, ModelicaParser.T__27, ModelicaParser.T__29, ModelicaParser.T__55, ModelicaParser.T__70, ModelicaParser.T__73, ModelicaParser.T__74, ModelicaParser.T__75, ModelicaParser.INITIAL, ModelicaParser.IDENT, ModelicaParser.STRING, ModelicaParser.UNSIGNED_NUMBER]:
                 localctx = ModelicaParser.Expression_simpleContext(self, localctx)
                 self.enterOuterAlt(localctx, 1)
                 self.state = 814
                 self.simple_expression()
-
+                pass
             elif token in [ModelicaParser.T__39]:
                 localctx = ModelicaParser.Expression_ifContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
@@ -5725,7 +5804,7 @@ class ModelicaParser ( Parser ):
                 self.match(ModelicaParser.T__47)
                 self.state = 830
                 self.expression()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -5780,6 +5859,7 @@ class ModelicaParser ( Parser ):
             self.state = 834
             self.expr(0)
             self.state = 841
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__17:
                 self.state = 835
@@ -5787,6 +5867,7 @@ class ModelicaParser ( Parser ):
                 self.state = 836
                 self.expr(0)
                 self.state = 839
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__17:
                     self.state = 837
@@ -5818,6 +5899,90 @@ class ModelicaParser ( Parser ):
      
         def copyFrom(self, ctx):
             super(ModelicaParser.ExprContext, self).copyFrom(ctx)
+
+
+    class Expr_negContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_negContext, self).__init__(parser)
+            self.op = None # Token
+            self.copyFrom(ctx)
+
+        def expr(self):
+            return self.getTypedRuleContext(ModelicaParser.ExprContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_neg"):
+                listener.enterExpr_neg(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_neg"):
+                listener.exitExpr_neg(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_neg"):
+                return visitor.visitExpr_neg(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_addContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_addContext, self).__init__(parser)
+            self.op = None # Token
+            self.copyFrom(ctx)
+
+        def expr(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
+            else:
+                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_add"):
+                listener.enterExpr_add(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_add"):
+                listener.exitExpr_add(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_add"):
+                return visitor.visitExpr_add(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Expr_expContext(ExprContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
+            super(ModelicaParser.Expr_expContext, self).__init__(parser)
+            self.op = None # Token
+            self.copyFrom(ctx)
+
+        def primary(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(ModelicaParser.PrimaryContext)
+            else:
+                return self.getTypedRuleContext(ModelicaParser.PrimaryContext,i)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterExpr_exp"):
+                listener.enterExpr_exp(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitExpr_exp"):
+                listener.exitExpr_exp(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitExpr_exp"):
+                return visitor.visitExpr_exp(self)
+            else:
+                return visitor.visitChildren(self)
 
 
     class Expr_orContext(ExprContext):
@@ -5930,32 +6095,6 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Expr_negContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_negContext, self).__init__(parser)
-            self.op = None # Token
-            self.copyFrom(ctx)
-
-        def expr(self):
-            return self.getTypedRuleContext(ModelicaParser.ExprContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_neg"):
-                listener.enterExpr_neg(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_neg"):
-                listener.exitExpr_neg(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitExpr_neg"):
-                return visitor.visitExpr_neg(self)
-            else:
-                return visitor.visitChildren(self)
-
-
     class Expr_notContext(ExprContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
@@ -6010,64 +6149,6 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Expr_addContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_addContext, self).__init__(parser)
-            self.op = None # Token
-            self.copyFrom(ctx)
-
-        def expr(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(ModelicaParser.ExprContext)
-            else:
-                return self.getTypedRuleContext(ModelicaParser.ExprContext,i)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_add"):
-                listener.enterExpr_add(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_add"):
-                listener.exitExpr_add(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitExpr_add"):
-                return visitor.visitExpr_add(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-    class Expr_expContext(ExprContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.ExprContext)
-            super(ModelicaParser.Expr_expContext, self).__init__(parser)
-            self.op = None # Token
-            self.copyFrom(ctx)
-
-        def primary(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(ModelicaParser.PrimaryContext)
-            else:
-                return self.getTypedRuleContext(ModelicaParser.PrimaryContext,i)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpr_exp"):
-                listener.enterExpr_exp(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpr_exp"):
-                listener.exitExpr_exp(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitExpr_exp"):
-                return visitor.visitExpr_exp(self)
-            else:
-                return visitor.visitChildren(self)
-
-
 
     def expr(self, _p=0):
         _parentctx = self._ctx
@@ -6080,6 +6161,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 853
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,108,self._ctx)
             if la_ == 1:
                 localctx = ModelicaParser.Expr_negContext(self, localctx)
@@ -6093,30 +6175,31 @@ class ModelicaParser ( Parser ):
                 pass
 
             elif la_ == 2:
-                localctx = ModelicaParser.Expr_notContext(self, localctx)
-                self._ctx = localctx
-                _prevctx = localctx
-                self.state = 846
-                self.match(ModelicaParser.T__70)
-                self.state = 847
-                self.expr(4)
-                pass
-
-            elif la_ == 3:
                 localctx = ModelicaParser.Expr_expContext(self, localctx)
                 self._ctx = localctx
                 _prevctx = localctx
-                self.state = 848
+                self.state = 846
                 self.primary()
-                self.state = 849
+                self.state = 847
                 localctx.op = self._input.LT(1)
                 _la = self._input.LA(1)
                 if not(_la==ModelicaParser.T__56 or _la==ModelicaParser.T__57):
                     localctx.op = self._errHandler.recoverInline(self)
                 else:
+                    self._errHandler.reportMatch(self)
                     self.consume()
-                self.state = 850
+                self.state = 848
                 self.primary()
+                pass
+
+            elif la_ == 3:
+                localctx = ModelicaParser.Expr_notContext(self, localctx)
+                self._ctx = localctx
+                _prevctx = localctx
+                self.state = 850
+                self.match(ModelicaParser.T__70)
+                self.state = 851
+                self.expr(4)
                 pass
 
             elif la_ == 4:
@@ -6138,6 +6221,7 @@ class ModelicaParser ( Parser ):
                         self.triggerExitRuleEvent()
                     _prevctx = localctx
                     self.state = 870
+                    self._errHandler.sync(self)
                     la_ = self._interp.adaptivePredict(self._input,109,self._ctx)
                     if la_ == 1:
                         localctx = ModelicaParser.Expr_mulContext(self, ModelicaParser.ExprContext(self, _parentctx, _parentState))
@@ -6152,6 +6236,7 @@ class ModelicaParser ( Parser ):
                         if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__28) | (1 << ModelicaParser.T__58) | (1 << ModelicaParser.T__59) | (1 << ModelicaParser.T__60))) != 0)):
                             localctx.op = self._errHandler.recoverInline(self)
                         else:
+                            self._errHandler.reportMatch(self)
                             self.consume()
                         self.state = 857
                         self.expr(8)
@@ -6170,6 +6255,7 @@ class ModelicaParser ( Parser ):
                         if not(((((_la - 56)) & ~0x3f) == 0 and ((1 << (_la - 56)) & ((1 << (ModelicaParser.T__55 - 56)) | (1 << (ModelicaParser.T__61 - 56)) | (1 << (ModelicaParser.T__62 - 56)) | (1 << (ModelicaParser.T__63 - 56)))) != 0)):
                             localctx.op = self._errHandler.recoverInline(self)
                         else:
+                            self._errHandler.reportMatch(self)
                             self.consume()
                         self.state = 860
                         self.expr(7)
@@ -6188,6 +6274,7 @@ class ModelicaParser ( Parser ):
                         if not(((((_la - 65)) & ~0x3f) == 0 and ((1 << (_la - 65)) & ((1 << (ModelicaParser.T__64 - 65)) | (1 << (ModelicaParser.T__65 - 65)) | (1 << (ModelicaParser.T__66 - 65)) | (1 << (ModelicaParser.T__67 - 65)) | (1 << (ModelicaParser.T__68 - 65)) | (1 << (ModelicaParser.T__69 - 65)))) != 0)):
                             localctx.op = self._errHandler.recoverInline(self)
                         else:
+                            self._errHandler.reportMatch(self)
                             self.consume()
                         self.state = 863
                         self.expr(6)
@@ -6248,52 +6335,48 @@ class ModelicaParser ( Parser ):
 
 
 
-    class Primary_initialContext(PrimaryContext):
+    class Primary_stringContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_initialContext, self).__init__(parser)
+            super(ModelicaParser.Primary_stringContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def function_call_args(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
-
+        def STRING(self):
+            return self.getToken(ModelicaParser.STRING, 0)
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_initial"):
-                listener.enterPrimary_initial(self)
+            if hasattr(listener, "enterPrimary_string"):
+                listener.enterPrimary_string(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_initial"):
-                listener.exitPrimary_initial(self)
+            if hasattr(listener, "exitPrimary_string"):
+                listener.exitPrimary_string(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_initial"):
-                return visitor.visitPrimary_initial(self)
+            if hasattr(visitor, "visitPrimary_string"):
+                return visitor.visitPrimary_string(self)
             else:
                 return visitor.visitChildren(self)
 
 
-    class Primary_derivativeContext(PrimaryContext):
+    class Primary_endContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_derivativeContext, self).__init__(parser)
+            super(ModelicaParser.Primary_endContext, self).__init__(parser)
             self.copyFrom(ctx)
-
-        def function_call_args(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_derivative"):
-                listener.enterPrimary_derivative(self)
+            if hasattr(listener, "enterPrimary_end"):
+                listener.enterPrimary_end(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_derivative"):
-                listener.exitPrimary_derivative(self)
+            if hasattr(listener, "exitPrimary_end"):
+                listener.exitPrimary_end(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_derivative"):
-                return visitor.visitPrimary_derivative(self)
+            if hasattr(visitor, "visitPrimary_end"):
+                return visitor.visitPrimary_end(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -6323,30 +6406,123 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Primary_functionContext(PrimaryContext):
+    class Primary_unsigned_numberContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_functionContext, self).__init__(parser)
+            super(ModelicaParser.Primary_unsigned_numberContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+        def UNSIGNED_NUMBER(self):
+            return self.getToken(ModelicaParser.UNSIGNED_NUMBER, 0)
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_unsigned_number"):
+                listener.enterPrimary_unsigned_number(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_unsigned_number"):
+                listener.exitPrimary_unsigned_number(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_unsigned_number"):
+                return visitor.visitPrimary_unsigned_number(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_function_argumentsContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_function_argumentsContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def function_arguments(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_argumentsContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_function_arguments"):
+                listener.enterPrimary_function_arguments(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_function_arguments"):
+                listener.exitPrimary_function_arguments(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_function_arguments"):
+                return visitor.visitPrimary_function_arguments(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_falseContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_falseContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_false"):
+                listener.enterPrimary_false(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_false"):
+                listener.exitPrimary_false(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_false"):
+                return visitor.visitPrimary_false(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_derivativeContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_derivativeContext, self).__init__(parser)
+            self.copyFrom(ctx)
 
         def function_call_args(self):
             return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_function"):
-                listener.enterPrimary_function(self)
+            if hasattr(listener, "enterPrimary_derivative"):
+                listener.enterPrimary_derivative(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_function"):
-                listener.exitPrimary_function(self)
+            if hasattr(listener, "exitPrimary_derivative"):
+                listener.exitPrimary_derivative(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_function"):
-                return visitor.visitPrimary_function(self)
+            if hasattr(visitor, "visitPrimary_derivative"):
+                return visitor.visitPrimary_derivative(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class Primary_component_referenceContext(PrimaryContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
+            super(ModelicaParser.Primary_component_referenceContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterPrimary_component_reference"):
+                listener.enterPrimary_component_reference(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitPrimary_component_reference"):
+                listener.exitPrimary_component_reference(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitPrimary_component_reference"):
+                return visitor.visitPrimary_component_reference(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -6379,75 +6555,6 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Primary_falseContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_falseContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_false"):
-                listener.enterPrimary_false(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_false"):
-                listener.exitPrimary_false(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_false"):
-                return visitor.visitPrimary_false(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-    class Primary_function_argumentsContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_function_argumentsContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def function_arguments(self):
-            return self.getTypedRuleContext(ModelicaParser.Function_argumentsContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_function_arguments"):
-                listener.enterPrimary_function_arguments(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_function_arguments"):
-                listener.exitPrimary_function_arguments(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_function_arguments"):
-                return visitor.visitPrimary_function_arguments(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-    class Primary_endContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_endContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_end"):
-                listener.enterPrimary_end(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_end"):
-                listener.exitPrimary_end(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_end"):
-                return visitor.visitPrimary_end(self)
-            else:
-                return visitor.visitChildren(self)
-
-
     class Primary_trueContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
@@ -6470,75 +6577,55 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Primary_component_referenceContext(PrimaryContext):
+    class Primary_functionContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_component_referenceContext, self).__init__(parser)
+            super(ModelicaParser.Primary_functionContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def component_reference(self):
-            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
+        def name(self):
+            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+
+        def function_call_args(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
 
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_component_reference"):
-                listener.enterPrimary_component_reference(self)
+            if hasattr(listener, "enterPrimary_function"):
+                listener.enterPrimary_function(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_component_reference"):
-                listener.exitPrimary_component_reference(self)
+            if hasattr(listener, "exitPrimary_function"):
+                listener.exitPrimary_function(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_component_reference"):
-                return visitor.visitPrimary_component_reference(self)
+            if hasattr(visitor, "visitPrimary_function"):
+                return visitor.visitPrimary_function(self)
             else:
                 return visitor.visitChildren(self)
 
 
-    class Primary_stringContext(PrimaryContext):
+    class Primary_initialContext(PrimaryContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_stringContext, self).__init__(parser)
+            super(ModelicaParser.Primary_initialContext, self).__init__(parser)
             self.copyFrom(ctx)
 
-        def STRING(self):
-            return self.getToken(ModelicaParser.STRING, 0)
+        def function_call_args(self):
+            return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
+
 
         def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_string"):
-                listener.enterPrimary_string(self)
+            if hasattr(listener, "enterPrimary_initial"):
+                listener.enterPrimary_initial(self)
 
         def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_string"):
-                listener.exitPrimary_string(self)
+            if hasattr(listener, "exitPrimary_initial"):
+                listener.exitPrimary_initial(self)
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_string"):
-                return visitor.visitPrimary_string(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-    class Primary_unsigned_numberContext(PrimaryContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.PrimaryContext)
-            super(ModelicaParser.Primary_unsigned_numberContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def UNSIGNED_NUMBER(self):
-            return self.getToken(ModelicaParser.UNSIGNED_NUMBER, 0)
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterPrimary_unsigned_number"):
-                listener.enterPrimary_unsigned_number(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitPrimary_unsigned_number"):
-                listener.exitPrimary_unsigned_number(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitPrimary_unsigned_number"):
-                return visitor.visitPrimary_unsigned_number(self)
+            if hasattr(visitor, "visitPrimary_initial"):
+                return visitor.visitPrimary_initial(self)
             else:
                 return visitor.visitChildren(self)
 
@@ -6551,6 +6638,7 @@ class ModelicaParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.state = 911
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,112,self._ctx)
             if la_ == 1:
                 localctx = ModelicaParser.Primary_unsigned_numberContext(self, localctx)
@@ -6726,6 +6814,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 914
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__27:
                 self.state = 913
@@ -6802,6 +6891,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 925
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__27:
                 self.state = 924
@@ -6811,6 +6901,7 @@ class ModelicaParser ( Parser ):
             self.state = 927
             self.match(ModelicaParser.IDENT)
             self.state = 929
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,116,self._ctx)
             if la_ == 1:
                 self.state = 928
@@ -6827,6 +6918,7 @@ class ModelicaParser ( Parser ):
                     self.state = 932
                     self.match(ModelicaParser.IDENT)
                     self.state = 934
+                    self._errHandler.sync(self)
                     la_ = self._interp.adaptivePredict(self._input,117,self._ctx)
                     if la_ == 1:
                         self.state = 933
@@ -6885,6 +6977,7 @@ class ModelicaParser ( Parser ):
             self.state = 941
             self.match(ModelicaParser.T__16)
             self.state = 943
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__12) | (1 << ModelicaParser.T__13) | (1 << ModelicaParser.T__16) | (1 << ModelicaParser.T__19) | (1 << ModelicaParser.T__27) | (1 << ModelicaParser.T__29) | (1 << ModelicaParser.T__39) | (1 << ModelicaParser.T__55))) != 0) or ((((_la - 71)) & ~0x3f) == 0 and ((1 << (_la - 71)) & ((1 << (ModelicaParser.T__70 - 71)) | (1 << (ModelicaParser.T__73 - 71)) | (1 << (ModelicaParser.T__74 - 71)) | (1 << (ModelicaParser.T__75 - 71)) | (1 << (ModelicaParser.INITIAL - 71)) | (1 << (ModelicaParser.IDENT - 71)) | (1 << (ModelicaParser.STRING - 71)) | (1 << (ModelicaParser.UNSIGNED_NUMBER - 71)))) != 0):
                 self.state = 942
@@ -6952,6 +7045,7 @@ class ModelicaParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.state = 958
+            self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,122,self._ctx)
             if la_ == 1:
                 self.enterOuterAlt(localctx, 1)
@@ -6962,19 +7056,20 @@ class ModelicaParser ( Parser ):
                 _la = self._input.LA(1)
                 while _la==ModelicaParser.T__20 or _la==ModelicaParser.T__48:
                     self.state = 952
+                    self._errHandler.sync(self)
                     token = self._input.LA(1)
                     if token in [ModelicaParser.T__20]:
                         self.state = 948
                         self.match(ModelicaParser.T__20)
                         self.state = 949
                         self.function_argument()
-
+                        pass
                     elif token in [ModelicaParser.T__48]:
                         self.state = 950
                         self.match(ModelicaParser.T__48)
                         self.state = 951
                         self.for_indices()
-
+                        pass
                     else:
                         raise NoViableAltException(self)
 
@@ -7130,6 +7225,31 @@ class ModelicaParser ( Parser ):
 
 
 
+    class Argument_expressionContext(Function_argumentContext):
+
+        def __init__(self, parser, ctx): # actually a ModelicaParser.Function_argumentContext)
+            super(ModelicaParser.Argument_expressionContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def expression(self):
+            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
+
+
+        def enterRule(self, listener):
+            if hasattr(listener, "enterArgument_expression"):
+                listener.enterArgument_expression(self)
+
+        def exitRule(self, listener):
+            if hasattr(listener, "exitArgument_expression"):
+                listener.exitArgument_expression(self)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitArgument_expression"):
+                return visitor.visitArgument_expression(self)
+            else:
+                return visitor.visitChildren(self)
+
+
     class Argument_functionContext(Function_argumentContext):
 
         def __init__(self, parser, ctx): # actually a ModelicaParser.Function_argumentContext)
@@ -7158,31 +7278,6 @@ class ModelicaParser ( Parser ):
                 return visitor.visitChildren(self)
 
 
-    class Argument_expressionContext(Function_argumentContext):
-
-        def __init__(self, parser, ctx): # actually a ModelicaParser.Function_argumentContext)
-            super(ModelicaParser.Argument_expressionContext, self).__init__(parser)
-            self.copyFrom(ctx)
-
-        def expression(self):
-            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
-
-
-        def enterRule(self, listener):
-            if hasattr(listener, "enterArgument_expression"):
-                listener.enterArgument_expression(self)
-
-        def exitRule(self, listener):
-            if hasattr(listener, "exitArgument_expression"):
-                listener.exitArgument_expression(self)
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitArgument_expression"):
-                return visitor.visitArgument_expression(self)
-            else:
-                return visitor.visitChildren(self)
-
-
 
     def function_argument(self):
 
@@ -7191,6 +7286,7 @@ class ModelicaParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.state = 981
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__12]:
                 localctx = ModelicaParser.Argument_functionContext(self, localctx)
@@ -7202,6 +7298,7 @@ class ModelicaParser ( Parser ):
                 self.state = 974
                 self.match(ModelicaParser.T__16)
                 self.state = 976
+                self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.IDENT:
                     self.state = 975
@@ -7210,13 +7307,13 @@ class ModelicaParser ( Parser ):
 
                 self.state = 978
                 self.match(ModelicaParser.T__18)
-
+                pass
             elif token in [ModelicaParser.T__13, ModelicaParser.T__16, ModelicaParser.T__19, ModelicaParser.T__27, ModelicaParser.T__29, ModelicaParser.T__39, ModelicaParser.T__55, ModelicaParser.T__70, ModelicaParser.T__73, ModelicaParser.T__74, ModelicaParser.T__75, ModelicaParser.INITIAL, ModelicaParser.IDENT, ModelicaParser.STRING, ModelicaParser.UNSIGNED_NUMBER]:
                 localctx = ModelicaParser.Argument_expressionContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
                 self.state = 980
                 self.expression()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -7269,6 +7366,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 984
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << ModelicaParser.T__13) | (1 << ModelicaParser.T__16) | (1 << ModelicaParser.T__19) | (1 << ModelicaParser.T__27) | (1 << ModelicaParser.T__29) | (1 << ModelicaParser.T__39) | (1 << ModelicaParser.T__55))) != 0) or ((((_la - 71)) & ~0x3f) == 0 and ((1 << (_la - 71)) & ((1 << (ModelicaParser.T__70 - 71)) | (1 << (ModelicaParser.T__73 - 71)) | (1 << (ModelicaParser.T__74 - 71)) | (1 << (ModelicaParser.T__75 - 71)) | (1 << (ModelicaParser.INITIAL - 71)) | (1 << (ModelicaParser.IDENT - 71)) | (1 << (ModelicaParser.STRING - 71)) | (1 << (ModelicaParser.UNSIGNED_NUMBER - 71)))) != 0):
                 self.state = 983
@@ -7459,17 +7557,18 @@ class ModelicaParser ( Parser ):
         self.enterRule(localctx, 136, self.RULE_subscript)
         try:
             self.state = 1014
+            self._errHandler.sync(self)
             token = self._input.LA(1)
             if token in [ModelicaParser.T__17]:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 1012
                 self.match(ModelicaParser.T__17)
-
+                pass
             elif token in [ModelicaParser.T__13, ModelicaParser.T__16, ModelicaParser.T__19, ModelicaParser.T__27, ModelicaParser.T__29, ModelicaParser.T__39, ModelicaParser.T__55, ModelicaParser.T__70, ModelicaParser.T__73, ModelicaParser.T__74, ModelicaParser.T__75, ModelicaParser.INITIAL, ModelicaParser.IDENT, ModelicaParser.STRING, ModelicaParser.UNSIGNED_NUMBER]:
                 self.enterOuterAlt(localctx, 2)
                 self.state = 1013
                 self.expression()
-
+                pass
             else:
                 raise NoViableAltException(self)
 
@@ -7525,6 +7624,7 @@ class ModelicaParser ( Parser ):
             self.state = 1016
             self.string_comment()
             self.state = 1018
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.T__77:
                 self.state = 1017
@@ -7579,6 +7679,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 1028
+            self._errHandler.sync(self)
             _la = self._input.LA(1)
             if _la==ModelicaParser.STRING:
                 self.state = 1020
