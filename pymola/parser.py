@@ -235,12 +235,29 @@ class ASTListener(ModelicaListener):
         )
         self.comp_clause = self.ast[ctx]
 
+    def enterComponent_clause1(self, ctx):
+        prefixes = ctx.type_prefix().getText().split(' ')
+        if prefixes[0] == '':
+            prefixes = []
+        self.ast[ctx] = ast.ComponentClause(
+            prefixes=prefixes,
+            type=ctx.type_specifier().getText(),
+            dimensions=[1]
+        )
+        self.comp_clause = self.ast[ctx]
+
     def exitComponent_clause(self, ctx):
         clause = self.ast[ctx]
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
 
     def enterComponent_declaration(self, ctx):
+        sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
+        self.sym_count += 1
+        self.ast[ctx] = sym
+        self.symbol_node = sym
+
+    def enterComponent_declaration1(self, ctx):
         sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
         self.sym_count += 1
         self.ast[ctx] = sym
@@ -267,7 +284,6 @@ class ASTListener(ModelicaListener):
         if sym.name in self.class_node.symbols:
             raise IOError(sym.name, 'already defined')
         self.class_node.symbols[sym.name] = sym
-        self.symbol_node = sym
 
     def exitDeclaration(self, ctx):
         sym = self.symbol_node
