@@ -197,6 +197,11 @@ class Expression(Node):
         super(Expression, self).__init__(**kwargs)
 
 
+class IfExpression(Node):
+    def __init__(self, **kwargs):
+        super(IfExpression, self).__init__(**kwargs)
+
+
 class Equation(Node):
     def __init__(self, **kwargs):
         super(Equation, self).__init__(**kwargs)
@@ -273,7 +278,12 @@ ComponentRef.ast_spec = {
 
 Expression.ast_spec = {
     'operator': Field([str]),
-    'operands': FieldList([Expression, Primary, ComponentRef, Array]),
+    'operands': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
+}
+
+IfExpression.ast_spec = {
+    'conditions': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
+    'expressions': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
 }
 
 Equation.ast_spec = {

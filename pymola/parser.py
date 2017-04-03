@@ -140,9 +140,14 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = self.ast[ctx.simple_expression()]
 
     def exitExpression_if(self, ctx):
-        # TODO
-        pass
-        #self.ast[ctx] = self.ast[ctx.simple_expression()]
+        all_expr = [self.ast[s] for s in ctx.expression()]
+        # Note that an else block is guaranteed to exist.
+        conditions = all_expr[:-1:2]
+        expressions = all_expr[1::2] + all_expr[-1:]
+
+        self.ast[ctx] = ast.IfExpression(
+            conditions=conditions,
+            expressions=expressions)
 
     def exitExpr_parenth(self, ctx):
         self.ast[ctx] = self.ast[ctx.expr()]
