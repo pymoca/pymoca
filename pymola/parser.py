@@ -252,7 +252,7 @@ class ASTListener(ModelicaListener):
         sym = self.symbol_node
         dimensions = None
         if ctx.array_subscripts() is not None:
-            dimensions = [int(s) for s in ctx.array_subscripts().subscript().getText()]
+            dimensions = [int(s.getText()) for s in ctx.array_subscripts().subscript()]
         elif self.comp_clause.dimensions is not None:
             dimensions = self.comp_clause.dimensions
         sym.name = ctx.IDENT().getText()
