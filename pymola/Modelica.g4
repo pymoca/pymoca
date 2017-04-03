@@ -101,10 +101,10 @@ element_list :
 
 // B.2.2.11 ------------------------------------------------
 element :
-    elem=import_clause
-    | elem=extends_clause
-    | elem=regular_element
-    | elem=replaceable_element
+    import_clause
+    | extends_clause
+    | regular_element
+    | replaceable_element
     ;
 
 regular_element:
@@ -207,14 +207,14 @@ argument_list :
 
 // B.2.5.4 ------------------------------------------------
 argument :
-    arg=element_modification_or_replaceable
-    | arg=element_redeclaration
+    element_modification_or_replaceable
+    | element_redeclaration
     ;
 
 // B.2.5.5 ------------------------------------------------
 element_modification_or_replaceable:
     EACH? FINAL?
-    (elem=element_modification | elem=element_replaceable)
+    (element_modification | element_replaceable)
     ;
 
 // B.2.5.6 ------------------------------------------------
@@ -230,7 +230,7 @@ element_redeclaration :
     ;
 
 // B.2.5.8 ------------------------------------------------
-element_replaceable:
+element_replaceable :
     'replaceable'
     (short_class_definition | component_clause1)
     constraining_clause?

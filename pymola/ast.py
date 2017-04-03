@@ -232,7 +232,7 @@ ComponentRef.ast_spec = {
 
 Expression.ast_spec = {
     'operator': Field([str]),
-    'operands': FieldList([Expression, ComponentRef]),
+    'operands': FieldList([Expression, Primary, ComponentRef]),
 }
 
 Equation.ast_spec = {

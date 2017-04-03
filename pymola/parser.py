@@ -204,7 +204,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = [self.ast[e] for e in ctx.element()]
 
     def exitElement(self, ctx):
-        self.ast[ctx] = self.ast[ctx.elem]
+        self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
 
     def exitImport_clause(self, ctx):
         self.ast[ctx] = 'TODO'
