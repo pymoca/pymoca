@@ -19,6 +19,8 @@ File
             ComponentRef
             Expression
             Primary
+        ForEquation
+            Equation
         ConnectClause
             ComponentRef
         Symbol
@@ -186,6 +188,16 @@ class Equation(Node):
         super(Equation, self).__init__(**kwargs)
 
 
+class ForIndex(Node):
+    def __init__(self, **kwargs):
+        super(ForIndex, self).__init__(**kwargs)
+
+
+class ForEquation(Node):
+    def __init__(self, **kwargs):
+        super(ForEquation, self).__init__(**kwargs)
+
+
 class ConnectClause(Node):
     def __init__(self, **kwargs):
         super(ConnectClause, self).__init__(**kwargs)
@@ -241,6 +253,17 @@ Equation.ast_spec = {
     'comment': Field([str]),
 }
 
+ForIndex.ast_spec = {
+    'name': Field([str]),
+    'expression': Field([Expression, Primary]),
+}
+
+ForEquation.ast_spec = {
+    'indices': FieldList([ForIndex]),
+    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
+    'comment': Field([str]),
+}
+
 ConnectClause.ast_spec = {
     'left': Field([ComponentRef]),
     'right': Field([ComponentRef]),
@@ -272,7 +295,7 @@ ComponentClause.ast_spec = {
 
 EquationSection.ast_spec = {
     'initial': Field([bool], False),
-    'equations': FieldList([Equation, ConnectClause], []),
+    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
 }
 
 Class.ast_spec = {
@@ -283,8 +306,8 @@ Class.ast_spec = {
     'type': Field([str], ''),
     'comment': Field(str, ''),
     'symbols': FieldDict([Symbol], {}),
-    'initial_equations': FieldList([Equation], []),
-    'equations': FieldList([Equation, ConnectClause], []),
+    'initial_equations': FieldList([Equation, ForEquation], []),
+    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
 }
 
 File.ast_spec = {

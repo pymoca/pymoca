@@ -13,6 +13,10 @@ from .generated.ModelicaLexer import ModelicaLexer
 from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
 
+# TODO
+#  - ':' as array index
+#  - Check for parsing
+
 
 class ASTListener(ModelicaListener):
 
@@ -108,6 +112,11 @@ class ASTListener(ModelicaListener):
             left=self.ast[ctx.simple_expression()],
             right=self.ast[ctx.expression()])
 
+    def exitEquation_for(self, ctx):
+        self.ast[ctx] = ast.ForEquation(
+            indices=[self.ast[s] for s in ctx.for_equation().for_indices().for_index()],
+            equations=[self.ast[s] for s in ctx.for_equation().equation()])
+
     def exitEquation_connect_clause(self, ctx):
         self.ast[ctx] = self.ast[ctx.connect_clause()]
 
@@ -157,6 +166,12 @@ class ASTListener(ModelicaListener):
 
     def exitArray_subscripts(self, ctx):
         self.ast[ctx] = [self.ast[s] for s in ctx.subscript()]
+
+    def exitFor_index(self, ctx):
+        self.ast[ctx] = ast.ForIndex(name=ctx.IDENT().getText(), expression=self.ast[ctx.expression()])
+
+    def exitFor_indices(self, ctx):
+        self.ast[ctx] = [self.ast[s] for s in ctx.for_index()]
 
     # PRIMARY ===========================================================
 
