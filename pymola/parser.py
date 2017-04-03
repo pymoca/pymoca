@@ -239,6 +239,12 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = sym
         self.symbol_node = sym
 
+    def enterElement_modification(self, ctx):
+        sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
+        self.sym_count += 1
+        self.ast[ctx] = sym
+        self.symbol_node = sym
+
     def exitComponent_declaration(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]
 
