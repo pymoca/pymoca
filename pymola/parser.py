@@ -263,8 +263,7 @@ class ASTListener(ModelicaListener):
             prefixes = []
         self.ast[ctx] = ast.ComponentClause(
             prefixes=prefixes,
-            type=ctx.type_specifier().getText(),
-            dimensions=[1]
+            type=ctx.type_specifier().getText()
         )
         self.comp_clause = self.ast[ctx]
 
@@ -274,8 +273,7 @@ class ASTListener(ModelicaListener):
             prefixes = []
         self.ast[ctx] = ast.ComponentClause(
             prefixes=prefixes,
-            type=ctx.type_specifier().getText(),
-            dimensions=[1]
+            type=ctx.type_specifier().getText()
         )
         self.comp_clause = self.ast[ctx]
 

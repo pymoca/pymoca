@@ -302,7 +302,7 @@ Symbol.ast_spec = {
     'final': Field([bool], False),
     'inner': Field([bool], False),
     'outer': Field([bool], False),
-    'dimensions': FieldList([Expression, int, ComponentRef], [1]),
+    'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
     'comment': Field([str], ''),
     'start': Field([Expression, Primary, ComponentRef, Array], Primary(value=0)),
     'id': Field([int], 0),
@@ -312,7 +312,7 @@ Symbol.ast_spec = {
 ComponentClause.ast_spec = {
     'prefixes': FieldList([str], []),
     'type': Field([str], ''),
-    'dimensions': FieldList([Expression, int, ComponentRef], [1]),
+    'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
     'comment': FieldList([str], []),
     'symbol_list': FieldList([Symbol], []),
 }
