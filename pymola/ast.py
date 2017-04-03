@@ -177,6 +177,11 @@ class Primary(Node):
         super(Primary, self).__init__(**kwargs)
 
 
+class Array(Node):
+    def __init__(self, **kwargs):
+        super(Array, self).__init__(**kwargs)
+
+
 class ComponentRef(Node):
     def __init__(self, **kwargs):
         super(ComponentRef, self).__init__(**kwargs)
@@ -243,6 +248,10 @@ class File(Node):
 # the allowed field types, this self referencing is not
 # possible when initially declaring a class in python
 
+Array.ast_spec = {
+    'values': FieldList([Expression, Primary, ComponentRef, Array])
+}
+
 Primary.ast_spec = {
     'value': Field([bool, float, int, str])
 }
@@ -253,7 +262,7 @@ ComponentRef.ast_spec = {
 
 Expression.ast_spec = {
     'operator': Field([str]),
-    'operands': FieldList([Expression, Primary, ComponentRef]),
+    'operands': FieldList([Expression, Primary, ComponentRef, Array]),
 }
 
 Equation.ast_spec = {
@@ -295,7 +304,7 @@ Symbol.ast_spec = {
     'outer': Field([bool], False),
     'dimensions': FieldList([Expression, int, ComponentRef], [1]),
     'comment': Field([str], ''),
-    'start': Field([Primary, ComponentRef], Primary(value=0)),
+    'start': Field([Expression, Primary, ComponentRef, Array], Primary(value=0)),
     'id': Field([int], 0),
     'order': Field([int], 0),
 }

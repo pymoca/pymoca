@@ -429,7 +429,6 @@ primary :
     | '(' output_expression_list ')'                    # primary_output_expression_list
     | '[' expression_list (';' expression_list)* ']'    # primary_expression_list
     | '{' function_arguments '}'                        # primary_function_arguments
-    | '{' function_arguments '}'                        # primary_function_arguments
     | 'end'                                             # primary_end
     ;
 

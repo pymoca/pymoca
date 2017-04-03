@@ -223,6 +223,12 @@ class ASTListener(ModelicaListener):
             name=ctx.getText()
         )
 
+    def exitPrimary_function_arguments(self, ctx):
+        # TODO: This does not support for generators, or function() calls yet.
+        #       Only expressions are supported, e.g. {1.0, 2.0, 3.0}.
+        v = [self.ast[x.expression()] for x in ctx.function_arguments().function_argument()]
+        self.ast[ctx] = ast.Array(values=v)
+
     def exitEquation_function(self, ctx):
         # TODO, add function ast
         self.ast[ctx] = ctx.getText()
