@@ -182,6 +182,11 @@ class Array(Node):
         super(Array, self).__init__(**kwargs)
 
 
+class Slice(Node):
+    def __init__(self, **kwargs):
+        super(Slice, self).__init__(**kwargs)
+
+
 class ComponentRef(Node):
     def __init__(self, **kwargs):
         super(ComponentRef, self).__init__(**kwargs)
@@ -248,12 +253,18 @@ class File(Node):
 # the allowed field types, this self referencing is not
 # possible when initially declaring a class in python
 
+Primary.ast_spec = {
+    'value': Field([bool, float, int, str])
+}
+
 Array.ast_spec = {
     'values': FieldList([Expression, Primary, ComponentRef, Array])
 }
 
-Primary.ast_spec = {
-    'value': Field([bool, float, int, str])
+Slice.ast_spec = {
+    'start': Field([Expression, Primary, ComponentRef], Primary(value=0)),
+    'stop': Field([Expression, Primary, ComponentRef], Primary(value=-1)),
+    'step': Field([Expression, Primary, ComponentRef], Primary(value=1)),
 }
 
 ComponentRef.ast_spec = {

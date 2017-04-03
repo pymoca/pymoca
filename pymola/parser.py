@@ -14,8 +14,7 @@ from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
 
 # TODO
-#  - ':' as array index
-#  - Check 'for' parsing
+#  - expression_if
 #  - Functions
 
 
@@ -140,6 +139,11 @@ class ASTListener(ModelicaListener):
     def exitExpression_simple(self, ctx):
         self.ast[ctx] = self.ast[ctx.simple_expression()]
 
+    def exitExpression_if(self, ctx):
+        # TODO
+        pass
+        #self.ast[ctx] = self.ast[ctx.simple_expression()]
+
     def exitExpr_primary(self, ctx):
         self.ast[ctx] = self.ast[ctx.primary()]
 
@@ -174,7 +178,10 @@ class ASTListener(ModelicaListener):
         )
 
     def exitSubscript(self, ctx):
-        self.ast[ctx] = self.ast[ctx.expression()]
+        if ctx.expression() is not None:
+            self.ast[ctx] = self.ast[ctx.expression()]
+        else:
+            self.ast[ctx] = ast.Slice()
 
     def exitArray_subscripts(self, ctx):
         self.ast[ctx] = [self.ast[s] for s in ctx.subscript()]
