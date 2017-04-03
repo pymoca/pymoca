@@ -257,7 +257,7 @@ Symbol.ast_spec = {
     'outer': Field([bool], False),
     'dimensions': FieldList([int], [1]),
     'comment': Field([str], ''),
-    'start': Field([Primary], Primary(value=0)),
+    'start': Field([Primary, ComponentRef], Primary(value=0)),
     'id': Field([int], 0),
     'order': Field([int], 0),
 }
