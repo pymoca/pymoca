@@ -394,7 +394,7 @@ Class.ast_spec = {
 }
 
 File.ast_spec = {
-    'within': Field([str], ''),
+    'within': FieldList([ComponentRef], []),
     'classes': FieldDict([Class], {}),
 }
 

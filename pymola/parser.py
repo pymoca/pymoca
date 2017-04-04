@@ -35,15 +35,16 @@ class ASTListener(ModelicaListener):
     # FILE ===========================================================
 
     def enterStored_definition(self, ctx):
-        within = ''
-        if ctx.name() is not None:
-            within = ctx.name().getText()
         file_node = ast.File()
-        file_node.within = within
         self.ast[ctx] = file_node
         self.file_node = file_node
 
     def exitStored_definition(self, ctx):
+        within = []
+        if ctx.component_reference() is not None:
+            within = [self.ast[ctx.component_reference()]]
+        self.file_node.within = within
+
         for class_node in [self.ast[e] for e in ctx.stored_definition_class()]:
             self.ast[ctx].classes[class_node.name] = class_node
         self.ast_result = self.ast[ctx]
