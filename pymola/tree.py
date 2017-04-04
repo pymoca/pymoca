@@ -203,13 +203,6 @@ class TreeListener(object):
         pass
 
 
-def flat_name(component_ref):
-    if len(component_ref.child) == 0:
-        return component_ref.name
-    else:
-        return component_ref.name + '.' + flat_name(component_ref.child[0])
-
-
 def flatten(root, class_name, instance_name=''):
     """
     This function takes and flattens it so that all subclasses instances
