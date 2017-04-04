@@ -14,6 +14,7 @@ from .generated.ModelicaParser import ModelicaParser
 
 # TODO
 #  - Functions
+#  - Make sure slice indices (eventually) evaluate to integers
 
 
 class ASTListener(ModelicaListener):
@@ -133,10 +134,10 @@ class ASTListener(ModelicaListener):
     def exitSimple_expression(self, ctx):
         if len(ctx.expr()) > 1:
             if len(ctx.expr()) > 2:
-                step = int(ctx.expr()[2])
+                step = self.ast[ctx.expr()[2]]
             else:
-                step = -1
-            self.ast[ctx] = ast.Slice(start=int(ctx.expr()[1]), stop=int(ctx.expr()[2]), step=step)
+                step = ast.Primary(value=1)
+            self.ast[ctx] = ast.Slice(start=self.ast[ctx.expr()[0]], stop=self.ast[ctx.expr()[1]], step=step)
         else:
             self.ast[ctx] = self.ast[ctx.expr()[0]]
 
