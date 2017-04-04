@@ -232,15 +232,20 @@ class ASTListener(ModelicaListener):
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
     def exitComponent_reference(self, ctx):
-        # TODO handle other idents
+        name = ctx.IDENT().getText()
+        indices = []
+        if ctx.array_subscripts() is not None:
+            indices = [self.ast[x] for x in ctx.array_subscripts().subscript()]
+        child = [self.ast[ctx.child]] if ctx.child is not None else []
+
         self.ast[ctx] = ast.ComponentRef(
-            name=ctx.getText()
+            name=name,
+            indices=indices,
+            child=child
         )
 
     def exitPrimary_component_reference(self, ctx):
-        self.ast[ctx] = ast.ComponentRef(
-            name=ctx.getText()
-        )
+        self.ast[ctx] = self.ast[ctx.component_reference()]
 
     def exitPrimary_output_expression_list(self, ctx):
         self.ast[ctx] = [self.ast[x] for x in ctx.output_expression_list().expression()]

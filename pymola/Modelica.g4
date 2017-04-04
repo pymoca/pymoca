@@ -442,7 +442,7 @@ name :
 
 // B.2.7.6 ------------------------------------------------
 component_reference :
-    '.'? IDENT array_subscripts? ('.' IDENT array_subscripts?)*
+    '.'? IDENT array_subscripts? (child=component_reference)?
     ;
 
 // B.2.7.7 ------------------------------------------------
