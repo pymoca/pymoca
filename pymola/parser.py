@@ -456,7 +456,9 @@ class ASTListener(ModelicaListener):
         if ctx.array_subscripts() is not None:
             sym.dimensions = self.ast[ctx.array_subscripts()]
         if ctx.modification() is not None:
-            sym.value = self.ast[ctx.modification()][-1]
+            mod = self.ast[ctx.modification()][-1]
+            if not isinstance(mod, ast.ClassModification):
+                sym.value = mod
 
     def exitElement_modification(self, ctx):
         if ctx.modification() is not None:
