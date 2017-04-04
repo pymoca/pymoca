@@ -2,7 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from __future__ import print_function, absolute_import, division, unicode_literals
 
 import antlr4
 import antlr4.Parser
@@ -149,9 +149,6 @@ class ASTListener(ModelicaListener):
             conditions=conditions,
             expressions=expressions)
 
-    def exitExpr_parenth(self, ctx):
-        self.ast[ctx] = self.ast[ctx.expression()]
-
     def exitExpr_primary(self, ctx):
         self.ast[ctx] = self.ast[ctx.primary()]
 
@@ -243,6 +240,9 @@ class ASTListener(ModelicaListener):
 
     def exitPrimary_output_expression_list(self, ctx):
         self.ast[ctx] = [self.ast[x] for x in ctx.output_expression_list().expression()]
+        # Collapse lists containing a single expression
+        if len(self.ast[ctx]) == 1:
+            self.ast[ctx] = self.ast[ctx][0]
 
     def exitPrimary_function_arguments(self, ctx):
         # TODO: This does not support for generators, or function() calls yet.

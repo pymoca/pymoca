@@ -407,8 +407,7 @@ simple_expression :
 
 // B.2.7.3 ------------------------------------------------
 expr :
-    '(' expression ')'                                      # expr_parenth
-    | op='-' expr                                           # expr_neg
+    op='-' expr                                             # expr_neg
     | primary op=('^' | '.^') primary                       # expr_exp
     | expr op=('*' | '/' | '.*' | './') expr                # expr_mul
     | expr  op=('+' | '-' | '.+' | '.-') expr               # expr_add
