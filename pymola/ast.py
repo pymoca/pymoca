@@ -335,7 +335,7 @@ IfEquation.ast_spec = {
 
 ForIndex.ast_spec = {
     'name': Field([str]),
-    'expression': Field([Expression, Primary]),
+    'expression': Field([Expression, Primary, Slice]),
 }
 
 ForEquation.ast_spec = {
