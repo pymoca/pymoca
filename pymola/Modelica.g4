@@ -425,7 +425,7 @@ primary :
     | STRING                                            # primary_string
     | 'false'                                           # primary_false
     | 'true'                                            # primary_true
-    | name function_call_args                           # primary_function
+    | component_reference function_call_args            # primary_function
     | 'der' function_call_args                          # primary_derivative
     | 'initial' function_call_args                      # primary_initial
     | component_reference                               # primary_component_reference

@@ -441,7 +441,7 @@ def serializedATN():
         buf.write("\u0365\3\2\2\2\u0369\u036c\3\2\2\2\u036a\u0368\3\2\2\2")
         buf.write("\u036a\u036b\3\2\2\2\u036bs\3\2\2\2\u036c\u036a\3\2\2")
         buf.write("\2\u036d\u038e\7\\\2\2\u036e\u038e\7[\2\2\u036f\u038e")
-        buf.write("\7L\2\2\u0370\u038e\7M\2\2\u0371\u0372\5v<\2\u0372\u0373")
+        buf.write("\7L\2\2\u0370\u038e\7M\2\2\u0371\u0372\5x=\2\u0372\u0373")
         buf.write("\5z>\2\u0373\u038e\3\2\2\2\u0374\u0375\7\26\2\2\u0375")
         buf.write("\u038e\5z>\2\u0376\u0377\7Y\2\2\u0377\u038e\5z>\2\u0378")
         buf.write("\u038e\5x=\2\u0379\u037a\7\23\2\2\u037a\u037b\5\u0084")
@@ -6000,8 +6000,8 @@ class ModelicaParser ( Parser ):
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
 
         def function_call_args(self):
             return self.getTypedRuleContext(ModelicaParser.Function_call_argsContext,0)
@@ -6077,7 +6077,7 @@ class ModelicaParser ( Parser ):
                 localctx = ModelicaParser.Primary_functionContext(self, localctx)
                 self.enterOuterAlt(localctx, 5)
                 self.state = 879
-                self.name()
+                self.component_reference()
                 self.state = 880
                 self.function_call_args()
                 pass

@@ -13,7 +13,7 @@ from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
 
 # TODO
-#  - Functions
+#  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
 
@@ -229,7 +229,12 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.Primary(value=True)
 
     def exitPrimary_function(self, ctx):
-        self.ast[ctx] = ast.Primary(value=ctx.getText())
+        # TODO: Could possible be cleaner if we let the expression in the ast bubble up.
+        #       E.g. self.ast[x] below, instead of self.ast[x.expression].
+        self.ast[ctx] = ast.Expression(
+            operator=self.ast[ctx.component_reference()],
+            operands=[self.ast[x.expression()] for x in ctx.function_call_args().function_arguments().function_argument()]
+        )
 
     def exitPrimary_derivative(self, ctx):
         self.ast[ctx] = ast.Primary(value=ctx.getText())
@@ -266,7 +271,7 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] = self.ast[ctx][0]
 
     def exitPrimary_function_arguments(self, ctx):
-        # TODO: This does not support for generators, or function() calls yet.
+        # TODO: This does not support for generators yet.
         #       Only expressions are supported, e.g. {1.0, 2.0, 3.0}.
         v = [self.ast[x.expression()] for x in ctx.function_arguments().function_argument()]
         self.ast[ctx] = ast.Array(values=v)
