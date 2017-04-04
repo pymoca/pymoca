@@ -229,8 +229,8 @@ def serializedATN():
         buf.write("\3\2\2\2\u016a\u016b\5(\25\2\u016b\u016c\5\u008cG\2\u016c")
         buf.write("\u016e\3\2\2\2\u016d\u016a\3\2\2\2\u016d\u016e\3\2\2\2")
         buf.write("\u016e!\3\2\2\2\u016f\u017e\7\35\2\2\u0170\u0171\7Z\2")
-        buf.write("\2\u0171\u0172\7\21\2\2\u0172\u017f\5v<\2\u0173\u017c")
-        buf.write("\5v<\2\u0174\u017a\7\36\2\2\u0175\u017b\7\37\2\2\u0176")
+        buf.write("\2\u0171\u0172\7\21\2\2\u0172\u017f\5x=\2\u0173\u017c")
+        buf.write("\5x=\2\u0174\u017a\7\36\2\2\u0175\u017b\7\37\2\2\u0176")
         buf.write("\u0177\7 \2\2\u0177\u0178\5$\23\2\u0178\u0179\7!\2\2\u0179")
         buf.write("\u017b\3\2\2\2\u017a\u0175\3\2\2\2\u017a\u0176\3\2\2\2")
         buf.write("\u017b\u017d\3\2\2\2\u017c\u0174\3\2\2\2\u017c\u017d\3")
@@ -240,7 +240,7 @@ def serializedATN():
         buf.write("\u0186\5$\23\2\u0185\u0183\3\2\2\2\u0186\u0189\3\2\2\2")
         buf.write("\u0187\u0185\3\2\2\2\u0187\u0188\3\2\2\2\u0188%\3\2\2")
         buf.write("\2\u0189\u0187\3\2\2\2\u018a\u018b\7\30\2\2\u018b\u018d")
-        buf.write("\5v<\2\u018c\u018e\5:\36\2\u018d\u018c\3\2\2\2\u018d\u018e")
+        buf.write("\5x=\2\u018c\u018e\5:\36\2\u018d\u018c\3\2\2\2\u018d\u018e")
         buf.write("\3\2\2\2\u018e\u0190\3\2\2\2\u018f\u0191\5\u0090I\2\u0190")
         buf.write("\u018f\3\2\2\2\u0190\u0191\3\2\2\2\u0191\'\3\2\2\2\u0192")
         buf.write("\u0193\7\"\2\2\u0193\u0195\5v<\2\u0194\u0196\5:\36\2\u0195")
@@ -2241,8 +2241,8 @@ class ModelicaParser ( Parser ):
         def IDENT(self):
             return self.getToken(ModelicaParser.IDENT, 0)
 
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
 
 
         def import_list(self):
@@ -2281,12 +2281,12 @@ class ModelicaParser ( Parser ):
                 self.state = 367
                 self.match(ModelicaParser.T__14)
                 self.state = 368
-                self.name()
+                self.component_reference()
                 pass
 
             elif la_ == 2:
                 self.state = 369
-                self.name()
+                self.component_reference()
                 self.state = 378
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -2391,8 +2391,8 @@ class ModelicaParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
 
 
         def class_modification(self):
@@ -2427,7 +2427,7 @@ class ModelicaParser ( Parser ):
             self.state = 392
             self.match(ModelicaParser.T__21)
             self.state = 393
-            self.name()
+            self.component_reference()
             self.state = 395
             self._errHandler.sync(self)
             _la = self._input.LA(1)
@@ -6213,16 +6213,15 @@ class ModelicaParser ( Parser ):
             self.match(ModelicaParser.IDENT)
             self.state = 917
             self._errHandler.sync(self)
-            _alt = self._interp.adaptivePredict(self._input,114,self._ctx)
-            while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
-                if _alt==1:
-                    self.state = 913
-                    self.match(ModelicaParser.T__27)
-                    self.state = 914
-                    self.match(ModelicaParser.IDENT) 
+            _la = self._input.LA(1)
+            while _la==ModelicaParser.T__27:
+                self.state = 913
+                self.match(ModelicaParser.T__27)
+                self.state = 914
+                self.match(ModelicaParser.IDENT)
                 self.state = 919
                 self._errHandler.sync(self)
-                _alt = self._interp.adaptivePredict(self._input,114,self._ctx)
+                _la = self._input.LA(1)
 
         except RecognitionException as re:
             localctx.exception = re

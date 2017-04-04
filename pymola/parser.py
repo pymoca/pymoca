@@ -14,10 +14,8 @@ from .generated.ModelicaParser import ModelicaParser
 
 # TODO
 #  - Functions
-#  - ComponentRef 'within'
 #  - Make sure slice indices (eventually) evaluate to integers
 
-#  - Import
 #  - min, max, start
 
 
@@ -295,11 +293,12 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = [ctx.IDENT()] + self.ast[ctx.import_list()]
 
     def exitImport_clause(self, ctx):
+        component = self.ast[ctx.component_reference()]
         if ctx.IDENT() is not None:
-            self.ast[ctx] = ast.ImportAsClause(component=ast.ComponentRef(name=ctx.name().getText()), name=ctx.IDENT().getText())
+            self.ast[ctx] = ast.ImportAsClause(component=component, name=ctx.IDENT().getText())
         else:
             symbols = self.ast[ctx.import_list()]
-            self.ast[ctx] = ast.ImportFromClause(component=ctx.name().getText(), symbols=symbols)
+            self.ast[ctx] = ast.ImportFromClause(component=component, symbols=symbols)
         self.class_node.imports += [self.ast[ctx]]
 
     def exitExtends_clause(self, ctx):
@@ -307,7 +306,7 @@ class ASTListener(ModelicaListener):
             class_modification = self.ast[ctx.class_modification()]
         else:
             class_modification = ast.ClassModification()
-        self.ast[ctx] = ast.ExtendsClause(component=ast.ComponentRef(name=ctx.name().getText()),
+        self.ast[ctx] = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
             class_modification=class_modification)
         self.class_node.extends += [self.ast[ctx]]
 
