@@ -32,7 +32,7 @@ model System
 	HBC hb;
 equation
 	connect(qa.down, a.up);
-	connect(qc.down, c.up)
+	connect(qc.down, c.up);
 	connect(a.down, b.up);
 	connect(c.down, b.up);
 	connect(b.down, hb.up);

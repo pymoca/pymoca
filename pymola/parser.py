@@ -371,15 +371,15 @@ class ASTListener(ModelicaListener):
             self.symbol_node = sym
 
     def exitElement_modification(self, ctx):
-        del self.symbol_node
+        self.symbol_node = None
 
     def exitComponent_declaration(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]
-        del self.symbol_node
+        self.symbol_node = None
 
     def exitComponent_declaration1(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]
-        del self.symbol_node
+        self.symbol_node = None
 
     def enterDeclaration(self, ctx):
         sym = self.symbol_node
