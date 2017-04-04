@@ -6,7 +6,6 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 
 import antlr4
 import antlr4.Parser
-import yaml
 
 from . import ast
 from .generated.ModelicaLexer import ModelicaLexer
@@ -14,7 +13,6 @@ from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
 
 # TODO
-#  - expression_if
 #  - Functions
 
 
@@ -134,6 +132,7 @@ class ASTListener(ModelicaListener):
 
     def exitSimple_expression(self, ctx):
         # TODO only using first expression
+        # TODO need this for slices
         self.ast[ctx] = self.ast[ctx.expr()[0]]
 
     def exitExpression_simple(self, ctx):
@@ -200,8 +199,7 @@ class ASTListener(ModelicaListener):
     # PRIMARY ===========================================================
 
     def exitPrimary_unsigned_number(self, ctx):
-        # TODO
-        self.ast[ctx] = ast.Primary(value=str(yaml.load(ctx.getText())))
+        self.ast[ctx] = ast.Primary(value=float(ctx.getText()))
 
     def exitPrimary_string(self, ctx):
         self.ast[ctx] = ast.Primary(value=ctx.getText())
