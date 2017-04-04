@@ -292,8 +292,11 @@ Slice.ast_spec = {
     'step': Field([Expression, Primary, ComponentRef], Primary(value=1)),
 }
 
+# TODO: Test slices
 ComponentRef.ast_spec = {
     'name': Field([str]),
+    'indices': FieldList([Expression, Slice, Primary, ComponentRef], []),
+    'child': FieldList([ComponentRef], []),
 }
 
 Expression.ast_spec = {

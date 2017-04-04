@@ -17,6 +17,7 @@ from .generated.ModelicaParser import ModelicaParser
 #  - Import
 #  - Replaceable
 #  - min, max, start
+#  - Make sure slice indices (eventually) evaluate to integers
 
 
 class ASTListener(ModelicaListener):
@@ -36,8 +37,8 @@ class ASTListener(ModelicaListener):
 
     def enterStored_definition(self, ctx):
         within = ''
-        if ctx.WITHIN() is not None:
-            within = ctx.WITHIN().getText()
+        if ctx.name() is not None:
+            within = ctx.name().getText()
         file_node = ast.File()
         file_node.within = within
         self.ast[ctx] = file_node
@@ -147,10 +148,10 @@ class ASTListener(ModelicaListener):
     def exitSimple_expression(self, ctx):
         if len(ctx.expr()) > 1:
             if len(ctx.expr()) > 2:
-                step = int(ctx.expr()[2])
+                step = self.ast[ctx.expr()[2]]
             else:
-                step = -1
-            self.ast[ctx] = ast.Slice(start=int(ctx.expr()[1]), stop=int(ctx.expr()[2]), step=step)
+                step = ast.Primary(value=1)
+            self.ast[ctx] = ast.Slice(start=self.ast[ctx.expr()[0]], stop=self.ast[ctx.expr()[1]], step=step)
         else:
             self.ast[ctx] = self.ast[ctx.expr()[0]]
 
@@ -245,15 +246,20 @@ class ASTListener(ModelicaListener):
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
     def exitComponent_reference(self, ctx):
-        # TODO handle other idents
+        name = ctx.IDENT().getText()
+        indices = []
+        if ctx.array_subscripts() is not None:
+            indices = [self.ast[x] for x in ctx.array_subscripts().subscript()]
+        child = [self.ast[ctx.child]] if ctx.child is not None else []
+
         self.ast[ctx] = ast.ComponentRef(
-            name=ctx.getText()
+            name=name,
+            indices=indices,
+            child=child
         )
 
     def exitPrimary_component_reference(self, ctx):
-        self.ast[ctx] = ast.ComponentRef(
-            name=ctx.getText()
-        )
+        self.ast[ctx] = self.ast[ctx.component_reference()]
 
     def exitPrimary_output_expression_list(self, ctx):
         self.ast[ctx] = [self.ast[x] for x in ctx.output_expression_list().expression()]
