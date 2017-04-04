@@ -203,6 +203,7 @@ class ASTListener(ModelicaListener):
     # PRIMARY ===========================================================
 
     def exitPrimary_unsigned_number(self, ctx):
+        # TODO
         self.ast[ctx] = ast.Primary(value=str(yaml.load(ctx.getText())))
 
     def exitPrimary_string(self, ctx):
@@ -224,8 +225,10 @@ class ASTListener(ModelicaListener):
             operator='der',
             operands=[ast.ComponentRef(name=comp_name)]
         )
-        if 'state' not in self.class_node.symbols[comp_name].prefixes:
-            self.class_node.symbols[comp_name].prefixes += ['state']
+        # TODO 'state' is not a standard prefix;  disable this for now as it does not work
+        # when differentiating states defined in superclasses.
+        #if 'state' not in self.class_node.symbols[comp_name].prefixes:
+        #    self.class_node.symbols[comp_name].prefixes += ['state']
 
     def exitComponent_reference(self, ctx):
         # TODO handle other idents
