@@ -243,7 +243,7 @@ def flatten(root, class_name, instance_name=''):
                     if isinstance(modification, ast.ClassModification):
                         modify_class(sym, modification)
                     else:
-                        sym.value = modification   
+                        sym.value = modification
 
     def flatten_symbol(sym, instance_prefix):
         sym_copy = copy.deepcopy(sym)
@@ -291,16 +291,15 @@ def flatten(root, class_name, instance_name=''):
         # carry out modifications
         modify_class(c, extends.class_modification)
 
-    # create a walker
-    ast_walker = TreeWalker()
-
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
         try:
             class_data = root.find_class(sym.type)
             if class_data.type == 'connector':
-                continue
+                flat_class.symbols[instance_prefix + sym_name] = copy.deepcopy(sym)
+                for sym_name2, sym2 in class_data.symbols.items():
+                    flat_class.symbols[instance_prefix + sym_name + "." + sym_name2] = copy.deepcopy(sym2)
 
             # recursively call flatten on the sub class
             flat_sub_file = flatten(root, sym.type.name, instance_name=sym_name)
@@ -316,15 +315,30 @@ def flatten(root, class_name, instance_name=''):
             # append original symbol to flat class
             flat_sym = flatten_symbol(sym, instance_prefix)
             flat_class.symbols[flat_sym.name] = flat_sym
-        
+
     # for all equations in the original class
     flat_class.equations += [flatten_equation(e, instance_prefix) for e in orig_class.equations]
 
-    # walker for expanding connect equations
-    # ast_walker.walk(ConnectExpanderListener(), flat_class)
-
     return flat_file
 
+def generate(ast_tree, model_name):
+    ast_tree_new = copy.deepcopy(ast_tree)
+    flat_tree = flatten(ast_tree_new, model_name)
+
+    # create a walker
+    ast_walker = TreeWalker()
+
+    # walker for expanding connect equations
+    ast_walker.walk(ConnectExpander(ast_tree_new.classes), flat_tree.classes[model_name])
+
+    root = flat_tree.classes[model_name]
+
+    classes = ast_tree.classes
+    instantiator = Instatiator(classes=classes)
+    ast_walker.walk(instantiator, root)
+
+    flat_tree = instantiator.res[root]
+    return flat_tree
 
 class Instatiator(TreeListener):
     """
@@ -391,6 +405,22 @@ class Instatiator(TreeListener):
         self.res[tree] = c
 
 
+
+def name_flat(tree):
+    s = tree.name
+    if hasattr(tree,"child"):
+        if len(tree.child)!=0:
+            assert(len(tree.child)==1)
+            return s+"."+name_flat(tree.child[0])
+    return s
+
+def deep_insert(tree, e):
+    if len(tree.child)==0:
+        tree.child.append(e)
+    else:
+        deep_insert(tree.child[0], e)
+    return tree
+
 class ConnectExpander(TreeListener):
 
     def __init__(self, classes):
@@ -399,8 +429,27 @@ class ConnectExpander(TreeListener):
         self.classes = classes
 
     def enterConnectClause(self, tree):
-        left_class = self.context['Class'].symbols[tree.left.name]
-        right_class =self.context['Class'].symbols[tree.right.name]
+        try:
+            left_class = self.context['Class'].symbols[name_flat(tree.left)]
+            right_class =self.context['Class'].symbols[name_flat(tree.right)]
+        except:
+            return
+        assert left_class.type.name == right_class.type.name
+        if left_class.type.name=="Real": return
+
+        left_class = self.classes[left_class.type.name]
+        right_class = self.classes[right_class.type.name]
+
         assert left_class.type == 'connector'
         assert right_class.type == 'connector'
         assert left_class == right_class
+
+        for sym_name, sym in left_class.symbols.items():
+            L = deep_insert(copy.deepcopy(tree.left), ast.ComponentRef(name=sym_name))
+            R = deep_insert(copy.deepcopy(tree.left), ast.ComponentRef(name=sym_name))
+            eq = ast.ConnectClause(
+                comment="connector",
+                left=L,
+                right=R,
+            )
+            self.context['Class'].equations.append(eq)

@@ -8,6 +8,7 @@ import copy
 
 import casadi as ca
 import numpy as np
+
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 def hashcompare(self,other):
@@ -162,21 +163,10 @@ class CasadiGenerator(tree.TreeListener):
 
 
 def generate(ast_tree, model_name):
-    ast_tree_new = copy.deepcopy(ast_tree)
-    ast_walker = tree.TreeWalker()
-    flat_tree = tree.flatten(ast_tree_new, model_name)
-
-
-    root = flat_tree.classes[model_name]
-
-    classes = ast_tree.classes
-    instantiator = tree.Instatiator(classes=classes)
-    ast_walker.walk(instantiator, root)
-
-    flat_tree = instantiator.res[root]
-
-    print(flat_tree)
+    flat_tree = tree.generate(ast_tree, model_name)
     sympy_gen = CasadiGenerator(flat_tree)
 
+    # create a walker
+    ast_walker = tree.TreeWalker()
     ast_walker.walk(sympy_gen, flat_tree)
     return sympy_gen.results
