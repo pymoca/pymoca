@@ -75,5 +75,24 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_estimator(self):
+        with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Estimator')
+        ref_model = CasadiSysModel()
+        print(casadi_model)
+
+        x = ca.MX.sym("x")
+        der_x = ca.MX.sym("der_x")
+        y = ca.MX.sym("y")
+
+        ref_model.states = [x]
+        ref_model.der_states = [der_x]
+        ref_model.outputs = [y]
+        ref_model.equations =  [ der_x + x, y-x]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
 if __name__ == "__main__":
     unittest.main()
