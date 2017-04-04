@@ -34,8 +34,8 @@ class ASTListener(ModelicaListener):
 
     def enterStored_definition(self, ctx):
         within = ''
-        if ctx.WITHIN() is not None:
-            within = ctx.WITHIN().getText()
+        if ctx.name() is not None:
+            within = ctx.name().getText()
         file_node = ast.File()
         file_node.within = within
         self.ast[ctx] = file_node
