@@ -312,7 +312,7 @@ ComponentRef.ast_spec = {
 }
 
 Expression.ast_spec = {
-    'operator': Field([str]),
+    'operator': Field([str, ComponentRef]),
     'operands': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
 }
 
