@@ -94,10 +94,64 @@ class TreeListener(object):
     def exitClass(self, tree):
         pass
 
+    def enterImportAsClause(self, tree):
+        pass
+
+    def exitImportAsClause(self, tree):
+        pass
+
+    def enterImportFromClause(self, tree):
+        pass
+
+    def exitImportFromClause(self, tree):
+        pass
+
+    def enterElementModification(self, tree):
+        pass
+
+    def exitElementModification(self, tree):
+        pass
+
+    def enterClassModification(self, tree):
+        pass
+
+    def exitClassModification(self, tree):
+        pass
+
+    def enterExtendsClause(self, tree):
+        pass
+
+    def exitExtendsClause(self, tree):
+        pass
+
+    def enterIfExpression(self, tree):
+        pass
+
+    def exitIfExpression(self, tree):
+        pass
+
     def enterExpression(self, tree):
         pass
 
     def exitExpression(self, tree):
+        pass
+
+    def enterIfEquation(self, tree):
+        pass
+
+    def exitIfEquation(self, tree):
+        pass
+
+    def enterForIndex(self, tree):
+        pass
+
+    def exitForIndex(self, tree):
+        pass
+
+    def enterForEquation(self, tree):
+        pass
+
+    def exitForEquation(self, tree):
         pass
 
     def enterEquation(self, tree):
@@ -122,6 +176,18 @@ class TreeListener(object):
         pass
 
     def exitComponentClause(self, tree):
+        pass
+
+    def enterArray(self, tree):
+        pass
+
+    def exitArray(self, tree):
+        pass
+
+    def enterSlice(self, tree):
+        pass
+
+    def exitSlice(self, tree):
         pass
 
     def enterPrimary(self, tree):
