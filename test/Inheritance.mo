@@ -10,7 +10,7 @@ model BaseB
 end BaseB;
 
 model Sub
-	extends BaseA(k = -1.0);
+	extends BaseA(k = -1.0, x(max = 30.0));
 	extends BaseB;
 equation
 	x + y = 3.0;

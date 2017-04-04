@@ -165,6 +165,13 @@ class Node(object):
             self.ast_spec[key].validate(name, key, value)
         self.__dict__[key] = value
 
+    def find_class(self, component_ref):
+        c = self.classes[component_ref.name]
+        if len(component_ref.child) > 0:
+            return c.get_component(component_ref.child[0])
+        else:
+            return c
+
     def __setattr__(self, key, value):
         self.set_field(key, value)
 
@@ -232,6 +239,8 @@ class ConnectClause(Node):
 class Symbol(Node):
     def __init__(self, **kwargs):
         super(Symbol, self).__init__(**kwargs)
+
+    ATTRIBUTES = ['min', 'max', 'start', 'fixed']
 
 
 class ComponentClause(Node):
@@ -397,7 +406,7 @@ ElementModification.ast_spec = {
 }
 
 ClassModification.ast_spec = {
-    'arguments': FieldList([ElementModification, Symbol], []),
+    'arguments': FieldList([ElementModification], []),
 }
 
 ExtendsClause.ast_spec = {

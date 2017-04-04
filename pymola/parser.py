@@ -407,7 +407,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ElementModification(name=ctx.name().getText(), modifications=modifications)
 
         sym = self.symbol_node
-        if ctx.name().getText() in ['start', 'min', 'max', 'fixed']:
+        if ctx.name().getText() in ast.Symbol.ATTRIBUTES:
             setattr(sym, ctx.name().getText(), self.ast[ctx.modification().expression()])
 
     def exitModification_class(self, ctx):

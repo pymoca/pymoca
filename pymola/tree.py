@@ -202,6 +202,14 @@ class TreeListener(object):
     def exitComponentRef(self, tree):
         pass
 
+
+def flat_name(component_ref):
+    if len(component_ref.child) == 0:
+        return component_ref.name
+    else:
+        return component_ref.name + '.' + flat_name(component_ref.child[0])
+
+
 def flatten(root, class_name, instance_name=''):
     """
     This function takes and flattens it so that all subclasses instances
@@ -232,6 +240,37 @@ def flatten(root, class_name, instance_name=''):
     else:
         instance_prefix = instance_name
 
+    def modify_class(c, modification):
+        for argument in modification.arguments:
+            if argument.name in ast.Symbol.ATTRIBUTES:
+                setattr(c, argument.name, argument.modifications[0])
+            else:
+                sym = flat_class.symbols[argument.name]
+
+                for modification in argument.modifications:
+                    if isinstance(modification, ast.ClassModification):
+                        modify_class(sym, modification)
+                    else:
+                        # TODO
+                        #sym.value = modification   
+                        pass         
+
+    # pull in parent classes
+    for extends in orig_class.extends:
+        c = root.find_class(extends.component)
+
+        # recursively call flatten on the parent class
+        flat_parent_file = flatten(root, c.name, instance_name=instance_name)
+        flat_parent_class = flat_parent_file.classes[c.name]
+
+        # add parent class members symbols and equations
+        for parent_sym_name, parent_sym in flat_parent_class.symbols.items():
+            flat_class.symbols[instance_prefix + parent_sym_name] = copy.deepcopy(parent_sym)
+        flat_class.equations += copy.deepcopy(flat_parent_class.equations)
+
+        # carry out modifications
+        modify_class(c, extends.class_modification)
+
     # create a walker
     ast_walker = TreeWalker()
 
@@ -239,7 +278,7 @@ def flatten(root, class_name, instance_name=''):
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
         if sym.type in root.classes:
-            class_data = root.classes[sym.type]
+            class_data = root.classes[sym.type] # TODO
             if class_data.type == 'connector':
                 continue
 
