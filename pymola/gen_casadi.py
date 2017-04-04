@@ -70,12 +70,10 @@ class CasadiGenerator(tree.TreeListener):
         symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
         for s in symbols:
             if len(s.prefixes) == 0:
-                variables += [s]
+                states += [s]
             else:
                 for prefix in s.prefixes:
-                    if prefix == 'state':
-                        states += [s]
-                    elif prefix == 'constant':
+                    if prefix == 'constant':
                         constants += [s]
                     elif prefix == 'parameter':
                         parameters += [s]
@@ -83,6 +81,7 @@ class CasadiGenerator(tree.TreeListener):
                         inputs += [s]
                     elif prefix == 'output':
                         outputs += [s]
+
 
         for s in outputs:
             if s not in states:

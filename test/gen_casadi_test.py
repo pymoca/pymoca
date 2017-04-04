@@ -61,6 +61,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Spring')
         ref_model = CasadiSysModel()
+        print(casadi_model)
         x = ca.MX.sym("x")
         v_x = ca.MX.sym("v_x")
         der_x = ca.MX.sym("der_x")
