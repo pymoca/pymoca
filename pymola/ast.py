@@ -242,6 +242,16 @@ class EquationSection(Node):
         super(EquationSection, self).__init__(**kwargs)
 
 
+class ImportAsClause(Node):
+    def __init__(self, **kwargs):
+        super(ImportAsClause, self).__init__(**kwargs)
+
+
+class ImportFromClause(Node):
+    def __init__(self, **kwargs):
+        super(ImportFromClause, self).__init__(**kwargs)
+
+
 class ElementModification(Node):
     def __init__(self, **kwargs):
         super(ElementModification, self).__init__(**kwargs)
@@ -366,6 +376,16 @@ EquationSection.ast_spec = {
     'equations': FieldList([Equation, ForEquation, ConnectClause], []),
 }
 
+ImportAsClause.ast_spec = {
+    'component': Field([ComponentRef]),
+    'name': Field([str])
+}
+
+ImportFromClause.ast_spec = {
+    'component': Field([ComponentRef]),
+    'symbols': FieldList([str])
+}
+
 ElementModification.ast_spec = {
     'name': Field(str, ''),
     'modifications': FieldList([Primary, Expression, ClassModification], []),
@@ -382,6 +402,7 @@ ExtendsClause.ast_spec = {
 
 Class.ast_spec = {
     'name': Field(str),
+    'imports': FieldList([ImportAsClause, ImportFromClause], []),
     'extends': FieldList([ExtendsClause], []),
     'encapsulated': Field([bool], False),
     'partial': Field([bool], False),

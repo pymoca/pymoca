@@ -14,9 +14,11 @@ from .generated.ModelicaParser import ModelicaParser
 
 # TODO
 #  - Functions
+#  - ComponentRef 'within'
+#  - Make sure slice indices (eventually) evaluate to integers
+
 #  - Import
 #  - min, max, start
-#  - Make sure slice indices (eventually) evaluate to integers
 
 
 class ASTListener(ModelicaListener):
@@ -288,8 +290,16 @@ class ASTListener(ModelicaListener):
     def exitElement(self, ctx):
         self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
 
+    def exitImport_list(self, ctx):
+        self.ast[ctx] = [ctx.IDENT()] + self.ast[ctx.import_list()]
+
     def exitImport_clause(self, ctx):
-        self.ast[ctx] = 'TODO'
+        if ctx.IDENT() is not None:
+            self.ast[ctx] = ast.ImportAsClause(component=ast.ComponentRef(name=ctx.name().getText()), name=ctx.IDENT().getText())
+        else:
+            symbols = self.ast[ctx.import_list()]
+            self.ast[ctx] = ast.ImportFromClause(component=ctx.name().getText(), symbols=symbols)
+        self.class_node.imports += [self.ast[ctx]]
 
     def exitExtends_clause(self, ctx):
         if ctx.class_modification() is not None:
