@@ -14,11 +14,9 @@ from .generated.ModelicaParser import ModelicaParser
 
 # TODO
 #  - Functions
-#  - ComponentRef 'within'
+#  - Function implements
+#  - ComponentRef extends, import
 #  - Make sure slice indices (eventually) evaluate to integers
-
-#  - Import
-#  - min, max, start
 
 
 class ASTListener(ModelicaListener):
@@ -346,27 +344,38 @@ class ASTListener(ModelicaListener):
         clause = self.ast[ctx]
 
     def enterComponent_declaration(self, ctx):
-        sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
+        sym = ast.Symbol(order = self.sym_count)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
         self.comp_clause.symbol_list += [sym]
 
     def enterComponent_declaration1(self, ctx):
-        sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
+        sym = ast.Symbol(order = self.sym_count)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
         self.comp_clause.symbol_list += [sym]
 
     def enterElement_modification(self, ctx):
-        sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
-        self.sym_count += 1
-        self.ast[ctx] = sym
-        self.symbol_node = sym
+        if self.symbol_node is not None:
+            self.ast[ctx] = self.symbol_node
+        else:
+            sym = ast.Symbol(order = self.sym_count)
+            self.sym_count += 1
+            self.ast[ctx] = sym
+            self.symbol_node = sym
+
+    def exitElement_modification(self, ctx):
+        del self.symbol_node
 
     def exitComponent_declaration(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]
+        del self.symbol_node
+
+    def exitComponent_declaration1(self, ctx):
+        self.ast[ctx].comment = self.ast[ctx.comment()]
+        del self.symbol_node
 
     def enterDeclaration(self, ctx):
         sym = self.symbol_node
@@ -392,9 +401,10 @@ class ASTListener(ModelicaListener):
         else:
             modifications = []
         self.ast[ctx] = ast.ElementModification(name=ctx.name().getText(), modifications=modifications)
+
         sym = self.symbol_node
-        if ctx.name().getText() == 'start':
-            sym.start = self.ast[ctx.modification().expression()]
+        if ctx.name().getText() in ['start', 'min', 'max', 'fixed']:
+            setattr(sym, ctx.name().getText(), self.ast[ctx.modification().expression()])
 
     def exitModification_class(self, ctx):
         self.ast[ctx] = [self.ast[ctx.class_modification()]]
@@ -403,10 +413,6 @@ class ASTListener(ModelicaListener):
 
     def exitModification_assignment(self, ctx):
         self.ast[ctx] = [self.ast[ctx.expression()]]
-
-        # TODO wrong
-        sym = self.symbol_node
-        sym.start = self.ast[ctx.expression()]
 
     def exitModification_assignment2(self, ctx):
         self.ast[ctx] = [self.ast[ctx.expression()]]

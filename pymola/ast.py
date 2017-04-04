@@ -10,6 +10,8 @@ import sys
 
 VALIDATE_AST = True
 
+nan = float('nan')
+
 """
 AST Node Type Hierarchy
 
@@ -358,7 +360,10 @@ Symbol.ast_spec = {
     'outer': Field([bool], False),
     'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
     'comment': Field([str], ''),
-    'start': Field([Expression, Primary, ComponentRef, Array], Primary(value=0)),
+    'start': Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
+    'min': Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
+    'max': Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
+    'fixed': Field([Primary], False),
     'id': Field([int], 0),
     'order': Field([int], 0),
 }
