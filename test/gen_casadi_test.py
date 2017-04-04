@@ -61,6 +61,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Spring')
         ref_model = CasadiSysModel()
+        print(casadi_model)
         x = ca.MX.sym("x")
         v_x = ca.MX.sym("v_x")
         der_x = ca.MX.sym("der_x")
@@ -73,6 +74,32 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations =  [ der_x - v_x, der_v_x - (-k*x - c*v_x)]
 
         self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_estimator(self):
+        with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Estimator')
+        ref_model = CasadiSysModel()
+        print(casadi_model)
+
+        x = ca.MX.sym("x")
+        der_x = ca.MX.sym("der_x")
+        y = ca.MX.sym("y")
+
+        ref_model.states = [x]
+        ref_model.der_states = [der_x]
+        ref_model.outputs = [y]
+        ref_model.equations =  [ der_x + x, y-x]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_aircraft(self):
+        with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
+        ref_model = CasadiSysModel()
 
 if __name__ == "__main__":
     unittest.main()
