@@ -3,7 +3,7 @@
 Tools for tree walking and visiting etc.
 """
 
-from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from __future__ import print_function, absolute_import, division, unicode_literals
 import copy
 
 from . import ast
@@ -220,7 +220,6 @@ def flatten(root, class_name, instance_name=''):
     # create the returned class
     flat_class = ast.Class(
         name=class_name,
-        equations=copy.deepcopy(orig_class.equations),
     )
 
     # flat file
@@ -246,6 +245,35 @@ def flatten(root, class_name, instance_name=''):
                     else:
                         sym.value = modification   
 
+    def flatten_symbol(sym, instance_prefix):
+        sym_copy = copy.deepcopy(sym)
+        sym_copy.name = instance_prefix + sym.name
+        return sym_copy
+
+    def flatten_equation(equation, instance_prefix):
+        equation_copy = copy.deepcopy(equation)
+
+        class EquationFlattener(TreeListener):
+            def __init__(self, instance_prefix):
+                self.instance_prefix = instance_prefix
+                self.d = 0
+
+                super(EquationFlattener, self).__init__()
+
+            def enterComponentRef(self, tree):
+                self.d += 1
+
+                if self.d == 1:
+                    tree.name = self.instance_prefix + tree.name
+
+            def exitComponentRef(self, tree):
+                self.d -= 1
+
+        w = TreeWalker()
+        w.walk(EquationFlattener(instance_prefix), equation_copy)
+
+        return equation_copy
+
     # pull in parent classes
     for extends in orig_class.extends:
         c = root.find_class(extends.component)
@@ -256,8 +284,9 @@ def flatten(root, class_name, instance_name=''):
 
         # add parent class members symbols and equations
         for parent_sym_name, parent_sym in flat_parent_class.symbols.items():
-            flat_class.symbols[instance_prefix + parent_sym_name] = copy.deepcopy(parent_sym)
-        flat_class.equations += copy.deepcopy(flat_parent_class.equations)
+            flat_sym = flatten_symbol(parent_sym, instance_prefix)
+            flat_class.symbols[flat_sym.name] = flat_sym
+        flat_class.equations += [flatten_equation(e, instance_prefix) for e in flat_parent_class.equations]
 
         # carry out modifications
         modify_class(c, extends.class_modification)
@@ -270,21 +299,26 @@ def flatten(root, class_name, instance_name=''):
         # if the symbol type is a class
         try:
             class_data = root.find_class(sym.type)
+            if class_data.type == 'connector':
+                continue
+
+            # recursively call flatten on the sub class
+            flat_sub_file = flatten(root, sym.type.name, instance_name=sym_name)
+            flat_sub_class = flat_sub_file.find_class(sym.type)
+
+            # add sub_class members symbols and equations
+            for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
+                flat_sym = flatten_symbol(sub_sym, instance_prefix)
+                flat_class.symbols[flat_sym.name] = flat_sym
+            flat_class.equations += [flatten_equation(e, instance_prefix) for e in flat_sub_class.equations]
+
         except KeyError:
             # append original symbol to flat class
-            flat_class.symbols[instance_prefix + sym_name] = copy.deepcopy(sym)
-            continue
-        if class_data.type == 'connector':
-            continue
-
-        # recursively call flatten on the sub class
-        flat_sub_file = flatten(root, sym.type.name, instance_name=sym_name)
-        flat_sub_class = flat_sub_file.find_class(sym.type)
-
-        # add sub_class members symbols and equations
-        for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
-            flat_class.symbols[instance_prefix + sub_sym_name] = copy.deepcopy(sub_sym)
-        flat_class.equations += copy.deepcopy(flat_sub_class.equations)
+            flat_sym = flatten_symbol(sym, instance_prefix)
+            flat_class.symbols[flat_sym.name] = flat_sym
+        
+    # for all equations in the original class
+    flat_class.equations += [flatten_equation(e, instance_prefix) for e in orig_class.equations]
 
     # walker for expanding connect equations
     # ast_walker.walk(ConnectExpanderListener(), flat_class)
