@@ -15,7 +15,6 @@ from .generated.ModelicaParser import ModelicaParser
 # TODO
 #  - Functions
 #  - Import
-#  - Replaceable
 #  - min, max, start
 #  - Make sure slice indices (eventually) evaluate to integers
 
@@ -305,7 +304,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = self.ast[ctx.comp_elem]
 
     def exitReplaceable_element(self, ctx):
-        self.ast[ctx] = 'TODO'
+        self.ast[ctx] = self.ast[ctx.comp_elem]
 
     def enterComponent_clause(self, ctx):
         prefixes = ctx.type_prefix().getText().split(' ')
