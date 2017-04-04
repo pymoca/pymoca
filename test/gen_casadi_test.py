@@ -94,5 +94,12 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_aircraft(self):
+        with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
+        ref_model = CasadiSysModel()
+
 if __name__ == "__main__":
     unittest.main()

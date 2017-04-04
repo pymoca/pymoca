@@ -24,7 +24,12 @@ ca.MX.__eq__  = equality
 op_map = {'*':"__mul__", '+':"__add__","-":"__sub__","/":"__div__"}
 
 def name_flat(tree):
-    return tree.name.replace('.','__')
+    s = tree.name.replace('.','__')
+    if hasattr(tree,"child"):
+        if len(tree.child)!=0:
+            assert(len(tree.child)==1)
+            return s+"__"+name_flat(tree.child[0])
+    return s
 
 class CasadiSysModel:
     def __init__(self):
@@ -53,11 +58,12 @@ class CasadiSysModel:
 
 class CasadiGenerator(tree.TreeListener):
 
-    def __init__(self):
+    def __init__(self, root):
         super(CasadiGenerator, self).__init__()
         self.src = {}
         self.nodes = {}
         self.derivative = {}
+        self.root = root
 
     def exitFile(self, tree):
         pass
@@ -134,8 +140,14 @@ class CasadiGenerator(tree.TreeListener):
     def exitPrimary(self, tree):
         self.src[tree] = float(tree.value)
 
+    def enterComponentRef(self, tree):
+        try:
+            self.src[tree] = self.nodes[name_flat(tree)]
+        except:
+            pass
+
     def exitComponentRef(self, tree):
-        self.src[tree] = self.nodes[name_flat(tree)]
+        pass
 
     def enterSymbol(self, tree):
         s =  ca.MX.sym(name_flat(tree))
@@ -153,6 +165,18 @@ def generate(ast_tree, model_name):
     ast_tree_new = copy.deepcopy(ast_tree)
     ast_walker = tree.TreeWalker()
     flat_tree = tree.flatten(ast_tree_new, model_name)
-    sympy_gen = CasadiGenerator()
+
+
+    root = flat_tree.classes[model_name]
+
+    classes = ast_tree.classes
+    instantiator = tree.Instatiator(classes=classes)
+    ast_walker.walk(instantiator, root)
+
+    flat_tree = instantiator.res[root]
+
+    print(flat_tree)
+    sympy_gen = CasadiGenerator(flat_tree)
+
     ast_walker.walk(sympy_gen, flat_tree)
     return sympy_gen.results
