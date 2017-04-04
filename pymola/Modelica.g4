@@ -120,8 +120,8 @@ replaceable_element:
 
 // B.2.2.12 ------------------------------------------------
 import_clause :
-    'import' ( IDENT '=' name
-        | name ('.' ( '*' | '{' import_list '}' ) )? ) comment
+    'import' ( IDENT '=' component_reference
+        | component_reference ('.' ( '*' | '{' import_list '}' ) )? ) comment
     ;
 
 // B.2.2.13 ------------------------------------------------
@@ -135,7 +135,7 @@ import_list :
 
 // B.2.3.1 ------------------------------------------------
 extends_clause :
-    'extends' name class_modification? annotation?
+    'extends' component_reference class_modification? annotation?
     ;
 
 // B.2.3.2 ------------------------------------------------
