@@ -251,9 +251,7 @@ def flatten(root, class_name, instance_name=''):
                     if isinstance(modification, ast.ClassModification):
                         modify_class(sym, modification)
                     else:
-                        # TODO
-                        #sym.value = modification   
-                        pass         
+                        sym.value = modification   
 
     # pull in parent classes
     for extends in orig_class.extends:

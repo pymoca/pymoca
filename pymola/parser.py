@@ -455,6 +455,8 @@ class ASTListener(ModelicaListener):
         sym = self.symbol_node
         if ctx.array_subscripts() is not None:
             sym.dimensions = self.ast[ctx.array_subscripts()]
+        if ctx.modification() is not None:
+            sym.value = self.ast[ctx.modification()][-1]
 
     def exitElement_modification(self, ctx):
         if ctx.modification() is not None:
@@ -473,7 +475,7 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] += [self.ast[ctx.expression()]]
 
     def exitModification_assignment(self, ctx):
-        self.ast[ctx] = [self.ast[ctx.expression()]]
+        self.ast[ctx] = [self.ast[ctx.expression()]]        
 
     def exitModification_assignment2(self, ctx):
         self.ast[ctx] = [self.ast[ctx.expression()]]
