@@ -242,6 +242,26 @@ class EquationSection(Node):
         super(EquationSection, self).__init__(**kwargs)
 
 
+class ElementModification(Node):
+    def __init__(self, **kwargs):
+        super(ElementModification, self).__init__(**kwargs)
+
+
+class ElementReplaceable(Node):
+    def __init__(self, **kwargs):
+        super(ElementReplaceable, self).__init__(**kwargs)
+
+
+class ClassModification(Node):
+    def __init__(self, **kwargs):
+        super(ClassModification, self).__init__(**kwargs)
+
+
+class ExtendsClause(Node):
+    def __init__(self, **kwargs):
+        super(ExtendsClause, self).__init__(**kwargs)
+
+
 class Class(Node):
     def __init__(self, **kwargs):
         super(Class, self).__init__(**kwargs)
@@ -343,8 +363,23 @@ EquationSection.ast_spec = {
     'equations': FieldList([Equation, ForEquation, ConnectClause], []),
 }
 
+ElementModification.ast_spec = {
+    'name': Field(str, ''),
+    'modifications': FieldList([Primary, Expression, ClassModification], []),
+}
+
+ClassModification.ast_spec = {
+    'arguments': FieldList([ElementModification, Symbol], []),
+}
+
+ExtendsClause.ast_spec = {
+    'component': Field([ComponentRef]),
+    'class_modification': Field([ClassModification]),
+}
+
 Class.ast_spec = {
     'name': Field(str),
+    'extends': FieldList([ExtendsClause], []),
     'encapsulated': Field([bool], False),
     'partial': Field([bool], False),
     'final': Field([bool], False),

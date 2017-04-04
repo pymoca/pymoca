@@ -14,6 +14,9 @@ from .generated.ModelicaParser import ModelicaParser
 
 # TODO
 #  - Functions
+#  - Import
+#  - Replaceable
+#  - min, max, start
 
 
 class ASTListener(ModelicaListener):
@@ -71,13 +74,24 @@ class ASTListener(ModelicaListener):
         class_node.comment = self.ast[ctx.string_comment()]
 
     def exitComposition(self, ctx):
-
         for eqlist in [self.ast[e] for e in ctx.equation_section()]:
             if eqlist is not None:
                 if eqlist.initial:
                     self.class_node.initial_equations += eqlist.equations
                 else:
                     self.class_node.equations += eqlist.equations
+
+    def exitArgument(self, ctx):
+        self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
+
+    def exitArgument_list(self, ctx):
+        self.ast[ctx] = [self.ast[a] for a in ctx.argument()]
+
+    def exitClass_modification(self, ctx):
+        arguments = []
+        if ctx.argument_list() is not None:
+            arguments = self.ast[ctx.argument_list()]
+        self.ast[ctx] = ast.ClassModification(arguments=arguments)
 
     def enterEquation_section(self, ctx):
         eq_sect = ast.EquationSection(
@@ -273,7 +287,13 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = 'TODO'
 
     def exitExtends_clause(self, ctx):
-        self.ast[ctx] = 'TODO'
+        if ctx.class_modification() is not None:
+            class_modification = self.ast[ctx.class_modification()]
+        else:
+            class_modification = ast.ClassModification()
+        self.ast[ctx] = ast.ExtendsClause(component=ast.ComponentRef(name=ctx.name().getText()),
+            class_modification=class_modification)
+        self.class_node.extends += [self.ast[ctx]]
 
     def exitRegular_element(self, ctx):
         self.ast[ctx] = self.ast[ctx.comp_elem]
@@ -306,17 +326,22 @@ class ASTListener(ModelicaListener):
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
 
+    def exitComponent_clause1(self, ctx):
+        clause = self.ast[ctx]
+
     def enterComponent_declaration(self, ctx):
         sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
+        self.comp_clause.symbol_list += [sym]
 
     def enterComponent_declaration1(self, ctx):
         sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
+        self.comp_clause.symbol_list += [sym]
 
     def enterElement_modification(self, ctx):
         sym = ast.Symbol(order = self.sym_count, start=ast.Primary(value=0.0))
@@ -346,13 +371,40 @@ class ASTListener(ModelicaListener):
             sym.dimensions = self.ast[ctx.array_subscripts()]
 
     def exitElement_modification(self, ctx):
+        if ctx.modification() is not None:
+            modifications = self.ast[ctx.modification()]
+        else:
+            modifications = []
+        self.ast[ctx] = ast.ElementModification(name=ctx.name().getText(), modifications=modifications)
         sym = self.symbol_node
         if ctx.name().getText() == 'start':
             sym.start = self.ast[ctx.modification().expression()]
 
+    def exitModification_class(self, ctx):
+        self.ast[ctx] = [self.ast[ctx.class_modification()]]
+        if ctx.expression() is not None:
+            self.ast[ctx] += [self.ast[ctx.expression()]]
+
     def exitModification_assignment(self, ctx):
+        self.ast[ctx] = [self.ast[ctx.expression()]]
+
+        # TODO wrong
         sym = self.symbol_node
         sym.start = self.ast[ctx.expression()]
+
+    def exitModification_assignment2(self, ctx):
+        self.ast[ctx] = [self.ast[ctx.expression()]]
+
+    def exitElement_replaceable(self, ctx):
+        self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
+
+    def exitElement_modification_or_replaceable(self, ctx):
+        self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
+
+    def exitElement_redeclaration(self, ctx):
+        self.ast[ctx] = []
+        for symbol in self.ast[ctx.component_clause1()].symbol_list:
+            symbol.redeclare = True
 
     # COMMENTS ==============================================================
 
