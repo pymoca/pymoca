@@ -428,7 +428,7 @@ def serializedATN():
         buf.write("\u0347\3\2\2\2\u0349\u034a\3\2\2\2\u034a\u034c\3\2\2\2")
         buf.write("\u034b\u0345\3\2\2\2\u034b\u034c\3\2\2\2\u034cq\3\2\2")
         buf.write("\2\u034d\u034e\b:\1\2\u034e\u034f\7\23\2\2\u034f\u0350")
-        buf.write("\5r:\2\u0350\u0351\7\25\2\2\u0351\u035c\3\2\2\2\u0352")
+        buf.write("\5n8\2\u0350\u0351\7\25\2\2\u0351\u035c\3\2\2\2\u0352")
         buf.write("\u0353\7:\2\2\u0353\u035c\5r:\13\u0354\u0355\5t;\2\u0355")
         buf.write("\u0356\t\6\2\2\u0356\u0357\5t;\2\u0357\u035c\3\2\2\2\u0358")
         buf.write("\u0359\7I\2\2\u0359\u035c\5r:\6\u035a\u035c\5t;\2\u035b")
@@ -5615,8 +5615,8 @@ class ModelicaParser ( Parser ):
             super().__init__(parser)
             self.copyFrom(ctx)
 
-        def expr(self):
-            return self.getTypedRuleContext(ModelicaParser.ExprContext,0)
+        def expression(self):
+            return self.getTypedRuleContext(ModelicaParser.ExpressionContext,0)
 
 
         def enterRule(self, listener:ParseTreeListener):
@@ -5673,7 +5673,7 @@ class ModelicaParser ( Parser ):
                 self.state = 844
                 self.match(ModelicaParser.T__16)
                 self.state = 845
-                self.expr(0)
+                self.expression()
                 self.state = 846
                 self.match(ModelicaParser.T__18)
                 pass
