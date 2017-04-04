@@ -252,7 +252,7 @@ def serializedATN():
         buf.write("\u01a2\3\2\2\2\u01a1\u01a3\t\4\2\2\u01a2\u01a1\3\2\2\2")
         buf.write("\u01a2\u01a3\3\2\2\2\u01a3\u01a5\3\2\2\2\u01a4\u01a6\t")
         buf.write("\5\2\2\u01a5\u01a4\3\2\2\2\u01a5\u01a6\3\2\2\2\u01a6-")
-        buf.write("\3\2\2\2\u01a7\u01a8\5v<\2\u01a8/\3\2\2\2\u01a9\u01ae")
+        buf.write("\3\2\2\2\u01a7\u01a8\5x=\2\u01a8/\3\2\2\2\u01a9\u01ae")
         buf.write("\5\62\32\2\u01aa\u01ab\7\27\2\2\u01ab\u01ad\5\62\32\2")
         buf.write("\u01ac\u01aa\3\2\2\2\u01ad\u01b0\3\2\2\2\u01ae\u01ac\3")
         buf.write("\2\2\2\u01ae\u01af\3\2\2\2\u01af\61\3\2\2\2\u01b0\u01ae")
@@ -2653,8 +2653,8 @@ class ModelicaParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
 
 
         def getRuleIndex(self):
@@ -2678,7 +2678,7 @@ class ModelicaParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 421
-            self.name()
+            self.component_reference()
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)

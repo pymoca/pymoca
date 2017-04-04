@@ -398,7 +398,7 @@ ForStatement.ast_spec = {
 
 Symbol.ast_spec = {
     'name': Field([str], ''),
-    'type': Field([str], ''),
+    'type': Field([ComponentRef], ComponentRef()),
     'prefixes': FieldList([str], []),
     'redeclare': Field([bool], False),
     'final': Field([bool], False),
@@ -417,7 +417,7 @@ Symbol.ast_spec = {
 
 ComponentClause.ast_spec = {
     'prefixes': FieldList([str], []),
-    'type': Field([str], ''),
+    'type': Field([ComponentRef], ComponentRef()),
     'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
     'comment': FieldList([str], []),
     'symbol_list': FieldList([Symbol], []),

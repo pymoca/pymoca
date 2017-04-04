@@ -382,7 +382,6 @@ class ASTListener(ModelicaListener):
             prefixes = []
         self.ast[ctx] = ast.ComponentClause(
             prefixes=prefixes,
-            type=ctx.type_specifier().getText()
         )
         self.comp_clause = self.ast[ctx]
 
@@ -392,17 +391,18 @@ class ASTListener(ModelicaListener):
             prefixes = []
         self.ast[ctx] = ast.ComponentClause(
             prefixes=prefixes,
-            type=ctx.type_specifier().getText()
         )
         self.comp_clause = self.ast[ctx]
 
     def exitComponent_clause(self, ctx):
         clause = self.ast[ctx]
+        clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
 
     def exitComponent_clause1(self, ctx):
         clause = self.ast[ctx]
+        clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
 
     def enterComponent_declaration(self, ctx):
         sym = ast.Symbol(order = self.sym_count)
@@ -429,6 +429,9 @@ class ASTListener(ModelicaListener):
 
     def exitElement_modification(self, ctx):
         self.symbol_node = None
+
+    def exitType_specifier(self, ctx):
+        self.ast[ctx] = self.ast[ctx.component_reference()]
 
     def exitComponent_declaration(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]
