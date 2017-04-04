@@ -396,6 +396,12 @@ class ASTListener(ModelicaListener):
 
     def exitComponent_clause(self, ctx):
         clause = self.ast[ctx]
+        # The component clause and all its symbols share the same type.
+        # However, the type will only be turned into a component reference
+        # somewhere between the enterDeclarion and exitDeclaration functions
+        # of the symbols. Therefore, we need to keep the component clause's
+        # type, and all its symbols' types, pointing at the same empty
+        # (ComponentRef) object until we can fill it.
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
