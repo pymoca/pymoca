@@ -131,9 +131,14 @@ class ASTListener(ModelicaListener):
     # EXPRESSIONS ===========================================================
 
     def exitSimple_expression(self, ctx):
-        # TODO only using first expression
-        # TODO need this for slices
-        self.ast[ctx] = self.ast[ctx.expr()[0]]
+        if len(ctx.expr()) > 1:
+            if len(ctx.expr()) > 2:
+                step = int(ctx.expr()[2])
+            else:
+                step = -1
+            self.ast[ctx] = ast.Slice(start=int(ctx.expr()[1]), stop=int(ctx.expr()[2]), step=step)
+        else:
+            self.ast[ctx] = self.ast[ctx.expr()[0]]
 
     def exitExpression_simple(self, ctx):
         self.ast[ctx] = self.ast[ctx.simple_expression()]
