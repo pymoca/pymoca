@@ -150,7 +150,7 @@ class ASTListener(ModelicaListener):
             expressions=expressions)
 
     def exitExpr_parenth(self, ctx):
-        self.ast[ctx] = self.ast[ctx.expr()]
+        self.ast[ctx] = self.ast[ctx.expression()]
 
     def exitExpr_primary(self, ctx):
         self.ast[ctx] = self.ast[ctx.primary()]

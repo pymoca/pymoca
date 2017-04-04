@@ -390,6 +390,8 @@ connect_clause :
 //=========================================================
 
 // B.2.7.1 ------------------------------------------------
+// TODO: What is the difference between expression and simple_expression?
+//       Can't we get rid of one of them?
 expression :
     simple_expression                           # expression_simple
     | 'if' expression 'then' expression
@@ -405,7 +407,7 @@ simple_expression :
 
 // B.2.7.3 ------------------------------------------------
 expr :
-    '(' expr ')'                                            # expr_parenth
+    '(' expression ')'                                      # expr_parenth
     | op='-' expr                                           # expr_neg
     | primary op=('^' | '.^') primary                       # expr_exp
     | expr op=('*' | '/' | '.*' | './') expr                # expr_mul
@@ -418,6 +420,7 @@ expr :
     ;
 
 // B.2.7.4 ------------------------------------------------
+// TODO: Figure out what an output_expression_list is (i.e. find an example).
 primary :
     UNSIGNED_NUMBER                                     # primary_unsigned_number
     | STRING                                            # primary_string
