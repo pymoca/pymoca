@@ -6,7 +6,7 @@ grammar Modelica;
 
 // B.2.1.1 ------------------------------------------------
 stored_definition :
-    (WITHIN name? ';')?
+    (WITHIN component_reference? ';')?
     (stored_definition_class)*
     ;
 

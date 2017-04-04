@@ -127,7 +127,7 @@ def serializedATN():
         buf.write("\3\2\2\2\u0082\u03cc\3\2\2\2\u0084\u03cf\3\2\2\2\u0086")
         buf.write("\u03d8\3\2\2\2\u0088\u03e0\3\2\2\2\u008a\u03ed\3\2\2\2")
         buf.write("\u008c\u03ef\3\2\2\2\u008e\u03fb\3\2\2\2\u0090\u03fd\3")
-        buf.write("\2\2\2\u0092\u0094\7T\2\2\u0093\u0095\5v<\2\u0094\u0093")
+        buf.write("\2\2\2\u0092\u0094\7T\2\2\u0093\u0095\5x=\2\u0094\u0093")
         buf.write("\3\2\2\2\u0094\u0095\3\2\2\2\u0095\u0096\3\2\2\2\u0096")
         buf.write("\u0098\7\3\2\2\u0097\u0092\3\2\2\2\u0097\u0098\3\2\2\2")
         buf.write("\u0098\u009c\3\2\2\2\u0099\u009b\5\4\3\2\u009a\u0099\3")
@@ -789,8 +789,8 @@ class ModelicaParser ( Parser ):
                 return self.getTypedRuleContext(ModelicaParser.Stored_definition_classContext,i)
 
 
-        def name(self):
-            return self.getTypedRuleContext(ModelicaParser.NameContext,0)
+        def component_reference(self):
+            return self.getTypedRuleContext(ModelicaParser.Component_referenceContext,0)
 
 
         def getRuleIndex(self):
@@ -825,7 +825,7 @@ class ModelicaParser ( Parser ):
                 _la = self._input.LA(1)
                 if _la==ModelicaParser.T__27 or _la==ModelicaParser.IDENT:
                     self.state = 145
-                    self.name()
+                    self.component_reference()
 
 
                 self.state = 148
