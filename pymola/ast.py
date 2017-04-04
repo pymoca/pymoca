@@ -229,6 +229,21 @@ class ConnectClause(Node):
         super(ConnectClause, self).__init__(**kwargs)
 
 
+class AssignmentStatement(Node):
+    def __init__(self, **kwargs):
+        super(AssignmentStatement, self).__init__(**kwargs)
+
+
+class IfStatement(Node):
+    def __init__(self, **kwargs):
+        super(IfStatement, self).__init__(**kwargs)
+
+
+class ForStatement(Node):
+    def __init__(self, **kwargs):
+        super(ForStatement, self).__init__(**kwargs)
+
+
 class Symbol(Node):
     def __init__(self, **kwargs):
         super(Symbol, self).__init__(**kwargs)
@@ -242,6 +257,11 @@ class ComponentClause(Node):
 class EquationSection(Node):
     def __init__(self, **kwargs):
         super(EquationSection, self).__init__(**kwargs)
+
+
+class AlgorithmSection(Node):
+    def __init__(self, **kwargs):
+        super(AlgorithmSection, self).__init__(**kwargs)
 
 
 class ImportAsClause(Node):
@@ -350,6 +370,24 @@ ConnectClause.ast_spec = {
     'comment': Field([str]),
 }
 
+AssignmentStatement.ast_spec = {
+    'left': Field([ComponentRef]),
+    'right': Field([Expression, Primary, ComponentRef]),
+    'comment': Field([str]),
+}
+
+IfStatement.ast_spec = {
+    'expressions': FieldList([Expression, Primary, ComponentRef]),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
+    'comment': Field([str]),
+}
+
+ForStatement.ast_spec = {
+    'indices': FieldList([ForIndex]),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
+    'comment': Field([str]),
+}
+
 Symbol.ast_spec = {
     'name': Field([str], ''),
     'type': Field([str], ''),
@@ -379,6 +417,11 @@ ComponentClause.ast_spec = {
 EquationSection.ast_spec = {
     'initial': Field([bool], False),
     'equations': FieldList([Equation, ForEquation, ConnectClause], []),
+}
+
+AlgorithmSection.ast_spec = {
+    'initial': Field([bool], False),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
 }
 
 ImportAsClause.ast_spec = {
@@ -417,6 +460,8 @@ Class.ast_spec = {
     'symbols': FieldDict([Symbol], {}),
     'initial_equations': FieldList([Equation, ForEquation], []),
     'equations': FieldList([Equation, ForEquation, ConnectClause], []),
+    'initial_statements': FieldList([AssignmentStatement, ForStatement], []),
+    'algorithms': FieldList([AssignmentStatement, ForStatement], []),
 }
 
 File.ast_spec = {

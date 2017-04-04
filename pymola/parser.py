@@ -26,6 +26,7 @@ class ASTListener(ModelicaListener):
         self.class_node = None
         self.comp_clause = None
         self.eq_sect = None
+        self.alg_sect = None
         self.symbol_node = None
         self.eq_comment = None
         self.sym_count = 0
@@ -80,6 +81,13 @@ class ASTListener(ModelicaListener):
                 else:
                     self.class_node.equations += eqlist.equations
 
+        for alglist in [self.ast[e] for e in ctx.algorithm_section()]:
+            if alglist is not None:
+                if alglist.initial:
+                    self.class_node.initial_statements += alglist.statements
+                else:
+                    self.class_node.algorithms += alglist.statements
+
     def exitArgument(self, ctx):
         self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
 
@@ -105,6 +113,20 @@ class ASTListener(ModelicaListener):
             eq_sect.equations += [self.ast[e] for e in ctx.equation()]
         else:
             eq_sect.equations += [self.ast[e] for e in ctx.equation()]
+
+    def enterAlgorithm_section(self, ctx):
+        alg_sect = ast.AlgorithmSection(
+            initial=ctx.INITIAL() is not None
+        )
+        self.ast[ctx] = alg_sect
+        self.alg_sect = alg_sect
+
+    def exitAlgorithm_section(self, ctx):
+        alg_sect = self.ast[ctx]
+        if alg_sect.initial:
+            alg_sect.statements += [self.ast[e] for e in ctx.statement()]
+        else:
+            alg_sect.statements += [self.ast[e] for e in ctx.statement()]
 
     # EQUATION ===========================================================
 
@@ -140,6 +162,41 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ConnectClause(
             left=self.ast[ctx.component_reference()[0]],
             right=self.ast[ctx.component_reference()[1]])
+
+    # STATEMENT ==========================================================
+
+    # TODO:
+    # - Missing statement types:
+    #   + Function calls (inside current function).
+    #   + Break
+    #   + Return
+    #   + While
+    #   + When? (also in equation missing)
+
+    def enterStatement(self, ctx):
+        pass
+
+    def exitStatement(self, ctx):
+        self.ast[ctx] = self.ast[ctx.statement_options()]
+        try:
+            self.ast[ctx].comment = self.ast[ctx.comment()]
+        except AttributeError:
+            pass
+
+    def exitStatement_component_reference(self, ctx):
+        self.ast[ctx] = ast.AssignmentStatement(
+            left=self.ast[ctx.component_reference()],
+            right=self.ast[ctx.expression()])
+
+    def exitStatement_if(self, ctx):
+        self.ast[ctx] = ast.IfStatement(
+            expressions=[self.ast[s] for s in ctx.if_statement().expression()],
+            statements=[self.ast[s] for s in ctx.if_statement().statement()])
+
+    def exitStatement_for(self, ctx):
+        self.ast[ctx] = ast.ForStatement(
+            indices=[self.ast[s] for s in ctx.for_statement().for_indices().for_index()],
+            statements=[self.ast[s] for s in ctx.for_statement().statement()])
 
     # EXPRESSIONS ===========================================================
 
