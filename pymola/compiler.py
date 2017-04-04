@@ -24,7 +24,7 @@ model_name = args[1]
 
 # Set CasADi installation folder
 if options.casadi_folder is not None:
-	sys.path.append(options.casadi_folder)
+    sys.path.append(options.casadi_folder)
 
 # Import rest of pymola
 from . import parser, tree, gen_casadi
@@ -34,12 +34,12 @@ S = ''
 for root, dir, files in os.walk(model_folder):
     for items in fnmatch.filter(files, "*.mo"):
         with open(os.path.join(root, items), 'r') as f:
-        	S += f.read()
+            S += f.read()
 
 # Compile
 ast = parser.parse(S)
 if options.flatten_only:
-	ast = tree.flatten(ast, model_name)
-	print(ast)
+    ast = tree.flatten(ast, model_name)
+    print(ast)
 else:
-	gen_casadi.generate(ast, model_name)
+    gen_casadi.generate(ast, model_name)

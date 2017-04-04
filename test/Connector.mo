@@ -1,18 +1,18 @@
-connector Link
+connector Link2
     Real force;
-end Link;
+end Link2;
 
-model RigidBody
+model RigidBody2
     Link link;
     Real x;
 equation
     der(x) = link.force;
-end RigidBody;
+end RigidBody2;
 
-model Aircraft
-    Link link;
-    RigidBody body;
+model Connector
+    Link2 link;
+    RigidBody2 body;
 equation
     connect(link, body.link);
-end Aircraft;
+end Connector;
 

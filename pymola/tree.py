@@ -268,25 +268,23 @@ def flatten(root, class_name, instance_name=''):
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
-        if sym.type in root.classes:
-            class_data = root.classes[sym.type] # TODO
-            if class_data.type == 'connector':
-                continue
-
-            # recursively call flatten on the sub class
-            flat_sub_file = flatten(root, sym.type, instance_name=sym_name)
-            flat_sub_class = flat_sub_file.classes[sym.type]
-
-            # add sub_class members symbols and equations
-            for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
-                flat_class.symbols[instance_prefix + sub_sym_name] = copy.deepcopy(sub_sym)
-            flat_class.equations += copy.deepcopy(flat_sub_class.equations)
-
-        # else if the symbols is not a class name
-        else:
+        try:
+            class_data = root.find_class(sym.type)
+        except KeyError:
             # append original symbol to flat class
             flat_class.symbols[instance_prefix + sym_name] = copy.deepcopy(sym)
+            continue
+        if class_data.type == 'connector':
+            continue
 
+        # recursively call flatten on the sub class
+        flat_sub_file = flatten(root, sym.type.name, instance_name=sym_name)
+        flat_sub_class = flat_sub_file.find_class(sym.type)
+
+        # add sub_class members symbols and equations
+        for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
+            flat_class.symbols[instance_prefix + sub_sym_name] = copy.deepcopy(sub_sym)
+        flat_class.equations += copy.deepcopy(flat_sub_class.equations)
 
     # walker for expanding connect equations
     # ast_walker.walk(ConnectExpanderListener(), flat_class)
