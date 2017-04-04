@@ -30,6 +30,7 @@ class CasadiSysModel:
     def __init__(self):
         self.states = []
         self.der_states = []
+        self.alg_states = []
         self.inputs = []
         self.outputs = []
         self.constants = []
@@ -40,6 +41,7 @@ class CasadiSysModel:
         r+="Model\n"
         r+="states: " + str(self.states) + "\n"
         r+="der_states: " + str(self.der_states) + "\n"
+        r+="alg_states: " + str(self.alg_states) + "\n"
         r+="inputs: " + str(self.inputs) + "\n"
         r+="outputs: " + str(self.outputs) + "\n"
         r+="constants: " + str(self.constants) + "\n"
@@ -47,7 +49,7 @@ class CasadiSysModel:
         r+="equations: " + str(self.equations) + "\n"
         return r
     def get_function(self):
-        return ca.Function('check',self.states+self.der_states+self.inputs+self.outputs+self.constants+self.parameters,self.equations)
+        return ca.Function('check',self.states+self.der_states+self.alg_states+self.inputs+self.outputs+self.constants+self.parameters,self.equations)
 
 class CasadiGenerator(tree.TreeListener):
 
@@ -88,8 +90,16 @@ class CasadiGenerator(tree.TreeListener):
                 variables += [s]
 
         results = CasadiSysModel()
-        results.states = [self.src[e] for e in states]
-        results.der_states = [self.derivative[self.src[e]] for e in states]
+        ode_states = []
+        alg_states = []
+        for s in states:
+            if self.src[s] in self.derivative:
+                ode_states.append(s)
+            else:
+                alg_states.append(s)
+        results.states = [self.src[e] for e in ode_states]
+        results.der_states = [self.derivative[self.src[e]] for e in ode_states]
+        results.alg_states = [self.src[e] for e in alg_states]
         results.constants = [self.src[e] for e in constants]
         results.parameters = [self.src[e] for e in parameters]
         results.inputs = [self.src[e] for e in inputs]
