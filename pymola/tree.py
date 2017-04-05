@@ -271,7 +271,6 @@ def flatten(root, class_name, instance_name=''):
 
         return expression_copy
 
-
     # pull in parent classes
     for extends in orig_class.extends:
         c = root.find_class(extends.component)
@@ -284,30 +283,26 @@ def flatten(root, class_name, instance_name=''):
         flat_parent_class = flat_parent_file.classes[c.name]
 
         # add parent class members symbols, equations and statements
-        for parent_sym_name, parent_sym in flat_parent_class.symbols.items():
-            flat_sym = flatten_symbol(parent_sym, instance_prefix)
-            flat_class.symbols[flat_sym.name] = flat_sym
-        flat_class.equations += [flatten_expression(e, instance_prefix) for e in flat_parent_class.equations]
-        flat_class.statements += [flatten_expression(e, instance_prefix) for e in flat_parent_class.statements]
+        flat_class.symbols.update(flat_parent_class.symbols)
+        flat_class.equations += flat_parent_class.equations
+        flat_class.statements += flat_parent_class.statements
 
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
         try:
             c = root.find_class(sym.type)
-            #if sym.class_modification is not None:
-            #    c = modify_class(c, sym.class_modification)
+            if sym.class_modification is not None:
+                c = modify_class(c, sym.class_modification)
 
-            # recursively call flatten on the sub class
-            flat_sub_file = flatten(root, c, instance_name=sym_name)
+            # recursively call flatten on the contained class
+            flat_sub_file = flatten(root, c, instance_name=instance_prefix + sym_name)
             flat_sub_class = flat_sub_file.find_class(sym.type) # TODO
 
             # add sub_class members symbols and equations
-            for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
-                flat_sym = flatten_symbol(sub_sym, instance_prefix)
-                flat_class.symbols[flat_sym.name] = flat_sym
-            flat_class.equations += [flatten_expression(e, instance_prefix) for e in flat_sub_class.equations]
-            flat_class.statements += [flatten_expression(e, instance_prefix) for e in flat_sub_class.statements]
+            flat_class.symbols.update(flat_sub_class.symbols)
+            flat_class.equations += flat_sub_class.equations
+            flat_class.statements += flat_sub_class.statements
 
         except KeyError:
             # append original symbol to flat class
