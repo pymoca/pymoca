@@ -16,11 +16,6 @@ logger = logging.getLogger("pymola")
 # TODO Flatten function vs. conversion classes
 # TODO mark protected variables as such
 
-try:
-    basestring
-except NameError:
-    basestring = str
-
 
 class TreeWalker(object):
 
@@ -183,32 +178,21 @@ class TreeListener(object):
         pass
 
 
-def flatten(root, class_name, instance_name=''):
+def flatten_class(root, orig_class, instance_name):
     """
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
     of the instance name passed.
     :param root: The root of the tree that contains all class definitions
-    :param class_name: The class we want to flatten
+    :param orig_class: The class we want to flatten
     :param instance_name:
     :return: flat_class, the flattened class of type Class
     """
 
-    # extract the original class of interest
-    if isinstance(class_name, str) or isinstance(class_name, basestring):
-        orig_class = root.classes[class_name]
-    else:
-        orig_class = class_name
-        class_name = orig_class.name
-
     # create the returned class
     flat_class = ast.Class(
-        name=class_name,
+        name=orig_class.name,
     )
-
-    # flat file
-    flat_file = ast.File()
-    flat_file.classes[class_name] = flat_class
 
     # append period to non empty instance_name
     if instance_name != '':
@@ -235,7 +219,7 @@ def flatten(root, class_name, instance_name=''):
                     orig_sym.__dict__.update(new_sym.__dict__)
             elif isinstance(argument, ast.ShortClassDefinition):
                 for sym in class_or_sym.symbols.values():
-                    if sym.type.name == argument.name: # TODO
+                    if len(sym.type.child) == 0 and sym.type.name == argument.name:
                         sym.type = argument.component
                 # TODO class modifications to short class definition
             else:
@@ -285,8 +269,7 @@ def flatten(root, class_name, instance_name=''):
         c = modify_class(c, extends.class_modification)
 
         # recursively call flatten on the parent class
-        flat_parent_file = flatten(root, c, instance_name=instance_name)
-        flat_parent_class = flat_parent_file.classes[c.name]
+        flat_parent_class = flatten_class(root, c, instance_name)
 
         # add parent class members symbols, equations and statements
         flat_class.symbols.update(flat_parent_class.symbols)
@@ -295,25 +278,30 @@ def flatten(root, class_name, instance_name=''):
 
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
-        # if the symbol type is a class
         try:
             c = root.find_class(sym.type)
+        except KeyError:
+            # append original symbol to flat class
+            flat_sym = flatten_symbol(sym, instance_prefix)
+            flat_class.symbols[flat_sym.name] = flat_sym
+        else:
+            # the symbol type is a class
             if sym.class_modification is not None:
                 c = modify_class(c, sym.class_modification)
 
             # recursively call flatten on the contained class
-            flat_sub_file = flatten(root, c, instance_name=instance_prefix + sym_name)
-            flat_sub_class = flat_sub_file.find_class(sym.type) # TODO
+            flat_sub_class = flatten_class(root, c, instance_prefix + sym_name)
 
             # add sub_class members symbols and equations
             flat_class.symbols.update(flat_sub_class.symbols)
             flat_class.equations += flat_sub_class.equations
             flat_class.statements += flat_sub_class.statements
 
-        except KeyError:
-            # append original symbol to flat class
-            flat_sym = flatten_symbol(sym, instance_prefix)
-            flat_class.symbols[flat_sym.name] = flat_sym
+            # we keep connectors in the class hierarchy, as we may refer to them further
+            # up using connect() clauses
+            if c.type == 'connector':
+                flat_sym = flatten_symbol(sym, instance_prefix)
+                flat_class.symbols[flat_sym.name] = flat_sym
 
     # for all equations in original class
     flow_connections = {}
@@ -322,17 +310,22 @@ def flatten(root, class_name, instance_name=''):
         if isinstance(equation, ast.ConnectClause):
             # expand connector
             connect_equations = []
-            sym_left = root.find_symbol(orig_class, equation.left)
-            sym_right = root.find_symbol(orig_class, equation.right)
+
+            sym_left = root.find_symbol(flat_class, flat_equation.left)
+            sym_right = root.find_symbol(flat_class, flat_equation.right)
 
             try:
                 class_left = root.find_class(sym_left.type)
                 class_right = root.find_class(sym_right.type)
+            except KeyError:
+                logger.warning("Connector class {} or {} not defined.  Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
 
+                connect_equation = ast.Equation(left=flat_equation.left, right=flat_equation.right)
+                connect_equations.append(connect_equation)
+            else:
                 assert(class_left == class_right)
 
-                flat_file_left = flatten(root, class_left.name)
-                flat_class_left = flat_file_left.classes[class_left.name]
+                flat_class_left = flatten_class(root, class_left, '')
 
                 for connector_variable in flat_class_left.symbols.values():
                     left_name = flat_equation.left.name + '.' + connector_variable.name
@@ -357,11 +350,6 @@ def flatten(root, class_name, instance_name=''):
                             flow_connections[connected_variable] = connected_variables
                     else:
                         raise Exception("Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
-            except KeyError:
-                logger.debug("Connector class not defined.  Assuming it to be an elementary type.")
-
-                connect_equation = ast.Equation(left=flat_equation.left, right=flat_equation.right)
-                connect_equations.append(connect_equation)
 
             flat_class.equations += connect_equations
         else:
@@ -379,4 +367,31 @@ def flatten(root, class_name, instance_name=''):
         connect_equation = ast.Equation(left=ast.Expression(operator='+', operands=operands), right=ast.Primary(value=0))
         flat_class.equations += [connect_equation]
 
+    return flat_class
+
+def flatten(root, class_name):
+    """
+    This function takes and flattens it so that all subclasses instances
+    are replaced by the their equations and symbols with name mangling
+    of the instance name passed.
+    :param root: The root of the tree that contains all class definitions
+    :param class_name: The class we want to flatten
+    :return: flat_file, a File containing the flattened class
+    """
+
+    # flatten class
+    flat_class = flatten_class(root, root.classes[class_name], '')
+
+    # strip connector symbols
+    for i, sym in list(flat_class.symbols.items()):
+        try:
+            c = root.find_class(sym.type)
+        except KeyError:
+            pass
+        else:
+            del flat_class.symbols[i]
+
+    # flat file
+    flat_file = ast.File()
+    flat_file.classes[class_name] = flat_class
     return flat_file

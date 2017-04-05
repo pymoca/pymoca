@@ -9,7 +9,8 @@ connector HQZ
 end HQZ;
 
 model ChannelZ
-	HQZ up;
+	replaceable connector port = HQBase;
+	port up;
 	HQZ down;
 equation
 	up.H = down.H;
@@ -29,9 +30,9 @@ equation
 end QBCZ;
 
 model SystemZ
-	ChannelZ a;
-	ChannelZ b;
-	ChannelZ c;
+	ChannelZ a(redeclare connector port = HQZ);
+	ChannelZ b(redeclare connector port = HQZ);
+	ChannelZ c(redeclare connector port = HQZ);
 	QBCZ qa;
 	QBCZ qc;
 	HBCZ hb;
