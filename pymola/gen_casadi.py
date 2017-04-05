@@ -153,7 +153,6 @@ class CasadiGenerator(NumpyGenerator):
         if op.startswith("."):
             op = op[1:]
 
-
         n_operands = len(tree.operands)
         if op == 'der':
             orig = self.src[tree.operands[0]]
@@ -261,7 +260,9 @@ class CasadiGenerator(NumpyGenerator):
 
     def enterSymbol(self, tree):
         size = [int(d.value) for d in tree.dimensions]
+        assert(len(size)<=2)
         for i in tree.type.indices:
+            assert len(size)==1
             size=[size[0]*self.get_int_parameter(i)]
         s =  ca.MX.sym(name_flat(tree), *size)
         self.nodes[name_flat(tree)] = s
@@ -289,9 +290,7 @@ class CasadiGenerator(NumpyGenerator):
         self.src[tree] = res[0].T
 
 def generate(ast_tree, model_name):
-    print(ast_tree)
     flat_tree = tree.flatten(ast_tree, model_name)
-    print(flat_tree)
     sympy_gen = CasadiGenerator(flat_tree, model_name)
 
     # create a walker
