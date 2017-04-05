@@ -149,6 +149,10 @@ class CasadiGenerator(tree.TreeListener):
             op = tree.operator.name
         except:
             op = str(tree.operator)
+
+        if op.startswith("."):
+            op = op[1:]
+
         n_operands = len(tree.operands)
         if op == 'der':
             orig = self.src[tree.operands[0]]
@@ -180,6 +184,7 @@ class CasadiGenerator(tree.TreeListener):
         elif n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
+            print(tree)
             lhs_op = getattr(lhs,tree.operator.name)
             src = lhs_op(rhs)
         else:
@@ -189,14 +194,27 @@ class CasadiGenerator(tree.TreeListener):
     def exitPrimary(self, tree):
         self.src[tree] = float(tree.value)
 
-    def enterComponentRef(self, tree):
+    def exitSlice(self, tree):
+        start = self.src[tree.start]
+        step = self.src[tree.step]
+        stop = self.src[tree.stop]
+        if isinstance(stop, ca.MX):
+            stop = self.get_int_parameter(tree.stop)
+        print(start, step, stop)
+        self.src[tree] = map(int,list(np.array(np.arange(start, stop+step, step))-1))
+
+    def exitComponentRef(self, tree):
         try:
             self.src[tree] = self.nodes[name_flat(tree)]
         except:
+            if tree.name=="Real":
+                return
             if tree.name=="time":
                 self.src[tree] = self.nodes["time"]
-            if len(tree.indices)>0:
+            if len(tree.indices)>0 and len(self.for_loops)==0:
                 self.src[tree] = self.get_indexed_symbol(tree)
+            elif len(tree.indices)>0:
+                self.src[tree] = self.get_indexed_symbol_loop(tree)
             for f in reversed(self.for_loops):
                 if f.name==tree.name:
                     self.src[tree] = f.index_variable
@@ -205,6 +223,13 @@ class CasadiGenerator(tree.TreeListener):
         return 1
 
     def get_indexed_symbol(self,tree):
+        s = self.nodes[tree.name]
+        slice = self.src[tree.indices[0]]
+        print(slice)
+        return s[slice]
+        print("get_indexed_symbol",tree)
+
+    def get_indexed_symbol_loop(self,tree):
 
         names = []
         for e in tree.indices:
@@ -220,8 +245,6 @@ class CasadiGenerator(tree.TreeListener):
 
         return s
 
-    def exitComponentRef(self, tree):
-        pass
 
     def get_int_parameter(self, i):
         s = self.root.find_symbol(self.root.classes[self.class_name],i)
@@ -229,7 +252,7 @@ class CasadiGenerator(tree.TreeListener):
         return int(s.value.value)
 
     def enterSymbol(self, tree):
-        size = 1
+        size = int(tree.dimensions[0].value)
         for i in tree.type.indices:
             size*=self.get_int_parameter(i)
 
@@ -262,6 +285,7 @@ class CasadiGenerator(tree.TreeListener):
 
 def generate(ast_tree, model_name):
     flat_tree = tree.flatten(ast_tree, model_name)
+    print(flat_tree)
     sympy_gen = CasadiGenerator(flat_tree, model_name)
 
     # create a walker

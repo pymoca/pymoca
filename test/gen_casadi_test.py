@@ -254,5 +254,27 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations =  [ x-range(1,11)]
 
         self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_forloop(self):
+        with open(os.path.join(TEST_DIR, 'ArrayExpressions.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ArrayExpressions')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        a = ca.MX.sym("a", 3)
+        b = ca.MX.sym("b", 4)
+        c = ca.MX.sym("c", 3)
+        d = ca.MX.sym("d", 3)
+        e = ca.MX.sym("e", 3)
+
+        scalar_f = ca.MX.sym("scalar_f")
+
+        ref_model.alg_states = [a,b,c,d,e,scalar_f]
+        ref_model.equations =  [ c-(a+b[0:3]), d-(ca.sin(a/b[1:4])), e - (d+scalar_f)]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
 if __name__ == "__main__":
     unittest.main()
