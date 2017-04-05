@@ -166,11 +166,15 @@ class Node(object):
         self.__dict__[key] = value
 
     def find_class(self, component_ref):
-        c = self.classes[component_ref.name]
+        return self.classes[component_ref.name]
+
+    def find_symbol(self, c, component_ref):
+        sym = c.symbols[component_ref.name]
         if len(component_ref.child) > 0:
-            return c.get_component(component_ref.child[0])
+            c = self.find_class(sym.type)
+            return self.find_symbol(c, component_ref.child[0])
         else:
-            return c
+            return sym
 
     def __setattr__(self, key, value):
         self.set_field(key, value)

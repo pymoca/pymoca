@@ -4,9 +4,16 @@ Tools for tree walking and visiting etc.
 """
 
 from __future__ import print_function, absolute_import, division, unicode_literals
+import logging
 import copy
 
 from . import ast
+
+logger = logging.getLogger("pymola")
+
+# TODO class name spaces
+# TODO dot notation
+# TODO find_symbol, find_class
 
 
 class TreeWalker(object):
@@ -275,7 +282,7 @@ def flatten(root, class_name, instance_name=''):
 
             # recursively call flatten on the sub class
             flat_sub_file = flatten(root, sym.type.name, instance_name=sym_name)
-            flat_sub_class = flat_sub_file.find_class(sym.type)
+            flat_sub_class = flat_sub_file.find_class(sym.type) # TODO
 
             # add sub_class members symbols and equations
             for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
@@ -288,68 +295,39 @@ def flatten(root, class_name, instance_name=''):
             flat_sym = flatten_symbol(sym, instance_prefix)
             flat_class.symbols[flat_sym.name] = flat_sym
 
-    # for all equations in the original class
-    flat_class.equations += [flatten_equation(e, instance_prefix) for e in orig_class.equations]
+    # for all equations in original class
+    for equation in orig_class.equations:
+        flat_equation = flatten_equation(equation, instance_prefix)
+        if isinstance(equation, ast.ConnectClause):
+            # expand connector
+            connect_equations = []
+            sym_left = root.find_symbol(orig_class, equation.left)
+            sym_right = root.find_symbol(orig_class, equation.right)
+
+            try:
+                class_left = root.find_class(sym_left.type)
+                class_right = root.find_class(sym_right.type)
+
+                assert(class_left == class_right)
+
+                for connector_variable in class_left.symbols.keys():
+                    left_name = flat_equation.left.name + '.' + connector_variable
+                    left = ast.ComponentRef(name=left_name)
+                    right_name = flat_equation.right.name + '.' + connector_variable
+                    right = ast.ComponentRef(name=right_name)
+                    connect_equation = ast.Equation(left=left, right=right)
+                    connect_equations.append(connect_equation)
+            except KeyError:
+                logger.debug("Connector class not defined.  Assuming it to be an elementary type.")
+
+                connect_equation = ast.Equation(left=flat_equation.left, right=flat_equation.right)
+                connect_equations.append(connect_equation)
+
+            # TODO if flow in prefixes:  flow_equalities[port_a] = flow_equalities[port_b] = flow_variables,
+
+            flat_class.equations += connect_equations
+        else:
+            # flatten equation
+            flat_class.equations += [flat_equation]
 
     return flat_file
-
-def generate(ast_tree, model_name):
-    ast_tree_new = copy.deepcopy(ast_tree)
-    flat_tree = flatten(ast_tree_new, model_name)
-
-    # create a walker
-    ast_walker = TreeWalker()
-
-    # walker for expanding connect equations
-    ast_walker.walk(ConnectExpander(ast_tree_new.classes), flat_tree.classes[model_name])
-
-    return flat_tree
-
-
-def name_flat(tree):
-    s = tree.name
-    if hasattr(tree,"child"):
-        if len(tree.child)!=0:
-            assert(len(tree.child)==1)
-            return s+"."+name_flat(tree.child[0])
-    return s
-
-def deep_insert(tree, e):
-    if len(tree.child)==0:
-        tree.child.append(e)
-    else:
-        deep_insert(tree.child[0], e)
-    return tree
-
-class ConnectExpander(TreeListener):
-
-    def __init__(self, classes):
-        super(ConnectExpander, self).__init__()
-        self.scope = []
-        self.classes = classes
-
-    def enterConnectClause(self, tree):
-        try:
-            left_class = self.context['Class'].symbols[name_flat(tree.left)]
-            right_class =self.context['Class'].symbols[name_flat(tree.right)]
-        except:
-            return
-        assert left_class.type.name == right_class.type.name
-        if left_class.type.name=="Real": return
-
-        left_class = self.classes[left_class.type.name]
-        right_class = self.classes[right_class.type.name]
-
-        assert left_class.type == 'connector'
-        assert right_class.type == 'connector'
-        assert left_class == right_class
-
-        for sym_name, sym in left_class.symbols.items():
-            L = deep_insert(copy.deepcopy(tree.left), ast.ComponentRef(name=sym_name))
-            R = deep_insert(copy.deepcopy(tree.left), ast.ComponentRef(name=sym_name))
-            eq = ast.ConnectClause(
-                comment="connector",
-                left=L,
-                right=R,
-            )
-            self.context['Class'].equations.append(eq)

@@ -163,7 +163,7 @@ class CasadiGenerator(tree.TreeListener):
 
 
 def generate(ast_tree, model_name):
-    flat_tree = tree.generate(ast_tree, model_name)
+    flat_tree = tree.flatten(ast_tree, model_name)
     sympy_gen = CasadiGenerator(flat_tree)
 
     # create a walker
