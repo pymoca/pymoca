@@ -255,7 +255,7 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
-    def test_forloop(self):
+    def test_arrayexpressions(self):
         with open(os.path.join(TEST_DIR, 'ArrayExpressions.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
