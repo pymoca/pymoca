@@ -189,7 +189,7 @@ def flatten(root, class_name, instance_name=''):
     """
 
     # extract the original class of interest
-    if isinstance(class_name, str):
+    if isinstance(class_name, str) or isinstance(class_name, basestring):
         orig_class = root.classes[class_name]
     else:
         orig_class = class_name
