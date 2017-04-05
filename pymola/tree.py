@@ -14,6 +14,7 @@ logger = logging.getLogger("pymola")
 # TODO class name spaces
 # TODO dot notation
 # TODO find_symbol, find_class
+# TODO Flatten function vs. conversion classes
 
 
 class TreeWalker(object):
@@ -296,6 +297,7 @@ def flatten(root, class_name, instance_name=''):
             flat_class.symbols[flat_sym.name] = flat_sym
 
     # for all equations in original class
+    flow_connections = {}
     for equation in orig_class.equations:
         flat_equation = flatten_equation(equation, instance_prefix)
         if isinstance(equation, ast.ConnectClause):
@@ -310,13 +312,29 @@ def flatten(root, class_name, instance_name=''):
 
                 assert(class_left == class_right)
 
-                for connector_variable in class_left.symbols.keys():
-                    left_name = flat_equation.left.name + '.' + connector_variable
-                    left = ast.ComponentRef(name=left_name)
-                    right_name = flat_equation.right.name + '.' + connector_variable
-                    right = ast.ComponentRef(name=right_name)
-                    connect_equation = ast.Equation(left=left, right=right)
-                    connect_equations.append(connect_equation)
+                for connector_variable in class_left.symbols.values():
+                    left_name = flat_equation.left.name + '.' + connector_variable.name
+                    right_name = flat_equation.right.name + '.' + connector_variable.name
+                    if len(connector_variable.prefixes) == 0:
+                        left = ast.ComponentRef(name=left_name)
+                        right = ast.ComponentRef(name=right_name)
+                        connect_equation = ast.Equation(left=left, right=right)
+                        connect_equations.append(connect_equation)
+                    elif connector_variable.prefixes == ['flow']:
+                        left_connected_variables = flow_connections.get(left_name, set())
+                        right_connected_variables = flow_connections.get(right_name, set())
+
+                        connected_variables = left_connected_variables.union(right_connected_variables)
+                        if left_name not in connected_variables:
+                            connected_variables.add(left_name)
+                        if right_name not in connected_variables:
+                            connected_variables.add(right_name)
+
+                        connected_variables = frozenset(connected_variables)
+                        for connected_variable in connected_variables:
+                            flow_connections[connected_variable] = connected_variables
+                    else:
+                        raise Exception("Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
             except KeyError:
                 logger.debug("Connector class not defined.  Assuming it to be an elementary type.")
 
@@ -329,5 +347,14 @@ def flatten(root, class_name, instance_name=''):
         else:
             # flatten equation
             flat_class.equations += [flat_equation]
+
+    # add flow equations
+    if len(flow_connections) > 0:
+        # TODO Flatten first
+        logger.warning("Note: Connections between connectors with flow variables are not supported across levels of the class hierarchy")
+    for connected_variables in set(flow_connections.values()):
+        operands = [ast.ComponentRef(name=variable) for variable in connected_variables]
+        connect_equation = ast.Equation(left=ast.Expression(operator='+', operands=operands), right=ast.Primary(value=0))
+        flat_class.equations += [connect_equation]
 
     return flat_file
