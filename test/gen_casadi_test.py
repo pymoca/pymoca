@@ -249,9 +249,10 @@ class GenCasadiTest(unittest.TestCase):
         ref_model = CasadiSysModel()
 
         x = ca.MX.sym("x",10)
+        b = ca.MX.sym("b")
 
-        ref_model.alg_states = [x]
-        ref_model.equations =  [ x-(np.arange(1,11))]
+        ref_model.alg_states = [x, b]
+        ref_model.equations =  [ x-(np.arange(1,11)+b)]
 
         self.assert_model_equivalent(ref_model, casadi_model)
 

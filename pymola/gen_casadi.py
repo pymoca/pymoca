@@ -281,11 +281,17 @@ class CasadiGenerator(NumpyGenerator):
         f = self.for_loops.pop()
 
         indexed_symbols = f.indexed_symbols.keys()
-        F = ca.Function('loop_body_'+f.name,[f.index_variable]+indexed_symbols,[ca.vcat([ca.vec(self.src[e]) for e in tree.equations])])
+        args = [f.index_variable]+indexed_symbols
+        expr = ca.vcat([ca.vec(self.src[e]) for e in tree.equations])
+        free_vars = ca.symvar(expr)
+
+        free_vars = [e for e in free_vars if e not in args]
+        all_args = args + free_vars
+        F = ca.Function('loop_body_'+f.name,all_args,[expr])
 
         indexed_symbols_full = [self.nodes[f.indexed_symbols[k].name] for k in indexed_symbols]
-        Fmap = F.map(len(f.values))
-        res = Fmap.call([f.values]+indexed_symbols_full)
+        Fmap = F.map("map","serial",len(f.values),list(range(len(args),len(all_args))),[])
+        res = Fmap.call([f.values]+indexed_symbols_full+free_vars)
 
         self.src[tree] = res[0].T
 
