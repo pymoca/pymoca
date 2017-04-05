@@ -219,7 +219,7 @@ element_modification_or_replaceable:
 
 // B.2.5.6 ------------------------------------------------
 element_modification :
-    name modification? string_comment
+    component_reference modification? string_comment
     ;
 
 // B.2.5.7 ------------------------------------------------
@@ -249,7 +249,7 @@ component_declaration1 :
 // B.2.5.11 ------------------------------------------------
 short_class_definition :
     class_prefixes IDENT '='
-    ( base_prefix name array_subscripts?
+    ( base_prefix component_reference array_subscripts?
         class_modification? comment
         | 'enumeration' '(' (enum_list? | ':') ')' comment)
     ;

@@ -64,6 +64,12 @@ class ASTListener(ModelicaListener):
         class_node.encapsulated = ctx.ENCAPSULATED() is not None
         class_node.partial = ctx.class_prefixes().PARTIAL() is not None
         class_node.type = ctx.class_prefixes().class_type().getText()
+        self.ast[ctx] = class_node
+
+    def exitShort_class_definition(self, ctx):
+        self.ast[ctx] = ast.ShortClassDefinition(name=ctx.IDENT().getText(),
+            type=ctx.class_prefixes().class_type().getText(),
+            component=self.ast[ctx.component_reference()])
 
     def enterClass_spec_comp(self, ctx):
         class_node = self.class_node
@@ -381,10 +387,16 @@ class ASTListener(ModelicaListener):
         self.class_node.extends += [self.ast[ctx]]
 
     def exitRegular_element(self, ctx):
-        self.ast[ctx] = self.ast[ctx.comp_elem]
+        if ctx.comp_elem is not None:
+            self.ast[ctx] = self.ast[ctx.comp_elem]
+        else:
+            self.ast[ctx] = self.ast[ctx.class_elem]
 
     def exitReplaceable_element(self, ctx):
-        self.ast[ctx] = self.ast[ctx.comp_elem]
+        if ctx.comp_elem is not None:
+            self.ast[ctx] = self.ast[ctx.comp_elem]
+        else:
+            self.ast[ctx] = self.ast[ctx.class_elem]
 
     def enterComponent_clause(self, ctx):
         prefixes = ctx.type_prefix().getText().split(' ')
@@ -475,20 +487,23 @@ class ASTListener(ModelicaListener):
         if ctx.array_subscripts() is not None:
             sym.dimensions = self.ast[ctx.array_subscripts()]
         if ctx.modification() is not None:
-            mod = self.ast[ctx.modification()][-1]
-            if not isinstance(mod, ast.ClassModification):
-                sym.value = mod
+            for mod in self.ast[ctx.modification()]:
+                if isinstance(mod, ast.ClassModification):
+                    sym.class_modification = mod
+                else:
+                    sym.value = mod
 
     def exitElement_modification(self, ctx):
+        component = self.ast[ctx.component_reference()]
         if ctx.modification() is not None:
             modifications = self.ast[ctx.modification()]
         else:
             modifications = []
-        self.ast[ctx] = ast.ElementModification(name=ctx.name().getText(), modifications=modifications)
+        self.ast[ctx] = ast.ElementModification(component=component, modifications=modifications)
 
         sym = self.symbol_node
-        if ctx.name().getText() in ast.Symbol.ATTRIBUTES:
-            setattr(sym, ctx.name().getText(), self.ast[ctx.modification().expression()])
+        if component.name in ast.Symbol.ATTRIBUTES:
+            setattr(sym, component.name, self.ast[ctx.modification().expression()])
 
     def exitModification_class(self, ctx):
         self.ast[ctx] = [self.ast[ctx.class_modification()]]
@@ -508,9 +523,10 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
 
     def exitElement_redeclaration(self, ctx):
-        self.ast[ctx] = []
-        for symbol in self.ast[ctx.component_clause1()].symbol_list:
-            symbol.redeclare = True
+        if ctx.component_clause1() is not None:
+            self.ast[ctx] = self.ast[ctx.component_clause1()]
+        else:
+            self.ast[ctx] = self.ast[ctx.short_class_definition()]
 
     # COMMENTS ==============================================================
 

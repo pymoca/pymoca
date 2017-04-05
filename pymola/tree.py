@@ -13,7 +13,6 @@ logger = logging.getLogger("pymola")
 
 # TODO class name spaces
 # TODO dot notation
-# TODO find_symbol, find_class
 # TODO Flatten function vs. conversion classes
 
 
@@ -190,7 +189,11 @@ def flatten(root, class_name, instance_name=''):
     """
 
     # extract the original class of interest
-    orig_class = root.classes[class_name]
+    if isinstance(class_name, str):
+        orig_class = root.classes[class_name]
+    else:
+        orig_class = class_name
+        class_name = orig_class.name
 
     # create the returned class
     flat_class = ast.Class(
@@ -207,18 +210,31 @@ def flatten(root, class_name, instance_name=''):
     else:
         instance_prefix = instance_name
 
-    def modify_class(c, modification):
+    def modify_class(class_or_sym, modification):
+        class_or_sym = copy.deepcopy(class_or_sym)
         for argument in modification.arguments:
-            if argument.name in ast.Symbol.ATTRIBUTES:
-                setattr(c, argument.name, argument.modifications[0])
+            if isinstance(argument, ast.ElementModification):
+                if argument.component.name in ast.Symbol.ATTRIBUTES:
+                    setattr(class_or_sym, argument.component.name, argument.modifications[0])
+                else:
+                    sym = class_or_sym.find_symbol(argument.component)
+                    for modification in argument.modifications:
+                        if isinstance(modification, ast.ClassModification):
+                            modify_class(sym, modification)
+                        else:
+                            sym.value = modification
+            elif isinstance(argument, ast.ComponentClause):
+                for new_sym in argument.symbol_list:
+                    orig_sym = class_or_sym.symbols[sym.name]
+                    orig_sym.__dict__.update(new_sym.__dict__)
+            elif isinstance(argument, ast.ShortClassDefinition):
+                for sym in class_or_sym.symbols.values():
+                    if sym.type.name == argument.name:
+                        sym.type = argument.component
+                # TODO class modifications to short class definition
             else:
-                sym = flat_class.symbols[argument.name]
-
-                for modification in argument.modifications:
-                    if isinstance(modification, ast.ClassModification):
-                        modify_class(sym, modification)
-                    else:
-                        sym.value = modification
+                raise Exception('Unsupported class modification argument {}'.format(argument))
+        return class_or_sym
 
     def flatten_symbol(sym, instance_prefix):
         sym_copy = copy.deepcopy(sym)
@@ -258,8 +274,11 @@ def flatten(root, class_name, instance_name=''):
     for extends in orig_class.extends:
         c = root.find_class(extends.component)
 
+        # carry out modifications
+        c = modify_class(c, extends.class_modification)
+
         # recursively call flatten on the parent class
-        flat_parent_file = flatten(root, c.name, instance_name=instance_name)
+        flat_parent_file = flatten(root, c, instance_name=instance_name)
         flat_parent_class = flat_parent_file.classes[c.name]
 
         # add parent class members symbols and equations
@@ -268,21 +287,16 @@ def flatten(root, class_name, instance_name=''):
             flat_class.symbols[flat_sym.name] = flat_sym
         flat_class.equations += [flatten_equation(e, instance_prefix) for e in flat_parent_class.equations]
 
-        # carry out modifications
-        modify_class(c, extends.class_modification)
-
     # for all symbols in the original class
     for sym_name, sym in orig_class.symbols.items():
         # if the symbol type is a class
         try:
-            class_data = root.find_class(sym.type)
-            if class_data.type == 'connector':
-                flat_class.symbols[instance_prefix + sym_name] = copy.deepcopy(sym)
-                for sym_name2, sym2 in class_data.symbols.items():
-                    flat_class.symbols[instance_prefix + sym_name + "." + sym_name2] = copy.deepcopy(sym2)
+            c = root.find_class(sym.type)
+            if sym.class_modification is not None:
+                c = modify_class(c, sym.class_modification)
 
             # recursively call flatten on the sub class
-            flat_sub_file = flatten(root, sym.type.name, instance_name=sym_name)
+            flat_sub_file = flatten(root, c, instance_name=sym_name)
             flat_sub_class = flat_sub_file.find_class(sym.type) # TODO
 
             # add sub_class members symbols and equations
@@ -343,8 +357,6 @@ def flatten(root, class_name, instance_name=''):
 
                 connect_equation = ast.Equation(left=flat_equation.left, right=flat_equation.right)
                 connect_equations.append(connect_equation)
-
-            # TODO if flow in prefixes:  flow_equalities[port_a] = flow_equalities[port_b] = flow_variables,
 
             flat_class.equations += connect_equations
         else:

@@ -281,6 +281,11 @@ class ElementModification(Node):
         super(ElementModification, self).__init__(**kwargs)
 
 
+class ShortClassDefinition(Node):
+    def __init__(self, **kwargs):
+        super(ShortClassDefinition, self).__init__(**kwargs)
+
+
 class ElementReplaceable(Node):
     def __init__(self, **kwargs):
         super(ElementReplaceable, self).__init__(**kwargs)
@@ -417,6 +422,7 @@ Symbol.ast_spec = {
     'fixed': Field([Primary], False),
     'id': Field([int], 0),
     'order': Field([int], 0),
+    'class_modification': Field(ClassModification),
 }
 
 ComponentClause.ast_spec = {
@@ -448,12 +454,19 @@ ImportFromClause.ast_spec = {
 }
 
 ElementModification.ast_spec = {
-    'name': Field(str, ''),
+    'component': Field(ComponentRef, ComponentRef()),
     'modifications': FieldList([Primary, Expression, ClassModification], []),
 }
 
+ShortClassDefinition.ast_spec = {
+    'name': Field(str),
+    'type': Field(str, ''),
+    'component': Field(ComponentRef),
+    'class_modification': Field([ClassModification]),
+}
+
 ClassModification.ast_spec = {
-    'arguments': FieldList([ElementModification], []),
+    'arguments': FieldList([ElementModification, ComponentClause, ShortClassDefinition], []),
 }
 
 ExtendsClause.ast_spec = {
