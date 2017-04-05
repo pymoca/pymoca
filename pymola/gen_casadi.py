@@ -295,10 +295,12 @@ class CasadiGenerator(NumpyGenerator):
         self.src[tree] = res[0].T
 
 def generate(ast_tree, model_name):
-    flat_tree = tree.flatten(ast_tree, model_name)
-    sympy_gen = CasadiGenerator(flat_tree, model_name)
-
     # create a walker
     ast_walker = tree.TreeWalker()
-    ast_walker.walk(sympy_gen, flat_tree)
-    return sympy_gen.results
+
+    flat_tree = tree.flatten(ast_tree, model_name)
+
+    casadi_gen = CasadiGenerator(flat_tree, model_name)
+    casadi_gen.src.update(casadi_gen.src)
+    ast_walker.walk(casadi_gen, flat_tree)
+    return casadi_gen.results

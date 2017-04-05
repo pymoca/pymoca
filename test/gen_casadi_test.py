@@ -23,7 +23,13 @@ class GenCasadiTest(unittest.TestCase):
     "Testing"
 
 
-    def assert_model_equivalent(self, A, B, tol=1e-9):
+    def assert_model_equivalent(self, A, B):
+        def sstr(a): return set([str(e) for e in a])
+
+        for l in ["states","der_states","inputs","outputs","constants","parameters","equations"]:
+            self.assertEqual(sstr(getattr(A,l)),sstr(getattr(B,l)))
+
+    def assert_model_equivalent_numeric(self, A, B, tol=1e-9):
         self.assertEqual(len(A.states),len(B.states))
         self.assertEqual(len(A.der_states),len(B.der_states))
         self.assertEqual(len(A.inputs),len(B.inputs))
@@ -46,6 +52,8 @@ class GenCasadiTest(unittest.TestCase):
             self.assertTrue(e in this_in)
             that_from_this.append(this_mx_dict[e])
         that = ca.Function('f',this_mx,that.call(that_from_this))
+
+        np.random.seed(0)
 
         args_in = []
         for i in range(this.n_in()):
@@ -85,7 +93,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters = [c,k]
         ref_model.equations =  [ der_x - v_x, der_v_x - (-k*x - c*v_x)]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_estimator(self):
         with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
@@ -104,7 +112,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.outputs = [y]
         ref_model.equations =  [ der_x + x, y-x]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_aircraft(self):
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
@@ -166,8 +174,8 @@ class GenCasadiTest(unittest.TestCase):
               c__down__H-b__up__H,
               b__down__H-hb__up__H,
 
-              c__down__Q+a__down__Q+b__up__Q,
-              qc__down__Q+c__up__Q,
+              a__down__Q+b__up__Q+c__down__Q,
+              c__up__Q+qc__down__Q,
               b__down__Q+hb__up__Q,
               a__up__Q+qa__down__Q]
 
@@ -193,7 +201,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = [der_x, der_y]
         ref_model.equations =  [ der_x+der_y-1, der_x-2]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_inheritance(self):
         with open(os.path.join(TEST_DIR, 'Inheritance.mo'), 'r') as f:
@@ -215,7 +223,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters = [k]
         ref_model.equations =  [ der_x-k*x, x+y-3]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_builtin(self):
         with open(os.path.join(TEST_DIR, 'BuiltinFunctions.mo'), 'r') as f:
@@ -237,7 +245,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.outputs = [y, z, w, u]
         ref_model.equations =  [ y-ca.sin(time), z-ca.cos(x),w-ca.fmin(y,z), u-ca.fabs(w)]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_forloop(self):
         with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
@@ -253,7 +261,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states = [x, b]
         ref_model.equations =  [ x-(np.arange(1,11)+b)]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_arrayexpressions(self):
         with open(os.path.join(TEST_DIR, 'ArrayExpressions.mo'), 'r') as f:
@@ -275,7 +283,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.constants = [b]
         ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f)]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_matrixexpressions(self):
         with open(os.path.join(TEST_DIR, 'MatrixExpressions.mo'), 'r') as f:
@@ -293,7 +301,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states = [A,b,c,d]
         ref_model.equations =  [ ca.mtimes(A,b)-c, ca.mtimes(A.T,b)-d]
 
-        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
 if __name__ == "__main__":
     unittest.main()

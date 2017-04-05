@@ -7,6 +7,7 @@ from __future__ import print_function, absolute_import, division, print_function
 import copy
 import json
 import sys
+from collections import OrderedDict
 
 VALIDATE_AST = True
 
@@ -105,7 +106,7 @@ class FieldList(list):
 
 
 # TODO get dict validation working
-class FieldDict(dict):
+class FieldDict(OrderedDict):
     def __init__(self, types, default):
         super(FieldDict, self).__init__()
         if type(types) is type or not hasattr(types, '__iter__'):
@@ -501,5 +502,3 @@ File.ast_spec = {
     'within': FieldList([ComponentRef], []),
     'classes': FieldDict([Class], {}),
 }
-
-

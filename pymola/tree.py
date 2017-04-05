@@ -22,7 +22,8 @@ class TreeWalker(object):
             getattr(listener, 'enterEvery')(tree)
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
-        for child_name in tree.ast_spec.keys():
+            #massive hack to make sure symbols get processesd first
+        for child_name in reversed(sorted(tree.ast_spec.keys())):
             self.handle_walk(self, listener, tree.__dict__[child_name])
         if hasattr(listener, 'exitEvery'):
             getattr(listener, 'exitEvery')(tree)
@@ -366,7 +367,7 @@ def flatten_class(root, orig_class, instance_name):
         # TODO Flatten first
         logger.warning("Note: Connections between connectors with flow variables are not supported across levels of the class hierarchy")
     for connected_variables in set(flow_connections.values()):
-        operands = [ast.ComponentRef(name=variable) for variable in connected_variables]
+        operands = [ast.ComponentRef(name=variable) for variable in sorted(connected_variables)]
         connect_equation = ast.Equation(left=ast.Expression(operator='+', operands=operands), right=ast.Primary(value=0))
         flat_class.equations += [connect_equation]
 
