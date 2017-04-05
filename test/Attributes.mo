@@ -6,6 +6,8 @@ model Attributes
 	input Real i2(fixed = false);
 	input Real i3;
 	output Modelica.SIunits.Temperature i4;
+	constant Real cst = 1;
+	parameter Real prm = 2;
 protected
 	output Real protected_variable;
 equation
