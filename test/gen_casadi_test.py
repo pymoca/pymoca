@@ -272,7 +272,26 @@ class GenCasadiTest(unittest.TestCase):
         scalar_f = ca.MX.sym("scalar_f")
 
         ref_model.alg_states = [a,b,c,d,e,scalar_f]
-        ref_model.equations =  [ c-(a+b[0:3]), d-(ca.sin(a/b[1:4])), e - (d+scalar_f)]
+        ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f)]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_matrixexpressions(self):
+        with open(os.path.join(TEST_DIR, 'MatrixExpressions.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'MatrixExpressions')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        A = ca.MX.sym("A", 3,3)
+        b = ca.MX.sym("b", 3)
+        c = ca.MX.sym("c", 3)
+
+        scalar_f = ca.MX.sym("scalar_f")
+
+        ref_model.alg_states = [A,b,c]
+        ref_model.equations =  [ ca.mtimes(A,b)-c]
 
         self.assert_model_equivalent(ref_model, casadi_model)
 

@@ -150,8 +150,11 @@ class CasadiGenerator(tree.TreeListener):
         except:
             op = str(tree.operator)
 
+        if op=="*":
+            op = "mtimes"
         if op.startswith("."):
             op = op[1:]
+
 
         n_operands = len(tree.operands)
         if op == 'der':
@@ -169,6 +172,10 @@ class CasadiGenerator(tree.TreeListener):
             src = self.src[tree.operands[0]]
             for i in tree.operands[1:]:
                 src += self.src[i]
+        elif op == 'mtimes':
+            src = self.src[tree.operands[0]]
+            for i in tree.operands[1:]:
+                src = ca.mtimes(src,self.src[i])
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
@@ -252,11 +259,12 @@ class CasadiGenerator(tree.TreeListener):
         return int(s.value.value)
 
     def enterSymbol(self, tree):
-        size = int(tree.dimensions[0].value)
+        size = [int(d.value) for d in tree.dimensions]
         for i in tree.type.indices:
-            size*=self.get_int_parameter(i)
+            size=[size[0]*self.get_int_parameter(i)]
 
-        s =  ca.MX.sym(name_flat(tree), size)
+
+        s =  ca.MX.sym(name_flat(tree), *size)
         self.nodes[name_flat(tree)] = s
         self.src[tree] = s
 
