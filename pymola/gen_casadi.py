@@ -176,6 +176,8 @@ class CasadiGenerator(tree.TreeListener):
             src = self.src[tree.operands[0]]
             for i in tree.operands[1:]:
                 src = ca.mtimes(src,self.src[i])
+        elif op == 'transpose' and n_operands == 1:
+            src = self.src[tree.operands[0]].T
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
