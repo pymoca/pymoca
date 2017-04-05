@@ -225,19 +225,20 @@ def flatten(root, class_name, instance_name=''):
         sym_copy.name = instance_prefix + sym.name
         return sym_copy
 
-    def flatten_equation(equation, instance_prefix):
-        equation_copy = copy.deepcopy(equation)
+    def flatten_expression(expression, instance_prefix):
+        expression_copy = copy.deepcopy(expression)
 
-        class EquationFlattener(TreeListener):
+        class ExpressionFlattener(TreeListener):
             def __init__(self, instance_prefix):
                 self.instance_prefix = instance_prefix
                 self.d = 0
 
-                super(EquationFlattener, self).__init__()
+                super(ExpressionFlattener, self).__init__()
 
             def enterComponentRef(self, tree):
                 self.d += 1
 
+                # TODO: Handle array indices in name flattening
                 if self.d == 1:
                     tree.name = self.instance_prefix + tree.name
                     c = tree
@@ -250,9 +251,10 @@ def flatten(root, class_name, instance_name=''):
                 self.d -= 1
 
         w = TreeWalker()
-        w.walk(EquationFlattener(instance_prefix), equation_copy)
+        w.walk(ExpressionFlattener(instance_prefix), expression_copy)
 
-        return equation_copy
+        return expression_copy
+
 
     # pull in parent classes
     for extends in orig_class.extends:
@@ -262,11 +264,12 @@ def flatten(root, class_name, instance_name=''):
         flat_parent_file = flatten(root, c.name, instance_name=instance_name)
         flat_parent_class = flat_parent_file.classes[c.name]
 
-        # add parent class members symbols and equations
+        # add parent class members symbols, equations and statements
         for parent_sym_name, parent_sym in flat_parent_class.symbols.items():
             flat_sym = flatten_symbol(parent_sym, instance_prefix)
             flat_class.symbols[flat_sym.name] = flat_sym
-        flat_class.equations += [flatten_equation(e, instance_prefix) for e in flat_parent_class.equations]
+        flat_class.equations += [flatten_expression(e, instance_prefix) for e in flat_parent_class.equations]
+        flat_class.statements += [flatten_expression(e, instance_prefix) for e in flat_parent_class.statements]
 
         # carry out modifications
         modify_class(c, extends.class_modification)
@@ -289,7 +292,8 @@ def flatten(root, class_name, instance_name=''):
             for sub_sym_name, sub_sym in flat_sub_class.symbols.items():
                 flat_sym = flatten_symbol(sub_sym, instance_prefix)
                 flat_class.symbols[flat_sym.name] = flat_sym
-            flat_class.equations += [flatten_equation(e, instance_prefix) for e in flat_sub_class.equations]
+            flat_class.equations += [flatten_expression(e, instance_prefix) for e in flat_sub_class.equations]
+            flat_class.statements += [flatten_expression(e, instance_prefix) for e in flat_sub_class.statements]
 
         except KeyError:
             # append original symbol to flat class
@@ -299,7 +303,7 @@ def flatten(root, class_name, instance_name=''):
     # for all equations in original class
     flow_connections = {}
     for equation in orig_class.equations:
-        flat_equation = flatten_equation(equation, instance_prefix)
+        flat_equation = flatten_expression(equation, instance_prefix)
         if isinstance(equation, ast.ConnectClause):
             # expand connector
             connect_equations = []
@@ -350,6 +354,8 @@ def flatten(root, class_name, instance_name=''):
         else:
             # flatten equation
             flat_class.equations += [flat_equation]
+
+    flat_class.statements += [flatten_expression(e, instance_prefix) for e in orig_class.statements]
 
     # add flow equations
     if len(flow_connections) > 0:
