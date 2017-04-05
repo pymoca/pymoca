@@ -47,6 +47,7 @@ class CasadiSysModel:
         self.inputs = []
         self.outputs = []
         self.constants = []
+        self.constant_values = []
         self.parameters = []
         self.equations = []
         self.time = ca.MX.sym('time')
@@ -60,6 +61,7 @@ class CasadiSysModel:
         r+="inputs: " + str(self.inputs) + "\n"
         r+="outputs: " + str(self.outputs) + "\n"
         r+="constants: " + str(self.constants) + "\n"
+        r+="constant_values: " + str(self.constant_values) + "\n"
         r+="parameters: " + str(self.parameters) + "\n"
         r+="equations: " + str(self.equations) + "\n"
         return r
@@ -92,6 +94,10 @@ class CasadiGenerator(tree.TreeListener):
         self.root = root
         self.class_name = class_name
         self.for_loops = []
+
+    def exitArray(self, tree):
+        self.src[tree] = [self.src[e] for e in tree.values]
+        print("array",self.src[tree])
 
     def exitFile(self, tree):
         pass
@@ -136,6 +142,7 @@ class CasadiGenerator(tree.TreeListener):
         results.der_states = [self.derivative[self.src[e]] for e in ode_states]
         results.alg_states = [self.src[e] for e in alg_states]
         results.constants = [self.src[e] for e in constants]
+        results.constant_values = [self.src[e.value] for e in constants]
         results.parameters = [self.src[e] for e in parameters]
         results.inputs = [self.src[e] for e in inputs]
         results.outputs = [self.src[e] for e in outputs]
@@ -264,8 +271,6 @@ class CasadiGenerator(tree.TreeListener):
         size = [int(d.value) for d in tree.dimensions]
         for i in tree.type.indices:
             size=[size[0]*self.get_int_parameter(i)]
-
-
         s =  ca.MX.sym(name_flat(tree), *size)
         self.nodes[name_flat(tree)] = s
         self.src[tree] = s
@@ -294,6 +299,7 @@ class CasadiGenerator(tree.TreeListener):
 
 
 def generate(ast_tree, model_name):
+    print(ast_tree)
     flat_tree = tree.flatten(ast_tree, model_name)
     print(flat_tree)
     sympy_gen = CasadiGenerator(flat_tree, model_name)
