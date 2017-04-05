@@ -3,6 +3,6 @@ model ForLoop
 	Real[n] x;
 equation
 	for i in 1:n loop
-    	der(x[i]) = i;
+    	x[i] = i;
     end for;
 end ForLoop;

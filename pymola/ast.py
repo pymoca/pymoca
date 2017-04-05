@@ -487,7 +487,7 @@ Class.ast_spec = {
     'initial_equations': FieldList([Equation, ForEquation], []),
     'equations': FieldList([Equation, ForEquation, ConnectClause], []),
     'initial_statements': FieldList([AssignmentStatement, ForStatement], []),
-    'algorithms': FieldList([AssignmentStatement, ForStatement], []),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
 }
 
 File.ast_spec = {

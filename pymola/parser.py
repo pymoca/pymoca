@@ -92,7 +92,7 @@ class ASTListener(ModelicaListener):
                 if alglist.initial:
                     self.class_node.initial_statements += alglist.statements
                 else:
-                    self.class_node.algorithms += alglist.statements
+                    self.class_node.statements += alglist.statements
 
     def exitArgument(self, ctx):
         self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]

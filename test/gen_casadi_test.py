@@ -95,12 +95,79 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent(ref_model, casadi_model)
 
     def test_aircraft(self):
-        return
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
         ref_model = CasadiSysModel()
+
+    def test_connector(self):
+        with open(os.path.join(TEST_DIR, 'ConnectorHQ.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'System')
+        ref_model = CasadiSysModel()
+        print(casadi_model)
+
+        a__up__H = ca.MX.sym("a__up__H")
+        a__up__Q = ca.MX.sym("a__up__Q")
+        a__down__H = ca.MX.sym("a__down__H")
+        a__down__Q = ca.MX.sym("a__down__Q")
+
+        b__up__H = ca.MX.sym("b__up__H")
+        b__up__Q = ca.MX.sym("b__up__Q")
+        b__down__H = ca.MX.sym("b__down__H")
+        b__down__Q = ca.MX.sym("b__down__Q")
+
+        c__up__H = ca.MX.sym("c__up__H")
+        c__up__Q = ca.MX.sym("c__up__Q")
+        c__down__H = ca.MX.sym("c__down__H")
+        c__down__Q = ca.MX.sym("c__down__Q")
+
+        qa__down__H = ca.MX.sym("qa__down__H")
+        qa__down__Q = ca.MX.sym("qa__down__Q")
+        qc__down__H = ca.MX.sym("qc__down__H")
+        qc__down__Q = ca.MX.sym("qc__down__Q")
+
+        hb__up__H = ca.MX.sym("hb__up__H")
+        hb__up__Q = ca.MX.sym("hb__up__Q")
+
+        # These should be removed - flattening bug
+        up = ca.MX.sym("up")
+        down = ca.MX.sym("down")
+
+        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H, b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q, b__down__Q, qc__down__Q, a__down__Q, up, down]
+
+
+        ref_model.equations = [ a__up__H-a__down__H,
+              a__up__Q+a__down__Q,
+	            c__up__H-c__down__H,
+              c__up__Q+c__down__Q,
+
+              b__up__H-b__down__H,
+              b__up__Q+b__down__Q,
+
+
+              qa__down__Q,
+              qc__down__Q,
+
+              hb__up__H,
+
+              qa__down__H-a__up__H,
+              qc__down__H-c__up__H,
+              a__down__H-b__up__H,
+              c__down__H-b__up__H,
+              b__down__H-hb__up__H,
+
+              c__down__Q+a__down__Q+b__up__Q,
+              qc__down__Q+c__up__Q,
+              b__down__Q+hb__up__Q,
+              a__up__Q+qa__down__Q]
+
+
+
+        print(ref_model)
+        self.assert_model_equivalent(ref_model, casadi_model)
 
     def test_duplicate(self):
         with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
@@ -165,5 +232,19 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_forloop(self):
+        with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ForLoop')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        x = ca.MX.sym("x",10)
+
+        ref_model.alg_states = [x]
+        ref_model.equations =  [ x-range(1,11)]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
 if __name__ == "__main__":
     unittest.main()
