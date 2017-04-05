@@ -53,6 +53,9 @@ class ASTListener(ModelicaListener):
     def enterStored_definition_class(self, ctx):
         class_node = ast.Class()
         class_node.final = ctx.FINAL() is not None
+        class_node.encapsulated = ctx.class_definition().ENCAPSULATED() is not None
+        class_node.partial = ctx.class_definition().class_prefixes().PARTIAL() is not None
+        class_node.type = ctx.class_definition().class_prefixes().class_type().getText()
         self.class_node = class_node
         self.ast[ctx] = class_node
 
@@ -60,11 +63,7 @@ class ASTListener(ModelicaListener):
         pass
 
     def enterClass_definition(self, ctx):
-        class_node = self.class_node
-        class_node.encapsulated = ctx.ENCAPSULATED() is not None
-        class_node.partial = ctx.class_prefixes().PARTIAL() is not None
-        class_node.type = ctx.class_prefixes().class_type().getText()
-        self.ast[ctx] = class_node
+        self.ast[ctx] = self.class_node
 
     def exitShort_class_definition(self, ctx):
         self.ast[ctx] = ast.ShortClassDefinition(name=ctx.IDENT().getText(),

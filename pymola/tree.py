@@ -14,6 +14,12 @@ logger = logging.getLogger("pymola")
 # TODO class name spaces
 # TODO dot notation
 # TODO Flatten function vs. conversion classes
+# TODO mark protected variables as such
+
+try:
+    basestring
+except NameError:
+    basestring = str
 
 
 class TreeWalker(object):
@@ -229,7 +235,7 @@ def flatten(root, class_name, instance_name=''):
                     orig_sym.__dict__.update(new_sym.__dict__)
             elif isinstance(argument, ast.ShortClassDefinition):
                 for sym in class_or_sym.symbols.values():
-                    if sym.type.name == argument.name:
+                    if sym.type.name == argument.name: # TODO
                         sym.type = argument.component
                 # TODO class modifications to short class definition
             else:
