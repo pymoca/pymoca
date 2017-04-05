@@ -265,6 +265,11 @@ def flatten(root, class_name, instance_name=''):
 
                 if self.d == 1:
                     tree.name = self.instance_prefix + tree.name
+                    c = tree
+                    while len(c.child) > 0:
+                        c = tree.child[0]
+                        tree.name += '.' + c.name
+                    tree.child = []
 
             def exitComponentRef(self, tree):
                 self.d -= 1
