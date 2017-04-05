@@ -217,7 +217,7 @@ def flatten(root, class_name, instance_name=''):
                 if argument.component.name in ast.Symbol.ATTRIBUTES:
                     setattr(class_or_sym, argument.component.name, argument.modifications[0])
                 else:
-                    sym = class_or_sym.find_symbol(argument.component)
+                    sym = root.find_symbol(class_or_sym, argument.component)
                     for modification in argument.modifications:
                         if isinstance(modification, ast.ClassModification):
                             modify_class(sym, modification)
@@ -295,8 +295,8 @@ def flatten(root, class_name, instance_name=''):
         # if the symbol type is a class
         try:
             c = root.find_class(sym.type)
-            if sym.class_modification is not None:
-                c = modify_class(c, sym.class_modification)
+            #if sym.class_modification is not None:
+            #    c = modify_class(c, sym.class_modification)
 
             # recursively call flatten on the sub class
             flat_sub_file = flatten(root, c, instance_name=sym_name)
