@@ -27,7 +27,9 @@ if options.casadi_folder is not None:
     sys.path.append(options.casadi_folder)
 
 # Import rest of pymola
-from . import parser, tree, gen_casadi
+from . import parser, tree
+if not options.flatten_only:
+    from . import gen_casadi
 
 # Load folder
 S = ''

@@ -287,7 +287,7 @@ equation :
 // B.2.6.5 ------------------------------------------------
 statement_options :
     component_reference (':=' expression | function_call_args)  # statement_component_reference
-    | '(' output_expression_list ')' ':='
+    | '(' component_reference (',' component_reference)* ')' ':='
         component_reference function_call_args                  # statement_component_function
     | 'break'           # statement_break
     | 'return'          # statement_return
