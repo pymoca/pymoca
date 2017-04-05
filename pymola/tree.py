@@ -38,39 +38,6 @@ class TreeWalker(object):
             pass
 
 
-class TreeVisitor(object):
-    """
-    TODO this class hasn't been tested
-    """
-
-    def visit(self, visitor, tree):
-        name = self.__class__.__name__
-        if hasattr(visitor, 'visit' + name):
-            return visitor.__getattribute__('visit' + name)(tree)
-        else:
-            res = []
-            for k in tree.ast_spec.keys():
-                res += [self.handle_visit(visitor, tree[k])]
-            if len(res) == 1:
-                res = res[0]
-            return res
-
-    @classmethod
-    def handle_visit(cls, visitor, tree):
-        res = []
-        if isinstance(tree, ast.Node):
-            res += visitor.visit(visitor, tree)
-        elif isinstance(tree, dict):
-            for k in tree.keys():
-                res += [cls.handle_visit(tree[k], visitor)]
-        elif isinstance(tree, list):
-            for c in tree:
-                res += [cls.handle_visit(c, visitor)]
-        if len(res) == 1:
-            res = res[0]
-        return res
-
-
 class TreeListener(object):
 
     def __init__(self):
@@ -336,79 +303,7 @@ def generate(ast_tree, model_name):
     # walker for expanding connect equations
     ast_walker.walk(ConnectExpander(ast_tree_new.classes), flat_tree.classes[model_name])
 
-    root = flat_tree.classes[model_name]
-
-    classes = ast_tree.classes
-    instantiator = Instatiator(classes=classes)
-    ast_walker.walk(instantiator, root)
-
-    flat_tree = instantiator.res[root]
     return flat_tree
-
-class Instatiator(TreeListener):
-    """
-    Instantiates all classes that are not connectors.
-    """
-
-    def __init__(self, classes, scope=[]):
-        super(Instatiator, self).__init__()
-        self.classes = classes
-        self.res = {}
-        self.scope = scope
-
-    @staticmethod
-    def get_scoped_name(scope, name):
-        scope = copy.deepcopy(scope)
-        scope += [str(name)]
-        return '.'.join(scope)
-
-    def enterComponentRef(self, tree):
-        name = self.get_scoped_name(self.scope, tree.name)
-        tree.name = name
-
-    def exitSymbol(self, tree):
-        """
-        Set the result of classes to their definitions if it is
-        not a connector, otherwise set the result to the symbol
-        """
-        if tree.type in self.classes:
-            class_def = self.classes[tree.type]
-            if class_def.type == 'connector':
-                self.res[tree] = tree
-            else:
-                self.res[tree] = class_def
-        else:
-            self.res[tree] = tree
-
-    def exitEquation(self, tree):
-        self.res[tree] = tree
-
-    def exitClass(self, tree):
-        """
-        For each nested class definition, expand its attributes,
-        fore each equation and symbol, copy them to the result
-        """
-        c = ast.Class()
-        for key, val in tree.symbols.items():
-            name = self.get_scoped_name(self.scope, key)
-            root = self.res[val]
-            if type(root) == ast.Class:
-                walker = TreeWalker()
-                instantiator = Instatiator(
-                    classes=self.classes,
-                    scope=self.scope + [key]
-                )
-                walker.walk(instantiator, root)
-                c.symbols.update(instantiator.res[root].symbols)
-                c.equations.extend(instantiator.res[root].equations)
-            elif type(root) == ast.Symbol:
-                root.name = name
-                c.symbols[name] = root
-            else:
-                raise RuntimeError('unhandled type', type(root))
-        c.equations.extend(tree.equations)
-        self.res[tree] = c
-
 
 
 def name_flat(tree):
