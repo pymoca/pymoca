@@ -306,11 +306,9 @@ class ASTListener(ModelicaListener):
         )
 
     def exitPrimary_derivative(self, ctx):
-        self.ast[ctx] = ast.Primary(value=ctx.getText())
-        comp_name = ctx.function_call_args().function_arguments().function_argument()[0].getText()
         self.ast[ctx] = ast.Expression(
             operator='der',
-            operands=[ast.ComponentRef(name=comp_name)]
+            operands=[self.ast[x.expression()] for x in ctx.function_call_args().function_arguments().function_argument()]
         )
         # TODO 'state' is not a standard prefix;  disable this for now as it does not work
         # when differentiating states defined in superclasses.
