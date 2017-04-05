@@ -32,13 +32,7 @@ op_map = {  '*':"__mul__",
             "abs":"fabs"}
 
 def name_flat(tree):
-    s = tree.name.replace('.','__')
-    if hasattr(tree,"child"):
-        assert len(tree.indices)==0
-        if len(tree.child)!=0:
-            assert(len(tree.child)==1)
-            return s+"__"+name_flat(tree.child[0])
-    return s
+    return tree.name.replace('.','__')
 
 class CasadiSysModel:
     def __init__(self):
@@ -159,7 +153,6 @@ class CasadiGenerator(NumpyGenerator):
         if op.startswith("."):
             op = op[1:]
 
-
         n_operands = len(tree.operands)
         if op == 'der':
             orig = self.src[tree.operands[0]]
@@ -214,17 +207,21 @@ class CasadiGenerator(NumpyGenerator):
         self.src[tree] = map(int,list(np.array(np.arange(start, stop+step, step))-1))
 
     def exitComponentRef(self, tree):
+        if tree.name=="Real":
+            return
+        if tree.name=="time":
+            self.src[tree] = self.nodes["time"]
+            return
+        if len(tree.indices)>0 and len(self.for_loops)==0:
+            self.src[tree] = self.get_indexed_symbol(tree)
+            return
+        elif len(tree.indices)>0:
+            self.src[tree] = self.get_indexed_symbol_loop(tree)
+            return
+
         try:
             self.src[tree] = self.nodes[name_flat(tree)]
         except:
-            if tree.name=="Real":
-                return
-            if tree.name=="time":
-                self.src[tree] = self.nodes["time"]
-            if len(tree.indices)>0 and len(self.for_loops)==0:
-                self.src[tree] = self.get_indexed_symbol(tree)
-            elif len(tree.indices)>0:
-                self.src[tree] = self.get_indexed_symbol_loop(tree)
             for f in reversed(self.for_loops):
                 if f.name==tree.name:
                     self.src[tree] = f.index_variable
@@ -263,7 +260,9 @@ class CasadiGenerator(NumpyGenerator):
 
     def enterSymbol(self, tree):
         size = [int(d.value) for d in tree.dimensions]
+        assert(len(size)<=2)
         for i in tree.type.indices:
+            assert len(size)==1
             size=[size[0]*self.get_int_parameter(i)]
         s =  ca.MX.sym(name_flat(tree), *size)
         self.nodes[name_flat(tree)] = s
@@ -290,12 +289,8 @@ class CasadiGenerator(NumpyGenerator):
 
         self.src[tree] = res[0].T
 
-
-
 def generate(ast_tree, model_name):
-    print(ast_tree)
     flat_tree = tree.flatten(ast_tree, model_name)
-    print(flat_tree)
     sympy_gen = CasadiGenerator(flat_tree, model_name)
 
     # create a walker
