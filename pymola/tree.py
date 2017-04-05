@@ -11,8 +11,6 @@ from . import ast
 
 logger = logging.getLogger("pymola")
 
-# TODO class name spaces
-# TODO dot notation
 # TODO Flatten function vs. conversion classes
 # TODO mark protected variables as such
 
@@ -189,6 +187,8 @@ def flatten_class(root, orig_class, instance_name):
     :return: flat_class, the flattened class of type Class
     """
 
+    CLASS_SEPARATOR = '.'
+
     # create the returned class
     flat_class = ast.Class(
         name=orig_class.name,
@@ -196,7 +196,7 @@ def flatten_class(root, orig_class, instance_name):
 
     # append period to non empty instance_name
     if instance_name != '':
-        instance_prefix = instance_name + '.'
+        instance_prefix = instance_name + CLASS_SEPARATOR
     else:
         instance_prefix = instance_name
 
@@ -250,7 +250,7 @@ def flatten_class(root, orig_class, instance_name):
                     c = tree
                     while len(c.child) > 0:
                         c = tree.child[0]
-                        tree.name += '.' + c.name
+                        tree.name += CLASS_SEPARATOR + c.name
                     tree.child = []
 
             def exitComponentRef(self, tree):
@@ -328,8 +328,8 @@ def flatten_class(root, orig_class, instance_name):
                 flat_class_left = flatten_class(root, class_left, '')
 
                 for connector_variable in flat_class_left.symbols.values():
-                    left_name = flat_equation.left.name + '.' + connector_variable.name
-                    right_name = flat_equation.right.name + '.' + connector_variable.name
+                    left_name = flat_equation.left.name + CLASS_SEPARATOR + connector_variable.name
+                    right_name = flat_equation.right.name + CLASS_SEPARATOR + connector_variable.name
                     if len(connector_variable.prefixes) == 0:
                         left = ast.ComponentRef(name=left_name)
                         right = ast.ComponentRef(name=right_name)
