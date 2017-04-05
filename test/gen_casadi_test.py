@@ -36,6 +36,18 @@ class GenCasadiTest(unittest.TestCase):
         this = A.get_function()
         that = B.get_function()
 
+        this_mx = this.mx_in()
+        that_mx = that.mx_in()
+        this_in = [e.name() for e in this_mx]
+        that_in = [e.name() for e in that_mx]
+
+        that_from_this = []
+        this_mx_dict = dict(zip(this_in,this_mx))
+        for e in that_in:
+            self.assertTrue(e in this_in)
+            that_from_this.append(this_mx_dict[e])
+        that = ca.Function('f',this_mx,that.call(that_from_this))
+
         args_in = []
         for i in range(this.n_in()):
             sp = this.sparsity_in(0)
@@ -44,6 +56,7 @@ class GenCasadiTest(unittest.TestCase):
 
         this_out = this.call(args_in)
         that_out = that.call(args_in)
+
 
         for i, (a,b) in enumerate(zip(this_out,that_out)):
             test = float(ca.norm_2(a-b))<=tol
@@ -132,12 +145,7 @@ class GenCasadiTest(unittest.TestCase):
         hb__up__H = ca.MX.sym("hb__up__H")
         hb__up__Q = ca.MX.sym("hb__up__Q")
 
-        # These should be removed - flattening bug
-        up = ca.MX.sym("up")
-        down = ca.MX.sym("down")
-
-        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H, b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q, b__down__Q, qc__down__Q, a__down__Q, up, down]
-
+        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H, b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q, b__down__Q, qc__down__Q, a__down__Q]
 
         ref_model.equations = [ a__up__H-a__down__H,
               a__up__Q+a__down__Q,
@@ -180,7 +188,7 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym("x")
         der_x = ca.MX.sym("der_x")
         y = ca.MX.sym("y")
-        der_y = ca.MX.sym("y")
+        der_y = ca.MX.sym("der_y")
 
         ref_model.states = [x,y]
         ref_model.der_states = [der_x, der_y]
@@ -246,5 +254,46 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations =  [ x-range(1,11)]
 
         self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_arrayexpressions(self):
+        with open(os.path.join(TEST_DIR, 'ArrayExpressions.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ArrayExpressions')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        a = ca.MX.sym("a", 3)
+        b = ca.MX.sym("b", 4)
+        c = ca.MX.sym("c", 3)
+        d = ca.MX.sym("d", 3)
+        e = ca.MX.sym("e", 3)
+
+        scalar_f = ca.MX.sym("scalar_f")
+
+        ref_model.alg_states = [a,b,c,d,e,scalar_f]
+        ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f)]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_matrixexpressions(self):
+        with open(os.path.join(TEST_DIR, 'MatrixExpressions.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'MatrixExpressions')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        A = ca.MX.sym("A", 3,3)
+        b = ca.MX.sym("b", 3)
+        c = ca.MX.sym("c", 3)
+
+        scalar_f = ca.MX.sym("scalar_f")
+
+        ref_model.alg_states = [A,b,c]
+        ref_model.equations =  [ ca.mtimes(A,b)-c]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
 if __name__ == "__main__":
     unittest.main()

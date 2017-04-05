@@ -8,7 +8,7 @@ model ArrayExpressions
     Real scalar_f = 1.3;
 equation
     // Array operators.
-    c = a .+ b[1:3]; // .+ is equal to + in this case
+    c = a .+ b[1:3].*e; // .+ is equal to + in this case
 
     // Calling a (scalar) function on an array maps the function to each element.
     d = sin(a ./ b[2:4]);
