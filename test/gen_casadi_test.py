@@ -95,11 +95,32 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent(ref_model, casadi_model)
 
     def test_aircraft(self):
+        return
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
         ref_model = CasadiSysModel()
+
+    def test_duplicate(self):
+        with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DuplicateState')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+        
+        x = ca.MX.sym("x")
+        der_x = ca.MX.sym("der_x")
+        y = ca.MX.sym("y")
+        der_y = ca.MX.sym("y")
+
+        ref_model.states = [x,y]
+        ref_model.der_states = [der_x, der_y]
+        ref_model.equations =  [ der_x+der_y-1, der_x-2]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
 
 if __name__ == "__main__":
     unittest.main()
