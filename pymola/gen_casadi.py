@@ -8,6 +8,7 @@ import copy
 
 import casadi as ca
 import numpy as np
+from .gen_numpy import NumpyGenerator
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -47,6 +48,7 @@ class CasadiSysModel:
         self.inputs = []
         self.outputs = []
         self.constants = []
+        self.constant_values = []
         self.parameters = []
         self.equations = []
         self.time = ca.MX.sym('time')
@@ -60,6 +62,7 @@ class CasadiSysModel:
         r+="inputs: " + str(self.inputs) + "\n"
         r+="outputs: " + str(self.outputs) + "\n"
         r+="constants: " + str(self.constants) + "\n"
+        r+="constant_values: " + str(self.constant_values) + "\n"
         r+="parameters: " + str(self.parameters) + "\n"
         r+="equations: " + str(self.equations) + "\n"
         return r
@@ -82,7 +85,7 @@ class ForLoop:
     def register_indexed_symbol(self, e, tree):
         self.indexed_symbols[e] = tree
 
-class CasadiGenerator(tree.TreeListener):
+class CasadiGenerator(NumpyGenerator):
 
     def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
@@ -136,6 +139,7 @@ class CasadiGenerator(tree.TreeListener):
         results.der_states = [self.derivative[self.src[e]] for e in ode_states]
         results.alg_states = [self.src[e] for e in alg_states]
         results.constants = [self.src[e] for e in constants]
+        results.constant_values = [self.src[e.value] for e in constants]
         results.parameters = [self.src[e] for e in parameters]
         results.inputs = [self.src[e] for e in inputs]
         results.outputs = [self.src[e] for e in outputs]
@@ -176,6 +180,8 @@ class CasadiGenerator(tree.TreeListener):
             src = self.src[tree.operands[0]]
             for i in tree.operands[1:]:
                 src = ca.mtimes(src,self.src[i])
+        elif op == 'transpose' and n_operands == 1:
+            src = self.src[tree.operands[0]].T
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
@@ -197,9 +203,6 @@ class CasadiGenerator(tree.TreeListener):
         else:
             raise Exception("unknown")
         self.src[tree] = src
-
-    def exitPrimary(self, tree):
-        self.src[tree] = float(tree.value)
 
     def exitSlice(self, tree):
         start = self.src[tree.start]
@@ -262,8 +265,6 @@ class CasadiGenerator(tree.TreeListener):
         size = [int(d.value) for d in tree.dimensions]
         for i in tree.type.indices:
             size=[size[0]*self.get_int_parameter(i)]
-
-
         s =  ca.MX.sym(name_flat(tree), *size)
         self.nodes[name_flat(tree)] = s
         self.src[tree] = s
@@ -292,6 +293,7 @@ class CasadiGenerator(tree.TreeListener):
 
 
 def generate(ast_tree, model_name):
+    print(ast_tree)
     flat_tree = tree.flatten(ast_tree, model_name)
     print(flat_tree)
     sympy_gen = CasadiGenerator(flat_tree, model_name)

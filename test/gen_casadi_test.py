@@ -271,7 +271,8 @@ class GenCasadiTest(unittest.TestCase):
 
         scalar_f = ca.MX.sym("scalar_f")
 
-        ref_model.alg_states = [a,b,c,d,e,scalar_f]
+        ref_model.alg_states = [a,c,d,e,scalar_f]
+        ref_model.constants = [b]
         ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f)]
 
         self.assert_model_equivalent(ref_model, casadi_model)
@@ -287,11 +288,10 @@ class GenCasadiTest(unittest.TestCase):
         A = ca.MX.sym("A", 3,3)
         b = ca.MX.sym("b", 3)
         c = ca.MX.sym("c", 3)
+        d = ca.MX.sym("d", 3)
 
-        scalar_f = ca.MX.sym("scalar_f")
-
-        ref_model.alg_states = [A,b,c]
-        ref_model.equations =  [ ca.mtimes(A,b)-c]
+        ref_model.alg_states = [A,b,c,d]
+        ref_model.equations =  [ ca.mtimes(A,b)-c, ca.mtimes(A.T,b)-d]
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
