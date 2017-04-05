@@ -36,6 +36,18 @@ class GenCasadiTest(unittest.TestCase):
         this = A.get_function()
         that = B.get_function()
 
+        this_mx = this.mx_in()
+        that_mx = that.mx_in()
+        this_in = [e.name() for e in this_mx]
+        that_in = [e.name() for e in that_mx]
+
+        that_from_this = []
+        this_mx_dict = dict(zip(this_in,this_mx))
+        for e in that_in:
+            self.assertTrue(e in this_in)
+            that_from_this.append(this_mx_dict[e])
+        that = ca.Function('f',this_mx,that.call(that_from_this))
+
         args_in = []
         for i in range(this.n_in()):
             sp = this.sparsity_in(0)
@@ -44,6 +56,7 @@ class GenCasadiTest(unittest.TestCase):
 
         this_out = this.call(args_in)
         that_out = that.call(args_in)
+
 
         for i, (a,b) in enumerate(zip(this_out,that_out)):
             test = float(ca.norm_2(a-b))<=tol
@@ -180,7 +193,7 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym("x")
         der_x = ca.MX.sym("der_x")
         y = ca.MX.sym("y")
-        der_y = ca.MX.sym("y")
+        der_y = ca.MX.sym("der_y")
 
         ref_model.states = [x,y]
         ref_model.der_states = [der_x, der_y]
