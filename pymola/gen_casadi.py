@@ -86,7 +86,7 @@ class CasadiGenerator(tree.TreeListener):
         variables = []
         symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
         for s in symbols:
-            if len(s.prefixes) == 0:
+            if len(s.prefixes) == 0 or len(s.prefixes)==1 and 'flow' in s.prefixes:
                 states += [s]
             else:
                 for prefix in s.prefixes:
@@ -139,10 +139,12 @@ class CasadiGenerator(tree.TreeListener):
                 self.derivative[orig] = s
                 self.nodes[s] = s
                 src = s
-        elif op in ['+'] and n_operands == 1:
-            src = self.src[tree.operands[0]]
         elif op in ['-'] and n_operands == 1:
             src = -self.src[tree.operands[0]]
+        elif op == '+':
+            src = self.src[tree.operands[0]]
+            for i in tree.operands[1:]:
+                src += self.src[i]
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
