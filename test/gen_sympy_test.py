@@ -17,6 +17,7 @@ import jinja2
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
+@unittest.skip
 class GenSympyTest(unittest.TestCase):
     "Testing"
 

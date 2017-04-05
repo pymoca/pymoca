@@ -261,6 +261,28 @@ def flatten_class(root, orig_class, instance_name):
 
         return expression_copy
 
+    def pull_functions(expression, instance_prefix):
+        expression_copy = copy.deepcopy(expression)
+
+        class FunctionPuller(TreeListener):
+            def __init__(self, instance_prefix, root, function_set):
+                self.instance_prefix = instance_prefix
+                self.root = root
+                self.function_set = function_set
+
+                super(FunctionPuller, self).__init__()
+
+            def exitExpression(self, tree):
+                if isinstance(tree.operator, ast.ComponentRef) and \
+                                tree.operator.name in self.root.classes:
+                    self.function_set.add(tree.operator.name)
+
+        w = TreeWalker()
+        function_set = set()
+        w.walk(FunctionPuller(instance_prefix, root, function_set), expression_copy)
+
+        return function_set
+
     # pull in parent classes
     for extends in orig_class.extends:
         c = root.find_class(extends.component)
@@ -371,6 +393,15 @@ def flatten_class(root, orig_class, instance_name):
         connect_equation = ast.Equation(left=ast.Expression(operator='+', operands=operands), right=ast.Primary(value=0))
         flat_class.equations += [connect_equation]
 
+    # TODO: Also drag along any functions we need
+    # function_set = set()
+    # for eq in flat_class.equations + flat_class.statements:
+    #     function_set |= pull_functions(eq, instance_prefix)
+
+    # for f in function_set:
+    #     if f not in flat_file.classes:
+    #         flat_file.classes.update(flatten(root, f, instance_name).classes)
+
     return flat_class
 
 def flatten(root, class_name):
@@ -398,4 +429,5 @@ def flatten(root, class_name):
     # flat file
     flat_file = ast.File()
     flat_file.classes[class_name] = flat_class
+
     return flat_file

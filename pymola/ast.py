@@ -462,7 +462,7 @@ ImportFromClause.ast_spec = {
 
 ElementModification.ast_spec = {
     'component': Field(ComponentRef, ComponentRef()),
-    'modifications': FieldList([Primary, Expression, ClassModification], []),
+    'modifications': FieldList([Primary, Expression, ClassModification, Array], []),
 }
 
 ShortClassDefinition.ast_spec = {
