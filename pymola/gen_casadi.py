@@ -33,6 +33,7 @@ op_map = {  '*':"__mul__",
 def name_flat(tree):
     s = tree.name.replace('.','__')
     if hasattr(tree,"child"):
+        assert len(tree.indices)==0
         if len(tree.child)!=0:
             assert(len(tree.child)==1)
             return s+"__"+name_flat(tree.child[0])
@@ -65,14 +66,32 @@ class CasadiSysModel:
     def get_function(self):
         return ca.Function('check',[self.time]+self.states+self.der_states+self.alg_states+self.inputs+self.outputs+self.constants+self.parameters,self.equations)
 
+class ForLoop:
+    def __init__(self, generator, tree):
+        self.tree = tree
+        self.generator = generator
+        i = tree.indices[0]
+        e = i.expression
+        start = e.start.value
+        step = e.step.value
+        stop = self.generator.get_int_parameter(e.stop)
+        self.values = np.arange(start, stop+step, step)
+        self.index_variable = ca.MX.sym(i.name)
+        self.name = i.name
+        self.indexed_symbols = {}
+    def register_indexed_symbol(self, e, tree):
+        self.indexed_symbols[e] = tree
+
 class CasadiGenerator(tree.TreeListener):
 
-    def __init__(self, root):
+    def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
         self.src = {}
         self.nodes = {"time" :ca.MX.sym("time")}
         self.derivative = {}
         self.root = root
+        self.class_name = class_name
+        self.for_loops = []
 
     def exitFile(self, tree):
         pass
@@ -93,7 +112,8 @@ class CasadiGenerator(tree.TreeListener):
                     if prefix == 'constant':
                         constants += [s]
                     elif prefix == 'parameter':
-                        parameters += [s]
+                        if s.type.name!="Integer":
+                            parameters += [s]
                     elif prefix == 'input':
                         inputs += [s]
                     elif prefix == 'output':
@@ -175,13 +195,45 @@ class CasadiGenerator(tree.TreeListener):
         except:
             if tree.name=="time":
                 self.src[tree] = self.nodes["time"]
-            pass
+            if len(tree.indices)>0:
+                self.src[tree] = self.get_indexed_symbol(tree)
+            for f in reversed(self.for_loops):
+                if f.name==tree.name:
+                    self.src[tree] = f.index_variable
+
+    def get_symbol_size(self,tree):
+        return 1
+
+    def get_indexed_symbol(self,tree):
+
+        names = []
+        for e in tree.indices:
+            assert hasattr(e,"name")
+            names.append(e.name)
+
+
+        s = ca.MX.sym(tree.name+str(names), self.get_symbol_size(tree))
+        print("self",tree, s, self.for_loops)
+        for f in reversed(self.for_loops):
+            if f.name in names:
+                f.register_indexed_symbol(s, tree)
+
+        return s
 
     def exitComponentRef(self, tree):
         pass
 
+    def get_int_parameter(self, i):
+        s = self.root.find_symbol(self.root.classes[self.class_name],i)
+        assert(s.type.name=="Integer")
+        return int(s.value.value)
+
     def enterSymbol(self, tree):
-        s =  ca.MX.sym(name_flat(tree))
+        size = 1
+        for i in tree.type.indices:
+            size*=self.get_int_parameter(i)
+
+        s =  ca.MX.sym(name_flat(tree), size)
         self.nodes[name_flat(tree)] = s
         self.src[tree] = s
 
@@ -191,10 +243,26 @@ class CasadiGenerator(tree.TreeListener):
     def exitEquation(self, tree):
         self.src[tree] = self.src[tree.left]-self.src[tree.right]
 
+    def enterForEquation(self, tree):
+        self.for_loops.append(ForLoop(self, tree))
+
+    def exitForEquation(self, tree):
+        f = self.for_loops.pop()
+
+        indexed_symbols = f.indexed_symbols.keys()
+        F = ca.Function('loop_body_'+f.name,[f.index_variable]+indexed_symbols,[ca.vcat([ca.vec(self.src[e]) for e in tree.equations])])
+
+        indexed_symbols_full = [self.nodes[f.indexed_symbols[k].name] for k in indexed_symbols]
+        Fmap = F.map(len(f.values))
+        res = Fmap.call([f.values]+indexed_symbols_full)
+
+        self.src[tree] = res[0].T
+
+
 
 def generate(ast_tree, model_name):
     flat_tree = tree.flatten(ast_tree, model_name)
-    sympy_gen = CasadiGenerator(flat_tree)
+    sympy_gen = CasadiGenerator(flat_tree, model_name)
 
     # create a walker
     ast_walker = tree.TreeWalker()

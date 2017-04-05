@@ -232,5 +232,19 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_forloop(self):
+        with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ForLoop')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        x = ca.MX.sym("x",10)
+
+        ref_model.alg_states = [x]
+        ref_model.equations =  [ x-range(1,11)]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
 if __name__ == "__main__":
     unittest.main()
