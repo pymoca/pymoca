@@ -322,6 +322,11 @@ class File(Node):
             return sym
 
 
+VISIBILITY_PRIVATE = 0
+VISIBILITY_PROTECTED = 1
+VISIBILITY_PUBLIC = 2
+
+
 # Here we define the AST specifications for all nodes
 # these are static variables shared between class instances
 # and are defined here to allow a class to list itself in
@@ -422,6 +427,7 @@ Symbol.ast_spec = {
     'fixed': Field([Primary], False),
     'id': Field([int], 0),
     'order': Field([int], 0),
+    'visibility': Field(int, VISIBILITY_PRIVATE),
     'class_modification': Field(ClassModification),
 }
 
@@ -472,6 +478,7 @@ ClassModification.ast_spec = {
 ExtendsClause.ast_spec = {
     'component': Field([ComponentRef]),
     'class_modification': Field([ClassModification]),
+    'visibility': Field(int, VISIBILITY_PRIVATE)
 }
 
 Class.ast_spec = {

@@ -79,6 +79,29 @@ class ASTListener(ModelicaListener):
         class_node.comment = self.ast[ctx.string_comment()]
 
     def exitComposition(self, ctx):
+        for clause in self.ast[ctx.epriv]:
+            if isinstance(clause, ast.ComponentClause):
+                for symbol in clause.symbol_list:
+                    symbol.visibility = ast.VISIBILITY_PRIVATE
+            elif isinstance(clause, ast.ExtendsClause):
+                clause.visibility = ast.VISIBILITY_PRIVATE
+
+        if ctx.epub is not None:
+            for clause in self.ast[ctx.epub]:
+                if isinstance(clause, ast.ComponentClause):
+                    for symbol in clause.symbol_list:
+                        symbol.visibility = ast.VISIBILITY_PUBLIC
+                elif isinstance(clause, ast.ExtendsClause):
+                    clause.visibility = ast.VISIBILITY_PUBLIC
+
+        if ctx.epro is not None:
+            for clause in self.ast[ctx.epro]:
+                if isinstance(clause, ast.ComponentClause):
+                    for symbol in clause.symbol_list:
+                        symbol.visibility = ast.VISIBILITY_PROTECTED
+                elif isinstance(clause, ast.ExtendsClause):
+                    clause.visibility = ast.VISIBILITY_PROTECTED
+
         for eqlist in [self.ast[e] for e in ctx.equation_section()]:
             if eqlist is not None:
                 if eqlist.initial:

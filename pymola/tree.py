@@ -12,7 +12,6 @@ from . import ast
 logger = logging.getLogger("pymola")
 
 # TODO Flatten function vs. conversion classes
-# TODO mark protected variables as such
 
 
 class TreeWalker(object):
@@ -270,6 +269,10 @@ def flatten_class(root, orig_class, instance_name):
 
         # recursively call flatten on the parent class
         flat_parent_class = flatten_class(root, c, instance_name)
+
+        # set visibility
+        for sym in flat_parent_class.symbols.values():
+            sym.visibility = min(sym.visibility, extends.visibility)
 
         # add parent class members symbols, equations and statements
         flat_class.symbols.update(flat_parent_class.symbols)
