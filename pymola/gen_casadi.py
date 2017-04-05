@@ -22,7 +22,13 @@ ca.MX.__cmp__ = hashcompare
 ca.MX.__eq__  = equality
 
 
-op_map = {'*':"__mul__", '+':"__add__","-":"__sub__","/":"__div__"}
+op_map = {  '*':"__mul__",
+            '+':"__add__",
+            "-":"__sub__",
+            "/":"__div__",
+            "min":"fmin",
+            "max":"fmax",
+            "abs":"fabs"}
 
 def name_flat(tree):
     s = tree.name.replace('.','__')
@@ -42,9 +48,11 @@ class CasadiSysModel:
         self.constants = []
         self.parameters = []
         self.equations = []
+        self.time = ca.MX.sym('time')
     def __str__(self):
         r = ""
         r+="Model\n"
+        r+="time: " + str(self.time) + "\n"
         r+="states: " + str(self.states) + "\n"
         r+="der_states: " + str(self.der_states) + "\n"
         r+="alg_states: " + str(self.alg_states) + "\n"
@@ -55,14 +63,14 @@ class CasadiSysModel:
         r+="equations: " + str(self.equations) + "\n"
         return r
     def get_function(self):
-        return ca.Function('check',self.states+self.der_states+self.alg_states+self.inputs+self.outputs+self.constants+self.parameters,self.equations)
+        return ca.Function('check',[self.time]+self.states+self.der_states+self.alg_states+self.inputs+self.outputs+self.constants+self.parameters,self.equations)
 
 class CasadiGenerator(tree.TreeListener):
 
     def __init__(self, root):
         super(CasadiGenerator, self).__init__()
         self.src = {}
-        self.nodes = {}
+        self.nodes = {"time" :ca.MX.sym("time")}
         self.derivative = {}
         self.root = root
 
@@ -112,28 +120,46 @@ class CasadiGenerator(tree.TreeListener):
         results.inputs = [self.src[e] for e in inputs]
         results.outputs = [self.src[e] for e in outputs]
         results.equations = [self.src[e] for e in tree.equations]
+        results.time = self.nodes["time"]
         self.results = results
 
 
     def exitExpression(self, tree):
-        op = str(tree.operator)
+        try:
+            op = tree.operator.name
+        except:
+            op = str(tree.operator)
         n_operands = len(tree.operands)
-
         if op == 'der':
             orig = self.src[tree.operands[0]]
-            s = ca.MX.sym("der_"+orig.name(),orig.sparsity())
-            self.derivative[orig] = s
-            self.nodes[s] = s
-            src = s
+            if orig in self.derivative:
+                src = self.derivative[orig]
+            else:
+                s = ca.MX.sym("der_"+orig.name(),orig.sparsity())
+                self.derivative[orig] = s
+                self.nodes[s] = s
+                src = s
+        elif op in ['+'] and n_operands == 1:
+            src = self.src[tree.operands[0]]
+        elif op in ['-'] and n_operands == 1:
+            src = -self.src[tree.operands[0]]
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
             lhs_op = getattr(lhs,op_map[op])
             src = lhs_op(rhs)
-        elif op in ['+'] and n_operands == 1:
+        elif op in op_map and n_operands == 1:
+            lhs = self.src[tree.operands[0]]
+            lhs_op = getattr(lhs,op_map[op])
+            src = lhs_op()
+        elif n_operands == 1:
             src = self.src[tree.operands[0]]
-        elif op in ['-'] and n_operands == 1:
-            src = -self.src[tree.operands[0]]
+            src = getattr(src,tree.operator.name)()
+        elif n_operands == 2:
+            lhs = self.src[tree.operands[0]]
+            rhs = self.src[tree.operands[1]]
+            lhs_op = getattr(lhs,tree.operator.name)
+            src = lhs_op(rhs)
         else:
             raise Exception("unknown")
         self.src[tree] = src
@@ -145,6 +171,8 @@ class CasadiGenerator(tree.TreeListener):
         try:
             self.src[tree] = self.nodes[name_flat(tree)]
         except:
+            if tree.name=="time":
+                self.src[tree] = self.nodes["time"]
             pass
 
     def exitComponentRef(self, tree):

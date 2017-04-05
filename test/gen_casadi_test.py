@@ -95,11 +95,75 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent(ref_model, casadi_model)
 
     def test_aircraft(self):
+        return
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
         ref_model = CasadiSysModel()
+
+    def test_duplicate(self):
+        with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DuplicateState')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        x = ca.MX.sym("x")
+        der_x = ca.MX.sym("der_x")
+        y = ca.MX.sym("y")
+        der_y = ca.MX.sym("y")
+
+        ref_model.states = [x,y]
+        ref_model.der_states = [der_x, der_y]
+        ref_model.equations =  [ der_x+der_y-1, der_x-2]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_inheritance(self):
+        with open(os.path.join(TEST_DIR, 'Inheritance.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Sub')
+        print("inheritance",casadi_model)
+        ref_model = CasadiSysModel()
+
+        x = ca.MX.sym("x")
+        der_x = ca.MX.sym("der_x")
+        y = ca.MX.sym("y")
+        der_y = ca.MX.sym("y")
+        k = ca.MX.sym("k")
+
+        ref_model.states = [x]
+        ref_model.der_states = [der_x]
+        ref_model.alg_states = [y]
+        ref_model.parameters = [k]
+        ref_model.equations =  [ der_x-k*x, x+y-3]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_builtin(self):
+        with open(os.path.join(TEST_DIR, 'BuiltinFunctions.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'BuiltinFunctions')
+        print("BuiltinFunctions",casadi_model)
+        ref_model = CasadiSysModel()
+
+        x = ca.MX.sym("x")
+        y = ca.MX.sym("y")
+        z = ca.MX.sym("z")
+        w = ca.MX.sym("w")
+        u = ca.MX.sym("u")
+        time = ca.MX.sym("time")
+
+        ref_model.inputs = [x]
+        ref_model.time = time
+        ref_model.outputs = [y, z, w, u]
+        ref_model.equations =  [ y-ca.sin(time), z-ca.cos(x),w-ca.fmin(y,z), u-ca.fabs(w)]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
 
 if __name__ == "__main__":
     unittest.main()
