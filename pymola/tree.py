@@ -312,7 +312,10 @@ def flatten(root, class_name, instance_name=''):
 
                 assert(class_left == class_right)
 
-                for connector_variable in class_left.symbols.values():
+                flat_file_left = flatten(root, class_left.name)
+                flat_class_left = flat_file_left.classes[class_left.name]
+
+                for connector_variable in flat_class_left.symbols.values():
                     left_name = flat_equation.left.name + '.' + connector_variable.name
                     right_name = flat_equation.right.name + '.' + connector_variable.name
                     if len(connector_variable.prefixes) == 0:
