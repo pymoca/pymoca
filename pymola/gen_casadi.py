@@ -121,10 +121,13 @@ class CasadiGenerator(tree.TreeListener):
 
         if op == 'der':
             orig = self.src[tree.operands[0]]
-            s = ca.MX.sym("der_"+orig.name(),orig.sparsity())
-            self.derivative[orig] = s
-            self.nodes[s] = s
-            src = s
+            if orig in self.derivative:
+                src = self.derivative[orig]
+            else:
+                s = ca.MX.sym("der_"+orig.name(),orig.sparsity())
+                self.derivative[orig] = s
+                self.nodes[s] = s
+                src = s
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
