@@ -145,12 +145,7 @@ class GenCasadiTest(unittest.TestCase):
         hb__up__H = ca.MX.sym("hb__up__H")
         hb__up__Q = ca.MX.sym("hb__up__Q")
 
-        # These should be removed - flattening bug
-        up = ca.MX.sym("up")
-        down = ca.MX.sym("down")
-
-        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H, b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q, b__down__Q, qc__down__Q, a__down__Q, up, down]
-
+        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H, b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q, b__down__Q, qc__down__Q, a__down__Q]
 
         ref_model.equations = [ a__up__H-a__down__H,
               a__up__Q+a__down__Q,
