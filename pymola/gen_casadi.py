@@ -8,6 +8,7 @@ import copy
 
 import casadi as ca
 import numpy as np
+from .gen_numpy import NumpyGenerator
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -84,7 +85,7 @@ class ForLoop:
     def register_indexed_symbol(self, e, tree):
         self.indexed_symbols[e] = tree
 
-class CasadiGenerator(tree.TreeListener):
+class CasadiGenerator(NumpyGenerator):
 
     def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
@@ -94,10 +95,6 @@ class CasadiGenerator(tree.TreeListener):
         self.root = root
         self.class_name = class_name
         self.for_loops = []
-
-    def exitArray(self, tree):
-        self.src[tree] = [self.src[e] for e in tree.values]
-        print("array",self.src[tree])
 
     def exitFile(self, tree):
         pass
@@ -206,9 +203,6 @@ class CasadiGenerator(tree.TreeListener):
         else:
             raise Exception("unknown")
         self.src[tree] = src
-
-    def exitPrimary(self, tree):
-        self.src[tree] = float(tree.value)
 
     def exitSlice(self, tree):
         start = self.src[tree.start]
