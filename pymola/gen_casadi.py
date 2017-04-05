@@ -1,7 +1,6 @@
 from __future__ import print_function, absolute_import, division, print_function, unicode_literals
 from . import tree
 
-import jinja2
 import os
 import sys
 import copy
@@ -204,7 +203,7 @@ class CasadiGenerator(NumpyGenerator):
         if isinstance(stop, ca.MX):
             stop = self.get_int_parameter(tree.stop)
         print(start, step, stop)
-        self.src[tree] = map(int,list(np.array(np.arange(start, stop+step, step))-1))
+        self.src[tree] = [ int(e) for e in list(np.array(np.arange(start, stop+step, step))-1)]
 
     def exitComponentRef(self, tree):
         if tree.name=="Real":
@@ -280,7 +279,7 @@ class CasadiGenerator(NumpyGenerator):
     def exitForEquation(self, tree):
         f = self.for_loops.pop()
 
-        indexed_symbols = f.indexed_symbols.keys()
+        indexed_symbols = list(f.indexed_symbols.keys())
         args = [f.index_variable]+indexed_symbols
         expr = ca.vcat([ca.vec(self.src[e]) for e in tree.equations])
         free_vars = ca.symvar(expr)

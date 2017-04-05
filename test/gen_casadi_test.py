@@ -14,7 +14,6 @@ from pymola import tree
 from pymola import gen_casadi
 import casadi as ca
 import numpy as np
-import jinja2
 
 
 CasadiSysModel = gen_casadi.CasadiSysModel
