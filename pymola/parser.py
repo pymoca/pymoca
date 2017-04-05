@@ -185,8 +185,20 @@ class ASTListener(ModelicaListener):
 
     def exitStatement_component_reference(self, ctx):
         self.ast[ctx] = ast.AssignmentStatement(
-            left=self.ast[ctx.component_reference()],
+            left=[self.ast[ctx.component_reference()]],
             right=self.ast[ctx.expression()])
+
+    def exitStatement_component_function(self, ctx):
+        all_comp_refs = [self.ast[x] for x in ctx.component_reference()]
+
+        right = ast.Expression(
+            operator=all_comp_refs[-1],
+            operands=[self.ast[x.expression()] for x in ctx.function_call_args().function_arguments().function_argument()]
+        )
+
+        self.ast[ctx] = ast.AssignmentStatement(
+            left=all_comp_refs[:-1],
+            right=right)
 
     def exitStatement_if(self, ctx):
         self.ast[ctx] = ast.IfStatement(
@@ -486,7 +498,7 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] += [self.ast[ctx.expression()]]
 
     def exitModification_assignment(self, ctx):
-        self.ast[ctx] = [self.ast[ctx.expression()]]        
+        self.ast[ctx] = [self.ast[ctx.expression()]]
 
     def exitModification_assignment2(self, ctx):
         self.ast[ctx] = [self.ast[ctx.expression()]]

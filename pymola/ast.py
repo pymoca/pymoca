@@ -379,7 +379,7 @@ ConnectClause.ast_spec = {
 }
 
 AssignmentStatement.ast_spec = {
-    'left': Field([ComponentRef]),
+    'left': FieldList([ComponentRef]),
     'right': Field([Expression, Primary, ComponentRef]),
     'comment': Field([str]),
 }
