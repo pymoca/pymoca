@@ -165,17 +165,6 @@ class Node(object):
             self.ast_spec[key].validate(name, key, value)
         self.__dict__[key] = value
 
-    def find_class(self, component_ref):
-        return self.classes[component_ref.name]
-
-    def find_symbol(self, c, component_ref):
-        sym = c.symbols[component_ref.name]
-        if len(component_ref.child) > 0:
-            c = self.find_class(sym.type)
-            return self.find_symbol(c, component_ref.child[0])
-        else:
-            return sym
-
     def __setattr__(self, key, value):
         self.set_field(key, value)
 
@@ -315,6 +304,17 @@ class Class(Node):
 class File(Node):
     def __init__(self, **kwargs):
         super(File, self).__init__(**kwargs)
+
+    def find_class(self, component_ref):
+        return self.classes[component_ref.name]
+
+    def find_symbol(self, c, component_ref):
+        sym = c.symbols[component_ref.name]
+        if len(component_ref.child) > 0:
+            c = self.find_class(sym.type)
+            return self.find_symbol(c, component_ref.child[0])
+        else:
+            return sym
 
 
 # Here we define the AST specifications for all nodes
