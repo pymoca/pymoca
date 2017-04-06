@@ -180,6 +180,9 @@ class CasadiGenerator(NumpyGenerator):
                 src = ca.mtimes(src,self.src[i])
         elif op == 'transpose' and n_operands == 1:
             src = self.src[tree.operands[0]].T
+        elif op == 'sum' and n_operands == 1:
+            v = self.src[tree.operands[0]]
+            src = ca.sum1(v)
         elif op == 'linspace' and n_operands == 3:
             a = self.src[tree.operands[0]]
             b = self.src[tree.operands[1]]
