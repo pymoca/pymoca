@@ -185,6 +185,29 @@ class CasadiGenerator(NumpyGenerator):
             b = self.src[tree.operands[1]]
             n_steps = int(self.src[tree.operands[2]])
             src = ca.linspace(a, b, n_steps)
+        elif op == 'fill' and n_operands == 2:
+            val = self.src[tree.operands[0]]
+            n_row = int(self.src[tree.operands[1]])
+            src = val * ca.MX.ones(n_row)
+        elif op == 'fill' and n_operands == 3:
+            val = self.src[tree.operands[0]]
+            n_row = int(self.src[tree.operands[1]])
+            n_col = int(self.src[tree.operands[2]])
+            src = val * ca.MX.ones(n_row, n_col)
+        elif op == 'zeros' and n_operands == 1:
+            n_row = int(self.src[tree.operands[0]])
+            src = ca.MX.zeros(n_row)
+        elif op == 'zeros' and n_operands == 2:
+            n_row = int(self.src[tree.operands[0]])
+            n_col = int(self.src[tree.operands[1]])
+            src = ca.MX.zeros(n_row, n_col)
+        elif op == 'ones' and n_operands == 1:
+            n_row = int(self.src[tree.operands[0]])
+            src = ca.MX.ones(n_row)
+        elif op == 'ones' and n_operands == 2:
+            n_row = int(self.src[tree.operands[0]])
+            n_col = int(self.src[tree.operands[1]])
+            src = ca.MX.ones(n_row, n_col)
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]

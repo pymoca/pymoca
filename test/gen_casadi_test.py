@@ -40,8 +40,10 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(len(A.equations),len(B.equations))
 
         for a, b in zip(A.constant_values, B.constant_values):
-            test = float(ca.norm_2(a-b))<=tol  
-            self.assertTrue(test)
+            delta = ca.vec(a - b)
+            for i in range(delta.size1()):
+                test = float(delta[i]) <= tol
+                self.assertTrue(test)
 
         this = A.get_function()
         that = B.get_function()
@@ -402,10 +404,13 @@ class GenCasadiTest(unittest.TestCase):
         c = ca.MX.sym("c", 3)
         d = ca.MX.sym("d", 3)
         B = ca.MX.sym("B", 3)
+        C = ca.MX.sym("C", 2,3)
+        D = ca.MX.sym("D", 3,2)
+        E = ca.MX.sym("E", 2,3)
 
         ref_model.alg_states = [A,b,c,d]
-        ref_model.constants = [B]
-        ref_model.constant_values = [ca.linspace(1.0, 2.0, 3)]
+        ref_model.constants = [B, C, D, E]
+        ref_model.constant_values = [ca.linspace(1.0, 2.0, 3), 1.7 * ca.MX.ones(2, 3), ca.MX.zeros(3, 2), ca.MX.ones(2, 3)]
         ref_model.equations =  [ ca.mtimes(A,b)-c, ca.mtimes(A.T,b)-d]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
