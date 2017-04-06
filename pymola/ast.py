@@ -249,7 +249,7 @@ class Symbol(Node):
     def __init__(self, **kwargs):
         super(Symbol, self).__init__(**kwargs)
 
-    ATTRIBUTES = ['min', 'max', 'start', 'fixed']
+    ATTRIBUTES = ['min', 'max', 'start', 'fixed', 'nominal']
 
 
 class ComponentClause(Node):
