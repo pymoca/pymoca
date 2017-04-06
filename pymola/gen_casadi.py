@@ -230,6 +230,11 @@ class CasadiGenerator(NumpyGenerator):
             n = len(diag)
             indices = list(range(n))
             src = ca.DM.triplet(indices, indices, diag, n, n)
+        elif op == 'delay' and n_operands == 2:
+            expr = self.src[tree.operands[0]]
+            delay_time = self.src[tree.operands[1]]
+            assert isinstance(expr, MX)
+            src = ca.MX.sym('{}_delayed_{}'.format(expr.name, delay_time), expr.size1(), expr.size2())
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
