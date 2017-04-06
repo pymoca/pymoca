@@ -334,171 +334,171 @@ VISIBILITY_PUBLIC = 2
 # the allowed field types, this self referencing is not
 # possible when initially declaring a class in python
 
-Primary.ast_spec = {
-    'value': Field([bool, float, int, str])
-}
+Primary.ast_spec = OrderedDict([
+    ('value', Field([bool, float, int, str])),
+])
 
-Array.ast_spec = {
-    'values': FieldList([Expression, Primary, ComponentRef, Array])
-}
+Array.ast_spec = OrderedDict([
+    ('values', FieldList([Expression, Primary, ComponentRef, Array])),
+])
 
-Slice.ast_spec = {
-    'start': Field([Expression, Primary, ComponentRef], Primary(value=0)),
-    'stop': Field([Expression, Primary, ComponentRef], Primary(value=-1)),
-    'step': Field([Expression, Primary, ComponentRef], Primary(value=1)),
-}
+Slice.ast_spec = OrderedDict([
+    ('start', Field([Expression, Primary, ComponentRef], Primary(value=0))),
+    ('stop', Field([Expression, Primary, ComponentRef], Primary(value=-1))),
+    ('step', Field([Expression, Primary, ComponentRef], Primary(value=1))),
+])
 
-ComponentRef.ast_spec = {
-    'name': Field([str]),
-    'indices': FieldList([Expression, Slice, Primary, ComponentRef], []),
-    'child': FieldList([ComponentRef], []),
-}
+ComponentRef.ast_spec = OrderedDict([
+    ('name', Field([str])),
+    ('indices', FieldList([Expression, Slice, Primary, ComponentRef], [])),
+    ('child', FieldList([ComponentRef], [])),
+])
 
-Expression.ast_spec = {
-    'operator': Field([str, ComponentRef]),
-    'operands': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
-}
+Expression.ast_spec = OrderedDict([
+    ('operator', Field([str, ComponentRef])),
+    ('operands', FieldList([Expression, Primary, ComponentRef, Array, IfExpression])),
+])
 
-IfExpression.ast_spec = {
-    'conditions': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
-    'expressions': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
-}
+IfExpression.ast_spec = OrderedDict([
+    ('conditions', FieldList([Expression, Primary, ComponentRef, Array, IfExpression])),
+    ('expressions', FieldList([Expression, Primary, ComponentRef, Array, IfExpression])),
+])
 
-Equation.ast_spec = {
-    'left': Field([Expression, Primary, ComponentRef]),
-    'right': Field([Expression, Primary, ComponentRef]),
-    'comment': Field([str]),
-}
+Equation.ast_spec = OrderedDict([
+    ('left', Field([Expression, Primary, ComponentRef])),
+    ('right', Field([Expression, Primary, ComponentRef])),
+    ('comment', Field([str])),
+])
 
-IfEquation.ast_spec = {
-    'expressions': FieldList([Expression, Primary, ComponentRef]),
-    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
-    'comment': Field([str]),
-}
+IfEquation.ast_spec = OrderedDict([
+    ('expressions', FieldList([Expression, Primary, ComponentRef])),
+    ('equations', FieldList([Equation, ForEquation, ConnectClause], [])),
+    ('comment', Field([str])),
+])
 
-ForIndex.ast_spec = {
-    'name': Field([str]),
-    'expression': Field([Expression, Primary, Slice]),
-}
+ForIndex.ast_spec = OrderedDict([
+    ('name', Field([str])),
+    ('expression', Field([Expression, Primary, Slice])),
+])
 
-ForEquation.ast_spec = {
-    'indices': FieldList([ForIndex]),
-    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
-    'comment': Field([str]),
-}
+ForEquation.ast_spec = OrderedDict([
+    ('indices', FieldList([ForIndex])),
+    ('equations', FieldList([Equation, ForEquation, ConnectClause], [])),
+    ('comment', Field([str])),
+])
 
-ConnectClause.ast_spec = {
-    'left': Field([ComponentRef]),
-    'right': Field([ComponentRef]),
-    'comment': Field([str]),
-}
+ConnectClause.ast_spec = OrderedDict([
+    ('left', Field([ComponentRef])),
+    ('right', Field([ComponentRef])),
+    ('comment', Field([str])),
+])
 
-AssignmentStatement.ast_spec = {
-    'left': FieldList([ComponentRef]),
-    'right': Field([Expression, Primary, ComponentRef]),
-    'comment': Field([str]),
-}
+AssignmentStatement.ast_spec = OrderedDict([
+    ('left', FieldList([ComponentRef])),
+    ('right', Field([Expression, Primary, ComponentRef])),
+    ('comment', Field([str])),
+])
 
-IfStatement.ast_spec = {
-    'expressions': FieldList([Expression, Primary, ComponentRef]),
-    'statements': FieldList([AssignmentStatement, ForStatement], []),
-    'comment': Field([str]),
-}
+IfStatement.ast_spec = OrderedDict([
+    ('expressions', FieldList([Expression, Primary, ComponentRef])),
+    ('statements', FieldList([AssignmentStatement, ForStatement], [])),
+    ('comment', Field([str])),
+])
 
-ForStatement.ast_spec = {
-    'indices': FieldList([ForIndex]),
-    'statements': FieldList([AssignmentStatement, ForStatement], []),
-    'comment': Field([str]),
-}
+ForStatement.ast_spec = OrderedDict([
+    ('indices', FieldList([ForIndex])),
+    ('statements', FieldList([AssignmentStatement, ForStatement], [])),
+    ('comment', Field([str])),
+])
 
-Symbol.ast_spec = {
-    'name': Field([str], ''),
-    'type': Field([ComponentRef], ComponentRef()),
-    'prefixes': FieldList([str], []),
-    'redeclare': Field([bool], False),
-    'final': Field([bool], False),
-    'inner': Field([bool], False),
-    'outer': Field([bool], False),
-    'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
-    'comment': Field([str], ''),
-    'start': Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'min': Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'max': Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'value': Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'fixed': Field([Primary], False),
-    'id': Field([int], 0),
-    'order': Field([int], 0),
-    'visibility': Field(int, VISIBILITY_PRIVATE),
-    'class_modification': Field(ClassModification),
-}
+Symbol.ast_spec = OrderedDict([
+    ('name', Field([str], '')),
+    ('type', Field([ComponentRef], ComponentRef())),
+    ('prefixes', FieldList([str], [])),
+    ('redeclare', Field([bool], False)),
+    ('final', Field([bool], False)),
+    ('inner', Field([bool], False)),
+    ('outer', Field([bool], False)),
+    ('dimensions', FieldList([Expression, Primary, ComponentRef], [Primary(value=1)])),
+    ('comment', Field([str], '')),
+    ('start', Field([Expression, Primary, ComponentRef, Array], Primary(value=nan))),
+    ('min', Field([Expression, Primary, ComponentRef, Array], Primary(value=nan))),
+    ('max', Field([Expression, Primary, ComponentRef, Array], Primary(value=nan))),
+    ('value', Field([Expression, Primary, ComponentRef, Array], Primary(value=nan))),
+    ('fixed', Field([Primary], False)),
+    ('id', Field([int], 0)),
+    ('order', Field([int], 0)),
+    ('visibility', Field(int, VISIBILITY_PRIVATE)),
+    ('class_modification', Field(ClassModification)),
+])
 
-ComponentClause.ast_spec = {
-    'prefixes': FieldList([str], []),
-    'type': Field([ComponentRef], ComponentRef()),
-    'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
-    'comment': FieldList([str], []),
-    'symbol_list': FieldList([Symbol], []),
-}
+ComponentClause.ast_spec = OrderedDict([
+    ('prefixes', FieldList([str], [])),
+    ('type', Field([ComponentRef], ComponentRef())),
+    ('dimensions', FieldList([Expression, Primary, ComponentRef], [Primary(value=1)])),
+    ('comment', FieldList([str], [])),
+    ('symbol_list', FieldList([Symbol], [])),
+])
 
-EquationSection.ast_spec = {
-    'initial': Field([bool], False),
-    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
-}
+EquationSection.ast_spec = OrderedDict([
+    ('initial', Field([bool], False)),
+    ('equations', FieldList([Equation, ForEquation, ConnectClause], [])),
+])
 
-AlgorithmSection.ast_spec = {
-    'initial': Field([bool], False),
-    'statements': FieldList([AssignmentStatement, ForStatement], []),
-}
+AlgorithmSection.ast_spec = OrderedDict([
+    ('initial', Field([bool], False)),
+    ('statements', FieldList([AssignmentStatement, ForStatement], [])),
+])
 
-ImportAsClause.ast_spec = {
-    'component': Field([ComponentRef]),
-    'name': Field([str])
-}
+ImportAsClause.ast_spec = OrderedDict([
+    ('component', Field([ComponentRef])),
+    ('name', Field([str])),
+])
 
-ImportFromClause.ast_spec = {
-    'component': Field([ComponentRef]),
-    'symbols': FieldList([str])
-}
+ImportFromClause.ast_spec = OrderedDict([
+    ('component', Field([ComponentRef])),
+    ('symbols', FieldList([str])),
+])
 
-ElementModification.ast_spec = {
-    'component': Field(ComponentRef, ComponentRef()),
-    'modifications': FieldList([Primary, Expression, ClassModification, Array], []),
-}
+ElementModification.ast_spec = OrderedDict([
+    ('component', Field(ComponentRef, ComponentRef())),
+    ('modifications', FieldList([Primary, Expression, ClassModification, Array], [])),
+])
 
-ShortClassDefinition.ast_spec = {
-    'name': Field(str),
-    'type': Field(str, ''),
-    'component': Field(ComponentRef),
-    'class_modification': Field([ClassModification]),
-}
+ShortClassDefinition.ast_spec = OrderedDict([
+    ('name', Field(str)),
+    ('type', Field(str, '')),
+    ('component', Field(ComponentRef)),
+    ('class_modification', Field([ClassModification])),
+])
 
-ClassModification.ast_spec = {
-    'arguments': FieldList([ElementModification, ComponentClause, ShortClassDefinition], []),
-}
+ClassModification.ast_spec = OrderedDict([
+    ('arguments', FieldList([ElementModification, ComponentClause, ShortClassDefinition], [])),
+])
 
-ExtendsClause.ast_spec = {
-    'component': Field([ComponentRef]),
-    'class_modification': Field([ClassModification]),
-    'visibility': Field(int, VISIBILITY_PRIVATE)
-}
+ExtendsClause.ast_spec = OrderedDict([
+    ('component', Field([ComponentRef])),
+    ('class_modification', Field([ClassModification])),
+    ('visibility', Field(int, VISIBILITY_PRIVATE))
+])
 
-Class.ast_spec = {
-    'name': Field(str),
-    'imports': FieldList([ImportAsClause, ImportFromClause], []),
-    'extends': FieldList([ExtendsClause], []),
-    'encapsulated': Field([bool], False),
-    'partial': Field([bool], False),
-    'final': Field([bool], False),
-    'type': Field([str], ''),
-    'comment': Field(str, ''),
-    'symbols': FieldDict([Symbol], {}),
-    'initial_equations': FieldList([Equation, ForEquation], []),
-    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
-    'initial_statements': FieldList([AssignmentStatement, ForStatement], []),
-    'statements': FieldList([AssignmentStatement, ForStatement], []),
-}
+Class.ast_spec = OrderedDict([
+    ('name', Field(str)),
+    ('imports', FieldList([ImportAsClause, ImportFromClause], [])),
+    ('extends', FieldList([ExtendsClause], [])),
+    ('encapsulated', Field([bool], False)),
+    ('partial', Field([bool], False)),
+    ('final', Field([bool], False)),
+    ('type', Field([str], '')),
+    ('comment', Field(str, '')),
+    ('symbols', FieldDict([Symbol], {})),
+    ('initial_equations', FieldList([Equation, ForEquation], [])),
+    ('equations', FieldList([Equation, ForEquation, ConnectClause], [])),
+    ('initial_statements', FieldList([AssignmentStatement, ForStatement], [])),
+    ('statements', FieldList([AssignmentStatement, ForStatement], [])),
+])
 
-File.ast_spec = {
-    'within': FieldList([ComponentRef], []),
-    'classes': FieldDict([Class], {}),
-}
+File.ast_spec = OrderedDict([
+    ('within', FieldList([ComponentRef], [])),
+    ('classes', FieldDict([Class], {})),
+])
