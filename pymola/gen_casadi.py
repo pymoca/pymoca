@@ -26,6 +26,12 @@ op_map = {  '*':"__mul__",
             '+':"__add__",
             "-":"__sub__",
             "/":"__div__",
+            '>':'__gt__',
+            '<':'__lt__',
+            '<=':'__le__',
+            '>=':'__ge__',
+            '!=':'__ne__',
+            '==':'__eq__',
             "min":"fmin",
             "max":"fmax",
             "abs":"fabs"}
@@ -196,6 +202,18 @@ class CasadiGenerator(NumpyGenerator):
             raise Exception("unknown")
         self.src[tree] = src
 
+    def exitIfExpression(self, tree):
+        assert(len(tree.conditions) + 1 == len(tree.expressions))
+
+        src = self.src[tree.expressions[-1]]
+        for cond_index in range(len(tree.conditions)):
+            cond = self.src[tree.conditions[-(cond_index + 1)]]
+            expr1 = self.src[tree.expressions[-(cond_index + 2)]]
+
+            src = ca.if_else(cond, expr1, src)
+
+        self.src[tree] = src
+
     def exitSlice(self, tree):
         start = self.src[tree.start]
         step = self.src[tree.step]
@@ -293,6 +311,21 @@ class CasadiGenerator(NumpyGenerator):
         res = Fmap.call([f.values]+indexed_symbols_full+free_vars)
 
         self.src[tree] = res[0].T
+
+    def exitIfEquation(self, tree):
+        assert(len(tree.equations) % (len(tree.conditions) + 1) == 0)
+
+        equations_per_condition = int(len(tree.equations) / (len(tree.conditions) + 1))
+
+        src = ca.vertcat(*[self.src[tree.equations[-(i + 1)]] for i in range(equations_per_condition)])
+        for cond_index in range(len(tree.conditions)):
+            cond = self.src[tree.conditions[-(cond_index + 1)]]
+            expr1 = ca.vertcat(*[self.src[tree.equations[-equations_per_condition * (cond_index + 1) - (i + 1)]] for i in range(equations_per_condition)])
+
+            src = ca.if_else(cond, expr1, src)
+
+        self.src[tree] = src
+
 
 def generate(ast_tree, model_name):
     # create a walker

@@ -371,7 +371,7 @@ Equation.ast_spec = OrderedDict([
 ])
 
 IfEquation.ast_spec = OrderedDict([
-    ('expressions', FieldList([Expression, Primary, ComponentRef])),
+    ('conditions', FieldList([Expression, Primary, ComponentRef])),
     ('equations', FieldList([Equation, ForEquation, ConnectClause], [])),
     ('comment', Field([str])),
 ])

@@ -281,6 +281,26 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_if_else(self):
+        with open(os.path.join(TEST_DIR, 'IfElse.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'IfElse')
+        ref_model = CasadiSysModel()
+
+        x = ca.MX.sym("x")
+        y1 = ca.MX.sym("y1")
+        y2 = ca.MX.sym("y2")
+        y3 = ca.MX.sym("y3")
+        y_max = ca.MX.sym("y_max")
+
+        ref_model.inputs = [x]
+        ref_model.outputs = [y1,y2,y3]
+        ref_model.parameters = [y_max]
+        ref_model.equations =  [ y1 - ca.if_else(x > 0, 1, 0) * y_max, ca.if_else(x > 1, ca.vertcat(y3 - 100, y2 - y_max), ca.if_else(x > 2, ca.vertcat(y3 - 1000, y2 - y_max - 1), ca.vertcat(y3 - 10000, y2)))]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_inheritance(self):
         with open(os.path.join(TEST_DIR, 'Inheritance.mo'), 'r') as f:
             txt = f.read()

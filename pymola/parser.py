@@ -175,7 +175,7 @@ class ASTListener(ModelicaListener):
 
     def exitEquation_if(self, ctx):
         self.ast[ctx] = ast.IfEquation(
-            expressions=[self.ast[s] for s in ctx.if_equation().expression()],
+            conditions=[self.ast[s] for s in ctx.if_equation().expression()],
             equations=[self.ast[s] for s in ctx.if_equation().equation()])
 
     def exitEquation_for(self, ctx):
