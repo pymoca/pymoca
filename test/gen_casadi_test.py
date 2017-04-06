@@ -388,12 +388,12 @@ class GenCasadiTest(unittest.TestCase):
         E = ca.MX.sym("E", 2)
 
         scalar_f = ca.MX.sym("scalar_f")
-        upper_index = ca.MX.sym("upper_index")
+        c_dim = ca.MX.sym("c_dim")
 
         ref_model.alg_states = [a,c,d,e,scalar_f,g]
         ref_model.parameters = [] # TODO missing upper_index
-        ref_model.constants = [b, B, C, D, E]
-        ref_model.constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2), ca.DM.zeros(3), ca.DM.ones(2)]
+        ref_model.constants = [b, c_dim, B, C, D, E]
+        ref_model.constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2), ca.DM.zeros(3), ca.DM.ones(2)]
         ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f), g - ca.sum1(c)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)

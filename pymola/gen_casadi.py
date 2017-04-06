@@ -1,5 +1,6 @@
 from __future__ import print_function, absolute_import, division, print_function, unicode_literals
 from . import tree
+from . import ast
 
 import os
 import sys
@@ -8,6 +9,17 @@ import copy
 import casadi as ca
 import numpy as np
 from .gen_numpy import NumpyGenerator
+
+# TODO
+#  - array of connectors
+#  - array of classes
+#  - expressions of parameters/constants in array declarations and in indexing
+#  - expressions of parameters/constants in linspace, zeros, etc
+#  - delay() operator
+#  - booleans
+# 
+#  - DLL export
+#  - Metadata export
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -186,33 +198,33 @@ class CasadiGenerator(NumpyGenerator):
         elif op == 'linspace' and n_operands == 3:
             a = self.src[tree.operands[0]]
             b = self.src[tree.operands[1]]
-            n_steps = int(self.src[tree.operands[2]])
+            n_steps = self.get_int_parameter(tree.operands[2])
             src = ca.linspace(a, b, n_steps)
         elif op == 'fill' and n_operands == 2:
             val = self.src[tree.operands[0]]
-            n_row = int(self.src[tree.operands[1]])
+            n_row = self.get_int_parameter(tree.operands[1])
             src = val * ca.DM.ones(n_row)
         elif op == 'fill' and n_operands == 3:
             val = self.src[tree.operands[0]]
-            n_row = int(self.src[tree.operands[1]])
-            n_col = int(self.src[tree.operands[2]])
+            n_row = self.get_int_parameter(tree.operands[1])
+            n_col = self.get_int_parameter(tree.operands[2])
             src = val * ca.DM.ones(n_row, n_col)
         elif op == 'zeros' and n_operands == 1:
-            n_row = int(self.src[tree.operands[0]])
+            n_row = self.get_int_parameter(tree.operands[0])
             src = ca.DM.zeros(n_row)
         elif op == 'zeros' and n_operands == 2:
-            n_row = int(self.src[tree.operands[0]])
-            n_col = int(self.src[tree.operands[1]])
+            n_row = self.get_int_parameter(tree.operands[0])
+            n_col = self.get_int_parameter(tree.operands[1])
             src = ca.DM.zeros(n_row, n_col)
         elif op == 'ones' and n_operands == 1:
-            n_row = int(self.src[tree.operands[0]])
+            n_row = self.get_int_parameter(tree.operands[0])
             src = ca.DM.ones(n_row)
         elif op == 'ones' and n_operands == 2:
-            n_row = int(self.src[tree.operands[0]])
-            n_col = int(self.src[tree.operands[1]])
+            n_row = self.get_int_parameter(tree.operands[0])
+            n_col = self.get_int_parameter(tree.operands[1])
             src = ca.DM.ones(n_row, n_col)
         elif op == 'identity' and n_operands == 1:
-            n = int(self.src[tree.operands[0]])
+            n = self.get_int_parameter(tree.operands[0])
             src = ca.DM.eye(n)
         elif op == 'diagonal' and n_operands == 1:
             diag = self.src[tree.operands[0]]
@@ -310,17 +322,19 @@ class CasadiGenerator(NumpyGenerator):
 
 
     def get_int_parameter(self, i):
+        if isinstance(i, ast.Primary):
+            return int(i.value)
         s = self.root.find_symbol(self.root.classes[self.class_name],i)
         assert(s.type.name=="Integer")
         return int(s.value.value)
 
     def enterSymbol(self, tree):
-        size = [int(d.value) for d in tree.dimensions]
+        size = [self.get_int_parameter(d) for d in tree.dimensions]
         assert(len(size)<=2)
         for i in tree.type.indices:
             assert len(size)==1
             size=[size[0]*self.get_int_parameter(i)]
-        s =  ca.MX.sym(name_flat(tree), *size)
+        s = ca.MX.sym(name_flat(tree), *size)
         self.nodes[name_flat(tree)] = s
         self.src[tree] = s
 
