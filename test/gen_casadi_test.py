@@ -423,5 +423,10 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_type(self):
+        with open(os.path.join(TEST_DIR, 'Type.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
 if __name__ == "__main__":
     unittest.main()
