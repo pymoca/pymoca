@@ -7,6 +7,7 @@ model ArrayExpressions
     Real e[3];
     Real scalar_f = 1.3;
     Real g;
+    parameter Integer upper_index = 4;
     constant Real B[3] = linspace(1, 2, 3);
     constant Real C[2] = fill(1.7, 2);
     constant Real D[3] = zeros(3);
@@ -16,7 +17,7 @@ equation
     c = a .+ b[1:3].*e; // .+ is equal to + in this case
 
     // Calling a (scalar) function on an array maps the function to each element.
-    d = sin(a ./ b[2:4]);
+    d = sin(a ./ b[2:upper_index]);
 
     // Difference between .+ and +
     e = d .+ scalar_f; // Different shapes, so + is not allowed, only .+ is.
