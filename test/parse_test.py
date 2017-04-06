@@ -37,6 +37,7 @@ class ParseTest(unittest.TestCase):
         print('AST TREE FLAT\n', flat_tree)
         self.flush()
 
+    @unittest.skip
     def test_bouncing_ball(self):
         with open(os.path.join(TEST_DIR, 'BouncingBall.mo'), 'r') as f:
             txt = f.read()
