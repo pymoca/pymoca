@@ -180,6 +180,11 @@ class CasadiGenerator(NumpyGenerator):
                 src = ca.mtimes(src,self.src[i])
         elif op == 'transpose' and n_operands == 1:
             src = self.src[tree.operands[0]].T
+        elif op == 'linspace' and n_operands == 3:
+            a = self.src[tree.operands[0]]
+            b = self.src[tree.operands[1]]
+            n_steps = int(self.src[tree.operands[2]])
+            src = ca.linspace(a, b, n_steps)
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
