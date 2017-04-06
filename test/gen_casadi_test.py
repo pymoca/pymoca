@@ -184,6 +184,84 @@ class GenCasadiTest(unittest.TestCase):
         print(ref_model)
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_connector_hqz(self):
+        with open(os.path.join(TEST_DIR, 'ConnectorHQZ.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'SystemZ')
+        ref_model = CasadiSysModel()
+        print(casadi_model)
+
+        a__up__H = ca.MX.sym("a__up__H")
+        a__up__Q = ca.MX.sym("a__up__Q")
+        a__up__Z = ca.MX.sym("a__up__Z")
+        a__down__H = ca.MX.sym("a__down__H")
+        a__down__Q = ca.MX.sym("a__down__Q")
+        a__down__Z = ca.MX.sym("a__down__Z")
+
+        b__up__H = ca.MX.sym("b__up__H")
+        b__up__Q = ca.MX.sym("b__up__Q")
+        b__up__Z = ca.MX.sym("b__up__Z")
+        b__down__H = ca.MX.sym("b__down__H")
+        b__down__Q = ca.MX.sym("b__down__Q")
+        b__down__Z = ca.MX.sym("b__down__Z")
+
+        c__up__H = ca.MX.sym("c__up__H")
+        c__up__Q = ca.MX.sym("c__up__Q")
+        c__up__Z = ca.MX.sym("c__up__Z")
+        c__down__H = ca.MX.sym("c__down__H")
+        c__down__Q = ca.MX.sym("c__down__Q")
+        c__down__Z = ca.MX.sym("c__down__Z")
+
+        qa__down__H = ca.MX.sym("qa__down__H")
+        qa__down__Q = ca.MX.sym("qa__down__Q")
+        qa__down__Z = ca.MX.sym("qa__down__Z")
+        qc__down__H = ca.MX.sym("qc__down__H")
+        qc__down__Q = ca.MX.sym("qc__down__Q")
+        qc__down__Z = ca.MX.sym("qc__down__Z")
+
+        hb__up__H = ca.MX.sym("hb__up__H")
+        hb__up__Q = ca.MX.sym("hb__up__Q")
+        hb__up__Z = ca.MX.sym("hb__up__Z")
+
+        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H, b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q, b__down__Q, qc__down__Q, a__down__Q, a__up__Z, a__down__Z, b__up__Z, b__down__Z, c__up__Z, c__down__Z, qa__down__Z, qc__down__Z, hb__up__Z]
+
+        ref_model.equations = [ a__up__H-a__down__H,
+              a__up__Q+a__down__Q,
+                c__up__H-c__down__H,
+              c__up__Q+c__down__Q,
+
+              b__up__H-b__down__H,
+              b__up__Q+b__down__Q,
+
+
+              qa__down__Q,
+              qc__down__Q,
+
+              hb__up__H,
+
+              qa__down__H-a__up__H,
+              qc__down__H-c__up__H,
+              a__down__H-b__up__H,
+              c__down__H-b__up__H,
+              b__down__H-hb__up__H,
+
+              a__down__Q+b__up__Q+c__down__Q,
+              c__up__Q+qc__down__Q,
+              b__down__Q+hb__up__Q,
+              a__up__Q+qa__down__Q,
+
+              qa__down__Z-a__up__Z,
+              qc__down__Z-c__up__Z,
+              a__down__Z-b__up__Z,
+              c__down__Z-b__up__Z,
+              b__down__Z-hb__up__Z]
+
+
+
+        print(ref_model)
+        self.assert_model_equivalent(ref_model, casadi_model)
+
     def test_duplicate(self):
         with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
             txt = f.read()
