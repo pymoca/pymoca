@@ -10,7 +10,7 @@ model ArrayExpressions
     constant Integer c_dim = 2;
     parameter Integer d_dim = 3;
     constant Real B[d_dim] = linspace(1, 2, 3);
-    constant Real C[c_dim] = fill(1.7, 2);
+    constant Real C[c_dim] = fill(1.7, c_dim);
     constant Real D[3] = zeros(d_dim);
     constant Real E[2] = ones(2);
 equation

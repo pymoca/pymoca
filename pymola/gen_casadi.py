@@ -16,7 +16,6 @@ from .gen_numpy import NumpyGenerator
 #  - expressions of parameters/constants in array declarations and in indexing
 #  - expressions of parameters/constants in linspace, zeros, etc
 #  - delay() operator
-#  - booleans
 # 
 #  - DLL export
 #  - Metadata export

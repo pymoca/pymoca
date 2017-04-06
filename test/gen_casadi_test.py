@@ -423,6 +423,38 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_attributes(self):
+        with open(os.path.join(TEST_DIR, 'Attributes.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Attributes')
+        print(casadi_model)
+        ref_model = CasadiSysModel()
+
+        i = ca.MX.sym("int")
+        b = ca.MX.sym("bool")
+        r = ca.MX.sym("real")
+        der_r = ca.MX.sym("der_real")
+        i1 = ca.MX.sym("i1")
+        i2 = ca.MX.sym("i2")
+        i3 = ca.MX.sym("i3")
+        i4 = ca.MX.sym("i4")
+        cst = ca.MX.sym("cst")
+        prm = ca.MX.sym("prm")
+        protected_variable = ca.MX.sym("protected_variable")
+
+        ref_model.states = [r]
+        ref_model.der_states = [der_r]
+        ref_model.alg_states = [i,b]
+        ref_model.inputs = [i1, i2, i3]
+        ref_model.outputs = [i4, protected_variable]
+        ref_model.constants = [cst]
+        ref_model.constant_values = [1]
+        ref_model.parameters = [prm]
+        ref_model.equations =  [ i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0) * i), protected_variable - (i1 + i2)]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_type(self):
         with open(os.path.join(TEST_DIR, 'Type.mo'), 'r') as f:
             txt = f.read()
