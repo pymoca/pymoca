@@ -266,11 +266,9 @@ class CasadiGenerator(NumpyGenerator):
         self.src[tree] = src
 
     def exitSlice(self, tree):
-        start = self.src[tree.start]
-        step = self.src[tree.step]
-        stop = self.src[tree.stop]
-        if isinstance(stop, ca.MX):
-            stop = self.get_int_parameter(tree.stop)
+        start = self.get_int_parameter(tree.start)
+        step = self.get_int_parameter(tree.step)
+        stop = self.get_int_parameter(tree.stop)
         print(start, step, stop)
         self.src[tree] = [ int(e) for e in list(np.array(np.arange(start, stop+step, step))-1)]
 

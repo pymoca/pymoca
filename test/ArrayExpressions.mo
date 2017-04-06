@@ -18,7 +18,7 @@ equation
     c = a .+ b[1:d_dim].*e; // .+ is equal to + in this case
 
     // Calling a (scalar) function on an array maps the function to each element.
-    d = sin(a ./ b[2:4]);
+    d = sin(a ./ b[c_dim:4]);
 
     // Difference between .+ and +
     e = d .+ scalar_f; // Different shapes, so + is not allowed, only .+ is.
