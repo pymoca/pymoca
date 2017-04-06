@@ -6,6 +6,10 @@ model ArrayExpressions
     Real d[3];
     Real e[3];
     Real scalar_f = 1.3;
+    constant Real B[3] = linspace(1, 2, 3);
+    constant Real C[2] = fill(1.7, 2);
+    constant Real D[3] = zeros(3);
+    constant Real E[2] = ones(2);
 equation
     // Array operators.
     c = a .+ b[1:3].*e; // .+ is equal to + in this case

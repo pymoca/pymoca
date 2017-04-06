@@ -4,12 +4,11 @@ model MatrixExpressions
     Real b[3];
     Real c[3];
     Real d[3];
-    constant Real B[3] = linspace(1, 2, 3);
     constant Real C[2, 3] = fill(1.7, 2, 3);
     constant Real D[3, 2] = zeros(3, 2);
     constant Real E[2, 3] = ones(2, 3);
-    /*constant Real E[5] = identity(5);
-    constant Real F[5] = diagonal({1.0, 2.0, 3.0, 4.0, 5.0})*/
+    constant Real I[5, 5] = identity(5);
+    constant Real F[3, 3] = diagonal({1, 2, 3});
 equation
     A*b = c;
     transpose(A)*b = d;

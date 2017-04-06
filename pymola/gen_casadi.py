@@ -188,26 +188,34 @@ class CasadiGenerator(NumpyGenerator):
         elif op == 'fill' and n_operands == 2:
             val = self.src[tree.operands[0]]
             n_row = int(self.src[tree.operands[1]])
-            src = val * ca.MX.ones(n_row)
+            src = val * ca.DM.ones(n_row)
         elif op == 'fill' and n_operands == 3:
             val = self.src[tree.operands[0]]
             n_row = int(self.src[tree.operands[1]])
             n_col = int(self.src[tree.operands[2]])
-            src = val * ca.MX.ones(n_row, n_col)
+            src = val * ca.DM.ones(n_row, n_col)
         elif op == 'zeros' and n_operands == 1:
             n_row = int(self.src[tree.operands[0]])
-            src = ca.MX.zeros(n_row)
+            src = ca.DM.zeros(n_row)
         elif op == 'zeros' and n_operands == 2:
             n_row = int(self.src[tree.operands[0]])
             n_col = int(self.src[tree.operands[1]])
-            src = ca.MX.zeros(n_row, n_col)
+            src = ca.DM.zeros(n_row, n_col)
         elif op == 'ones' and n_operands == 1:
             n_row = int(self.src[tree.operands[0]])
-            src = ca.MX.ones(n_row)
+            src = ca.DM.ones(n_row)
         elif op == 'ones' and n_operands == 2:
             n_row = int(self.src[tree.operands[0]])
             n_col = int(self.src[tree.operands[1]])
-            src = ca.MX.ones(n_row, n_col)
+            src = ca.DM.ones(n_row, n_col)
+        elif op == 'identity' and n_operands == 1:
+            n = int(self.src[tree.operands[0]])
+            src = ca.DM.eye(n)
+        elif op == 'diagonal' and n_operands == 1:
+            diag = self.src[tree.operands[0]]
+            n = len(diag)
+            indices = list(range(n))
+            src = ca.DM.triplet(indices, indices, diag, n, n)
         elif op in op_map and n_operands == 2:
             lhs = self.src[tree.operands[0]]
             rhs = self.src[tree.operands[1]]
