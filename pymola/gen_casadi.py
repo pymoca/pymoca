@@ -11,8 +11,8 @@ import numpy as np
 from .gen_numpy import NumpyGenerator
 
 # TODO
-#  - Test starting loop at an offset
 #  - Test loops with fixed secondary indices
+#  - Expressions with indices
 
 #  - DLL export
 #  - Metadata export
@@ -75,7 +75,7 @@ class ForLoop:
         start = e.start.value
         step = e.step.value
         stop = self.generator.get_integer(e.stop)
-        self.values = np.arange(start, stop + step, step)
+        self.values = np.arange(start, stop + step, step, dtype=np.int)
         self.index_variable = ca.MX.sym(i.name)
         self.name = i.name
         self.indexed_symbols = {}
@@ -261,7 +261,7 @@ class CasadiGenerator(NumpyGenerator):
         F = ca.Function('loop_body_' + f.name, all_args, [expr])
 
         indexed_symbols_full = [self.nodes[
-            f.indexed_symbols[k].name] for k in indexed_symbols]
+            f.indexed_symbols[k].name][f.values - 1] for k in indexed_symbols]
         Fmap = F.map("map", "serial", len(f.values), list(
             range(len(args), len(all_args))), [])
         res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
