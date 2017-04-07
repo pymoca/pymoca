@@ -4,8 +4,10 @@ Tools for tree walking and visiting etc.
 """
 
 from __future__ import print_function, absolute_import, division, unicode_literals
+from collections import OrderedDict
 import logging
 import copy
+import json
 
 from . import ast
 
@@ -317,6 +319,13 @@ def flatten_class(root, orig_class, instance_name):
             # recursively call flatten on the contained class
             flat_sub_class = flatten_class(root, c, instance_prefix + sym_name)
 
+            # carry class dimensions over to symbols
+            for flat_class_symbol in flat_sub_class.symbols.values():
+                if len(flat_class_symbol.dimensions) == 1 and isinstance(flat_class_symbol.dimensions[0], ast.Primary) and flat_class_symbol.dimensions[0].value == 1:
+                    flat_class_symbol.dimensions = sym.dimensions
+                else:
+                    flat_class_symbol.dimensions = sym.dimensions + flat_class_symbol.dimensions
+
             # add sub_class members symbols and equations
             flat_class.symbols.update(flat_sub_class.symbols)
             flat_class.equations += flat_sub_class.equations
@@ -329,7 +338,7 @@ def flatten_class(root, orig_class, instance_name):
                 flat_class.symbols[flat_sym.name] = flat_sym
 
     # for all equations in original class
-    flow_connections = {}
+    flow_connections = OrderedDict()
     for equation in orig_class.equations:
         flat_equation = flatten_expression(equation, instance_prefix)
         if isinstance(equation, ast.ConnectClause):
@@ -355,22 +364,23 @@ def flatten_class(root, orig_class, instance_name):
                 for connector_variable in flat_class_left.symbols.values():
                     left_name = flat_equation.left.name + CLASS_SEPARATOR + connector_variable.name
                     right_name = flat_equation.right.name + CLASS_SEPARATOR + connector_variable.name
+                    left = ast.ComponentRef(name=left_name, indices=flat_equation.left.indices)
+                    right = ast.ComponentRef(name=right_name, indices=flat_equation.right.indices)
                     if len(connector_variable.prefixes) == 0:
-                        left = ast.ComponentRef(name=left_name)
-                        right = ast.ComponentRef(name=right_name)
                         connect_equation = ast.Equation(left=left, right=right)
                         connect_equations.append(connect_equation)
                     elif connector_variable.prefixes == ['flow']:
-                        left_connected_variables = flow_connections.get(left_name, set())
-                        right_connected_variables = flow_connections.get(right_name, set())
+                        left_repr = repr(left)
+                        right_repr = repr(right)
 
-                        connected_variables = left_connected_variables.union(right_connected_variables)
-                        if left_name not in connected_variables:
-                            connected_variables.add(left_name)
-                        if right_name not in connected_variables:
-                            connected_variables.add(right_name)
+                        left_connected_variables = flow_connections.get(left_repr, OrderedDict())
+                        right_connected_variables = flow_connections.get(right_repr, OrderedDict())
 
-                        connected_variables = frozenset(connected_variables)
+                        left_connected_variables.update(right_connected_variables)
+                        connected_variables = left_connected_variables
+                        connected_variables[left_repr] = left
+                        connected_variables[right_repr] = right
+
                         for connected_variable in connected_variables:
                             flow_connections[connected_variable] = connected_variables
                     else:
@@ -387,10 +397,14 @@ def flatten_class(root, orig_class, instance_name):
     if len(flow_connections) > 0:
         # TODO Flatten first
         logger.warning("Note: Connections between connectors with flow variables are not supported across levels of the class hierarchy")
-    for connected_variables in sorted(set(flow_connections.values())):
-        operands = [ast.ComponentRef(name=variable) for variable in sorted(connected_variables)]
-        connect_equation = ast.Equation(left=ast.Expression(operator='+', operands=operands), right=ast.Primary(value=0))
-        flat_class.equations += [connect_equation]
+
+    processed = [] # OrderedDict is not hashable, so we cannot use sets.
+    for connected_variables in flow_connections.values():
+        if connected_variables not in processed:
+            operands = list(connected_variables.values())
+            connect_equation = ast.Equation(left=ast.Expression(operator='+', operands=operands), right=ast.Primary(value=0))
+            flat_class.equations += [connect_equation]
+            processed.append(connected_variables)
 
     # TODO: Also drag along any functions we need
     # function_set = set()

@@ -182,9 +182,9 @@ class GenCasadiTest(unittest.TestCase):
               b__down__H-hb__up__H,
 
               a__down__Q+b__up__Q+c__down__Q,
-              c__up__Q+qc__down__Q,
+              qc__down__Q+c__up__Q,
               b__down__Q+hb__up__Q,
-              a__up__Q+qa__down__Q]
+              qa__down__Q+a__up__Q]
 
 
 
@@ -254,9 +254,9 @@ class GenCasadiTest(unittest.TestCase):
               b__down__H-hb__up__H,
 
               a__down__Q+b__up__Q+c__down__Q,
-              c__up__Q+qc__down__Q,
+              qc__down__Q+c__up__Q,
               b__down__Q+hb__up__Q,
-              a__up__Q+qa__down__Q,
+              qa__down__Q+a__up__Q,
 
               qa__down__Z-a__up__Z,
               qc__down__Z-c__up__Z,
@@ -387,16 +387,19 @@ class GenCasadiTest(unittest.TestCase):
         C = ca.MX.sym("C", 2)
         D = ca.MX.sym("D", 3)
         E = ca.MX.sym("E", 2)
+        arx = ca.MX.sym("ar__x", 3)
+        arcy = ca.MX.sym("arc__y", 2)
+        arcw = ca.MX.sym("arc__w", 2)
 
         scalar_f = ca.MX.sym("scalar_f")
         c_dim = ca.MX.sym("c_dim")
 
-        ref_model.alg_states = [a,c,d,e,scalar_f,g]
+        ref_model.alg_states = [a,c,d,e,scalar_f,g,arx,arcy,arcw]
         ref_model.parameters = [] # TODO missing upper_index
         ref_model.outputs = [h]
         ref_model.constants = [b, c_dim, B, C, D, E]
         ref_model.constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2), ca.DM.zeros(3), ca.DM.ones(2)]
-        ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f), g - ca.sum1(c), h - B[1]]
+        ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f), g - ca.sum1(c), h - B[1], arx[1] - scalar_f, arcy[0] - arcy[1], arcw[0] + arcw[1]]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

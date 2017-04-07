@@ -11,9 +11,6 @@ import numpy as np
 from .gen_numpy import NumpyGenerator
 
 # TODO
-#  - array of connectors
-#  - array of classes
-# 
 #  - DLL export
 #  - Metadata export
 
@@ -267,36 +264,14 @@ class CasadiGenerator(NumpyGenerator):
 
         self.src[tree] = src
 
-    def exitComponentRef(self, tree):
-        # TODO do we still need this? Merge with get_symbol()?
-        if tree.name=="Real":
-            return
-        if tree.name=="time":
-            self.src[tree] = self.nodes["time"]
-            return
-        if len(tree.indices)>0 and len(self.for_loops)==0:
-            self.src[tree] = self.get_indexed_symbol(tree)
-            return
-        elif len(tree.indices)>0:
-            self.src[tree] = self.get_indexed_symbol_loop(tree)
-            return
-
-        try:
-            self.src[tree] = self.nodes[name_flat(tree)]
-        except:
-            for f in reversed(self.for_loops):
-                if f.name==tree.name:
-                    self.src[tree] = f.index_variable
-
     def get_symbol_size(self,tree):
         return 1
 
     def get_indexed_symbol(self,tree):
-        self.get_src(tree)
-        s = self.nodes[tree.name]
+        s = self.nodes[name_flat(tree)]
         slice = self.get_int_parameter(tree.indices[0])
         print(slice)
-        return s[slice]
+        return s[np.array(slice) - 1]
         print("get_indexed_symbol",tree)
 
     def get_indexed_symbol_loop(self,tree):
@@ -316,15 +291,36 @@ class CasadiGenerator(NumpyGenerator):
         return s
 
     def get_src(self, i):
+        # TODO clean up
         if isinstance(i, ast.Symbol):
             return self.get_symbol(i)
         elif isinstance(i, ast.ComponentRef):
             if i in self.src:
                 return self.src[i]
-            #if i.name == 'time':
-            #    return self.nodes['time']
+
+            tree = i
+            if tree.name=="time":
+                self.src[tree] = self.nodes["time"]
+                return self.src[tree]
+
+            for f in reversed(self.for_loops):
+                if f.name==tree.name:
+                    self.src[tree] = f.index_variable
+                    return self.src[tree]
+
             tree = self.root.find_symbol(self.root.classes[self.class_name], i)
-            return self.get_symbol(tree)
+            self.src[i] = self.get_symbol(tree)
+            tree = i 
+
+            if len(tree.indices)>0 and len(self.for_loops)==0:
+                self.src[tree] = self.get_indexed_symbol(tree)
+                return self.src[tree]
+            elif len(tree.indices)>0:
+                self.src[tree] = self.get_indexed_symbol_loop(tree)
+                return self.src[tree]
+
+            return self.src[i]
+            
         else:
             return self.src[i]
 
@@ -354,6 +350,9 @@ class CasadiGenerator(NumpyGenerator):
             return self.get_int_parameter(s.value)
         if isinstance(i, ast.Expression):
             # Evaluate expression
+            ast_walker = tree.TreeWalker()
+            ast_walker.walk(self, i)
+
             # TODO dep symbols may not be parsed yet.  
             # TODO parse on demand?  self.get_symbol querying cache, calling exitSymbol() otherwise?  Can then drop OrderedDict as well.
             expr = self.get_src(i)
@@ -366,7 +365,7 @@ class CasadiGenerator(NumpyGenerator):
             start = self.get_int_parameter(i.start)
             step = self.get_int_parameter(i.step)
             stop = self.get_int_parameter(i.stop)
-            return [ int(e) for e in list(np.array(np.arange(start, stop+step, step))-1)]
+            return [ int(e) for e in list(np.array(np.arange(start, stop+step, step)))]
         else:
             raise Exception(i)
 
