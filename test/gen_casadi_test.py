@@ -426,7 +426,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states = [A,b,c,d]
         ref_model.constants = [C, D, E, I, F]
         ref_model.constant_values = [1.7 * ca.DM.ones(2, 3), ca.DM.zeros(3, 2), ca.DM.ones(2, 3), ca.DM.eye(5), ca.DM.triplet([0, 1, 2], [0, 1, 2], [1, 2, 3], 3, 3)]
-        ref_model.equations =  [ ca.mtimes(A,b)-c, ca.mtimes(A.T,b)-d]
+        ref_model.equations =  [ ca.mtimes(A,b)-c, ca.mtimes(A.T,b)-d, F[1,2]]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

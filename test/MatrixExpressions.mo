@@ -12,4 +12,5 @@ model MatrixExpressions
 equation
     A*b = c;
     transpose(A)*b = d;
+    F[2, 3] = 0;
 end MatrixExpressions;

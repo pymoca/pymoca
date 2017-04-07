@@ -11,7 +11,6 @@ import numpy as np
 from .gen_numpy import NumpyGenerator
 
 # TODO
-#  - Test array indexing
 #  - Test starting loop at an offset
 #  - Test loops with fixed secondary indices
 
@@ -329,6 +328,7 @@ class CasadiGenerator(NumpyGenerator):
         size = [self.get_integer(d) for d in tree.dimensions]
         assert(len(size) <= 2)
         for i in tree.type.indices:
+            # TODO
             assert len(size) == 1
             size = [size[0] * self.get_integer(i)]
         s = ca.MX.sym(tree.name, *size)
@@ -337,6 +337,7 @@ class CasadiGenerator(NumpyGenerator):
 
     def get_indexed_symbol(self, tree, s):
         # Check whether we loop over an index of this symbol
+        indices = []
         for index in tree.indices:
             if isinstance(index, ast.ComponentRef):                
                 for for_loop in self.for_loops:
@@ -347,9 +348,14 @@ class CasadiGenerator(NumpyGenerator):
                         return s
 
             sl = self.get_integer(index)
-            # Modelica indexing starts from one;  Python from zero
-            s = s[sl - 1]
-        return s
+            # Modelica indexing starts from one;  Python from zero.
+            indices.append(sl - 1)        
+        if len(indices) == 1:
+            return s[indices[0]]
+        elif len(indices) == 2:
+            return s[indices[0], indices[1]]
+        else:
+            raise Exception("Dimensions higher than two are not yet supported")
 
     def get_component(self, tree):
         # Check special symbols
