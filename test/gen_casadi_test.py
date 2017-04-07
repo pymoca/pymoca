@@ -91,8 +91,8 @@ class GenCasadiTest(unittest.TestCase):
         print(casadi_model)
         x = ca.MX.sym("x")
         v_x = ca.MX.sym("v_x")
-        der_x = ca.MX.sym("der_x")
-        der_v_x = ca.MX.sym("der_v_x")
+        der_x = ca.MX.sym("der(x)")
+        der_v_x = ca.MX.sym("der(v_x)")
         k = ca.MX.sym("k")
         c = ca.MX.sym("c")
         ref_model.states = [x,v_x]
@@ -111,7 +111,7 @@ class GenCasadiTest(unittest.TestCase):
         print(casadi_model)
 
         x = ca.MX.sym("x")
-        der_x = ca.MX.sym("der_x")
+        der_x = ca.MX.sym("der(x)")
         y = ca.MX.sym("y")
 
         ref_model.states = [x]
@@ -181,7 +181,7 @@ class GenCasadiTest(unittest.TestCase):
               c__down__H-b__up__H,
               b__down__H-hb__up__H,
 
-              a__down__Q+b__up__Q+c__down__Q,
+              a__down__Q+(b__up__Q+c__down__Q),
               qc__down__Q+c__up__Q,
               b__down__Q+hb__up__Q,
               qa__down__Q+a__up__Q]
@@ -253,7 +253,7 @@ class GenCasadiTest(unittest.TestCase):
               c__down__H-b__up__H,
               b__down__H-hb__up__H,
 
-              a__down__Q+b__up__Q+c__down__Q,
+              a__down__Q+(b__up__Q+c__down__Q),
               qc__down__Q+c__up__Q,
               b__down__Q+hb__up__Q,
               qa__down__Q+a__up__Q,
@@ -278,9 +278,9 @@ class GenCasadiTest(unittest.TestCase):
         ref_model = CasadiSysModel()
 
         x = ca.MX.sym("x")
-        der_x = ca.MX.sym("der_x")
+        der_x = ca.MX.sym("der(x)")
         y = ca.MX.sym("y")
-        der_y = ca.MX.sym("der_y")
+        der_y = ca.MX.sym("der(y)")
 
         ref_model.states = [x,y]
         ref_model.der_states = [der_x, der_y]
@@ -317,7 +317,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model = CasadiSysModel()
 
         x = ca.MX.sym("x")
-        der_x = ca.MX.sym("der_x")
+        der_x = ca.MX.sym("der(x)")
         y = ca.MX.sym("y")
         der_y = ca.MX.sym("y")
         k = ca.MX.sym("k")
@@ -439,7 +439,7 @@ class GenCasadiTest(unittest.TestCase):
         i = ca.MX.sym("int")
         b = ca.MX.sym("bool")
         r = ca.MX.sym("real")
-        der_r = ca.MX.sym("der_real")
+        der_r = ca.MX.sym("der(real)")
         i1 = ca.MX.sym("i1")
         i2 = ca.MX.sym("i2")
         i3 = ca.MX.sym("i3")

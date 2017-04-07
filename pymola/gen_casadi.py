@@ -161,14 +161,14 @@ class CasadiGenerator(NumpyGenerator):
         self.results = results
 
     def exitExpression(self, tree):
-        try:
+        if isinstance(tree.operator, ast.ComponentRef):
             op = tree.operator.name
-        except:
-            op = str(tree.operator)
+        else:
+            op = tree.operator
 
-        if op == "*":
-            op = "mtimes"
-        if op.startswith("."):
+        if op == '*':
+            op = 'mtimes' # .* differs from *
+        if op.startswith('.'):
             op = op[1:]
 
         n_operands = len(tree.operands)
@@ -177,16 +177,12 @@ class CasadiGenerator(NumpyGenerator):
             if orig in self.derivative:
                 src = self.derivative[orig]
             else:
-                s = ca.MX.sym("der_" + orig.name(), orig.sparsity())
+                s = ca.MX.sym("der({})".format(orig.name()), orig.sparsity())
                 self.derivative[orig] = s
                 self.nodes[s] = s
                 src = s
-        elif op in ['-'] and n_operands == 1:
+        elif op == '-' and n_operands == 1:
             src = -self.get_src(tree.operands[0])
-        elif op == '+':
-            src = self.get_src(tree.operands[0])
-            for i in tree.operands[1:]:
-                src += self.get_src(i)
         elif op == 'mtimes':
             src = self.get_src(tree.operands[0])
             for i in tree.operands[1:]:
@@ -253,11 +249,10 @@ class CasadiGenerator(NumpyGenerator):
         elif n_operands == 2:
             lhs = self.get_src(tree.operands[0])
             rhs = self.get_src(tree.operands[1])
-            print(tree)
             lhs_op = getattr(lhs, tree.operator.name)
             src = lhs_op(rhs)
         else:
-            raise Exception("unknown")
+            raise Exception("Unknown operator {}({})".format(op, ','.join(n_operands * ['.'])))
         self.src[tree] = src
 
     def exitIfExpression(self, tree):
