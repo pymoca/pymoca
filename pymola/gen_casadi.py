@@ -13,9 +13,6 @@ from .gen_numpy import NumpyGenerator
 # TODO
 #  - array of connectors
 #  - array of classes
-#  - expressions of parameters/constants in array declarations and in indexing
-#  - expressions of parameters/constants in linspace, zeros, etc
-#  - delay() operator
 # 
 #  - DLL export
 #  - Metadata export
@@ -93,6 +90,7 @@ class ForLoop:
         self.name = i.name
         self.indexed_symbols = {}
     def register_indexed_symbol(self, e, tree):
+        self.generator.get_src(tree) # ensure symbol is available
         self.indexed_symbols[e] = tree
 
 class CasadiGenerator(NumpyGenerator):
@@ -145,15 +143,15 @@ class CasadiGenerator(NumpyGenerator):
                 ode_states.append(s)
             else:
                 alg_states.append(s)
-        results.states = [self.src[e] for e in ode_states]
-        results.der_states = [self.derivative[self.src[e]] for e in ode_states]
-        results.alg_states = [self.src[e] for e in alg_states]
-        results.constants = [self.src[e] for e in constants]
-        results.constant_values = [self.src[e.value] for e in constants]
-        results.parameters = [self.src[e] for e in parameters]
-        results.inputs = [self.src[e] for e in inputs]
-        results.outputs = [self.src[e] for e in outputs]
-        results.equations = [self.src[e] for e in tree.equations]
+        results.states = [self.get_src(e) for e in ode_states]
+        results.der_states = [self.derivative[self.get_src(e)] for e in ode_states]
+        results.alg_states = [self.get_src(e) for e in alg_states]
+        results.constants = [self.get_src(e) for e in constants]
+        results.constant_values = [self.get_src(e.value) for e in constants]
+        results.parameters = [self.get_src(e) for e in parameters]
+        results.inputs = [self.get_src(e) for e in inputs]
+        results.outputs = [self.get_src(e) for e in outputs]
+        results.equations = [self.get_src(e) for e in tree.equations]
         results.time = self.nodes["time"]
         self.results = results
 
@@ -171,7 +169,7 @@ class CasadiGenerator(NumpyGenerator):
 
         n_operands = len(tree.operands)
         if op == 'der':
-            orig = self.src[tree.operands[0]]
+            orig = self.get_src(tree.operands[0])
             if orig in self.derivative:
                 src = self.derivative[orig]
             else:
@@ -180,31 +178,31 @@ class CasadiGenerator(NumpyGenerator):
                 self.nodes[s] = s
                 src = s
         elif op in ['-'] and n_operands == 1:
-            src = -self.src[tree.operands[0]]
+            src = -self.get_src(tree.operands[0])
         elif op == '+':
-            src = self.src[tree.operands[0]]
+            src = self.get_src(tree.operands[0])
             for i in tree.operands[1:]:
-                src += self.src[i]
+                src += self.get_src(i)
         elif op == 'mtimes':
-            src = self.src[tree.operands[0]]
+            src = self.get_src(tree.operands[0])
             for i in tree.operands[1:]:
-                src = ca.mtimes(src,self.src[i])
+                src = ca.mtimes(src,self.get_src(i))
         elif op == 'transpose' and n_operands == 1:
-            src = self.src[tree.operands[0]].T
+            src = self.get_src(tree.operands[0]).T
         elif op == 'sum' and n_operands == 1:
-            v = self.src[tree.operands[0]]
+            v = self.get_src(tree.operands[0])
             src = ca.sum1(v)
         elif op == 'linspace' and n_operands == 3:
-            a = self.src[tree.operands[0]]
-            b = self.src[tree.operands[1]]
+            a = self.get_src(tree.operands[0])
+            b = self.get_src(tree.operands[1])
             n_steps = self.get_int_parameter(tree.operands[2])
             src = ca.linspace(a, b, n_steps)
         elif op == 'fill' and n_operands == 2:
-            val = self.src[tree.operands[0]]
+            val = self.get_src(tree.operands[0])
             n_row = self.get_int_parameter(tree.operands[1])
             src = val * ca.DM.ones(n_row)
         elif op == 'fill' and n_operands == 3:
-            val = self.src[tree.operands[0]]
+            val = self.get_src(tree.operands[0])
             n_row = self.get_int_parameter(tree.operands[1])
             n_col = self.get_int_parameter(tree.operands[2])
             src = val * ca.DM.ones(n_row, n_col)
@@ -226,30 +224,30 @@ class CasadiGenerator(NumpyGenerator):
             n = self.get_int_parameter(tree.operands[0])
             src = ca.DM.eye(n)
         elif op == 'diagonal' and n_operands == 1:
-            diag = self.src[tree.operands[0]]
+            diag = self.get_src(tree.operands[0])
             n = len(diag)
             indices = list(range(n))
             src = ca.DM.triplet(indices, indices, diag, n, n)
         elif op == 'delay' and n_operands == 2:
-            expr = self.src[tree.operands[0]]
-            delay_time = self.src[tree.operands[1]]
+            expr = self.get_src(tree.operands[0])
+            delay_time = self.get_src(tree.operands[1])
             assert isinstance(expr, MX)
             src = ca.MX.sym('{}_delayed_{}'.format(expr.name, delay_time), expr.size1(), expr.size2())
         elif op in op_map and n_operands == 2:
-            lhs = self.src[tree.operands[0]]
-            rhs = self.src[tree.operands[1]]
+            lhs = self.get_src(tree.operands[0])
+            rhs = self.get_src(tree.operands[1])
             lhs_op = getattr(lhs,op_map[op])
             src = lhs_op(rhs)
         elif op in op_map and n_operands == 1:
-            lhs = self.src[tree.operands[0]]
+            lhs = self.get_src(tree.operands[0])
             lhs_op = getattr(lhs,op_map[op])
             src = lhs_op()
         elif n_operands == 1:
-            src = self.src[tree.operands[0]]
+            src = self.get_src(tree.operands[0])
             src = getattr(src,tree.operator.name)()
         elif n_operands == 2:
-            lhs = self.src[tree.operands[0]]
-            rhs = self.src[tree.operands[1]]
+            lhs = self.get_src(tree.operands[0])
+            rhs = self.get_src(tree.operands[1])
             print(tree)
             lhs_op = getattr(lhs,tree.operator.name)
             src = lhs_op(rhs)
@@ -260,23 +258,17 @@ class CasadiGenerator(NumpyGenerator):
     def exitIfExpression(self, tree):
         assert(len(tree.conditions) + 1 == len(tree.expressions))
 
-        src = self.src[tree.expressions[-1]]
+        src = self.get_src(tree.expressions[-1])
         for cond_index in range(len(tree.conditions)):
-            cond = self.src[tree.conditions[-(cond_index + 1)]]
-            expr1 = self.src[tree.expressions[-(cond_index + 2)]]
+            cond = self.get_src(tree.conditions[-(cond_index + 1)])
+            expr1 = self.get_src(tree.expressions[-(cond_index + 2)])
 
             src = ca.if_else(cond, expr1, src)
 
         self.src[tree] = src
 
-    def exitSlice(self, tree):
-        start = self.get_int_parameter(tree.start)
-        step = self.get_int_parameter(tree.step)
-        stop = self.get_int_parameter(tree.stop)
-        print(start, step, stop)
-        self.src[tree] = [ int(e) for e in list(np.array(np.arange(start, stop+step, step))-1)]
-
     def exitComponentRef(self, tree):
+        # TODO do we still need this? Merge with get_symbol()?
         if tree.name=="Real":
             return
         if tree.name=="time":
@@ -300,8 +292,9 @@ class CasadiGenerator(NumpyGenerator):
         return 1
 
     def get_indexed_symbol(self,tree):
+        self.get_src(tree)
         s = self.nodes[tree.name]
-        slice = self.src[tree.indices[0]]
+        slice = self.get_int_parameter(tree.indices[0])
         print(slice)
         return s[slice]
         print("get_indexed_symbol",tree)
@@ -322,29 +315,63 @@ class CasadiGenerator(NumpyGenerator):
 
         return s
 
+    def get_src(self, i):
+        if isinstance(i, ast.Symbol):
+            return self.get_symbol(i)
+        elif isinstance(i, ast.ComponentRef):
+            if i in self.src:
+                return self.src[i]
+            #if i.name == 'time':
+            #    return self.nodes['time']
+            tree = self.root.find_symbol(self.root.classes[self.class_name], i)
+            return self.get_symbol(tree)
+        else:
+            return self.src[i]
+
+    def get_symbol(self, tree):
+        assert isinstance(tree, ast.Symbol)
+
+        try:
+            return self.src[tree]
+        except KeyError:
+            size = [self.get_int_parameter(d) for d in tree.dimensions]
+            assert(len(size)<=2)
+            for i in tree.type.indices:
+                assert len(size)==1
+                size=[size[0]*self.get_int_parameter(i)]
+            s = ca.MX.sym(name_flat(tree), *size)
+            self.nodes[name_flat(tree)] = s
+            self.src[tree] = s
+            return s
 
     def get_int_parameter(self, i):
         if isinstance(i, ast.Primary):
             return int(i.value)
-        s = self.root.find_symbol(self.root.classes[self.class_name],i)
-        assert(s.type.name=="Integer")
-        return int(s.value.value)
-
-    def enterSymbol(self, tree):
-        size = [self.get_int_parameter(d) for d in tree.dimensions]
-        assert(len(size)<=2)
-        for i in tree.type.indices:
-            assert len(size)==1
-            size=[size[0]*self.get_int_parameter(i)]
-        s = ca.MX.sym(name_flat(tree), *size)
-        self.nodes[name_flat(tree)] = s
-        self.src[tree] = s
-
-    def exitSymbol(self, tree):
-        pass
+        if isinstance(i, ast.ComponentRef):
+            # TODO dep symbols may not be parsed yet
+            s = self.root.find_symbol(self.root.classes[self.class_name], i)
+            assert(s.type.name == 'Integer')
+            return self.get_int_parameter(s.value)
+        if isinstance(i, ast.Expression):
+            # Evaluate expression
+            # TODO dep symbols may not be parsed yet.  
+            # TODO parse on demand?  self.get_symbol querying cache, calling exitSymbol() otherwise?  Can then drop OrderedDict as well.
+            expr = self.get_src(i)
+            deps = [expr.dep(i) for i in range(expr.n_dep()) if expr.dep(i).is_symbolic()]
+            dep_values = [self.get_int_parameter(self.root.find_symbol(self.root.classes[self.class_name], ast.ComponentRef(name=dep.name())).value) for dep in deps if dep.is_symbolic()]
+            F = ca.Function('get_int_parameter', deps, [expr])
+            ret = F.call(dep_values)
+            return int(ret[0])
+        if isinstance(i, ast.Slice):
+            start = self.get_int_parameter(i.start)
+            step = self.get_int_parameter(i.step)
+            stop = self.get_int_parameter(i.stop)
+            return [ int(e) for e in list(np.array(np.arange(start, stop+step, step))-1)]
+        else:
+            raise Exception(i)
 
     def exitEquation(self, tree):
-        self.src[tree] = self.src[tree.left]-self.src[tree.right]
+        self.src[tree] = self.get_src(tree.left)-self.get_src(tree.right)
 
     def enterForEquation(self, tree):
         self.for_loops.append(ForLoop(self, tree))
@@ -354,7 +381,7 @@ class CasadiGenerator(NumpyGenerator):
 
         indexed_symbols = list(f.indexed_symbols.keys())
         args = [f.index_variable]+indexed_symbols
-        expr = ca.vcat([ca.vec(self.src[e]) for e in tree.equations])
+        expr = ca.vcat([ca.vec(self.get_src(e)) for e in tree.equations])
         free_vars = ca.symvar(expr)
 
         free_vars = [e for e in free_vars if e not in args]
@@ -372,10 +399,10 @@ class CasadiGenerator(NumpyGenerator):
 
         equations_per_condition = int(len(tree.equations) / (len(tree.conditions) + 1))
 
-        src = ca.vertcat(*[self.src[tree.equations[-(i + 1)]] for i in range(equations_per_condition)])
+        src = ca.vertcat(*[self.get_src(tree.equations[-(i + 1)]) for i in range(equations_per_condition)])
         for cond_index in range(len(tree.conditions)):
-            cond = self.src[tree.conditions[-(cond_index + 1)]]
-            expr1 = ca.vertcat(*[self.src[tree.equations[-equations_per_condition * (cond_index + 1) - (i + 1)]] for i in range(equations_per_condition)])
+            cond = self.get_src(tree.conditions[-(cond_index + 1)])
+            expr1 = ca.vertcat(*[self.get_src(tree.equations[-equations_per_condition * (cond_index + 1) - (i + 1)]) for i in range(equations_per_condition)])
 
             src = ca.if_else(cond, expr1, src)
 
