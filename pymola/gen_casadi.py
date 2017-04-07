@@ -59,7 +59,7 @@ class CasadiSysModel:
         return r
 
     def get_function(self):
-        return ca.Function('check', [self.time] + self.states + self.der_states + self.alg_states + self.inputs + self.outputs + self.constants + self.parameters, self.equations)
+        return ca.Function('check', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
 
 
 class ForLoop:
@@ -94,9 +94,6 @@ class CasadiGenerator(NumpyGenerator):
         self.class_name = class_name
         self.for_loops = []
 
-    def exitFile(self, tree):
-        pass
-
     def exitClass(self, tree):
         states = []
         inputs = []
@@ -106,23 +103,16 @@ class CasadiGenerator(NumpyGenerator):
         variables = []
         symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
         for s in symbols:
-            # TODO clean up
-            if len(s.prefixes) == 0 or len(s.prefixes) == 1 and 'flow' in s.prefixes:
-                states += [s]
+            if 'constant' in s.prefixes:
+                constants.append(s)
+            elif 'parameter' in s.prefixes:
+                parameters.append(s)
             else:
-                for prefix in s.prefixes:
-                    if prefix == 'constant':
-                        constants += [s]
-                    elif prefix == 'parameter':
-                        parameters += [s]
-                    elif prefix == 'input':
-                        inputs += [s]
-                    elif prefix == 'output':
-                        outputs += [s]
-
-        for s in outputs:
-            if s not in states:
-                variables += [s]
+                states.append(s)
+                if 'input' in s.prefixes:
+                    inputs.append(s)
+                elif 'output' in s.prefixes:
+                    outputs.append(s)
 
         ode_states = []
         alg_states = []
@@ -141,7 +131,6 @@ class CasadiGenerator(NumpyGenerator):
         self.model.inputs = [self.get_src(e) for e in inputs]
         self.model.outputs = [self.get_src(e) for e in outputs]
         self.model.equations = [self.get_src(e) for e in tree.equations]
-        self.model.time = self.nodes["time"]
 
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):

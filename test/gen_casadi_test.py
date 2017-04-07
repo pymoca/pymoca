@@ -116,6 +116,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = [x]
         ref_model.der_states = [der_x]
+        ref_model.alg_states = [y]
         ref_model.outputs = [y]
         ref_model.equations =  [ der_x + x, y-x]
 
@@ -303,6 +304,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.inputs = [x]
         ref_model.outputs = [y1,y2,y3]
+        ref_model.alg_states = [x,y1,y2,y3]
         ref_model.parameters = [y_max]
         ref_model.equations =  [ y1 - ca.if_else(x > 0, 1, 0) * y_max, ca.if_else(x > 1, ca.vertcat(y3 - 100, y2 - y_max), ca.if_else(x > 2, ca.vertcat(y3 - 1000, y2 - y_max - 1), ca.vertcat(y3 - 10000, y2)))]
 
@@ -343,12 +345,11 @@ class GenCasadiTest(unittest.TestCase):
         z = ca.MX.sym("z")
         w = ca.MX.sym("w")
         u = ca.MX.sym("u")
-        time = ca.MX.sym("time")
 
         ref_model.inputs = [x]
-        ref_model.time = time
         ref_model.outputs = [y, z, w, u]
-        ref_model.equations =  [ y-ca.sin(time), z-ca.cos(x),w-ca.fmin(y,z), u-ca.fabs(w)]
+        ref_model.alg_states = [x, y, z, w, u]
+        ref_model.equations =  [ y-ca.sin(ref_model.time), z-ca.cos(x),w-ca.fmin(y,z), u-ca.fabs(w)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -397,7 +398,7 @@ class GenCasadiTest(unittest.TestCase):
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = [a,c,d,e,scalar_f,g,arx,arcy,arcw]
+        ref_model.alg_states = [a,c,d,e,scalar_f,g,arx,arcy,arcw,h]
         ref_model.parameters = [d_dim]
         ref_model.outputs = [h]
         ref_model.constants = [b, c_dim, B, C, D, E]
@@ -453,7 +454,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = [r]
         ref_model.der_states = [der_r]
-        ref_model.alg_states = [i,b]
+        ref_model.alg_states = [i,b,i1,i2,i3,i4,protected_variable]
         ref_model.inputs = [i1, i2, i3]
         ref_model.outputs = [i4, protected_variable]
         ref_model.constants = [cst]
