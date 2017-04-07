@@ -2,7 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from __future__ import print_function, absolute_import, division, unicode_literals
 
 import os
 import sys
@@ -20,8 +20,6 @@ CasadiSysModel = gen_casadi.CasadiSysModel
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class GenCasadiTest(unittest.TestCase):
-    "Testing"
-
 
     def assert_model_equivalent(self, A, B):
         def sstr(a): return set([str(e) for e in a])

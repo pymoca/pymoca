@@ -1,6 +1,6 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
-from . import tree
 from . import ast
+from .tree import TreeWalker, flatten
 
 import os
 import sys
@@ -11,6 +11,10 @@ import numpy as np
 from .gen_numpy import NumpyGenerator
 
 # TODO
+#  - Test array indexing
+#  - Test starting loop at an offset
+#  - Test loops with fixed secondary indices
+
 #  - DLL export
 #  - Metadata export
 
@@ -71,14 +75,13 @@ class ForLoop:
         e = i.expression
         start = e.start.value
         step = e.step.value
-        stop = self.generator.get_int_parameter(e.stop)
+        stop = self.generator.get_integer(e.stop)
         self.values = np.arange(start, stop + step, step)
         self.index_variable = ca.MX.sym(i.name)
         self.name = i.name
         self.indexed_symbols = {}
 
     def register_indexed_symbol(self, e, tree):
-        self.generator.get_src(tree)  # ensure symbol is available
         self.indexed_symbols[e] = tree
 
 
@@ -121,16 +124,16 @@ class CasadiGenerator(NumpyGenerator):
                 ode_states.append(s)
             else:
                 alg_states.append(s)
-        self.model.states = [self.get_src(e) for e in ode_states]
+        self.model.states = [self.get_mx(e) for e in ode_states]
         self.model.der_states = [self.derivative[
-            self.get_src(e)] for e in ode_states]
-        self.model.alg_states = [self.get_src(e) for e in alg_states]
-        self.model.constants = [self.get_src(e) for e in constants]
-        self.model.constant_values = [self.get_src(e.value) for e in constants]
-        self.model.parameters = [self.get_src(e) for e in parameters]
-        self.model.inputs = [self.get_src(e) for e in inputs]
-        self.model.outputs = [self.get_src(e) for e in outputs]
-        self.model.equations = [self.get_src(e) for e in tree.equations]
+            self.get_mx(e)] for e in ode_states]
+        self.model.alg_states = [self.get_mx(e) for e in alg_states]
+        self.model.constants = [self.get_mx(e) for e in constants]
+        self.model.constant_values = [self.get_mx(e.value) for e in constants]
+        self.model.parameters = [self.get_mx(e) for e in parameters]
+        self.model.inputs = [self.get_mx(e) for e in inputs]
+        self.model.outputs = [self.get_mx(e) for e in outputs]
+        self.model.equations = [self.get_mx(e) for e in tree.equations]
 
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):
@@ -145,7 +148,7 @@ class CasadiGenerator(NumpyGenerator):
 
         n_operands = len(tree.operands)
         if op == 'der':
-            orig = self.get_src(tree.operands[0])
+            orig = self.get_mx(tree.operands[0])
             if orig in self.derivative:
                 src = self.derivative[orig]
             else:
@@ -154,73 +157,73 @@ class CasadiGenerator(NumpyGenerator):
                 self.nodes[s] = s
                 src = s
         elif op == '-' and n_operands == 1:
-            src = -self.get_src(tree.operands[0])
+            src = -self.get_mx(tree.operands[0])
         elif op == 'mtimes':
-            src = self.get_src(tree.operands[0])
+            src = self.get_mx(tree.operands[0])
             for i in tree.operands[1:]:
-                src = ca.mtimes(src, self.get_src(i))
+                src = ca.mtimes(src, self.get_mx(i))
         elif op == 'transpose' and n_operands == 1:
-            src = self.get_src(tree.operands[0]).T
+            src = self.get_mx(tree.operands[0]).T
         elif op == 'sum' and n_operands == 1:
-            v = self.get_src(tree.operands[0])
+            v = self.get_mx(tree.operands[0])
             src = ca.sum1(v)
         elif op == 'linspace' and n_operands == 3:
-            a = self.get_src(tree.operands[0])
-            b = self.get_src(tree.operands[1])
-            n_steps = self.get_int_parameter(tree.operands[2])
+            a = self.get_mx(tree.operands[0])
+            b = self.get_mx(tree.operands[1])
+            n_steps = self.get_integer(tree.operands[2])
             src = ca.linspace(a, b, n_steps)
         elif op == 'fill' and n_operands == 2:
-            val = self.get_src(tree.operands[0])
-            n_row = self.get_int_parameter(tree.operands[1])
+            val = self.get_mx(tree.operands[0])
+            n_row = self.get_integer(tree.operands[1])
             src = val * ca.DM.ones(n_row)
         elif op == 'fill' and n_operands == 3:
-            val = self.get_src(tree.operands[0])
-            n_row = self.get_int_parameter(tree.operands[1])
-            n_col = self.get_int_parameter(tree.operands[2])
+            val = self.get_mx(tree.operands[0])
+            n_row = self.get_integer(tree.operands[1])
+            n_col = self.get_integer(tree.operands[2])
             src = val * ca.DM.ones(n_row, n_col)
         elif op == 'zeros' and n_operands == 1:
-            n_row = self.get_int_parameter(tree.operands[0])
+            n_row = self.get_integer(tree.operands[0])
             src = ca.DM.zeros(n_row)
         elif op == 'zeros' and n_operands == 2:
-            n_row = self.get_int_parameter(tree.operands[0])
-            n_col = self.get_int_parameter(tree.operands[1])
+            n_row = self.get_integer(tree.operands[0])
+            n_col = self.get_integer(tree.operands[1])
             src = ca.DM.zeros(n_row, n_col)
         elif op == 'ones' and n_operands == 1:
-            n_row = self.get_int_parameter(tree.operands[0])
+            n_row = self.get_integer(tree.operands[0])
             src = ca.DM.ones(n_row)
         elif op == 'ones' and n_operands == 2:
-            n_row = self.get_int_parameter(tree.operands[0])
-            n_col = self.get_int_parameter(tree.operands[1])
+            n_row = self.get_integer(tree.operands[0])
+            n_col = self.get_integer(tree.operands[1])
             src = ca.DM.ones(n_row, n_col)
         elif op == 'identity' and n_operands == 1:
-            n = self.get_int_parameter(tree.operands[0])
+            n = self.get_integer(tree.operands[0])
             src = ca.DM.eye(n)
         elif op == 'diagonal' and n_operands == 1:
-            diag = self.get_src(tree.operands[0])
+            diag = self.get_mx(tree.operands[0])
             n = len(diag)
             indices = list(range(n))
             src = ca.DM.triplet(indices, indices, diag, n, n)
         elif op == 'delay' and n_operands == 2:
-            expr = self.get_src(tree.operands[0])
-            delay_time = self.get_src(tree.operands[1])
+            expr = self.get_mx(tree.operands[0])
+            delay_time = self.get_mx(tree.operands[1])
             assert isinstance(expr, MX)
             src = ca.MX.sym('{}_delayed_{}'.format(
                 expr.name, delay_time), expr.size1(), expr.size2())
         elif op in OP_MAP and n_operands == 2:
-            lhs = self.get_src(tree.operands[0])
-            rhs = self.get_src(tree.operands[1])
+            lhs = self.get_mx(tree.operands[0])
+            rhs = self.get_mx(tree.operands[1])
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
-            lhs = self.get_src(tree.operands[0])
+            lhs = self.get_mx(tree.operands[0])
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         elif n_operands == 1:
-            src = self.get_src(tree.operands[0])
+            src = self.get_mx(tree.operands[0])
             src = getattr(src, tree.operator.name)()
         elif n_operands == 2:
-            lhs = self.get_src(tree.operands[0])
-            rhs = self.get_src(tree.operands[1])
+            lhs = self.get_mx(tree.operands[0])
+            rhs = self.get_mx(tree.operands[1])
             lhs_op = getattr(lhs, tree.operator.name)
             src = lhs_op(rhs)
         else:
@@ -230,120 +233,17 @@ class CasadiGenerator(NumpyGenerator):
     def exitIfExpression(self, tree):
         assert(len(tree.conditions) + 1 == len(tree.expressions))
 
-        src = self.get_src(tree.expressions[-1])
+        src = self.get_mx(tree.expressions[-1])
         for cond_index in range(len(tree.conditions)):
-            cond = self.get_src(tree.conditions[-(cond_index + 1)])
-            expr1 = self.get_src(tree.expressions[-(cond_index + 2)])
+            cond = self.get_mx(tree.conditions[-(cond_index + 1)])
+            expr1 = self.get_mx(tree.expressions[-(cond_index + 2)])
 
             src = ca.if_else(cond, expr1, src)
 
         self.src[tree] = src
 
-    def get_symbol_size(self, tree):
-        return 1
-
-    def get_indexed_symbol(self, tree):
-        s = self.nodes[tree.name]
-        sl = self.get_int_parameter(tree.indices[0])
-        return s[sl - 1]
-
-    def get_indexed_symbol_loop(self, tree):
-        names = []
-        for e in tree.indices:
-            assert hasattr(e, "name")
-            names.append(e.name)
-
-        s = ca.MX.sym(tree.name + str(names), self.get_symbol_size(tree))
-        for f in reversed(self.for_loops):
-            if f.name in names:
-                f.register_indexed_symbol(s, tree)
-
-        return s
-
-    def get_src(self, i):
-        # TODO clean up
-        if isinstance(i, ast.Symbol):
-            return self.get_symbol(i)
-        elif isinstance(i, ast.ComponentRef):
-            if i in self.src:
-                return self.src[i]
-
-            tree = i
-            if tree.name == "time":
-                self.src[tree] = self.nodes["time"]
-                return self.src[tree]
-
-            for f in reversed(self.for_loops):
-                if f.name == tree.name:
-                    self.src[tree] = f.index_variable
-                    return self.src[tree]
-
-            tree = self.root.find_symbol(self.root.classes[self.class_name], i)
-            self.src[i] = self.get_symbol(tree)
-            tree = i
-
-            if len(tree.indices) > 0 and len(self.for_loops) == 0:
-                self.src[tree] = self.get_indexed_symbol(tree)
-                return self.src[tree]
-            elif len(tree.indices) > 0:
-                self.src[tree] = self.get_indexed_symbol_loop(tree)
-                return self.src[tree]
-
-            return self.src[i]
-
-        else:
-            return self.src[i]
-
-    def get_symbol(self, tree):
-        assert isinstance(tree, ast.Symbol)
-
-        try:
-            return self.src[tree]
-        except KeyError:
-            size = [self.get_int_parameter(d) for d in tree.dimensions]
-            assert(len(size) <= 2)
-            for i in tree.type.indices:
-                assert len(size) == 1
-                size = [size[0] * self.get_int_parameter(i)]
-            s = ca.MX.sym(tree.name, *size)
-            self.nodes[tree.name] = s
-            self.src[tree] = s
-            return s
-
-    def get_int_parameter(self, i):
-        if isinstance(i, ast.Primary):
-            return int(i.value)
-        if isinstance(i, ast.ComponentRef):
-            # TODO dep symbols may not be parsed yet
-            s = self.root.find_symbol(self.root.classes[self.class_name], i)
-            assert(s.type.name == 'Integer')
-            return self.get_int_parameter(s.value)
-        if isinstance(i, ast.Expression):
-            # Evaluate expression
-            ast_walker = tree.TreeWalker()
-            ast_walker.walk(self, i)
-
-            # TODO dep symbols may not be parsed yet.
-            # TODO parse on demand?  self.get_symbol querying cache, calling
-            # exitSymbol() otherwise?  Can then drop OrderedDict as well.
-            expr = self.get_src(i)
-            deps = [expr.dep(i) for i in range(expr.n_dep())
-                    if expr.dep(i).is_symbolic()]
-            dep_values = [self.get_int_parameter(self.root.find_symbol(self.root.classes[
-                                                 self.class_name], ast.ComponentRef(name=dep.name())).value) for dep in deps if dep.is_symbolic()]
-            F = ca.Function('get_int_parameter', deps, [expr])
-            ret = F.call(dep_values)
-            return int(ret[0])
-        if isinstance(i, ast.Slice):
-            start = self.get_int_parameter(i.start)
-            step = self.get_int_parameter(i.step)
-            stop = self.get_int_parameter(i.stop)
-            return np.arange(start, stop + step, step, dtype=np.int)
-        else:
-            raise Exception(i)
-
     def exitEquation(self, tree):
-        self.src[tree] = self.get_src(tree.left) - self.get_src(tree.right)
+        self.src[tree] = self.get_mx(tree.left) - self.get_mx(tree.right)
 
     def enterForEquation(self, tree):
         self.for_loops.append(ForLoop(self, tree))
@@ -353,7 +253,7 @@ class CasadiGenerator(NumpyGenerator):
 
         indexed_symbols = list(f.indexed_symbols.keys())
         args = [f.index_variable] + indexed_symbols
-        expr = ca.vcat([ca.vec(self.get_src(e)) for e in tree.equations])
+        expr = ca.vcat([ca.vec(self.get_mx(e)) for e in tree.equations])
         free_vars = ca.symvar(expr)
 
         arg_names = [arg.name() for arg in args]
@@ -375,23 +275,118 @@ class CasadiGenerator(NumpyGenerator):
         equations_per_condition = int(
             len(tree.equations) / (len(tree.conditions) + 1))
 
-        src = ca.vertcat(*[self.get_src(tree.equations[-(i + 1)])
+        src = ca.vertcat(*[self.get_mx(tree.equations[-(i + 1)])
                            for i in range(equations_per_condition)])
         for cond_index in range(len(tree.conditions)):
-            cond = self.get_src(tree.conditions[-(cond_index + 1)])
-            expr1 = ca.vertcat(*[self.get_src(tree.equations[-equations_per_condition * (
+            cond = self.get_mx(tree.conditions[-(cond_index + 1)])
+            expr1 = ca.vertcat(*[self.get_mx(tree.equations[-equations_per_condition * (
                 cond_index + 1) - (i + 1)]) for i in range(equations_per_condition)])
 
             src = ca.if_else(cond, expr1, src)
 
         self.src[tree] = src
 
+    def get_integer(self, tree):
+        # CasADi needs to know the dimensions of symbols at instantiation.
+        # We therefore need a mechanism to evaluate expressions that define dimensions of symbols.
+        if isinstance(tree, ast.Primary):
+            return int(tree.value)
+        if isinstance(tree, ast.ComponentRef):
+            s = self.root.find_symbol(self.root.classes[self.class_name], tree)
+            assert s.type.name == 'Integer'
+            return self.get_integer(s.value)
+        if isinstance(tree, ast.Expression):
+            # Make sure that the expression has been converted to MX by (re)visiting the
+            # relevant part of the AST.
+            ast_walker = TreeWalker()
+            ast_walker.walk(self, tree)
+
+            # Obtain expression
+            expr = self.get_mx(tree)
+
+            # Obtain the symbols it depends on
+            deps = [expr.dep(i) for i in range(expr.n_dep())
+                    if expr.dep(i).is_symbolic()]
+
+            # Find the values of the symbols
+            vals = [self.get_integer(self.root.find_symbol(self.root.classes[self.class_name], 
+                    ast.ComponentRef(name=dep.name())).value) for dep in deps if dep.is_symbolic()]
+
+            # Evaluate the expression
+            F = ca.Function('get_integer_{}'.format('_'.join([dep.name() for dep in deps])), deps, [expr])
+            ret = F.call(vals)
+            return int(ret[0])
+        if isinstance(tree, ast.Slice):
+            start = self.get_integer(tree.start)
+            step = self.get_integer(tree.step)
+            stop = self.get_integer(tree.stop)
+            return np.arange(start, stop + step, step, dtype=np.int)
+        else:
+            raise Exception('Unexpected node type {}'.format(i.__class__.__name__))
+
+    def get_symbol(self, tree):
+        # Create symbol
+        size = [self.get_integer(d) for d in tree.dimensions]
+        assert(len(size) <= 2)
+        for i in tree.type.indices:
+            assert len(size) == 1
+            size = [size[0] * self.get_integer(i)]
+        s = ca.MX.sym(tree.name, *size)
+        self.nodes[tree.name] = s
+        return s
+
+    def get_indexed_symbol(self, tree, s):
+        # Check whether we loop over an index of this symbol
+        for index in tree.indices:
+            if isinstance(index, ast.ComponentRef):                
+                for for_loop in self.for_loops:
+                    if index.name == for_loop.name:
+                        # TODO support nested loops
+                        s = ca.MX.sym('{}[{}]'.format(tree.name, for_loop.name))
+                        for_loop.register_indexed_symbol(s, tree)
+                        return s
+
+            sl = self.get_integer(index)
+            # Modelica indexing starts from one;  Python from zero
+            s = s[sl - 1]
+        return s
+
+    def get_component(self, tree):
+        # Check special symbols
+        if tree.name == 'time':
+            return self.model.time
+        else:
+            for f in reversed(self.for_loops):
+                if f.name == tree.name:
+                    return f.index_variable
+
+        # Check ordinary symbols
+        symbol = self.root.find_symbol(self.root.classes[self.class_name], tree)
+        s = self.get_mx(symbol)
+        if len(tree.indices) > 0:
+            s = self.get_indexed_symbol(tree, s)
+        return s
+
+    def get_mx(self, tree):
+        # We pull components and symbols from the AST on demand.  
+        # This is to ensure that parametrized vector dimensions can be resolved.  Vector
+        # dimensions need to be known at CasADi MX creation time.
+        if tree not in self.src:
+            if isinstance(tree, ast.Symbol):
+                s = self.get_symbol(tree)
+            elif isinstance(tree, ast.ComponentRef):
+                s = self.get_component(tree)
+            else:
+                raise Exception('Tried to look up expression before it was reached by the tree walker')
+            self.src[tree] = s
+        return self.src[tree]
+
 
 def generate(ast_tree, model_name):
     # create a walker
-    ast_walker = tree.TreeWalker()
+    ast_walker = TreeWalker()
 
-    flat_tree = tree.flatten(ast_tree, model_name)
+    flat_tree = flatten(ast_tree, model_name)
 
     casadi_gen = CasadiGenerator(flat_tree, model_name)
     casadi_gen.src.update(casadi_gen.src)
