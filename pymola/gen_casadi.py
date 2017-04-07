@@ -41,7 +41,6 @@ class CasadiSysModel:
         self.constant_values = []
         self.parameters = []
         self.equations = []
-        # TODO we create the time symbol twice
         self.time = ca.MX.sym('time')
 
     def __str__(self):
@@ -89,7 +88,7 @@ class CasadiGenerator(NumpyGenerator):
         super(CasadiGenerator, self).__init__()
         self.src = {}
         self.model = CasadiSysModel()
-        self.nodes = {"time": self.model.time}
+        self.nodes = {'time': self.model.time}
         self.derivative = {}
         self.root = root
         self.class_name = class_name
@@ -115,9 +114,7 @@ class CasadiGenerator(NumpyGenerator):
                     if prefix == 'constant':
                         constants += [s]
                     elif prefix == 'parameter':
-                        # TODO clean up
-                        if s.type.name != "Integer":
-                            parameters += [s]
+                        parameters += [s]
                     elif prefix == 'input':
                         inputs += [s]
                     elif prefix == 'output':
