@@ -424,6 +424,7 @@ Symbol.ast_spec = {
     'start' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
     'min' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
     'max' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
+    'nominal' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
     'value' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
     'fixed' : Field([Primary], False),
     'id' : Field([int], 0),
