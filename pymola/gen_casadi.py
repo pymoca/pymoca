@@ -41,10 +41,6 @@ op_map = {'*': "__mul__",
           "abs": "fabs"}
 
 
-def name_flat(tree):
-    return tree.name.replace('.', '__')
-
-
 class CasadiSysModel:
 
     def __init__(self):
@@ -271,7 +267,7 @@ class CasadiGenerator(NumpyGenerator):
         return 1
 
     def get_indexed_symbol(self, tree):
-        s = self.nodes[name_flat(tree)]
+        s = self.nodes[tree.name]
         slice = self.get_int_parameter(tree.indices[0])
         print(slice)
         return s[np.array(slice) - 1]
@@ -337,8 +333,8 @@ class CasadiGenerator(NumpyGenerator):
             for i in tree.type.indices:
                 assert len(size) == 1
                 size = [size[0] * self.get_int_parameter(i)]
-            s = ca.MX.sym(name_flat(tree), *size)
-            self.nodes[name_flat(tree)] = s
+            s = ca.MX.sym(tree.name, *size)
+            self.nodes[tree.name] = s
             self.src[tree] = s
             return s
 
