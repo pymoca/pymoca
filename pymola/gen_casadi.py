@@ -1,4 +1,4 @@
-from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from __future__ import print_function, absolute_import, division, unicode_literals
 from . import tree
 from . import ast
 
@@ -112,6 +112,7 @@ class CasadiGenerator(NumpyGenerator):
                     if prefix == 'constant':
                         constants += [s]
                     elif prefix == 'parameter':
+                        # TODO clean up
                         if s.type.name != "Integer":
                             parameters += [s]
                     elif prefix == 'input':
@@ -256,10 +257,8 @@ class CasadiGenerator(NumpyGenerator):
 
     def get_indexed_symbol(self, tree):
         s = self.nodes[tree.name]
-        slice = self.get_int_parameter(tree.indices[0])
-        print(slice)
-        return s[np.array(slice) - 1]
-        print("get_indexed_symbol", tree)
+        sl = self.get_int_parameter(tree.indices[0])
+        return s[sl - 1]
 
     def get_indexed_symbol_loop(self, tree):
 
@@ -269,7 +268,6 @@ class CasadiGenerator(NumpyGenerator):
             names.append(e.name)
 
         s = ca.MX.sym(tree.name + str(names), self.get_symbol_size(tree))
-        print("self", tree, s, self.for_loops)
         for f in reversed(self.for_loops):
             if f.name in names:
                 f.register_indexed_symbol(s, tree)
@@ -354,7 +352,7 @@ class CasadiGenerator(NumpyGenerator):
             start = self.get_int_parameter(i.start)
             step = self.get_int_parameter(i.step)
             stop = self.get_int_parameter(i.stop)
-            return [int(e) for e in list(np.array(np.arange(start, stop + step, step)))]
+            return np.arange(start, stop + step, step, dtype=np.int)
         else:
             raise Exception(i)
 
