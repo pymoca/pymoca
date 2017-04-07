@@ -41,6 +41,7 @@ class CasadiSysModel:
         self.constant_values = []
         self.parameters = []
         self.equations = []
+        # TODO we create the time symbol twice
         self.time = ca.MX.sym('time')
 
     def __str__(self):
@@ -87,7 +88,8 @@ class CasadiGenerator(NumpyGenerator):
     def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
         self.src = {}
-        self.nodes = {"time": ca.MX.sym("time")}
+        self.model = CasadiSysModel()
+        self.nodes = {"time": self.model.time}
         self.derivative = {}
         self.root = root
         self.class_name = class_name
@@ -105,6 +107,7 @@ class CasadiGenerator(NumpyGenerator):
         variables = []
         symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
         for s in symbols:
+            # TODO clean up
             if len(s.prefixes) == 0 or len(s.prefixes) == 1 and 'flow' in s.prefixes:
                 states += [s]
             else:
@@ -124,7 +127,6 @@ class CasadiGenerator(NumpyGenerator):
             if s not in states:
                 variables += [s]
 
-        results = CasadiSysModel()
         ode_states = []
         alg_states = []
         for s in states:
@@ -132,18 +134,17 @@ class CasadiGenerator(NumpyGenerator):
                 ode_states.append(s)
             else:
                 alg_states.append(s)
-        results.states = [self.get_src(e) for e in ode_states]
-        results.der_states = [self.derivative[
+        self.model.states = [self.get_src(e) for e in ode_states]
+        self.model.der_states = [self.derivative[
             self.get_src(e)] for e in ode_states]
-        results.alg_states = [self.get_src(e) for e in alg_states]
-        results.constants = [self.get_src(e) for e in constants]
-        results.constant_values = [self.get_src(e.value) for e in constants]
-        results.parameters = [self.get_src(e) for e in parameters]
-        results.inputs = [self.get_src(e) for e in inputs]
-        results.outputs = [self.get_src(e) for e in outputs]
-        results.equations = [self.get_src(e) for e in tree.equations]
-        results.time = self.nodes["time"]
-        self.results = results
+        self.model.alg_states = [self.get_src(e) for e in alg_states]
+        self.model.constants = [self.get_src(e) for e in constants]
+        self.model.constant_values = [self.get_src(e.value) for e in constants]
+        self.model.parameters = [self.get_src(e) for e in parameters]
+        self.model.inputs = [self.get_src(e) for e in inputs]
+        self.model.outputs = [self.get_src(e) for e in outputs]
+        self.model.equations = [self.get_src(e) for e in tree.equations]
+        self.model.time = self.nodes["time"]
 
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):
@@ -261,7 +262,6 @@ class CasadiGenerator(NumpyGenerator):
         return s[sl - 1]
 
     def get_indexed_symbol_loop(self, tree):
-
         names = []
         for e in tree.indices:
             assert hasattr(e, "name")
@@ -410,4 +410,4 @@ def generate(ast_tree, model_name):
     casadi_gen = CasadiGenerator(flat_tree, model_name)
     casadi_gen.src.update(casadi_gen.src)
     ast_walker.walk(casadi_gen, flat_tree)
-    return casadi_gen.results
+    return casadi_gen.model
