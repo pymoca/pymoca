@@ -327,10 +327,6 @@ class CasadiGenerator(NumpyGenerator):
         # Create symbol
         size = [self.get_integer(d) for d in tree.dimensions]
         assert(len(size) <= 2)
-        for i in tree.type.indices:
-            # TODO
-            assert len(size) == 1
-            size = [size[0] * self.get_integer(i)]
         s = ca.MX.sym(tree.name, *size)
         self.nodes[tree.name] = s
         return s
