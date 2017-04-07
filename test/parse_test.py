@@ -86,5 +86,13 @@ class ParseTest(unittest.TestCase):
         #     raise IOError('{:s} != {:s}'.format(str(names), str(names_set)))
         self.flush()
 
+    def test_inheritance(self):
+        with open(os.path.join(TEST_DIR, 'InheritanceInstantiation.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, 'C2')
+
+        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp.b'].value.value, 3.0)
+
 if __name__ == "__main__":
     unittest.main()

@@ -177,7 +177,7 @@ class TreeListener(object):
         pass
 
 
-def flatten_class(root, orig_class, instance_name):
+def flatten_class(root, orig_class, instance_name, class_modification=None):
     """
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
@@ -284,7 +284,10 @@ def flatten_class(root, orig_class, instance_name):
 
         return function_set
 
-    # pull in parent classes
+    extended_orig_class = ast.Class(
+        name=orig_class.name,
+    )
+
     for extends in orig_class.extends:
         c = root.find_class(extends.component)
 
@@ -292,19 +295,30 @@ def flatten_class(root, orig_class, instance_name):
         c = modify_class(c, extends.class_modification)
 
         # recursively call flatten on the parent class
-        flat_parent_class = flatten_class(root, c, instance_name)
+        # NOTE: We do not to pass the instance name along. The symbol renaming
+        # is handled at the current level, not at the level of the base class.
+        # That way we can properly apply class modifications to inherited
+        # symbols.
+        flat_parent_class = flatten_class(root, c, '')
 
         # set visibility
         for sym in flat_parent_class.symbols.values():
             sym.visibility = min(sym.visibility, extends.visibility)
 
         # add parent class members symbols, equations and statements
-        flat_class.symbols.update(flat_parent_class.symbols)
-        flat_class.equations += flat_parent_class.equations
-        flat_class.statements += flat_parent_class.statements
+        extended_orig_class.symbols.update(flat_parent_class.symbols)
+        extended_orig_class.equations += flat_parent_class.equations
+        extended_orig_class.statements += flat_parent_class.statements
+
+    extended_orig_class.symbols.update(orig_class.symbols)
+    extended_orig_class.equations += orig_class.equations
+    extended_orig_class.statements += orig_class.statements
+
+    if class_modification is not None:
+        extended_orig_class = modify_class(extended_orig_class, class_modification)
 
     # for all symbols in the original class
-    for sym_name, sym in orig_class.symbols.items():
+    for sym_name, sym in extended_orig_class.symbols.items():
         try:
             c = root.find_class(sym.type)
         except KeyError:
@@ -312,12 +326,8 @@ def flatten_class(root, orig_class, instance_name):
             flat_sym = flatten_symbol(sym, instance_prefix)
             flat_class.symbols[flat_sym.name] = flat_sym
         else:
-            # the symbol type is a class
-            if sym.class_modification is not None:
-                c = modify_class(c, sym.class_modification)
-
             # recursively call flatten on the contained class
-            flat_sub_class = flatten_class(root, c, instance_prefix + sym_name)
+            flat_sub_class = flatten_class(root, c, instance_prefix + sym_name, sym.class_modification)
 
             # carry class dimensions over to symbols
             for flat_class_symbol in flat_sub_class.symbols.values():
