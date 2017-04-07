@@ -11,9 +11,10 @@ import numpy as np
 from .gen_numpy import NumpyGenerator
 
 # TODO
-#  - Test loops with fixed secondary indices
+#  - Other, fixed indices in for loops
 #  - Expressions with indices
-
+#  - Nested for loops
+#
 #  - DLL export
 #  - Metadata export
 
