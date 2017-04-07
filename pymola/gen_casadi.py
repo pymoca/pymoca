@@ -14,19 +14,7 @@ from .gen_numpy import NumpyGenerator
 #  - DLL export
 #  - Metadata export
 
-FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-
-def hashcompare(self, other):
-    return cmp(hash(self), hash(other))
-
-def equality(self, other):
-    return hash(self) == hash(other)
-
-ca.MX.__cmp__ = hashcompare
-ca.MX.__eq__ = equality
-
-
-op_map = {'*': "__mul__",
+OP_MAP = {'*': "__mul__",
           '+': "__add__",
           "-": "__sub__",
           "/": "__div__",
@@ -230,14 +218,14 @@ class CasadiGenerator(NumpyGenerator):
             assert isinstance(expr, MX)
             src = ca.MX.sym('{}_delayed_{}'.format(
                 expr.name, delay_time), expr.size1(), expr.size2())
-        elif op in op_map and n_operands == 2:
+        elif op in OP_MAP and n_operands == 2:
             lhs = self.get_src(tree.operands[0])
             rhs = self.get_src(tree.operands[1])
-            lhs_op = getattr(lhs, op_map[op])
+            lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
-        elif op in op_map and n_operands == 1:
+        elif op in OP_MAP and n_operands == 1:
             lhs = self.get_src(tree.operands[0])
-            lhs_op = getattr(lhs, op_map[op])
+            lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         elif n_operands == 1:
             src = self.get_src(tree.operands[0])
@@ -384,7 +372,8 @@ class CasadiGenerator(NumpyGenerator):
         expr = ca.vcat([ca.vec(self.get_src(e)) for e in tree.equations])
         free_vars = ca.symvar(expr)
 
-        free_vars = [e for e in free_vars if e not in args]
+        arg_names = [arg.name() for arg in args]
+        free_vars = [e for e in free_vars if e.name() not in arg_names]
         all_args = args + free_vars
         F = ca.Function('loop_body_' + f.name, all_args, [expr])
 
