@@ -32,14 +32,16 @@ if not options.flatten_only:
     from . import gen_casadi
 
 # Load folder
-S = ''
+ast = None
 for root, dir, files in os.walk(model_folder):
     for items in fnmatch.filter(files, "*.mo"):
         with open(os.path.join(root, items), 'r') as f:
-            S += f.read()
+            if ast is None:
+                ast = parser.parse(f.read())
+            else:
+                ast.extend(parser.parse(f.read()))
 
 # Compile
-ast = parser.parse(S)
 if options.flatten_only:
     ast = tree.flatten(ast, model_name)
     print(ast)

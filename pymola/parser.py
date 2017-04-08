@@ -581,4 +581,7 @@ def parse(text):
     parse_walker = antlr4.ParseTreeWalker()
     parse_walker.walk(ast_listener, parse_tree)
     ast_tree = ast_listener.ast_result
+    # TODO: This is not the prettiest way, but avoid having to instantialize a
+    # Collection every time we want to parse+flatten a single file.
+    ast_tree = ast.Collection(files=[ast_tree])
     return ast_tree

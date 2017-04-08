@@ -289,7 +289,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
     )
 
     for extends in orig_class.extends:
-        c = root.find_class(extends.component)
+        c = root.find_class(extends.component, orig_class.within)
 
         # recursively call flatten on the parent class
         # NOTE: We do not to pass the instance name along. The symbol renaming
@@ -435,7 +435,7 @@ def flatten(root, class_name):
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
     of the instance name passed.
-    :param root: The root of the tree that contains all class definitions
+    :param root: The root of the tree that contains all files with all class definitions
     :param class_name: The class we want to flatten
     :return: flat_file, a File containing the flattened class
     """
@@ -446,7 +446,7 @@ def flatten(root, class_name):
             c.within = f.within
 
     # flatten class
-    flat_class = flatten_class(root, root.classes[class_name], '')
+    flat_class = flatten_class(root, root.find_class(class_name), '')
 
     # strip connector symbols
     for i, sym in list(flat_class.symbols.items()):

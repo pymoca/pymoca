@@ -340,14 +340,16 @@ class Collection(Node):
     def __init__(self, **kwargs):
         super(Collection, self).__init__(**kwargs)
 
-    def find_class(self, component_ref):
+    def extend(self, other):
+        self.files.extend(other.files)
+
+    def find_class(self, component_ref, within=[]):
         if isinstance(component_ref, str):
             assert component_ref.find('.') == -1
             component_ref = ComponentRef(name=component_ref)
 
         # First we try to the find the file matching the right 'within'
-
-        if not component_ref.child:
+        if not component_ref.child and not within:
             for f in self.files:
                 if not f.within:
                     try:
@@ -360,15 +362,49 @@ class Collection(Node):
             raise KeyError
         else:
             # TODO: Should we move this to a 'get_parent' method in the ComponentRef class
-            within = copy.deepcopy(component_ref)
+            c_within = copy.deepcopy(component_ref)
 
-            n = within
+            n = c_within
             while n.child[0].child:
                 n = n.child[0]
             class_name = n.child[0].name
             n.child = []
 
-            return next(f.classes[class_name] for f in self.files if f.within and f.within[0] == within and class_name in f.classes)
+            # Merge the within passed in, and the within we split from the
+            # class to be looked up
+            extended_within = copy.deepcopy(within)
+
+            if extended_within:
+                n = extended_within[0]
+                while n.child:
+                    n = n.child[0]
+                n.child.append(c_within)
+                extended_within = extended_within[0]
+            else:
+                extended_within = c_within
+
+            c = next((f.classes[class_name] for f in self.files if f.within and f.within[0] == extended_within and class_name in f.classes), None)
+
+            # TODO: This could probably be cleaner if we do nested classes.
+            # Then we could traverse up the tree until we found a match,
+            # instead of just trying twice (once with, once without prepending
+            # the passed-in 'within').
+            if c is None:
+                # Try again with root node lookup instead of relative
+                c = next((f.classes[class_name] for f in self.files if f.within and f.within[0] == c_within and class_name in f.classes), None)
+                if c is None:
+                    # TODO: How long do we traverse? Do we somehow force a stop at Real, Boolean, etc?
+                    #       Now a force is stopped on anything in the Modelica library.
+                    if c_within.name == "Modelica":
+                        raise KeyError
+                    else:
+                        raise Exception("Could not find class {} in {}".format(class_name, c_within))
+                else:
+                    return c
+            else:
+                return c
+
+
 
     def find_symbol(self, c, component_ref):
         sym = c.symbols[component_ref.name]
