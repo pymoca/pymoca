@@ -291,9 +291,6 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
     for extends in orig_class.extends:
         c = root.find_class(extends.component)
 
-        # carry out modifications
-        c = modify_class(c, extends.class_modification)
-
         # recursively call flatten on the parent class
         # NOTE: We do not to pass the instance name along. The symbol renaming
         # is handled at the current level, not at the level of the base class.
@@ -309,6 +306,9 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
         extended_orig_class.symbols.update(flat_parent_class.symbols)
         extended_orig_class.equations += flat_parent_class.equations
         extended_orig_class.statements += flat_parent_class.statements
+
+        # carry out modifications
+        extended_orig_class = modify_class(extended_orig_class, extends.class_modification)
 
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
