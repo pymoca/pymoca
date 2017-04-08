@@ -517,9 +517,12 @@ ImportFromClause.ast_spec = {
     'symbols' : FieldList([str]),
 }
 
+# TODO: Check if ComponentRef modifiers are handled correctly. For example,
+# check HomotopicLinear which extends PartialHomotopic with the modifier
+# "H(min = H_b)".
 ElementModification.ast_spec = {
     'component': Field([ComponentRef], [ComponentRef()]),
-    'modifications' : FieldList([Primary, Expression, ClassModification, Array], []),
+    'modifications' : FieldList([Primary, Expression, ClassModification, Array, ComponentRef], []),
 }
 
 ShortClassDefinition.ast_spec = {
