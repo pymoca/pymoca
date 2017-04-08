@@ -440,6 +440,11 @@ def flatten(root, class_name):
     :return: flat_file, a File containing the flattened class
     """
 
+    # The within information is needed at the class level when extending
+    for f in root.files:
+        for c in f.classes.values():
+            c.within = f.within
+
     # flatten class
     flat_class = flatten_class(root, root.classes[class_name], '')
 

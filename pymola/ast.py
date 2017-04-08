@@ -556,6 +556,7 @@ Class.ast_spec = {
     'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
     'initial_statements' : FieldList([AssignmentStatement, ForStatement], []),
     'statements' : FieldList([AssignmentStatement, ForStatement], []),
+    'within' : FieldList([ComponentRef], []),
 }
 
 File.ast_spec = {
