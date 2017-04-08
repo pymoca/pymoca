@@ -250,7 +250,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                     tree.name = self.instance_prefix + tree.name
                     c = tree
                     while len(c.child) > 0:
-                        c = tree.child[0]
+                        c = c.child[0]
                         tree.name += CLASS_SEPARATOR + c.name
                     tree.child = []
 

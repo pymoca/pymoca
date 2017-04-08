@@ -16,7 +16,7 @@ nan = float('nan')
 """
 AST Node Type Hierarchy
 
-File
+Root Class
     Class
         Equation
             ComponentRef
@@ -194,6 +194,15 @@ class ComponentRef(Node):
     def __init__(self, **kwargs):
         super(ComponentRef, self).__init__(**kwargs)
 
+    def __eq__(self, other):
+        if not (len(self.child) == len(other.child)):
+            return False
+
+        if self.child and other.child:
+            return (self.child[0] == other.child[0])
+
+        return self.__dict__ == other.__dict__
+
 
 class Expression(Node):
     def __init__(self, **kwargs):
@@ -312,7 +321,54 @@ class File(Node):
         super(File, self).__init__(**kwargs)
 
     def find_class(self, component_ref):
+        for c in self.classes:
+            if not component_ref.child:
+                return self.classes[component_ref.name]
+
         return self.classes[component_ref.name]
+
+    def find_symbol(self, c, component_ref):
+        sym = c.symbols[component_ref.name]
+        if len(component_ref.child) > 0:
+            c = self.find_class(sym.type)
+            return self.find_symbol(c, component_ref.child[0])
+        else:
+            return sym
+
+
+class Collection(Node):
+    def __init__(self, **kwargs):
+        super(Collection, self).__init__(**kwargs)
+
+    def find_class(self, component_ref):
+        if isinstance(component_ref, str):
+            assert component_ref.find('.') == -1
+            component_ref = ComponentRef(name=component_ref)
+
+        # First we try to the find the file matching the right 'within'
+
+        if not component_ref.child:
+            for f in self.files:
+                if not f.within:
+                    try:
+                        return f.classes[component_ref.name]
+                    except KeyError:
+                        continue
+
+            # Could not find symbol. Assume it is an elementary type
+            # TODO: Is this a correct assumption? What if we have an undefined type that is not elementary?
+            raise KeyError
+        else:
+            # TODO: Should we move this to a 'get_parent' method in the ComponentRef class
+            within = copy.deepcopy(component_ref)
+
+            n = within
+            while n.child[0].child:
+                n = n.child[0]
+            class_name = n.child[0].name
+            n.child = []
+
+            return next(f.classes[class_name] for f in self.files if f.within and f.within[0] == within and class_name in f.classes)
 
     def find_symbol(self, c, component_ref):
         sym = c.symbols[component_ref.name]
@@ -502,4 +558,15 @@ Class.ast_spec = {
 File.ast_spec = {
     'within' : FieldList([ComponentRef], []),
     'classes' : FieldDict([Class], {}),
+}
+
+# TODO: The Modelica specification (v3.3, Ch. 4) seems to suggest that
+# everything can/should be stored in one single (root) class, that can contain
+# other classes (each in turn also storing classes). That would make both File
+# and Collection types obsolete, but could make processing certain files (e.g.
+# Package.mo) before others important. For example, a 'within' statement would
+# only make sense if that package actually already exists in our tree of
+# classes, otherwise we would have nowhere to add the classes in that file.
+Collection.ast_spec = {
+    'files': FieldList([File], []),
 }
