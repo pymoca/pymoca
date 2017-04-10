@@ -194,15 +194,6 @@ class ComponentRef(Node):
     def __init__(self, **kwargs):
         super(ComponentRef, self).__init__(**kwargs)
 
-    def __eq__(self, other):
-        if not (len(self.child) == len(other.child)):
-            return False
-
-        if self.child and other.child:
-            return (self.child[0] == other.child[0])
-
-        return self.__dict__ == other.__dict__
-
 
 class Expression(Node):
     def __init__(self, **kwargs):
@@ -383,7 +374,7 @@ class Collection(Node):
             else:
                 extended_within = c_within
 
-            c = next((f.classes[class_name] for f in self.files if f.within and f.within[0] == extended_within and class_name in f.classes), None)
+            c = next((f.classes[class_name] for f in self.files if f.within and repr(f.within[0]) == repr(extended_within) and class_name in f.classes), None)
 
             # TODO: This could probably be cleaner if we do nested classes.
             # Then we could traverse up the tree until we found a match,
@@ -391,7 +382,9 @@ class Collection(Node):
             # the passed-in 'within').
             if c is None:
                 # Try again with root node lookup instead of relative
-                c = next((f.classes[class_name] for f in self.files if f.within and f.within[0] == c_within and class_name in f.classes), None)
+                # NOTE: We are using repr() to compare, because implementing
+                # __eq__ on the ComponentRef class will make it unhashable.
+                c = next((f.classes[class_name] for f in self.files if f.within and repr(f.within[0]) == repr(c_within) and class_name in f.classes), None)
                 if c is None:
                     # TODO: How long do we traverse? Do we somehow force a stop at Real, Boolean, etc?
                     #       Now a force is stopped on anything in the Modelica library.
