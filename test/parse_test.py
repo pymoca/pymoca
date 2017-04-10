@@ -107,5 +107,13 @@ class ParseTest(unittest.TestCase):
 
         self.assertEqual(flat_tree.classes['C2'].symbols['bcomp.b'].value.value, 3.0)
 
+    def test_inheritance_symbol_modifiers(self):
+        with open(os.path.join(TEST_DIR, 'Inheritance.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, 'Sub')
+
+        self.assertEqual(flat_tree.classes['Sub'].symbols['x'].max.value, 30.0)
+
 if __name__ == "__main__":
     unittest.main()
