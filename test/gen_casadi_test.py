@@ -71,7 +71,7 @@ class GenCasadiTest(unittest.TestCase):
 
 
         for i, (a,b) in enumerate(zip(this_out,that_out)):
-            test = float(ca.norm_2(a-b))<=tol
+            test = float(ca.norm_2(ca.vec(a-b)))<=tol
             if not test:
                 print("Expr mismatch")
                 print("A: ", A.equations[i], a)
@@ -361,12 +361,13 @@ class GenCasadiTest(unittest.TestCase):
 
         x = ca.MX.sym("x",10)
         y = ca.MX.sym("y",10)
+        z = ca.MX.sym("z",10)
         b = ca.MX.sym("b")
         n = ca.MX.sym("n")
 
-        ref_model.alg_states = [x, y, b]
+        ref_model.alg_states = [x, y, z, b]
         ref_model.parameters = [n]
-        ref_model.equations =  [ x-(np.arange(1,11)+b),y[0:5]-np.zeros(5),y[5:]-np.ones(5)]
+        ref_model.equations =  [ x-(np.arange(1,11)+b),y[0:5]-np.zeros(5),y[5:]-np.ones(5),ca.horzcat(z[0:5]-np.array([2, 2, 2, 2, 2]), z[5:10]-np.array([1, 1, 1, 1, 1]))]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

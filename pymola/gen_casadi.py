@@ -1,4 +1,5 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
+from collections import namedtuple
 from . import ast
 from .tree import TreeWalker, flatten
 
@@ -12,7 +13,6 @@ from .gen_numpy import NumpyGenerator
 
 # TODO
 #  - Other, fixed indices in for loops
-#  - Expressions with indices
 #  - Nested for loops
 #
 #  - DLL export
@@ -66,6 +66,9 @@ class CasadiSysModel:
         return ca.Function('check', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
 
 
+ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
+
+
 class ForLoop:
 
     def __init__(self, generator, tree):
@@ -81,8 +84,16 @@ class ForLoop:
         self.name = i.name
         self.indexed_symbols = {}
 
-    def register_indexed_symbol(self, e, tree):
-        self.indexed_symbols[e] = tree
+    def register_indexed_symbol(self, e, tree, index_expr=None):
+        if isinstance(index_expr, ca.MX):
+            F = ca.Function('index_expr', [self.index_variable], [index_expr])
+            expr = lambda ar : np.array([F(a)[0] for a in ar], dtype=np.int)
+            Fmap = F.map("map", "serial", len(self.values), [], [])
+            res = Fmap.call([self.values])
+            indices = np.array(res[0].T, dtype=np.int)
+        else:
+            indices = self.values
+        self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, indices)
 
 
 class CasadiGenerator(NumpyGenerator):
@@ -262,7 +273,7 @@ class CasadiGenerator(NumpyGenerator):
         F = ca.Function('loop_body_' + f.name, all_args, [expr])
 
         indexed_symbols_full = [self.nodes[
-            f.indexed_symbols[k].name][f.values - 1] for k in indexed_symbols]
+            f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in indexed_symbols]
         Fmap = F.map("map", "serial", len(f.values), list(
             range(len(args), len(all_args))), [])
         res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
@@ -309,13 +320,22 @@ class CasadiGenerator(NumpyGenerator):
                     if expr.dep(i).is_symbolic()]
 
             # Find the values of the symbols
-            vals = [self.get_integer(self.root.find_symbol(self.root.classes[self.class_name], 
-                    ast.ComponentRef(name=dep.name())).value) for dep in deps if dep.is_symbolic()]
+            vals = []
+            for dep in deps:
+                if dep.is_symbolic():
+                    if (len(self.for_loops) > 0) and (dep.name() == self.for_loops[-1].name):
+                        vals.append(self.for_loops[-1].index_variable)
+                    else:
+                        vals.append(self.get_integer(self.root.find_symbol(self.root.classes[self.class_name], 
+                                    ast.ComponentRef(name=dep.name())).value))
 
             # Evaluate the expression
             F = ca.Function('get_integer_{}'.format('_'.join([dep.name() for dep in deps])), deps, [expr])
             ret = F.call(vals)
-            return int(ret[0])
+            if ret[0].is_constant():
+                return int(ret[0])
+            else:
+                return ret[0]
         if isinstance(tree, ast.Slice):
             start = self.get_integer(tree.start)
             step = self.get_integer(tree.step)
@@ -345,6 +365,12 @@ class CasadiGenerator(NumpyGenerator):
                         return s
 
             sl = self.get_integer(index)
+            if not isinstance(sl, int) and not isinstance(sl, np.ndarray):
+                for_loop = self.for_loops[-1]
+                s = ca.MX.sym('{}[{}]'.format(tree.name, for_loop.name))
+                for_loop.register_indexed_symbol(s, tree, sl)
+                return s
+
             # Modelica indexing starts from one;  Python from zero.
             indices.append(sl - 1)        
         if len(indices) == 1:
