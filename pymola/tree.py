@@ -349,7 +349,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
 
     # for all equations in original class
     flow_connections = OrderedDict()
-    for equation in orig_class.equations:
+    for equation in extended_orig_class.equations:
         flat_equation = flatten_expression(equation, instance_prefix)
         if isinstance(equation, ast.ConnectClause):
             # expand connector
@@ -401,7 +401,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
             # flatten equation
             flat_class.equations += [flat_equation]
 
-    flat_class.statements += [flatten_expression(e, instance_prefix) for e in orig_class.statements]
+    flat_class.statements += [flatten_expression(e, instance_prefix) for e in extended_orig_class.statements]
 
     # add flow equations
     if len(flow_connections) > 0:
