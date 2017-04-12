@@ -30,6 +30,7 @@ if options.casadi_folder is not None:
 from . import parser, tree
 if not options.flatten_only:
     from . import gen_casadi
+    import casadi as ca
 
 # Load folder
 ast = None
@@ -46,4 +47,27 @@ if options.flatten_only:
     ast = tree.flatten(ast, model_name)
     print(ast)
 else:
-    gen_casadi.generate(ast, model_name)
+    model = gen_casadi.generate(ast, model_name)
+    f = model.get_function()
+
+    # Generate C code
+    cg = ca.CodeGenerator(model_name)
+    cg.add(f)
+    cg.add(f.forward(1))
+    cg.add(f.reverse(1))
+    cg.add(f.reverse(1).forward(1))
+    cg.generate()
+
+    file_name = model_name + '.c'
+
+    # Compile shared library
+    if os.name == 'posix':
+        ext = 'so'
+    else:
+        ext = 'dll'
+    try:
+        os.system("clang -shared {} -o lib{}.{}".format(file_name, model_name, ext))
+    except:
+        raise
+    finally:
+        os.remove(file_name)
