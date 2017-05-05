@@ -367,6 +367,8 @@ class Collection(Node):
         # TODO: Should be directly build the class_lookup, or wait until the first call to find_class?
         self._class_lookup = None
 
+        self._flattened_class_cache = {}
+
     def _build_class_lookup(self):
         self._class_lookup = {}
 

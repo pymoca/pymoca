@@ -156,7 +156,6 @@ class TreeListener(object):
     def exitComponentRef(self, tree: ast.ComponentRef) -> None:
         pass
 
-
 class TreeWalker(object):
     """
     Defines methods for tree walker. Inherit from this to make your own.
@@ -201,7 +200,7 @@ class TreeWalker(object):
 
 
 def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: str,
-                  class_modification: ast.ClassModification = None) -> ast.Class:
+                  class_modification: ast.ClassModification = None, store_cache=True) -> ast.Class:
     """
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
@@ -210,6 +209,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     :param orig_class: The class we want to flatten
     :param instance_name:
     :param class_modification:
+    :param store_cache: Whether we want to store the to-be-flattened class in the cache.
     :return: flat_class, the flattened class of type Class
     """
 
@@ -224,79 +224,74 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     else:
         instance_prefix = instance_name
 
-    extended_orig_class = ast.Class(
-        name=orig_class.name,
-    )
+    full_ref = ast.ComponentRef(name=orig_class.name)
+    if orig_class.within:
+        full_ref = ast.merge_component_ref(orig_class.within[0], full_ref)
 
-    for extends in orig_class.extends:
-        c = root.find_class(extends.component, orig_class.within)
+    full_ref_tuple = ast.component_ref_to_tuple(full_ref)
 
-        # recursively call flatten on the parent class
-        # NOTE: We do not to pass the instance name along. The symbol renaming
-        # is handled at the current level, not at the level of the base class.
-        # That way we can properly apply class modifications to inherited
-        # symbols.
-        flat_parent_class = flatten_class(root, c, '')
+    # A flag whether the current call to this function will put the class in cache.
+    # When False (i.e. when we use a cached version of ourselves), we can avoid
+    # looking for class names in symbols.
+    check_sub_class = True
 
-        # set visibility
-        for sym in flat_parent_class.symbols.values():
-            if sym.visibility > extends.visibility:
-                sym.visibility = extends.visibility
+    if full_ref_tuple in root._flattened_class_cache:
+        extended_orig_class = copy.deepcopy(root._flattened_class_cache[full_ref_tuple])
+        check_sub_class = False
+    elif instance_name or class_modification is not None:
+        extended_orig_class = flatten_class(root, orig_class, '')  # NOTE: this will add the current class it to cache
+        check_sub_class = False
+    else:
+        # The current flatten_class call will be the one to put the class in cache
+        extended_orig_class = pull_extends(root, orig_class)
 
-        # add parent class members symbols, equations and statements
-        extended_orig_class.symbols.update(flat_parent_class.symbols)
-        extended_orig_class.equations += flat_parent_class.equations
-        extended_orig_class.initial_equations += flat_parent_class.initial_equations
-        extended_orig_class.statements += flat_parent_class.statements
-        extended_orig_class.initial_statements += flat_parent_class.initial_statements
-
-        # carry out modifications
-        extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
-
-    extended_orig_class.symbols.update(orig_class.symbols)
-    extended_orig_class.equations += orig_class.equations
-    extended_orig_class.initial_equations += orig_class.initial_equations
-    extended_orig_class.statements += orig_class.statements
-    extended_orig_class.initial_statements += orig_class.initial_statements
-
+    # Regardless of whether we found a cache version of ourselves, or whether we
+    # still have to, we have to take the following steps.
     if class_modification is not None:
         extended_orig_class = modify_class(root, extended_orig_class, class_modification)
+
+    if not instance_name and not check_sub_class:
+        # Early termination
+        return extended_orig_class
 
     # for all symbols in the original class
     for sym_name, sym in extended_orig_class.symbols.items():
         flat_sym = flatten_symbol(sym, instance_prefix)
-        try:
-            c = root.find_class(flat_sym.type)
-        except KeyError:
-            # append original symbol to flat class
+        if not check_sub_class:
             flat_class.symbols[flat_sym.name] = flat_sym
         else:
-            # recursively call flatten on the contained class
-            flat_sub_class = flatten_class(root, c, flat_sym.name, flat_sym.class_modification)
-
-            # carry class dimensions over to symbols
-            for flat_class_symbol in flat_sub_class.symbols.values():
-                if len(flat_class_symbol.dimensions) == 1 \
-                        and isinstance(flat_class_symbol.dimensions[0], ast.Primary) \
-                        and flat_class_symbol.dimensions[0].value == 1:
-                    flat_class_symbol.dimensions = flat_sym.dimensions
-                elif len(flat_sym.dimensions) == 1 and isinstance(flat_sym.dimensions[0], ast.Primary) \
-                        and flat_sym.dimensions[0].value == 1:
-                    flat_class_symbol.dimensions = flat_class_symbol.dimensions
-                else:
-                    flat_class_symbol.dimensions = flat_sym.dimensions + flat_class_symbol.dimensions
-
-            # add sub_class members symbols and equations
-            flat_class.symbols.update(flat_sub_class.symbols)
-            flat_class.equations += flat_sub_class.equations
-            flat_class.initial_equations += flat_sub_class.initial_equations
-            flat_class.statements += flat_sub_class.statements
-            flat_class.initial_statements += flat_sub_class.initial_statements
-
-            # we keep connectors in the class hierarchy, as we may refer to them further
-            # up using connect() clauses
-            if c.type == 'connector':
+            try:
+                c = root.find_class(flat_sym.type)
+            except KeyError:
+                # append original symbol to flat class
                 flat_class.symbols[flat_sym.name] = flat_sym
+            else:
+                # recursively call flatten on the contained class
+                flat_sub_class = flatten_class(root, c, flat_sym.name, flat_sym.class_modification)
+
+                # carry class dimensions over to symbols
+                for flat_class_symbol in flat_sub_class.symbols.values():
+                    if len(flat_class_symbol.dimensions) == 1 \
+                            and isinstance(flat_class_symbol.dimensions[0], ast.Primary) \
+                            and flat_class_symbol.dimensions[0].value == 1:
+                        flat_class_symbol.dimensions = flat_sym.dimensions
+                    elif len(flat_sym.dimensions) == 1 and isinstance(flat_sym.dimensions[0], ast.Primary) \
+                            and flat_sym.dimensions[0].value == 1:
+                        flat_class_symbol.dimensions = flat_class_symbol.dimensions
+                    else:
+                        flat_class_symbol.dimensions = flat_sym.dimensions + flat_class_symbol.dimensions
+
+                # add sub_class members symbols and equations
+                flat_class.symbols.update(flat_sub_class.symbols)
+                flat_class.equations += flat_sub_class.equations
+                flat_class.initial_equations += flat_sub_class.initial_equations
+                flat_class.statements += flat_sub_class.statements
+                flat_class.initial_statements += flat_sub_class.initial_statements
+
+                # we keep connectors in the class hierarchy, as we may refer to them further
+                # up using connect() clauses
+                if c.type == 'connector':
+                    flat_class.symbols[flat_sym.name] = flat_sym
 
     # now resolve all references inside the symbol definitions
     for sym_name, sym in flat_class.symbols.items():
@@ -394,7 +389,49 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     # for f in function_set:
     #     if f not in flat_file.classes:
     #         flat_file.classes.update(flatten(root, f, instance_name).classes)
+
+    if not instance_name and class_modification is None and not full_ref_tuple in root._flattened_class_cache and store_cache:
+        root._flattened_class_cache[full_ref_tuple] = copy.deepcopy(flat_class)
+
     return flat_class
+
+
+def pull_extends(root: ast.Collection, orig_class: ast.Class):
+    extended_orig_class = ast.Class(
+        name=orig_class.name,
+    )
+
+    for extends in orig_class.extends:
+        c = root.find_class(extends.component, orig_class.within)
+
+        # recursively call flatten on the parent class
+        # NOTE: We do not to pass the instance name along. The symbol renaming
+        # is handled at the current level, not at the level of the base class.
+        # That way we can properly apply class modifications to inherited
+        # symbols.
+        flat_parent_class = flatten_class(root, c, '')
+
+        # set visibility
+        for sym in flat_parent_class.symbols.values():
+            sym.visibility = min(sym.visibility, extends.visibility)
+
+        # add parent class members symbols, equations and statements
+        extended_orig_class.symbols.update(flat_parent_class.symbols)
+        extended_orig_class.equations += flat_parent_class.equations
+        extended_orig_class.initial_equations += flat_parent_class.initial_equations
+        extended_orig_class.statements += flat_parent_class.statements
+        extended_orig_class.initial_statements += flat_parent_class.initial_statements
+
+        # carry out modifications
+        extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
+
+    extended_orig_class.symbols.update(orig_class.symbols)
+    extended_orig_class.equations += orig_class.equations
+    extended_orig_class.initial_equations += orig_class.initial_equations
+    extended_orig_class.statements += orig_class.statements
+    extended_orig_class.initial_statements += orig_class.initial_statements
+
+    return extended_orig_class
 
 
 def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification):
@@ -606,7 +643,7 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
             c.within = f.within
 
     # flatten class
-    flat_class = flatten_class(root, root.find_class(class_name), '')
+    flat_class = flatten_class(root, root.find_class(class_name), '', store_cache=False)
 
     # add equations for state symbol values
     # we do this here, instead of in flatten_class, because symbol values
