@@ -457,7 +457,7 @@ Equation.ast_spec = {
 
 IfEquation.ast_spec = {
     'conditions' : FieldList([Expression, Primary, ComponentRef]),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
+    'equations' : FieldList([Equation, ForEquation, ConnectClause, IfEquation], []),
     'comment' : Field([str]),
 }
 
@@ -480,7 +480,7 @@ ConnectClause.ast_spec = {
 
 AssignmentStatement.ast_spec = {
     'left' : FieldList([ComponentRef]),
-    'right' : Field([Expression, Primary, ComponentRef]),
+    'right' : Field([Expression, IfExpression, Primary, ComponentRef]),
     'comment' : Field([str]),
 }
 
