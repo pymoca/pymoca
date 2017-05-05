@@ -388,7 +388,8 @@ class Collection(Node):
                 if c is None:
                     # TODO: How long do we traverse? Do we somehow force a stop at Real, Boolean, etc?
                     #       Now a force is stopped on anything in the Modelica library.
-                    if c_within.name == "Modelica":
+                    # FIXME: The "SI" part should be removed when we can handle import statements.
+                    if c_within.name in ("Modelica", "SI"):
                         raise KeyError
                     else:
                         raise Exception("Could not find class {} in {}".format(class_name, c_within))
