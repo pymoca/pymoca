@@ -248,7 +248,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     # Regardless of whether we found a cache version of ourselves, or whether we
     # still have to, we have to take the following steps.
     if class_modification is not None:
-        extended_orig_class = modify_class(root, extended_orig_class, class_modification)
+        extended_orig_class = modify_class(root, extended_orig_class, class_modification, inplace=True)
 
     if not instance_name and not check_sub_class:
         # Early termination
@@ -256,30 +256,30 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
     # for all symbols in the original class
     for sym_name, sym in extended_orig_class.symbols.items():
-        flat_sym = flatten_symbol(sym, instance_prefix)
+        sym = flatten_symbol(sym, instance_prefix, inplace=True)
         if not check_sub_class:
-            flat_class.symbols[flat_sym.name] = flat_sym
+            flat_class.symbols[sym.name] = sym
         else:
             try:
-                c = root.find_class(flat_sym.type)
+                c = root.find_class(sym.type)
             except KeyError:
                 # append original symbol to flat class
-                flat_class.symbols[flat_sym.name] = flat_sym
+                flat_class.symbols[sym.name] = sym
             else:
                 # recursively call flatten on the contained class
-                flat_sub_class = flatten_class(root, c, flat_sym.name, flat_sym.class_modification)
+                flat_sub_class = flatten_class(root, c, sym.name, sym.class_modification)
 
                 # carry class dimensions over to symbols
                 for flat_class_symbol in flat_sub_class.symbols.values():
                     if len(flat_class_symbol.dimensions) == 1 \
                             and isinstance(flat_class_symbol.dimensions[0], ast.Primary) \
                             and flat_class_symbol.dimensions[0].value == 1:
-                        flat_class_symbol.dimensions = flat_sym.dimensions
-                    elif len(flat_sym.dimensions) == 1 and isinstance(flat_sym.dimensions[0], ast.Primary) \
-                            and flat_sym.dimensions[0].value == 1:
+                        flat_class_symbol.dimensions = sym.dimensions
+                    elif len(sym.dimensions) == 1 and isinstance(sym.dimensions[0], ast.Primary) \
+                            and sym.dimensions[0].value == 1:
                         flat_class_symbol.dimensions = flat_class_symbol.dimensions
                     else:
-                        flat_class_symbol.dimensions = flat_sym.dimensions + flat_class_symbol.dimensions
+                        flat_class_symbol.dimensions = sym.dimensions + flat_class_symbol.dimensions
 
                 # add sub_class members symbols and equations
                 flat_class.symbols.update(flat_sub_class.symbols)
@@ -291,17 +291,17 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
                 # we keep connectors in the class hierarchy, as we may refer to them further
                 # up using connect() clauses
                 if c.type == 'connector':
-                    flat_class.symbols[flat_sym.name] = flat_sym
+                    flat_class.symbols[sym.name] = sym
 
     # now resolve all references inside the symbol definitions
     for sym_name, sym in flat_class.symbols.items():
-        flat_sym = flatten_component_refs(root, flat_class, sym, instance_prefix)
+        flat_sym = flatten_component_refs(root, flat_class, sym, instance_prefix, inplace=True)
         flat_class.symbols[sym_name] = flat_sym
 
     # for all equations in original class
     flow_connections = OrderedDict()
     for equation in extended_orig_class.equations:
-        flat_equation = flatten_component_refs(root, flat_class, equation, instance_prefix)
+        flat_equation = flatten_component_refs(root, flat_class, equation, instance_prefix, inplace=True)
         if isinstance(equation, ast.ConnectClause):
             # expand connector
             connect_equations = []
@@ -356,11 +356,11 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             # flatten equation
             flat_class.equations += [flat_equation]
 
-    flat_class.initial_equations += [flatten_component_refs(root, flat_class, e, instance_prefix) for e in
+    flat_class.initial_equations += [flatten_component_refs(root, flat_class, e, instance_prefix, inplace=True) for e in
                               extended_orig_class.initial_equations]
-    flat_class.statements += [flatten_component_refs(root, flat_class, e, instance_prefix) for e in
+    flat_class.statements += [flatten_component_refs(root, flat_class, e, instance_prefix, inplace=True) for e in
                               extended_orig_class.statements]
-    flat_class.initial_statements += [flatten_component_refs(root, flat_class, e, instance_prefix) for e in
+    flat_class.initial_statements += [flatten_component_refs(root, flat_class, e, instance_prefix, inplace=True) for e in
                               extended_orig_class.initial_statements]
 
     # add flow equations
@@ -423,7 +423,7 @@ def pull_extends(root: ast.Collection, orig_class: ast.Class):
         extended_orig_class.initial_statements += flat_parent_class.initial_statements
 
         # carry out modifications
-        extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
+        extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification, inplace=True)
 
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
@@ -434,7 +434,7 @@ def pull_extends(root: ast.Collection, orig_class: ast.Class):
     return extended_orig_class
 
 
-def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification):
+def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification, inplace=True):
     """
     Apply a modification to a class or symbol.
     :param root: root tree for looking up symbols
@@ -442,7 +442,9 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
     :param modification: modification to apply
     :return:
     """
-    class_or_sym = copy.deepcopy(class_or_sym)
+    if not inplace:
+        class_or_sym = copy.deepcopy(class_or_sym)
+
     for argument in modification.arguments:
         if isinstance(argument, ast.ElementModification):
             if argument.component.name in ast.Symbol.ATTRIBUTES:
@@ -451,7 +453,10 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
                 s = root.find_symbol(class_or_sym, argument.component)
                 for modification in argument.modifications:
                     if isinstance(modification, ast.ClassModification):
-                        s.__dict__.update(modify_class(root, s, modification).__dict__)
+                        if inplace:
+                            s = modify_class(root, s, modification, inplace)
+                        else:
+                            s.__dict__.update(modify_class(root, s, modification, inplace).__dict__)
                     else:
                         s.value = modification
         elif isinstance(argument, ast.ComponentClause):
@@ -468,14 +473,18 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
     return class_or_sym
 
 
-def flatten_symbol(s: ast.Symbol, instance_prefix: str) -> ast.Symbol:
+def flatten_symbol(s: ast.Symbol, instance_prefix: str, inplace=True) -> ast.Symbol:
     """
     Given a symbols and a prefix performs name mangling
     :param s: Symbol
     :param instance_prefix: Prefix for instance
     :return: flattened symbol
     """
-    s_copy = copy.deepcopy(s)
+    if inplace:
+        s_copy = s
+    else:
+        s_copy = copy.deepcopy(s)
+
     s_copy.name = instance_prefix + s.name
     if len(instance_prefix) > 0:
         # Strip 'input' and 'output' prefixes from nested symbols.
@@ -541,7 +550,8 @@ class ComponentRefFlattener(TreeListener):
 def flatten_component_refs(
         root: ast.Collection, container: ast.Class,
         expression: ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol],
-        instance_prefix: str) -> ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol]:
+        instance_prefix: str,
+        inplace=True) -> ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol]:
     """
     Flattens component refs in a tree
     :param root: root node
@@ -551,12 +561,13 @@ def flatten_component_refs(
     :return: flattened expression
     """
 
-    expression_copy = copy.deepcopy(expression)
+    if not inplace:
+        expression = copy.deepcopy(expression)
 
     w = TreeWalker()
-    w.walk(ComponentRefFlattener(root, container, instance_prefix), expression_copy)
+    w.walk(ComponentRefFlattener(root, container, instance_prefix), expression)
 
-    return expression_copy
+    return expression
 
 
 class StateAnnotator(TreeListener):
