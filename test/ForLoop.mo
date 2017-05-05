@@ -3,10 +3,13 @@ model ForLoop
 	Real x[n];
     Real y[n];
     Real z[n];
+    Real w[2, n];
     Real b;
 equation
 	for i in 1:n loop
     	x[i] = i+b;
+        w[1, i] = i;
+        w[2, i] = 2*i;
     end for;
     for j in 1:5 loop
     	y[j] = 0;

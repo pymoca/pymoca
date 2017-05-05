@@ -12,7 +12,6 @@ import numpy as np
 from .gen_numpy import NumpyGenerator
 
 # TODO
-#  - Other, fixed indices in for loops
 #  - Nested for loops
 #
 #  - DLL export
