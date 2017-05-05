@@ -216,7 +216,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                             sym.value = modification
             elif isinstance(argument, ast.ComponentClause):
                 for new_sym in argument.symbol_list:
-                    orig_sym = class_or_sym.symbols[sym.name]
+                    orig_sym = class_or_sym.symbols[new_sym.name]
                     orig_sym.__dict__.update(new_sym.__dict__)
             elif isinstance(argument, ast.ShortClassDefinition):
                 for sym in class_or_sym.symbols.values():
