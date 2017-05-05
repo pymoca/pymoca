@@ -367,7 +367,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                 connect_equation = ast.Equation(left=flat_equation.left, right=flat_equation.right)
                 connect_equations.append(connect_equation)
             else:
-                assert(class_left == class_right)
+                # TODO: Add check about matching inputs and outputs
 
                 flat_class_left = flatten_class(root, class_left, '')
 
@@ -376,7 +376,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                     right_name = flat_equation.right.name + CLASS_SEPARATOR + connector_variable.name
                     left = ast.ComponentRef(name=left_name, indices=flat_equation.left.indices)
                     right = ast.ComponentRef(name=right_name, indices=flat_equation.right.indices)
-                    if len(connector_variable.prefixes) == 0:
+                    if len(connector_variable.prefixes) == 0 or connector_variable.prefixes[0] in ['input', 'output']:
                         connect_equation = ast.Equation(left=left, right=right)
                         connect_equations.append(connect_equation)
                     elif connector_variable.prefixes == ['flow']:
