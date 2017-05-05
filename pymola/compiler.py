@@ -43,7 +43,7 @@ if not options.flatten_only:
 
 # Load folder
 ast = None
-for root, dir, files in os.walk(model_folder):
+for root, dir, files in os.walk(model_folder, followlinks=True):
     for item in fnmatch.filter(files, "*.mo"):
         logger.info("Parsing {}".format(item))
 
