@@ -45,6 +45,16 @@ def to_json(var):
         res = var
     return res
 
+# Helper function to compare component references to each other without converting to JSON
+def compare_component_ref(this, other):
+    if len(this.child) != len(other.child):
+        return False
+
+    if this.child and other.child:
+        return compare_component_ref(this.child[0], other.child[0])
+
+    return this.__dict__ == other.__dict__
+
 
 class Field(object):
     def __init__(self, types, default=None):
@@ -374,7 +384,7 @@ class Collection(Node):
             else:
                 extended_within = c_within
 
-            c = next((f.classes[class_name] for f in self.files if f.within and repr(f.within[0]) == repr(extended_within) and class_name in f.classes), None)
+            c = next((f.classes[class_name] for f in self.files if f.within and compare_component_ref(f.within[0], extended_within) and class_name in f.classes), None)
 
             # TODO: This could probably be cleaner if we do nested classes.
             # Then we could traverse up the tree until we found a match,
@@ -382,9 +392,7 @@ class Collection(Node):
             # the passed-in 'within').
             if c is None:
                 # Try again with root node lookup instead of relative
-                # NOTE: We are using repr() to compare, because implementing
-                # __eq__ on the ComponentRef class will make it unhashable.
-                c = next((f.classes[class_name] for f in self.files if f.within and repr(f.within[0]) == repr(c_within) and class_name in f.classes), None)
+                c = next((f.classes[class_name] for f in self.files if f.within and compare_component_ref(f.within[0], c_within) and class_name in f.classes), None)
                 if c is None:
                     # TODO: How long do we traverse? Do we somehow force a stop at Real, Boolean, etc?
                     #       Now a force is stopped on anything in the Modelica library.
