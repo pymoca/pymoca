@@ -7,6 +7,9 @@ from optparse import OptionParser
 import sys
 import os
 import fnmatch
+import logging
+
+logger = logging.getLogger("pymola")
 
 # Parse command line arguments
 usage = "usage: %prog [options] MODEL_FOLDER MODEL_NAME"
@@ -15,12 +18,18 @@ parser.add_option("-c", "--casadi", dest="casadi_folder",
                   help="CasADi installation folder")
 parser.add_option("-f", "--flatten_only",
                   action="store_true", dest="flatten_only")
+parser.add_option("-v", "--verbose",
+                  action="store_true", dest="verbose")
 (options, args) = parser.parse_args()
 if len(args) != 2:
     parser.error("incorrect number of arguments")
 
 model_folder = args[0]
 model_name = args[1]
+
+# Set log level
+if options.verbose:
+    logging.basicConfig(level=logging.DEBUG)
 
 # Set CasADi installation folder
 if options.casadi_folder is not None:
@@ -35,8 +44,10 @@ if not options.flatten_only:
 # Load folder
 ast = None
 for root, dir, files in os.walk(model_folder):
-    for items in fnmatch.filter(files, "*.mo"):
-        with open(os.path.join(root, items), 'r') as f:
+    for item in fnmatch.filter(files, "*.mo"):
+        logger.info("Parsing {}".format(item))
+
+        with open(os.path.join(root, item), 'r') as f:
             if ast is None:
                 ast = parser.parse(f.read())
             else:
