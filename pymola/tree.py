@@ -214,6 +214,8 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                         if isinstance(modification, ast.ClassModification):
                             sym.__dict__.update(modify_class(sym, modification).__dict__)
                         else:
+                            # TODO Modifies it in the class, not in the instance!
+                            # TODO Add test case.
                             sym.value = modification
             elif isinstance(argument, ast.ComponentClause):
                 for new_sym in argument.symbol_list:
@@ -267,6 +269,11 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                     self.cutoff_depth = self.depth
                 else:
                     tree.name = new_name
+                    c = tree
+                    while len(c.child) > 0:
+                        c = c.child[0]
+                        if len(c.indices) > 0:
+                            tree.indices += c.indices
                     tree.child = []
 
             def exitComponentRef(self, tree):
