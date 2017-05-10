@@ -396,13 +396,15 @@ class GenCasadiTest(unittest.TestCase):
         arcw = ca.MX.sym("arc.w", 2)
         nested1z = ca.MX.sym('nested1.z', 3)
         nested2z = ca.MX.sym('nested2.z', 2, 3)
+        nested1n = ca.MX.sym('nested1.n', 1)
+        nested2n = ca.MX.sym('nested2.n', 2)
 
         scalar_f = ca.MX.sym("scalar_f")
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
         ref_model.alg_states = [a,c,d,e,scalar_f,g,arx,arcy,arcw,nested1z,nested2z,h]
-        ref_model.parameters = [d_dim]
+        ref_model.parameters = [d_dim,nested1n,nested2n]
         ref_model.outputs = [h]
         ref_model.constants = [b, c_dim, B, C, D, E]
         ref_model.constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2), ca.DM.zeros(3), ca.DM.ones(2)]

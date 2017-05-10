@@ -9,7 +9,8 @@ connector ArrayConnector
 end ArrayConnector;
 
 model NestedArrayExpressions
-    Real z[3];
+    parameter Integer n = 3;
+    Real z[n];
 end NestedArrayExpressions;
 
 model ArrayExpressions
@@ -50,7 +51,7 @@ equation
 
     // Nesting
     nested1.z = ones(3);
-    nested2[1].z = zeros(3);
+    nested2[1].z = zeros(nested2[1].n);
     nested2[2].z[1] = 3;
     nested2[2].z[2] = 2;
     nested2[2].z[3] = 1;
