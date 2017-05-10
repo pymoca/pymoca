@@ -6,10 +6,13 @@ from .tree import TreeWalker, flatten
 import os
 import sys
 import copy
+import logging
 
 import casadi as ca
 import numpy as np
 from .gen_numpy import NumpyGenerator
+
+logger = logging.getLogger("pymola")
 
 # TODO
 #  - Nested for loops
@@ -108,6 +111,8 @@ class CasadiGenerator(NumpyGenerator):
         self.for_loops = []
 
     def exitClass(self, tree):
+        logger.debug('exitClass {}'.format(tree.name))
+
         states = []
         inputs = []
         outputs = []
@@ -155,6 +160,8 @@ class CasadiGenerator(NumpyGenerator):
             op = 'mtimes' # .* differs from *
         if op.startswith('.'):
             op = op[1:]
+
+        logger.debug('exitExpression')
 
         n_operands = len(tree.operands)
         if op == 'der':
@@ -241,6 +248,8 @@ class CasadiGenerator(NumpyGenerator):
         self.src[tree] = src
 
     def exitIfExpression(self, tree):
+        logger.debug('exitIfExpression')
+
         assert(len(tree.conditions) + 1 == len(tree.expressions))
 
         src = self.get_mx(tree.expressions[-1])
@@ -253,33 +262,43 @@ class CasadiGenerator(NumpyGenerator):
         self.src[tree] = src
 
     def exitEquation(self, tree):
+        logger.debug('exitEquation')
+
         self.src[tree] = self.get_mx(tree.left) - self.get_mx(tree.right)
 
     def enterForEquation(self, tree):
+        logger.debug('enterForEquation')
+
         self.for_loops.append(ForLoop(self, tree))
 
     def exitForEquation(self, tree):
+        logger.debug('exitForEquation')
+
         f = self.for_loops.pop()
+        if len(f.values) > 0:
+            indexed_symbols = list(f.indexed_symbols.keys())
+            args = [f.index_variable] + indexed_symbols
+            expr = ca.vcat([ca.vec(self.get_mx(e)) for e in tree.equations])
+            free_vars = ca.symvar(expr)
 
-        indexed_symbols = list(f.indexed_symbols.keys())
-        args = [f.index_variable] + indexed_symbols
-        expr = ca.vcat([ca.vec(self.get_mx(e)) for e in tree.equations])
-        free_vars = ca.symvar(expr)
+            arg_names = [arg.name() for arg in args]
+            free_vars = [e for e in free_vars if e.name() not in arg_names]
+            all_args = args + free_vars
+            F = ca.Function('loop_body_' + f.name, all_args, [expr])
 
-        arg_names = [arg.name() for arg in args]
-        free_vars = [e for e in free_vars if e.name() not in arg_names]
-        all_args = args + free_vars
-        F = ca.Function('loop_body_' + f.name, all_args, [expr])
+            indexed_symbols_full = [self.nodes[
+                f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in indexed_symbols]
+            Fmap = F.map("map", "serial", len(f.values), list(
+                range(len(args), len(all_args))), [])
+            res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
 
-        indexed_symbols_full = [self.nodes[
-            f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in indexed_symbols]
-        Fmap = F.map("map", "serial", len(f.values), list(
-            range(len(args), len(all_args))), [])
-        res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
-
-        self.src[tree] = res[0].T
+            self.src[tree] = res[0].T
+        else:
+            self.src[tree] = ca.MX()
 
     def exitIfEquation(self, tree):
+        logger.debug('exitIfEquation')
+
         assert(len(tree.equations) % (len(tree.conditions) + 1) == 0)
 
         equations_per_condition = int(
@@ -329,7 +348,7 @@ class CasadiGenerator(NumpyGenerator):
                                     ast.ComponentRef(name=dep.name())).value))
 
             # Evaluate the expression
-            F = ca.Function('get_integer_{}'.format('_'.join([dep.name() for dep in deps])), deps, [expr])
+            F = ca.Function('get_integer_{}'.format('_'.join([dep.name().replace('.', '_') for dep in deps])), deps, [expr])
             ret = F.call(vals)
             if ret[0].is_constant():
                 return int(ret[0])
