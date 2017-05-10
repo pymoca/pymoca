@@ -71,9 +71,11 @@ class CasadiSysModel:
         if n_variables != n_equations:
             logger.warning("System is not balanced.  Number of variables is {}, number of equations is {}.".format(n_variables, n_equations))
 
-    def get_function(self):
-        return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
-
+    def get_function(self, group_arguments=True):
+        if group_arguments:
+            return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
+        else:
+            return ca.Function('dae', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
 
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 

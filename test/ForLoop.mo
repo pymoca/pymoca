@@ -21,4 +21,7 @@ equation
     	z[k] = 2;
     	z[k+5] = 1;
     end for;
+    for l in 1:0 loop
+        z[l] = 1e3;
+    end for;
 end ForLoop;
