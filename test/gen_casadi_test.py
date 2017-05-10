@@ -394,17 +394,19 @@ class GenCasadiTest(unittest.TestCase):
         arx = ca.MX.sym("ar.x", 3)
         arcy = ca.MX.sym("arc.y", 2)
         arcw = ca.MX.sym("arc.w", 2)
+        nested1z = ca.MX.sym('nested1.z', 3)
+        nested2z = ca.MX.sym('nested2.z', 2, 3)
 
         scalar_f = ca.MX.sym("scalar_f")
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = [a,c,d,e,scalar_f,g,arx,arcy,arcw,h]
+        ref_model.alg_states = [a,c,d,e,scalar_f,g,arx,arcy,arcw,nested1z,nested2z,h]
         ref_model.parameters = [d_dim]
         ref_model.outputs = [h]
         ref_model.constants = [b, c_dim, B, C, D, E]
         ref_model.constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2), ca.DM.zeros(3), ca.DM.ones(2)]
-        ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f), g - ca.sum1(c), h - B[1], arx[1] - scalar_f, arcy[0] - arcy[1], arcw[0] + arcw[1]]
+        ref_model.equations =  [ c-(a+b[0:3]*e), d-(ca.sin(a/b[1:4])), e - (d+scalar_f), g - ca.sum1(c), h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - ca.DM.zeros(3), nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1], arcw[0] + arcw[1]]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

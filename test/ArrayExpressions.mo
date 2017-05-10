@@ -8,6 +8,10 @@ connector ArrayConnector
     flow Real w;
 end ArrayConnector;
 
+model NestedArrayExpressions
+    Real z[3];
+end NestedArrayExpressions;
+
 model ArrayExpressions
     Real a[3] = {1.0, 2.0, 3.0};
     constant Real b[4] = {2.7, 3.7, 4.7, 5.7}; // Can also be done with 2.7:5.7
@@ -25,6 +29,8 @@ model ArrayExpressions
     constant Real E[2] = ones(d_dim - 1);
     ArrayElement ar[c_dim + 1];
     ArrayConnector arc[c_dim];
+    NestedArrayExpressions nested1;
+    NestedArrayExpressions nested2[2];
 equation
     // Array operators.
     c = a .+ b[1:d_dim].*e; // .+ is equal to + in this case
@@ -41,6 +47,13 @@ equation
     // Indexing
     h = B[d_dim - 1];
     ar[2].x = scalar_f;
+
+    // Nesting
+    nested1.z = ones(3);
+    nested2[1].z = zeros(3);
+    nested2[2].z[1] = 3;
+    nested2[2].z[2] = 2;
+    nested2[2].z[3] = 1;
 
     // Connecting
     connect(arc[1], arc[2]);
