@@ -59,7 +59,10 @@ if options.flatten_only:
     print(ast)
 else:
     model = gen_casadi.generate(ast, model_name)
+    model.check_balanced()
+    
     f = model.get_function()
+    f.print_dimensions()
 
     # Generate C code
     cg = ca.CodeGenerator(model_name)

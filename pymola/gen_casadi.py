@@ -7,6 +7,7 @@ import os
 import sys
 import copy
 import logging
+import itertools
 
 import casadi as ca
 import numpy as np
@@ -64,8 +65,14 @@ class CasadiSysModel:
         r += "equations: " + str(self.equations) + "\n"
         return r
 
+    def check_balanced(self):
+        n_variables = sum(v.size1() * v.size2() for v in itertools.chain(self.states, self.alg_states))
+        n_equations = sum(e.size1() * e.size2() for e in self.equations)
+        if n_variables != n_equations:
+            logger.warning("System is not balanced.  Number of variables is {}, number of equations is {}.".format(n_variables, n_equations))
+
     def get_function(self):
-        return ca.Function('check', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
+        return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
 
 
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
