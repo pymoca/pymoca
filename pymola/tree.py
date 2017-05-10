@@ -8,6 +8,7 @@ from collections import OrderedDict
 import logging
 import copy
 import json
+import sys
 
 from . import ast
 
@@ -232,33 +233,49 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
         sym_copy.name = instance_prefix + sym.name
         return sym_copy
 
-    def flatten_expression(expression, instance_prefix):
+    def flatten_component_refs(container, expression, instance_prefix):
         expression_copy = copy.deepcopy(expression)
 
-        class ExpressionFlattener(TreeListener):
-            def __init__(self, instance_prefix):
+        class ComponentRefFlattener(TreeListener):
+            def __init__(self, container, instance_prefix):
+                self.container = container
                 self.instance_prefix = instance_prefix
-                self.d = 0
+                self.depth = 0
+                self.cutoff_depth = sys.maxsize
 
-                super(ExpressionFlattener, self).__init__()
+                super(ComponentRefFlattener, self).__init__()
 
             def enterComponentRef(self, tree):
-                self.d += 1
+                self.depth += 1
+                if self.depth > self.cutoff_depth:
+                    return
 
-                # TODO: Handle array indices in name flattening
-                if self.d == 1:
-                    tree.name = self.instance_prefix + tree.name
-                    c = tree
-                    while len(c.child) > 0:
-                        c = c.child[0]
-                        tree.name += CLASS_SEPARATOR + c.name
+                # Compose flatted name
+                new_name = self.instance_prefix + tree.name
+                c = tree
+                while len(c.child) > 0:
+                    c = c.child[0]
+                    new_name += CLASS_SEPARATOR + c.name
+
+                # If the flattened name exists in the container, use it. 
+                # Otherwise, skip this reference.
+                try:
+                    root.find_symbol(self.container, ast.ComponentRef(name=new_name))
+                except KeyError:
+                    # The component was not found in the container.  We leave this
+                    # reference alone.
+                    self.cutoff_depth = self.depth
+                else:
+                    tree.name = new_name
                     tree.child = []
 
             def exitComponentRef(self, tree):
-                self.d -= 1
+                self.depth -= 1
+                if self.depth < self.cutoff_depth:
+                    self.cutoff_depth = sys.maxsize
 
         w = TreeWalker()
-        w.walk(ExpressionFlattener(instance_prefix), expression_copy)
+        w.walk(ComponentRefFlattener(container, instance_prefix), expression_copy)
 
         return expression_copy
 
@@ -319,22 +336,24 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
 
     # for all symbols in the original class
     for sym_name, sym in extended_orig_class.symbols.items():
+        flat_sym = flatten_symbol(sym, instance_prefix)
         try:
-            c = root.find_class(sym.type)
+            c = root.find_class(flat_sym.type)
         except KeyError:
             # append original symbol to flat class
-            flat_sym = flatten_symbol(sym, instance_prefix)
             flat_class.symbols[flat_sym.name] = flat_sym
         else:
             # recursively call flatten on the contained class
-            flat_sub_class = flatten_class(root, c, instance_prefix + sym_name, sym.class_modification)
+            flat_sub_class = flatten_class(root, c, flat_sym.name, sym.class_modification)
 
             # carry class dimensions over to symbols
             for flat_class_symbol in flat_sub_class.symbols.values():
                 if len(flat_class_symbol.dimensions) == 1 and isinstance(flat_class_symbol.dimensions[0], ast.Primary) and flat_class_symbol.dimensions[0].value == 1:
-                    flat_class_symbol.dimensions = sym.dimensions
+                    flat_class_symbol.dimensions = flat_sym.dimensions
+                elif len(flat_sym.dimensions) == 1 and isinstance(flat_sym.dimensions[0], ast.Primary) and flat_sym.dimensions[0].value == 1:
+                    flat_class_symbol.dimensions = flat_class_symbol.dimensions
                 else:
-                    flat_class_symbol.dimensions = sym.dimensions + flat_class_symbol.dimensions
+                    flat_class_symbol.dimensions = flat_sym.dimensions + flat_class_symbol.dimensions
 
             # add sub_class members symbols and equations
             flat_class.symbols.update(flat_sub_class.symbols)
@@ -344,13 +363,17 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
             # we keep connectors in the class hierarchy, as we may refer to them further
             # up using connect() clauses
             if c.type == 'connector':
-                flat_sym = flatten_symbol(sym, instance_prefix)
                 flat_class.symbols[flat_sym.name] = flat_sym
+
+    # now resolve all references inside the symbol definitions
+    for sym_name, sym in flat_class.symbols.items():
+        flat_sym = flatten_component_refs(flat_class, sym, instance_prefix)
+        flat_class.symbols[sym_name] = flat_sym
 
     # for all equations in original class
     flow_connections = OrderedDict()
     for equation in extended_orig_class.equations:
-        flat_equation = flatten_expression(equation, instance_prefix)
+        flat_equation = flatten_component_refs(flat_class, equation, instance_prefix)
         if isinstance(equation, ast.ConnectClause):
             # expand connector
             connect_equations = []
@@ -401,7 +424,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
             # flatten equation
             flat_class.equations += [flat_equation]
 
-    flat_class.statements += [flatten_expression(e, instance_prefix) for e in extended_orig_class.statements]
+    flat_class.statements += [flatten_component_refs(flat_class, e, instance_prefix) for e in extended_orig_class.statements]
 
     # add flow equations
     if len(flow_connections) > 0:
