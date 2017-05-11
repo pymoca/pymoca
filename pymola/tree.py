@@ -214,8 +214,6 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                         if isinstance(modification, ast.ClassModification):
                             sym.__dict__.update(modify_class(sym, modification).__dict__)
                         else:
-                            # TODO Modifies it in the class, not in the instance!
-                            # TODO Add test case.
                             sym.value = modification
             elif isinstance(argument, ast.ComponentClause):
                 for new_sym in argument.symbol_list:
@@ -351,7 +349,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
             flat_class.symbols[flat_sym.name] = flat_sym
         else:
             # recursively call flatten on the contained class
-            flat_sub_class = flatten_class(root, c, flat_sym.name, sym.class_modification)
+            flat_sub_class = flatten_class(root, c, flat_sym.name, flat_sym.class_modification)
 
             # carry class dimensions over to symbols
             for flat_class_symbol in flat_sub_class.symbols.values():
