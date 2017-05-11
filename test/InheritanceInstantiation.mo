@@ -1,6 +1,8 @@
 // Example taken from Section 7.1 in the Modelica Specification (v3.3)
 class A
-    parameter Real a=0, b=0;
+    parameter Real a=0;
+    parameter Integer b=0;
+    Real v[b];
 end A;
 
 class B

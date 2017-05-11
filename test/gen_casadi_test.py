@@ -48,8 +48,8 @@ class GenCasadiTest(unittest.TestCase):
 
         this_mx = this.mx_in()
         that_mx = that.mx_in()
-        this_in = [e.name() for e in this_mx]
-        that_in = [e.name() for e in that_mx]
+        this_in = [e.name() for e in this_mx if e.is_symbolic()]
+        that_in = [e.name() for e in that_mx if e.is_symbolic()]
 
         that_from_this = []
         this_mx_dict = dict(zip(this_in,this_mx))
@@ -335,6 +335,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'C2')
         ref_model = CasadiSysModel()
+        print(casadi_model)
 
         bcomp1_a = ca.MX.sym('bcomp1.a')
         bcomp1_b = ca.MX.sym('bcomp1.b')
@@ -343,9 +344,13 @@ class GenCasadiTest(unittest.TestCase):
         bcomp3_a = ca.MX.sym('bcomp3.a')
         bcomp3_b = ca.MX.sym('bcomp3.b')
 
+        bcomp1_v = ca.MX.sym('bcomp1.v', 3)
+        bcomp2_v = ca.MX.sym('bcomp2.v', 4)
+        bcomp3_v = ca.MX.sym('bcomp3.v', 2)
+
         ref_model.states = []
         ref_model.der_states = []
-        ref_model.alg_states = []
+        ref_model.alg_states = [bcomp1_v, bcomp2_v, bcomp3_v]
         ref_model.parameters = [bcomp1_a, bcomp1_b, bcomp2_a, bcomp2_b, bcomp3_a, bcomp3_b]
         ref_model.equations =  []
 
