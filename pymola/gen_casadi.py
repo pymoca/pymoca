@@ -66,10 +66,13 @@ class CasadiSysModel:
         return r
 
     def check_balanced(self):
-        n_variables = sum(v.size1() * v.size2() for v in itertools.chain(self.states, self.alg_states))
+        n_states = sum(v.size1() * v.size2() for v in itertools.chain(self.states, self.alg_states))
+        n_inputs = sum(v.size1() * v.size2() for v in self.inputs)
         n_equations = sum(e.size1() * e.size2() for e in self.equations)
-        if n_variables != n_equations:
-            logger.warning("System is not balanced.  Number of variables is {}, number of equations is {}.".format(n_variables, n_equations))
+        if n_states - n_inputs == n_equations:
+            logger.info("System is balanced.")
+        else:
+            logger.warning("System is not balanced.  Number of states minus inputs is {}, number of equations is {}.".format(n_states - n_inputs, n_equations))
 
     def get_function(self, group_arguments=True):
         if group_arguments:
