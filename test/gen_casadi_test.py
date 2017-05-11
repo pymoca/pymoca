@@ -313,7 +313,6 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Sub')
-        print("inheritance",casadi_model)
         ref_model = CasadiSysModel()
 
         x = ca.MX.sym("x")
@@ -327,6 +326,28 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states = [y]
         ref_model.parameters = [k]
         ref_model.equations =  [ der_x-k*x, x+y-3]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_inheritance_instantiation(self):
+        with open(os.path.join(TEST_DIR, 'InheritanceInstantiation.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'C2')
+        ref_model = CasadiSysModel()
+
+        bcomp1_a = ca.MX.sym('bcomp1.a')
+        bcomp1_b = ca.MX.sym('bcomp1.b')
+        bcomp2_a = ca.MX.sym('bcomp2.a')
+        bcomp2_b = ca.MX.sym('bcomp2.b')
+        bcomp3_a = ca.MX.sym('bcomp3.a')
+        bcomp3_b = ca.MX.sym('bcomp3.b')
+
+        ref_model.states = []
+        ref_model.der_states = []
+        ref_model.alg_states = []
+        ref_model.parameters = [bcomp1_a, bcomp1_b, bcomp2_a, bcomp2_b, bcomp3_a, bcomp3_b]
+        ref_model.equations =  []
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

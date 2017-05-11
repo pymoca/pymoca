@@ -1,6 +1,6 @@
 // Example taken from Section 7.1 in the Modelica Specification (v3.3)
 class A
-    parameter Real a, b;
+    parameter Real a=0, b=0;
 end A;
 
 class B
@@ -12,5 +12,7 @@ class C
 end C;
 
 class C2
-    B bcomp(b=3);
+    B bcomp1(b=3);
+    B bcomp2(b=4);
+    C bcomp3;
 end C2;
