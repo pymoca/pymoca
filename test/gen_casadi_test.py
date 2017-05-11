@@ -53,9 +53,13 @@ class GenCasadiTest(unittest.TestCase):
 
         that_from_this = []
         this_mx_dict = dict(zip(this_in,this_mx))
+        that_mx_dict = dict(zip(that_in,that_mx))
         for e in that_in:
             self.assertTrue(e in this_in)
+            self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
+            self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
             that_from_this.append(this_mx_dict[e])
+
         that = ca.Function('f',this_mx,that.call(that_from_this))
 
         np.random.seed(0)
