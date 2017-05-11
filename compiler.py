@@ -28,8 +28,7 @@ model_folder = args[0]
 model_name = args[1]
 
 # Set log level
-if options.verbose:
-    logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG if options.verbose else logging.INFO)
 
 # Set CasADi installation folder
 if options.casadi_folder is not None:
@@ -55,9 +54,13 @@ for root, dir, files in os.walk(model_folder, followlinks=True):
 
 # Compile
 if options.flatten_only:
+    logger.info("Flattening")
+
     ast = tree.flatten(ast, model_name)
     print(ast)
 else:
+    logger.info("Generating CasADi model")
+    
     model = gen_casadi.generate(ast, model_name)
     model.check_balanced()
     
