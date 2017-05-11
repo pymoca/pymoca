@@ -144,7 +144,7 @@ class CasadiGenerator(NumpyGenerator):
         ode_states = []
         alg_states = []
         for s in states:
-            if self.src[s] in self.derivative:
+            if self.get_mx(s) in self.derivative:
                 ode_states.append(s)
             else:
                 alg_states.append(s)
