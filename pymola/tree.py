@@ -231,6 +231,14 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
     def flatten_symbol(sym, instance_prefix):
         sym_copy = copy.deepcopy(sym)
         sym_copy.name = instance_prefix + sym.name
+        if len(instance_prefix) > 0:
+            # Strip 'input' and 'output' prefixes from nested symbols.
+            strip_keywords = ['input', 'output']
+            for strip_keyword in strip_keywords:
+                try:
+                    sym_copy.prefixes.remove(strip_keyword)
+                except ValueError:
+                    pass
         return sym_copy
 
     def flatten_component_refs(container, expression, instance_prefix):
