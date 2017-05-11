@@ -490,6 +490,11 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by ModelicaParser#component_reference_element.
+    def visitComponent_reference_element(self, ctx):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by ModelicaParser#component_reference.
     def visitComponent_reference(self, ctx):
         return self.visitChildren(ctx)

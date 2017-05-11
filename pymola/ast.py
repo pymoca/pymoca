@@ -360,7 +360,7 @@ class Collection(Node):
 
             # Could not find symbol. Assume it is an elementary type
             # TODO: Is this a correct assumption? What if we have an undefined type that is not elementary?
-            raise KeyError
+            raise KeyError(component_ref.name)
         else:
             # TODO: Should we move this to a 'get_parent' method in the ComponentRef class
             c_within = copy.deepcopy(component_ref)
@@ -398,7 +398,7 @@ class Collection(Node):
                     #       Now a force is stopped on anything in the Modelica library.
                     # FIXME: The "SI" part should be removed when we can handle import statements.
                     if c_within.name in ("Modelica", "SI"):
-                        raise KeyError
+                        raise KeyError(c_within.name)
                     else:
                         raise Exception("Could not find class {} in {}".format(class_name, c_within))
                 else:

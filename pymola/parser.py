@@ -346,18 +346,22 @@ class ASTListener(ModelicaListener):
         #if 'state' not in self.class_node.symbols[comp_name].prefixes:
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
-    def exitComponent_reference(self, ctx):
-        name = ctx.IDENT().getText()
-        indices = []
+    def exitComponent_reference_element(self, ctx):
         if ctx.array_subscripts() is not None:
             indices = [self.ast[x] for x in ctx.array_subscripts().subscript()]
-        child = [self.ast[ctx.child]] if ctx.child is not None else []
-
+        else:
+            indices = []
         self.ast[ctx] = ast.ComponentRef(
-            name=name,
+            name=ctx.IDENT().getText(),
             indices=indices,
-            child=child
+            child=[]
         )
+
+    def exitComponent_reference(self, ctx):
+        for element in reversed([self.ast[ctx] for ctx in ctx.component_reference_element()]):
+            if ctx in self.ast:
+                element.child = [self.ast[ctx]]
+            self.ast[ctx] = element
 
     def exitPrimary_component_reference(self, ctx):
         self.ast[ctx] = self.ast[ctx.component_reference()]
@@ -570,12 +574,12 @@ class ASTListener(ModelicaListener):
 
 
 # UTILITY FUNCTIONS ========================================================
-
 def parse(text):
     input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
     stream = antlr4.CommonTokenStream(lexer)
     parser = ModelicaParser(stream)
+    #parser.buildParseTrees = False
     parse_tree = parser.stored_definition()
     ast_listener = ASTListener()
     parse_walker = antlr4.ParseTreeWalker()

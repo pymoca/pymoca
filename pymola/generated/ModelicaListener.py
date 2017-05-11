@@ -877,6 +877,15 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ModelicaParser#component_reference_element.
+    def enterComponent_reference_element(self, ctx):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#component_reference_element.
+    def exitComponent_reference_element(self, ctx):
+        pass
+
+
     # Enter a parse tree produced by ModelicaParser#component_reference.
     def enterComponent_reference(self, ctx):
         pass
