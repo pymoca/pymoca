@@ -13,11 +13,15 @@ import os
 import sys
 import subprocess
 import pprint
+import shutil
+import fnmatch
 
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 from setuptools.command.build_ext import build_ext
 from setuptools import Command
+
+from Cython.Build import cythonize
 
 MAJOR = 0
 MINOR = 1
@@ -78,12 +82,16 @@ def call_antlr4(arg):
     classpath = ".:{:s}:$CLASSPATH".format(antlr_path)
     generated = os.path.join(ROOT_DIR, 'pymola', 'generated')
     cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
-            " -o {generated:s} -visitor -Dlanguage=Python2".format(**locals())
+            " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
     print(cmd)
     proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'pymola'))
     proc.communicate()
     with open(os.path.join(ROOT_DIR, 'pymola', 'generated', '__init__.py'), 'w') as fid:
         fid.write('')
+    for root, dir, files in os.walk(generated):
+        for item in fnmatch.filter(files, "Modelica*.py"):
+            filename = os.path.join(root, item)
+            shutil.move(filename, filename.replace('.py', '.pyx'))
 
 def git_version():
     "Return the git revision as a string"
@@ -213,7 +221,8 @@ def setup_package():
         ),
         cmdclass={
             'antlr': AntlrBuildCommand,
-        }
+        },
+        ext_modules=cythonize('pymola/generated/*.pyx', compiler_directives={'boundscheck': False, 'initializedcheck': False, 'language_level': 3})
     )
 
     full_version = get_version_info()[0]
