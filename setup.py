@@ -191,6 +191,11 @@ def setup_package():
         install_reqs = req_file.read().split('\n')
     # pprint.pprint(install_reqs)
 
+    # Disable compiler optimization.  We have to do this, as the default -O3 triggers a bug in clang causing an initialization failure.
+    #os.environ['CFLAGS'] = '-O0'
+    # Or alternatively, use gcc:
+    os.environ['CC'] = 'gcc-6'
+
     metadata = dict(
         name='pymola',
         maintainer="James Goppert",
