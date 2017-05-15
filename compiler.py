@@ -104,7 +104,7 @@ else:
         for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs']:
             db[key] = [Variable(e.name(), None, []) for e in getattr(model, key)]
 
-        db['parameters'] = [Variable(e.name(), float(v) if v.is_constant() else None, []) for e, v in zip(model.parameters, model.parameter_values)]
+        db['parameters'] = [Variable(e.name(), v, []) for e, v in zip(model.parameters, model.parameter_values)]
 
         DelayedVariable = namedtuple('DelayedVariable', ['name', 'origin', 'delay'])
         db['delayed_states'] = [DelayedVariable(t[0].name(), t[1].name(), t[2]) for t in model.delayed_states]

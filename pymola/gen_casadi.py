@@ -11,7 +11,6 @@ import itertools
 
 import casadi as ca
 import numpy as np
-from .gen_numpy import NumpyGenerator
 
 logger = logging.getLogger("pymola")
 
@@ -82,7 +81,7 @@ class CasadiSysModel:
             composite_parameters, simple_parameters = [], []
             composite_parameter_values, simple_parameter_values = [], []
             for e, v in zip(self.parameters, self.parameter_values):
-                idx = v.is_constant() or v.is_symbolic()
+                idx = isinstance(v, float)
                 (composite_parameters, simple_parameters)[idx].append(e)
                 (composite_parameter_values, simple_parameter_values)[idx].append(v)
 
@@ -195,7 +194,7 @@ class CasadiGenerator(TreeListener):
         self.src[tree] = [self.src[e] for e in tree.values]
 
     def exitPrimary(self, tree):
-        self.src[tree] = ca.MX(tree.value)
+        self.src[tree] = tree.value
 
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):

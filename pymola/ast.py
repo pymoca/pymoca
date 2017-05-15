@@ -429,7 +429,7 @@ VISIBILITY_PUBLIC = 2
 # possible when initially declaring a class in python
 
 Primary.ast_spec = {
-    'value' : Field([bool, float, int, str]),
+    'value' : Field([bool, float, int, str, type(None)]),
 }
 
 Array.ast_spec = {
@@ -515,11 +515,11 @@ Symbol.ast_spec = {
     'outer' : Field([bool], False),
     'dimensions' : FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
     'comment' : Field([str], ''),
-    'start' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'min' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'max' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'nominal' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
-    'value' : Field([Expression, Primary, ComponentRef, Array], Primary(value=nan)),
+    'start' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'min' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'max' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'nominal' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'value' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
     'fixed' : Field([Primary], False),
     'id' : Field([int], 0),
     'order' : Field([int], 0),
