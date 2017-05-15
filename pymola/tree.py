@@ -5,7 +5,7 @@ Tools for tree walking and visiting etc.
 
 from __future__ import print_function, absolute_import, division, unicode_literals
 
-import copy
+import pickle
 import logging
 import sys
 from collections import OrderedDict
@@ -236,7 +236,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     check_sub_class = True
 
     if full_ref_tuple in root._flattened_class_cache:
-        extended_orig_class = copy.deepcopy(root._flattened_class_cache[full_ref_tuple])
+        extended_orig_class = pickle.loads(pickle.dumps(root._flattened_class_cache[full_ref_tuple], -1))
         check_sub_class = False
     elif instance_name or class_modification is not None:
         extended_orig_class = flatten_class(root, orig_class, '')  # NOTE: this will add the current class it to cache
@@ -391,7 +391,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     #         flat_file.classes.update(flatten(root, f, instance_name).classes)
 
     if not instance_name and class_modification is None and not full_ref_tuple in root._flattened_class_cache and store_cache:
-        root._flattened_class_cache[full_ref_tuple] = copy.deepcopy(flat_class)
+        root._flattened_class_cache[full_ref_tuple] = pickle.loads(pickle.dumps(flat_class, -1))
 
     return flat_class
 
@@ -443,7 +443,7 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
     :return:
     """
     if not inplace:
-        class_or_sym = copy.deepcopy(class_or_sym)
+        class_or_sym = pickle.loads(pickle.dumps(class_or_sym, -1))
 
     for argument in modification.arguments:
         if isinstance(argument, ast.ElementModification):
@@ -483,7 +483,7 @@ def flatten_symbol(s: ast.Symbol, instance_prefix: str, inplace=True) -> ast.Sym
     if inplace:
         s_copy = s
     else:
-        s_copy = copy.deepcopy(s)
+        s_copy = pickle.loads(pickle.dumps(s, -1))
 
     s_copy.name = instance_prefix + s.name
     if len(instance_prefix) > 0:
@@ -562,7 +562,7 @@ def flatten_component_refs(
     """
 
     if not inplace:
-        expression = copy.deepcopy(expression)
+        expression = pickle.loads(pickle.dumps(expression, -1))
 
     w = TreeWalker()
     w.walk(ComponentRefFlattener(root, container, instance_prefix), expression)
@@ -630,7 +630,7 @@ def pull_functions(root: ast.Collection, expression: ast.Expression, instance_pr
     :return:
     """
 
-    expression_copy = copy.deepcopy(expression)
+    expression_copy = pickle.loads(pickle.dumps(expression, -1))
 
     w = TreeWalker()
     function_set = set()
