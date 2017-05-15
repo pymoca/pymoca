@@ -81,9 +81,9 @@ class CasadiSysModel:
             composite_parameters, simple_parameters = [], []
             composite_parameter_values, simple_parameter_values = [], []
             for e, v in zip(self.parameters, self.parameter_values):
-                idx = isinstance(v, float)
-                (composite_parameters, simple_parameters)[idx].append(e)
-                (composite_parameter_values, simple_parameter_values)[idx].append(v)
+                is_composite = isinstance(v, ca.MX) and not v.is_constant()
+                (simple_parameters, composite_parameters)[is_composite].append(e)
+                (simple_parameter_values, composite_parameter_values)[is_composite].append(float(v) if not is_composite and isinstance(v, ca.MX) else v)
 
             self.equations = ca.substitute(self.equations, composite_parameters, composite_parameter_values)
             self.parameters = simple_parameters
@@ -101,6 +101,8 @@ class CasadiSysModel:
     def initial_residual_function(self, group_arguments=True, replace_constants=True):
         # TODO
         raise NotImplementedError
+
+    
 
     # TODO min, max, nominal: how?? as function of parameters.
 
