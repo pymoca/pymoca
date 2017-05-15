@@ -398,7 +398,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.alg_states = [x, y, z, w, b]
         ref_model.parameters = [n]
-        ref_model.equations =  [ ca.horzcat(x-(np.arange(1,11)+b),w[0,:].T-np.arange(1,11),w[1,:].T-np.arange(2,21,2)),y[0:5]-np.zeros(5),y[5:]-np.ones(5),ca.horzcat(z[0:5]-np.array([2, 2, 2, 2, 2]), z[5:10]-np.array([1, 1, 1, 1, 1])),ca.MX()]
+        ref_model.equations =  [ ca.horzcat(x-(np.arange(1,11)+b),w[0,:].T-np.arange(1,11),w[1,:].T-np.arange(2,21,2)),y[0:5]-np.zeros(5),y[5:]-np.ones(5),ca.horzcat(z[0:5]-np.array([2, 2, 2, 2, 2]), z[5:10]-np.array([1, 1, 1, 1, 1]))]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
