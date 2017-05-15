@@ -64,7 +64,7 @@ else:
     model = gen_casadi.generate(ast, model_name)
     model.check_balanced()
     
-    f = model.get_function()
+    f = model.get_function(replace_constants=True)
     f.print_dimensions()
 
     # Generate C code
@@ -83,8 +83,22 @@ else:
     else:
         ext = 'dll'
     try:
-        os.system("clang -shared {} -o lib{}.{}".format(file_name, model_name, ext))
+        os.system("clang -shared {} -o {}.{}".format(file_name, model_name, ext))
     except:
         raise
     finally:
         os.remove(file_name)
+
+    # Output metadata
+    import configparser
+    config = configparser.ConfigParser()
+
+    for key in ['states', 'der_states', 'alg_states', 'parameters', 'inputs', 'outputs']:
+        config[key] = {'{}[{},{}]'.format(x.name(), x.size1(), x.size2()) : '' for x in getattr(model, key)}
+
+    config['parameter_values'] = {x.name() : y for x, y in zip(model.parameters, model.parameter_values)}
+
+    config['delayed_states'] = {t[0].name() : (t[1].name(), t[2]) for t in model.delayed_states}
+
+    with open('{}.ini'.format(model_name), 'w') as configfile:
+        config.write(configfile)

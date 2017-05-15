@@ -49,6 +49,7 @@ class CasadiSysModel:
         self.parameters = []
         self.equations = []
         self.time = ca.MX.sym('time')
+        self.delayed_states = []
 
     def __str__(self):
         r = ""
@@ -74,11 +75,18 @@ class CasadiSysModel:
         else:
             logger.warning("System is not balanced.  Number of states minus inputs is {}, number of equations is {}.".format(n_states - n_inputs, n_equations))
 
-    def get_function(self, group_arguments=True):
-        if group_arguments:
-            return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
+    def get_function(self, group_arguments=True, replace_constants=True):
+        if replace_constants:
+            equations = ca.substitute(self.equations, self.constants, self.constant_values)
+            constants = []
         else:
-            return ca.Function('dae', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
+            equations = self.equations
+            constants = self.constants
+
+        if group_arguments:
+            return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*constants), ca.vertcat(*self.parameters)], [ca.vertcat(*equations)])
+        else:
+            return ca.Function('dae', [self.time] + self.states + self.der_states + self.alg_states + constants + self.parameters, equations)
 
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 
@@ -144,6 +152,9 @@ class CasadiGenerator(NumpyGenerator):
                 elif 'output' in s.prefixes:
                     outputs.append(s)
 
+        def discard_empty(l):
+            return list(filter(lambda s : not s.is_empty(), l))
+
         ode_states = []
         alg_states = []
         for s in states:
@@ -151,16 +162,17 @@ class CasadiGenerator(NumpyGenerator):
                 ode_states.append(s)
             else:
                 alg_states.append(s)
-        self.model.states = [self.get_mx(e) for e in ode_states]
-        self.model.der_states = [self.derivative[
-            self.get_mx(e)] for e in ode_states]
-        self.model.alg_states = [self.get_mx(e) for e in alg_states]
-        self.model.constants = [self.get_mx(e) for e in constants]
-        self.model.constant_values = [self.get_mx(e.value) for e in constants]
-        self.model.parameters = [self.get_mx(e) for e in parameters]
-        self.model.inputs = [self.get_mx(e) for e in inputs]
-        self.model.outputs = [self.get_mx(e) for e in outputs]
-        self.model.equations = [self.get_mx(e) for e in tree.equations]
+        self.model.states = discard_empty([self.get_mx(e) for e in ode_states])
+        self.model.der_states = discard_empty([self.derivative[
+            self.get_mx(e)] for e in ode_states])
+        self.model.alg_states = discard_empty([self.get_mx(e) for e in alg_states])
+        self.model.constants = discard_empty([self.get_mx(e) for e in constants])
+        self.model.constant_values = [self.get_mx(e.value) for e in constants if not self.get_mx(e).is_empty()]
+        self.model.parameters = discard_empty([self.get_mx(e) for e in parameters])
+        self.model.parameter_values = [self.get_mx(e.value) for e in parameters if not self.get_mx(e).is_empty()]
+        self.model.inputs = discard_empty([self.get_mx(e) for e in inputs])
+        self.model.outputs = discard_empty([self.get_mx(e) for e in outputs])
+        self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
 
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):
@@ -237,7 +249,8 @@ class CasadiGenerator(NumpyGenerator):
             delay_time = self.get_mx(tree.operands[1])
             assert isinstance(expr, MX)
             src = ca.MX.sym('{}_delayed_{}'.format(
-                expr.name, delay_time), expr.size1(), expr.size2())
+                expr.name(), delay_time), expr.size1(), expr.size2())
+            self.model.delayed_states.append((src, expr, delay_time))
         elif op in OP_MAP and n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
             rhs = self.get_mx(tree.operands[1])
