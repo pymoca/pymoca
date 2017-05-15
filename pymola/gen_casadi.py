@@ -32,17 +32,23 @@ OP_MAP = {'*': "__mul__",
           "abs": "fabs"}
 
 
+VariableMetadata = namedtuple('VariableMetadata', ['min', 'max', 'nominal'])
+
+
 class CasadiSysModel:
 
     def __init__(self):
         self.states = []
+        self.state_metadata = []
         self.der_states = []
         self.alg_states = []
+        self.alg_state_metadata = []
         self.inputs = []
         self.outputs = []
         self.constants = []
         self.constant_values = []
         self.parameters = []
+        self.parameter_values = []
         self.equations = []
         self.time = ca.MX.sym('time')
         self.delayed_states = []
@@ -103,11 +109,20 @@ class CasadiSysModel:
         return ca.Function('initial_residual', [self.time], [0])
 
     def state_metadata_function(self, group_arguments=True):
-        return ca.Function('initial_residual', [self.time], [0])
+        m, M, n = [], [], []
+        for e, v in zip(itertools.chain(self.states, self.alg_states), itertools.chain(self.state_metadata, self.alg_state_metadata)):
+            m_ = v.min if hasattr(v.min, '__iter__') else np.full(e.size(), v.min if v.min is not None else -np.inf)
+            M_ = v.max if hasattr(v.max, '__iter__') else np.full(e.size(), v.max if v.max is not None else np.inf)
+            n_ = v.nominal if hasattr(v.nominal, '__iter__') else np.full(e.size(), v.nominal if v.nominal is not None else 1)
+            m.append(m_)
+            M.append(M_)
+            n.append(n_)
+        out = ca.horzcat(ca.vertcat(*m), ca.vertcat(*M), ca.vertcat(*n))
+        if group_arguments:
+            return ca.Function('state_metadata', [ca.vertcat(*self.parameters)], [out[:len(self.state_metadata), :], out[len(self.state_metadata):, :]])
+        else:
+            return ca.Function('state_metadata', self.parameters, [out])
 
-    
-
-    # TODO min, max, nominal: how?? as function of parameters.
 
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 
@@ -184,9 +199,12 @@ class CasadiGenerator(TreeListener):
             else:
                 alg_states.append(s)
         self.model.states = discard_empty([self.get_mx(e) for e in ode_states])
+        self.model.state_metadata = [VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal)) for e in ode_states if not self.get_mx(e).is_empty()]
         self.model.der_states = discard_empty([self.derivative[
             self.get_mx(e)] for e in ode_states])
         self.model.alg_states = discard_empty([self.get_mx(e) for e in alg_states])
+        self.model.alg_state_metadata = [VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal)) for e in alg_states if not self.get_mx(e).is_empty()]
+        assert len(self.model.alg_states) == len(self.model.alg_state_metadata)
         self.model.constants = discard_empty([self.get_mx(e) for e in constants])
         self.model.constant_values = [self.get_mx(e.value) for e in constants if not self.get_mx(e).is_empty()]
         self.model.parameters = discard_empty([self.get_mx(e) for e in parameters])
