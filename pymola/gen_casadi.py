@@ -94,13 +94,16 @@ class CasadiSysModel:
     
     def dae_residual_function(self, group_arguments=True):
         if group_arguments:
-            return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
+            return ca.Function('dae_residual', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
         else:
-            return ca.Function('dae', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
+            return ca.Function('dae_residual', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
 
-    def initial_residual_function(self, group_arguments=True, replace_constants=True):
+    def initial_residual_function(self, group_arguments=True):
         # TODO
-        raise NotImplementedError
+        return ca.Function('initial_residual', [self.time], [0])
+
+    def state_metadata_function(self, group_arguments=True):
+        return ca.Function('initial_residual', [self.time], [0])
 
     
 

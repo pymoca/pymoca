@@ -4,6 +4,7 @@ Compiler tool.
 """
 
 from optparse import OptionParser
+from collections import namedtuple
 import sys
 import os
 import fnmatch
@@ -64,39 +65,51 @@ else:
     model = gen_casadi.generate(ast, model_name)
     model.check_balanced()
     model.simplify(replace_constants=True, replace_parameter_expressions=True)
-    
-    f = model.dae_residual_function(group_arguments=True)
-    f.print_dimensions()
 
-    # Generate C code
-    cg = ca.CodeGenerator(model_name)
-    cg.add(f)
-    cg.add(f.forward(1))
-    cg.add(f.reverse(1))
-    cg.add(f.reverse(1).forward(1))
-    cg.generate()
-
-    file_name = model_name + '.c'
-
-    # Compile shared library
+    # Compile shared libraries
     if os.name == 'posix':
         ext = 'so'
     else:
         ext = 'dll'
-    so_file_name = '{}.{}'.format(model_name, ext)
-    try:
-        os.system("clang -shared {} -o {}".format(file_name, so_file_name))
-    except:
-        raise
-    finally:
-        os.remove(file_name)
+
+    class ObjectData:
+        def __init__(self, key, derivatives, library):
+            self.key = key
+            self.derivatives = derivatives
+            self.library = library
+            
+    objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'state_metadata': ObjectData('state_metadata', False, '')}
+    for o, d in objects.items():
+        f = getattr(model, o + '_function')(group_arguments=True)
+        f.print_dimensions()
+
+        # Generate C code
+        library_name = '{}_{}'.format(model_name, o)
+
+        cg = ca.CodeGenerator(library_name)
+        cg.add(f)
+        if d.derivatives:
+            cg.add(f.forward(1))
+            cg.add(f.reverse(1))
+            cg.add(f.reverse(1).forward(1))
+        cg.generate()
+
+        file_name = library_name + '.c'
+
+        d.library = '{}.{}'.format(library_name, ext)
+        try:
+            os.system("clang -shared {} -o {}".format(file_name, d.library))
+        except:
+            raise
+        finally:
+            os.remove(file_name)
 
     # Output metadata        
-    from collections import namedtuple
     import shelve
     with shelve.open(model_name, 'n') as db:
-        # Include a reference to the shared library
-        db['library'] = so_file_name
+        # Include references to the shared libraries
+        for o, d in objects.items():
+            db[d.key] = d.library
         db['library_os'] = os.name
 
         # Describe variables per category
