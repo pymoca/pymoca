@@ -63,8 +63,9 @@ else:
     
     model = gen_casadi.generate(ast, model_name)
     model.check_balanced()
+    model.simplify(replace_constants=True, replace_parameter_expressions=True)
     
-    f = model.get_function(replace_constants=True)
+    f = model.dae_residual_function(group_arguments=True)
     f.print_dimensions()
 
     # Generate C code
@@ -99,9 +100,11 @@ else:
         db['library_os'] = os.name
 
         # Describe variables per category
-        Variable = namedtuple('Variable', ['name', 'aliases'])
-        for key in ['states', 'der_states', 'alg_states', 'parameters', 'inputs', 'outputs']:
-            db[key] = [Variable(x.name(), []) for x in getattr(model, key)]
+        Variable = namedtuple('Variable', ['name', 'value', 'aliases'])
+        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs']:
+            db[key] = [Variable(e.name(), None, []) for e in getattr(model, key)]
+
+        db['parameters'] = [Variable(e.name(), float(v) if v.is_constant() else None, []) for e, v in zip(model.parameters, model.parameter_values)]
 
         DelayedVariable = namedtuple('DelayedVariable', ['name', 'origin', 'delay'])
         db['delayed_states'] = [DelayedVariable(t[0].name(), t[1].name(), t[2]) for t in model.delayed_states]

@@ -43,8 +43,8 @@ class GenCasadiTest(unittest.TestCase):
                 test = float(delta[i]) <= tol
                 self.assertTrue(test)
 
-        this = A.get_function(group_arguments=False)
-        that = B.get_function(group_arguments=False)
+        this = A.dae_residual_function(group_arguments=False)
+        that = B.dae_residual_function(group_arguments=False)
 
         this_mx = this.mx_in()
         that_mx = that.mx_in()

@@ -1,7 +1,7 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
 from collections import namedtuple
 from . import ast
-from .tree import TreeWalker, flatten
+from .tree import TreeWalker, TreeListener, flatten
 
 import os
 import sys
@@ -17,9 +17,6 @@ logger = logging.getLogger("pymola")
 
 # TODO
 #  - Nested for loops
-#
-#  - DLL export
-#  - Metadata export
 
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
@@ -75,20 +72,38 @@ class CasadiSysModel:
         else:
             logger.warning("System is not balanced.  Number of states minus inputs is {}, number of equations is {}.".format(n_states - n_inputs, n_equations))
 
-    # TODO initial_residual, dae_residual, parameters, values, min, max
-
-    def get_function(self, group_arguments=True, replace_constants=True):
+    def simplify(self, replace_constants=True, replace_parameter_expressions=True):
         if replace_constants:
-            equations = ca.substitute(self.equations, self.constants, self.constant_values)
-            constants = []
-        else:
-            equations = self.equations
-            constants = self.constants
+            self.equations = ca.substitute(self.equations, self.constants, self.constant_values)
+            self.constants = []
+            self.constant_values = []
 
+        if replace_parameter_expressions:
+            composite_parameters, simple_parameters = [], []
+            composite_parameter_values, simple_parameter_values = [], []
+            for e, v in zip(self.parameters, self.parameter_values):
+                idx = v.is_constant() or v.is_symbolic()
+                (composite_parameters, simple_parameters)[idx].append(e)
+                (composite_parameter_values, simple_parameter_values)[idx].append(v)
+
+            self.equations = ca.substitute(self.equations, composite_parameters, composite_parameter_values)
+            self.parameters = simple_parameters
+            self.parameter_values = simple_parameter_values
+
+        # TODO detect and eliminate aliases
+        # TODO eliminate protected variables without min/max attribute
+    
+    def dae_residual_function(self, group_arguments=True):
         if group_arguments:
-            return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*constants), ca.vertcat(*self.parameters)], [ca.vertcat(*equations)])
+            return ca.Function('dae', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
         else:
-            return ca.Function('dae', [self.time] + self.states + self.der_states + self.alg_states + constants + self.parameters, equations)
+            return ca.Function('dae', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
+
+    def initial_residual_function(self, group_arguments=True, replace_constants=True):
+        # TODO
+        raise NotImplementedError
+
+    # TODO min, max, nominal: how?? as function of parameters.
 
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 
@@ -120,7 +135,7 @@ class ForLoop:
         self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, indices)
 
 
-class CasadiGenerator(NumpyGenerator):
+class CasadiGenerator(TreeListener):
 
     def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
@@ -175,6 +190,12 @@ class CasadiGenerator(NumpyGenerator):
         self.model.inputs = discard_empty([self.get_mx(e) for e in inputs])
         self.model.outputs = discard_empty([self.get_mx(e) for e in outputs])
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
+
+    def exitArray(self, tree):
+        self.src[tree] = [self.src[e] for e in tree.values]
+
+    def exitPrimary(self, tree):
+        self.src[tree] = ca.MX(tree.value)
 
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):
@@ -349,7 +370,7 @@ class CasadiGenerator(NumpyGenerator):
             return int(tree.value)
         if isinstance(tree, ast.ComponentRef):
             s = self.root.find_symbol(self.root.classes[self.class_name], tree)
-            assert s.type.name == 'Integer'
+            assert(s.type.name == 'Integer')
             return self.get_integer(s.value)
         if isinstance(tree, ast.Expression):
             # Make sure that the expression has been converted to MX by (re)visiting the
@@ -463,6 +484,5 @@ def generate(ast_tree, model_name):
     flat_tree = flatten(ast_tree, model_name)
 
     casadi_gen = CasadiGenerator(flat_tree, model_name)
-    casadi_gen.src.update(casadi_gen.src)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model
