@@ -75,6 +75,8 @@ class CasadiSysModel:
         else:
             logger.warning("System is not balanced.  Number of states minus inputs is {}, number of equations is {}.".format(n_states - n_inputs, n_equations))
 
+    # TODO initial_residual, dae_residual, parameters, values, min, max
+
     def get_function(self, group_arguments=True, replace_constants=True):
         if replace_constants:
             equations = ca.substitute(self.equations, self.constants, self.constant_values)

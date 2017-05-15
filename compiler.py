@@ -82,23 +82,26 @@ else:
         ext = 'so'
     else:
         ext = 'dll'
+    so_file_name = '{}.{}'.format(model_name, ext)
     try:
-        os.system("clang -shared {} -o {}.{}".format(file_name, model_name, ext))
+        os.system("clang -shared {} -o {}".format(file_name, so_file_name))
     except:
         raise
     finally:
         os.remove(file_name)
 
-    # Output metadata
-    import configparser
-    config = configparser.ConfigParser()
+    # Output metadata        
+    from collections import namedtuple
+    import shelve
+    with shelve.open(model_name, 'n') as db:
+        # Include a reference to the shared library
+        db['library'] = so_file_name
+        db['library_os'] = os.name
 
-    for key in ['states', 'der_states', 'alg_states', 'parameters', 'inputs', 'outputs']:
-        config[key] = {'{}[{},{}]'.format(x.name(), x.size1(), x.size2()) : '' for x in getattr(model, key)}
+        # Describe variables per category
+        Variable = namedtuple('Variable', ['name', 'aliases'])
+        for key in ['states', 'der_states', 'alg_states', 'parameters', 'inputs', 'outputs']:
+            db[key] = [Variable(x.name(), []) for x in getattr(model, key)]
 
-    config['parameter_values'] = {x.name() : y for x, y in zip(model.parameters, model.parameter_values)}
-
-    config['delayed_states'] = {t[0].name() : (t[1].name(), t[2]) for t in model.delayed_states}
-
-    with open('{}.ini'.format(model_name), 'w') as configfile:
-        config.write(configfile)
+        DelayedVariable = namedtuple('DelayedVariable', ['name', 'origin', 'delay'])
+        db['delayed_states'] = [DelayedVariable(t[0].name(), t[1].name(), t[2]) for t in model.delayed_states]
