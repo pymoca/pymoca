@@ -1,4 +1,4 @@
-#pymola
+# pymola
 
 A python/modelica based simulation environment.
 
@@ -8,7 +8,7 @@ A python/modelica based simulation environment.
 ## Examples
 [Simple IPython Notebook Example](test/Spring.ipynb)
 
-##Roadmap
+## Roadmap
 
 ### Completed Tasks
 
