@@ -194,7 +194,12 @@ def setup_package():
     # Disable compiler optimization.  We have to do this, as the default -O3 triggers a bug in clang causing an initialization failure.
     #os.environ['CFLAGS'] = '-O0'
     # Or alternatively, use gcc:
-    os.environ['CC'] = 'gcc-6'
+    
+    os.environ['CC'] = 'gcc'
+
+    # Without disabling this, it will reach a limit
+    # on tracking and disable tracking and then recompile, which is slow
+    os.environ['CFLAGS'] = '-fno-var-tracking-assignments'
 
     metadata = dict(
         name='pymola',
@@ -219,7 +224,9 @@ def setup_package():
         cmdclass={
             'antlr': AntlrBuildCommand,
         },
-        ext_modules=cythonize('pymola/generated/*.pyx', compiler_directives={'boundscheck': False, 'initializedcheck': False, 'language_level': 3})
+        ext_modules=cythonize('pymola/generated/*.pyx',
+            compiler_directives={'boundscheck': False,
+                'initializedcheck': False, 'language_level': 3})
     )
 
     full_version = get_version_info()[0]
