@@ -5,3 +5,5 @@ include LICENSE
 include README.md
 recursive-include doc *
 recursive-include java *
+include versioneer.py
+include pymola/_version.py

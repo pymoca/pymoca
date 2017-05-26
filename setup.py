@@ -22,6 +22,7 @@ from setuptools.command.build_ext import build_ext
 from setuptools import Command
 
 from Cython.Build import cythonize
+import versioneer
 
 MAJOR = 0
 MINOR = 1
@@ -93,87 +94,6 @@ def call_antlr4(arg):
             filename = os.path.join(root, item)
             shutil.move(filename, filename.replace('.py', '.pyx'))
 
-def git_version():
-    "Return the git revision as a string"
-    def _minimal_ext_cmd(cmd):
-        "construct minimal environment"
-        env = {}
-        for k in ['SYSTEMROOT', 'PATH']:
-            var = os.environ.get(k)
-            if var is not None:
-                env[k] = var
-        # LANGUAGE is used on win32
-        env['LANGUAGE'] = 'C'
-        env['LANG'] = 'C'
-        env['LC_ALL'] = 'C'
-        out = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            env=env).communicate()[0]
-        return out
-
-    try:
-        out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
-        git_revision = out.strip().decode('ascii')
-    except OSError:
-        git_revision = "Unknown"
-
-    return git_revision
-
-
-def get_version_info():
-    """
-    Adding the git rev number needs to be done inside write_version_py(),
-    otherwise the import of package.version messes up
-    the build under Python 3.
-    """
-    full_version = VERSION
-    if os.path.exists('.git'):
-        git_revision = git_version()
-    elif os.path.exists('pymola/version.py'):
-        # must be a source distribution, use existing version file
-        try:
-            from pymola.version import git_revision as git_revision
-        except ImportError:
-            raise ImportError("Unable to import git_revision. Try removing "
-                              "pymola/version.py and the build directory "
-                              "before building.")
-    else:
-        git_revision = "Unknown"
-
-    if not ISRELEASED:
-        full_version += '.git.' + git_revision[:7]
-
-    return full_version, git_revision
-
-
-def write_version_py(filename='pymola/version.py'):
-    """
-    Create a version.py file.
-    """
-    cnt = """
-# THIS FILE IS GENERATED FROM SETUP.PY
-short_version = '%(version)s'
-version = '%(version)s'
-full_version = '%(full_version)s'
-git_revision = '%(git_revision)s'
-release = %(isrelease)s
-
-if not release:
-    version = full_version
-"""
-    full_version, git_revision = get_version_info()
-
-    with open(filename, 'w') as fid:
-        try:
-            fid.write(cnt % {'version': VERSION,
-                             'full_version': full_version,
-                             'git_revision': git_revision,
-                             'isrelease': str(ISRELEASED)})
-        finally:
-            fid.close()
-
-
 def setup_package():
     """
     Setup the package.
@@ -182,9 +102,6 @@ def setup_package():
     old_path = os.getcwd()
     os.chdir(src_path)
     sys.path.insert(0, src_path)
-
-    # Rewrite the version file everytime
-    write_version_py()
 
     # Install requirements
     with open('requirements.txt', 'r') as req_file:
@@ -202,6 +119,7 @@ def setup_package():
     os.environ['CFLAGS'] = '-fno-var-tracking-assignments'
 
     metadata = dict(
+        version=versioneer.get_version(),
         name='pymola',
         maintainer="James Goppert",
         maintainer_email="james.goppert@gmail.com",
@@ -223,14 +141,12 @@ def setup_package():
         ),
         cmdclass={
             'antlr': AntlrBuildCommand,
+            'versioneer': versioneer.get_cmdclass(),  
         },
         ext_modules=cythonize('pymola/generated/*.pyx',
             compiler_directives={'boundscheck': False,
                 'initializedcheck': False, 'language_level': 3})
     )
-
-    full_version = get_version_info()[0]
-    metadata['version'] = full_version
 
     try:
         setup(**metadata)
