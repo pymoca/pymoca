@@ -7,3 +7,7 @@ recursive-include doc *
 recursive-include java *
 include versioneer.py
 include pymola/_version.py
+include pymola/Modelica.g4
+include pymola/generated/*.tokens
+include pymola/generated/*.pyx
+include pymola/generated/*.c
