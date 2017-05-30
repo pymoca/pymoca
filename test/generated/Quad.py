@@ -7,6 +7,7 @@ import sympy.physics.mechanics as mech
 from pymola.sympy_runtime import OdeModel
 from sympy import sin, cos, tan
 
+
 class Quad(OdeModel):
 
     def __init__(self):
@@ -14,14 +15,26 @@ class Quad(OdeModel):
         super(Quad, self).__init__()
 
         # states
-        x, y, z, R, Q, U, R, P, V, Q, P, W, phi, theta, psi, P, Q, R = mech.dynamicsymbols('x, y, z, R, Q, U, R, P, V, Q, P, W, phi, theta, psi, P, Q, R')
-        self.x = sympy.Matrix([x, y, z, R, Q, U, R, P, V, Q, P, W, phi, theta, psi, P, Q, R])
+        phi, theta, psi_, P, Q, R, x, y, z, U, V, W = mech.dynamicsymbols('phi, theta, psi_, P, Q, R, x, y, z, U, V, W')
+        self.x = sympy.Matrix([phi, theta, psi_, P, Q, R, x, y, z, U, V, W])
+        self.x0 = {
+            phi : 0,
+            theta : 0,
+            psi_ : 0,
+            P : 0,
+            Q : 0,
+            R : 0,
+            x : 0,
+            y : 0,
+            z : 0,
+            U : 0,
+            V : 0,
+            W : 0,
+            }
 
-        # inputs
-        self.u = sympy.Matrix([])
-
-        # outputs
-        self.y = sympy.Matrix([])
+        # variables
+        F_x, F_y, F_z, M_x, M_y, M_z = mech.dynamicsymbols('F_x, F_y, F_z, M_x, M_y, M_z')
+        self.v = sympy.Matrix([F_x, F_y, F_z, M_x, M_y, M_z])
 
         # constants
         self.c = sympy.Matrix([])
@@ -32,21 +45,25 @@ class Quad(OdeModel):
         J_x, J_y, J_z, m = sympy.symbols('J_x, J_y, J_z, m')
         self.p = sympy.Matrix([J_x, J_y, J_z, m])
         self.p0 = {
-            'J_x' : 1,
-            'J_y' : 1,
-            'J_z' : 1,
-            'm' : 1,
+            J_x : 1.0,
+            J_y : 1.0,
+            J_z : 1.0,
+            m : 1.0,
             }
 
-        # variables
-        F_y, F_z, F_x, M_z, M_y, M_x = sympy.symbols('F_y, F_z, F_x, M_z, M_y, M_x')
-        self.v = sympy.Matrix([F_y, F_z, F_x, M_z, M_y, M_x])
-      
+        # inputs
+        self.u = sympy.Matrix([])
+        self.u0 = {
+            }
+
+        # outputs
+        self.y = sympy.Matrix([])
+
         # equations
         self.eqs = [
             M_x - (- P - phi),
             M_y - (- Q - theta),
-            M_z - (- R - psi),
+            M_z - (- R - psi_),
             F_x - (- x),
             F_y - (- y),
             F_z - (- z),
@@ -58,11 +75,10 @@ class Quad(OdeModel):
             - m * U * (Q).diff(self.t) + m * V * (P).diff(self.t) + m * (W).diff(self.t) - (F_z),
             (phi).diff(self.t) - (P + Q * sin(phi) * tan(theta) + R * cos(phi) * tan(theta)),
             (theta).diff(self.t) - (Q * cos(phi) - R * sin(phi)),
-            cos(theta) * (psi).diff(self.t) - (Q * sin(phi) + R * cos(phi)),
+            cos(theta) * (psi_).diff(self.t) - (Q * sin(phi) + R * cos(phi)),
             (P).diff(self.t) - (M_x),
             (Q).diff(self.t) - (M_y),
             (R).diff(self.t) - (M_z),
             ]
 
         self.compute_fg()
-    

@@ -7,7 +7,6 @@ from __future__ import print_function, absolute_import, division, print_function
 import copy
 import json
 from enum import Enum
-
 from typing import List, Union, Dict
 
 
@@ -436,11 +435,11 @@ class Collection(Node):
             else:
                 return c
 
-    def find_symbol(self, c: Class, component_ref: ComponentRef) -> Symbol:
-        sym = c.symbols[component_ref.name]
+    def find_symbol(self, node, component_ref: ComponentRef) -> Symbol:
+        sym = node.symbols[component_ref.name]
         if len(component_ref.child) > 0:
-            c = self.find_class(sym.type)
-            return self.find_symbol(c, component_ref.child[0])
+            node = self.find_class(sym.type)
+            return self.find_symbol(node, component_ref.child[0])
         else:
             return sym
 

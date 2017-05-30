@@ -2,10 +2,11 @@
 
 from __future__ import print_function, division
 
+from typing import List
+
 import pylab as pl
 import scipy.integrate
 import sympy
-from typing import List
 
 
 # noinspection PyPep8Naming
@@ -56,23 +57,26 @@ class OdeModel(object):
                 D = self.g.jacobian(self.u)
         return A, B, C, D
 
-    def linearize(self, x0=None, u0=None):
+    def linearize(self, x0=None, u0=None, t0=0.0):
         ss = self.linearize_symbolic()
         ss_eval = []
         ss_subs = {}
-        ss_subs.update(self.p0)
-        ss_subs.update(self.c0)
         if x0 is None:
             # noinspection PyUnusedLocal
             x0 = self.x.subs(self.x0)[:]
         if u0 is None:
             # noinspection PyUnusedLocal
-            u0 = self.x.subs(self.u0)[:]
+            u0 = self.u.subs(self.u0)[:]
+        ss_subs.update({self.x[i]: x0[i] for i in range(len(self.x))})
+        ss_subs.update({self.u[i]: u0[i] for i in range(len(self.u))})
+        ss_subs.update(self.p0)
+        ss_subs.update(self.c0)
         for i in range(len(ss)):
             ss_eval += [pl.matrix(ss[i].subs(ss_subs)).astype(float)]
         return ss_eval
 
-    def simulate(self, x0: List[float]=None, u0: float=None, t0: float=0, tf: float=10, dt: float=0.01) -> dict:
+    def simulate(self, x0: List[float] = None, u0: float = None, t0: float = 0, tf: float = 10,
+                 dt: float = 0.01) -> dict:
         x_sym = sympy.DeferredVector('x')
         # noinspection PyUnusedLocal
         y_sym = sympy.DeferredVector('y')

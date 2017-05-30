@@ -2,12 +2,16 @@ from __future__ import print_function, absolute_import, division, print_function
 
 import copy
 import os
+from typing import List
 
 import jinja2
 
+from . import ast
 from .tree import TreeListener, TreeWalker, flatten
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
+# noinspection PyUnresolvedReferences
+BUILTINS = dir(__builtins__) + ['psi']
 
 
 class SympyGenerator(TreeListener):
@@ -15,7 +19,7 @@ class SympyGenerator(TreeListener):
         super(SympyGenerator, self).__init__()
         self.src = {}
 
-    def exitFile(self, tree):
+    def exitFile(self, tree: ast.File):
         d = {'classes': []}
         for key in sorted(tree.classes.keys()):
             d['classes'] += [self.src[tree.classes[key]]]
@@ -37,15 +41,18 @@ from sympy import sin, cos, tan
             'render': self,
         })
 
-    def exitClass(self, tree):
+    def exitClass(self, tree: ast.Class):
         states = []
         inputs = []
         outputs = []
         constants = []
         parameters = []
         variables = []
-        symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
+
+        symbols = sorted(tree.symbols.values(), key=lambda x: x.order)  # type: List[ast.Symbol]
+
         for s in symbols:
+
             if len(s.prefixes) == 0:
                 variables += [s]
             else:
@@ -147,7 +154,7 @@ class {{tree.name}}(OdeModel):
 ''')
         self.src[tree] = template.render(d)
 
-    def exitExpression(self, tree):
+    def exitExpression(self, tree: ast.Expression):
         op = str(tree.operator)
         n_operands = len(tree.operands)
         if op == 'der':
@@ -163,29 +170,43 @@ class {{tree.name}}(OdeModel):
                 op=op,
                 expr=self.src[tree.operands[0]])
         else:
-            src = "({operator:s} ".format(**tree.__dict__)
-            for operand in tree.operands:
-                src += ' ' + self.src[operand]
-            src += ")"
+            operand_src = ','.join([self.src[o] for o in tree.operands])
+            src = "{tree.operator.name:s}({operand_src:s})".format(**locals())
         self.src[tree] = src
 
-    def exitPrimary(self, tree):
+    def exitPrimary(self, tree: ast.Primary):
         val = str(tree.value)
         self.src[tree] = "{:s}".format(val)
 
-    def exitComponentRef(self, tree):
-        self.src[tree] = "{name:s}".format(name=tree.name.replace('.', '__'))
+    def exitComponentRef(self, tree: ast.ComponentRef):
 
-    def exitSymbol(self, tree):
-        self.src[tree] = "{name:s}".format(name=tree.name.replace('.', '__'))
+        # prevent name clash with builtins
+        name = tree.name.replace('.', '__')
+        while name in BUILTINS:
+            name = name + '_'
+        self.src[tree] = name
 
-    def exitEquation(self, tree):
+    def exitSymbol(self, tree: ast.Symbol):
+        # prevent name clash with builtins
+        name = tree.name.replace('.', '__')
+        while name in BUILTINS:
+            name = name + '_'
+
+        self.src[tree] = name
+
+    def exitEquation(self, tree: ast.Equation):
         self.src[tree] = "{left:s} - ({right:s})".format(
             left=self.src[tree.left],
             right=self.src[tree.right])
 
 
-def generate(ast_tree, model_name):
+def generate(ast_tree: ast.Collection, model_name: str):
+    """
+    
+    :param ast_tree: AST to generate from
+    :param model_name: class to generate
+    :return: sympy source code for model
+    """
     ast_tree_new = copy.deepcopy(ast_tree)
     ast_walker = TreeWalker()
     flat_tree = flatten(ast_tree_new, model_name)

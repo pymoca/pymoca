@@ -9,7 +9,6 @@ import copy
 import logging
 import sys
 from collections import OrderedDict
-
 from typing import Union
 
 from . import ast
@@ -385,7 +384,6 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     # for f in function_set:
     #     if f not in flat_file.classes:
     #         flat_file.classes.update(flatten(root, f, instance_name).classes)
-
     return flat_class
 
 
@@ -449,14 +447,14 @@ class ComponentRefFlattener(TreeListener):
     it also locates all symbols and determines which are states (
     one of the equations contains a derivative of the symbol)
     """
+
     def __init__(self, root: ast.Collection, container: ast.Class, instance_prefix: str):
         self.root = root
         self.container = container
         self.instance_prefix = instance_prefix
         self.depth = 0
         self.cutoff_depth = sys.maxsize
-
-        super(ComponentRefFlattener, self).__init__()
+        super().__init__()
 
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
@@ -492,15 +490,6 @@ class ComponentRefFlattener(TreeListener):
         if self.depth < self.cutoff_depth:
             self.cutoff_depth = sys.maxsize
 
-    def exitExpression(self, tree: ast.Expression):
-        """
-        When exiting an expression, check if it is a derivative, if it is
-        put state prefix on symbol
-        """
-        if tree.operator == 'der':
-            s = self.root.find_symbol(self.container, tree.operands[0])
-            s.prefixes.append('state')
-
 
 def flatten_component_refs(
         root: ast.Collection, container: ast.Class,
@@ -523,16 +512,48 @@ def flatten_component_refs(
     return expression_copy
 
 
+class StateAnnotator(TreeListener):
+    """
+    This finds all variables that are differentiated and annotates them with the state prefix
+    """
+
+    def __init__(self, root: ast.Collection, node: ast.Node):
+        self.root = root
+        self.node = node
+        super().__init__()
+
+    def exitExpression(self, tree: ast.Expression):
+        """
+        When exiting an expression, check if it is a derivative, if it is
+        put state prefix on symbol
+        """
+        if tree.operator == 'der':
+            s = self.root.find_symbol(self.node, tree.operands[0])
+            if 'state' not in s.prefixes:
+                s.prefixes.append('state')
+
+
+def annotate_states(root: ast.Collection, node: ast.Node) -> None:
+    """
+    TODO: document
+    :param root: collection for performing symbol lookup etc.
+    :param node: node of tree to walk
+    :return: 
+    """
+    w = TreeWalker()
+    w.walk(StateAnnotator(root, node), node)
+
+
 class FunctionPuller(TreeListener):
     """
     Listener to extract functions
     """
+
     def __init__(self, instance_prefix: str, root, function_set):
         self.instance_prefix = instance_prefix
         self.root = root
         self.function_set = function_set
-
-        super(FunctionPuller, self).__init__()
+        super().__init__()
 
     def exitExpression(self, tree: ast.Expression):
         if isinstance(tree.operator, ast.ComponentRef) and \
@@ -585,6 +606,9 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
             pass
         else:
             del flat_class.symbols[i]
+
+    # annotate states
+    annotate_states(root, flat_class)
 
     # flat file
     flat_file = ast.File()

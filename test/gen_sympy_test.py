@@ -79,6 +79,22 @@ class GenSympyTest(unittest.TestCase):
         res = e.simulate()
         self.flush()
 
+    def test_quad(self):
+        with open(os.path.join(TEST_DIR, 'Quad.mo'), 'r') as f:
+            txt = f.read()
+        # noinspection PyUnusedLocal
+        ast_tree = parser.parse(txt)
+        text = gen_sympy.generate(ast_tree, 'Quad')
+        with open(os.path.join(TEST_DIR, 'generated/Quad.py'), 'w') as f:
+            f.write(text)
+        from test.generated.Quad import Quad as Quad
+        e = Quad()
+        e.linearize_symbolic()
+        e.linearize()
+        # noinspection PyUnusedLocal
+        res = e.simulate()
+        self.flush()
+
     @unittest.skip
     def test_connector(self):
         with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
