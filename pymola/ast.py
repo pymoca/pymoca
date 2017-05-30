@@ -6,10 +6,31 @@ from __future__ import print_function, absolute_import, division, print_function
 
 import copy
 import json
-import sys
-from collections import OrderedDict
+from enum import Enum
 
-VALIDATE_AST = True
+from typing import List, Union, Dict
+
+
+class Visibility(Enum):
+    PRIVATE = 0, 'private'
+    PROTECTED = 1, 'protected'
+    PUBLIC = 2, 'public'
+
+    def __new__(cls, value, name):
+        member = object.__new__(cls)
+        member._value_ = value
+        member.fullname = name
+        return member
+
+    def __int__(self):
+        return self.value
+
+    def __str__(self):
+        return self.fullname
+
+    def __lt__(self, other):
+        return self.value < other.value
+
 
 nan = float('nan')
 
@@ -34,301 +55,297 @@ Root Class
 """
 
 
-def to_json(var):
-    if isinstance(var, list):
-        res = [to_json(item) for item in var]
-    elif isinstance(var, dict):
-        res = {key: to_json(var[key]) for key in var.keys()}
-    elif isinstance(var, Node):
-        res = {key: to_json(var.__dict__[key]) for key in var.__dict__.keys()}
-    else:
-        res = var
-    return res
-
-# Helper function to compare component references to each other without converting to JSON
-def compare_component_ref(this, other):
-    if len(this.child) != len(other.child):
-        return False
-
-    if this.child and other.child:
-        return compare_component_ref(this.child[0], other.child[0])
-
-    return this.__dict__ == other.__dict__
-
-
-class Field(object):
-    def __init__(self, types, default=None):
-        if type(types) is type or not hasattr(types, '__iter__'):
-            types = [types]
-        types = list(types)
-        if sys.version_info < (3,):
-            if str in types:
-                types += [unicode]
-        self.types = types
-        self.default = default
-
-    def validate(self, name, key, val, throw=True):
-        if not type(val) in self.types:
-            if throw:
-                raise IOError('{:s}.{:s} requires types ({:s}), but got {:s}'.format(
-                    name, key, ','.join([t.__name__ for t in self.types]), type(val).__name__))
-            else:
-                return False
-        else:
-            return True
-
-
-class FieldList(list):
-    def __init__(self, types, default=[]):
-        super(FieldList, self).__init__()
-        if type(types) is type or not hasattr(types, '__iter__'):
-            types = [types]
-        types = list(types)
-        if sys.version_info < (3,):
-            if str in types:
-                types += [unicode]
-        self.types = types
-        self.default = default
-
-    def validate(self, name, key, val_list, throw=True):
-        if type(val_list) != list:
-            if throw:
-                raise IOError('{:s}.{:s} requires types {:s}, but got {:s}'.format(
-                name, key, 'list', type(val_list).__name__))
-            else:
-                return False
-
-        for val in val_list:
-            if not type(val) in self.types:
-                if throw:
-                    raise IOError('{:s}.{:s} requires list items of type ({:s}), but got {:s}'.format(
-                        name, key, ','.join([t.__name__ for t in self.types]), type(val).__name__))
-                else:
-                    return False
-            else:
-                return True
-
-    def __add__(self, other):
-        if other in self.types:
-            super(FieldList, self).__add__(other)
-        else:
-            raise IOError('List requires elements of type', self.types)
-
-
-# TODO get dict validation working
-class FieldDict(OrderedDict):
-    def __init__(self, types, default):
-        super(FieldDict, self).__init__()
-        if type(types) is type or not hasattr(types, '__iter__'):
-            types = [types]
-        types = list(types)
-        if sys.version_info < (3,):
-            if str in types:
-                types += [unicode]
-        self.types = types
-        self.default = default
-
-    def validate(self, name, key, val_dict, throw=True):
-        if type(val_dict) != dict:
-            if throw:
-                raise IOError('{:s}.{:s} requires types ({:s}), but got {:s}'.format(
-                name, key, 'dict', type(val).__name__))
-            else:
-                return False
-
-        for val in val_dict.values():
-            if not type(val) in self.types:
-                if throw:
-                    raise IOError('{:s}.{:s} requires list items of type ({:s}), but got {:s}'.format(
-                        name, key, ','.join([t.__name__ for t in self.types]), type(val).__name__))
-                else:
-                    return False
-            else:
-                return True
-
-    def __setitem__(self, key, value):
-        if VALIDATE_AST:
-            if not type(value) in self.types:
-                raise IOError('{:s} requires dict values of type ({:s}), but got {:s}'.format(
-                    key, ','.join([t.__name__ for t in self.types]), type(value).__name__))
-        super(FieldDict, self).__setitem__(key, value)
-
-
 class Node(object):
-    ast_spec = {}
-
     def __init__(self, **kwargs):
-        for key in self.ast_spec.keys():
-            # make sure we don't share ast_spec default data by using deep copy
-            field_type = type(self.ast_spec[key])
-            default = self.ast_spec[key].default
-            self.__dict__[key] = copy.deepcopy(default)
+        self.set_args(**kwargs)
+
+    def set_args(self, **kwargs):
         for key in kwargs.keys():
-            # types = self.ast_spec[key].types
-            val = kwargs[key]
-            self.set_field(key, val)
-
-    def set_field(self, key, value):
-        if VALIDATE_AST:
-            name = self.__class__.__name__
-            if key not in self.ast_spec.keys():
-                raise IOError('{:s} not a child of {:s}'.format(key, name))
-            self.ast_spec[key].validate(name, key, value)
-        self.__dict__[key] = value
-
-    def __setattr__(self, key, value):
-        self.set_field(key, value)
+            if key not in self.__dict__.keys():
+                raise KeyError('{:s} not valid arg'.format(key))
+            self.__dict__[key] = kwargs[key]
 
     def __repr__(self):
-        return json.dumps(to_json(self), indent=2, sort_keys=True)
+        return json.dumps(self.to_json(self), indent=2, sort_keys=True)
+
+    @classmethod
+    def to_json(cls, var):
+        if isinstance(var, list):
+            res = [cls.to_json(item) for item in var]
+        elif isinstance(var, dict):
+            res = {key: cls.to_json(var[key]) for key in var.keys()}
+        elif isinstance(var, Node):
+            res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()}
+        elif isinstance(var, Visibility):
+            res = str(var)
+        else:
+            res = var
+        return res
 
     __str__ = __repr__
 
 
 class Primary(Node):
     def __init__(self, **kwargs):
-        super(Primary, self).__init__(**kwargs)
+        self.value = None  # type: Union[bool, float, int, str, type(None)]
+        super().__init__(**kwargs)
 
 
 class Array(Node):
     def __init__(self, **kwargs):
-        super(Array, self).__init__(**kwargs)
+        self.values = []  # type: List[Union[Expression, Primary, ComponentRef, Array]]
+        super().__init__(**kwargs)
 
 
 class Slice(Node):
     def __init__(self, **kwargs):
-        super(Slice, self).__init__(**kwargs)
+        self.start = Primary(value=0)  # type: Union[Expression, Primary, ComponentRef]
+        self.stop = Primary(value=-1)  # type: Union[Expression, Primary, ComponentRef]
+        self.step = Primary(value=1)  # type: Union[Expression, Primary, ComponentRef]
+        super().__init__(**kwargs)
 
 
 class ComponentRef(Node):
     def __init__(self, **kwargs):
-        super(ComponentRef, self).__init__(**kwargs)
+        self.name = ''  # type: str
+        self.indices = []  # type: List[Union[Expression, Slice, Primary, ComponentRef]]
+        self.child = []  # type: List[ComponentRef]
+        super().__init__(**kwargs)
 
 
 class Expression(Node):
     def __init__(self, **kwargs):
-        super(Expression, self).__init__(**kwargs)
+        self.operator = None  # type: Union[str, ComponentRef]
+        self.operands = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        super().__init__(**kwargs)
 
 
 class IfExpression(Node):
     def __init__(self, **kwargs):
-        super(IfExpression, self).__init__(**kwargs)
+        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.expressions = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        super().__init__(**kwargs)
 
 
 class Equation(Node):
     def __init__(self, **kwargs):
-        super(Equation, self).__init__(**kwargs)
+        self.left = None  # type: Union[Expression, Primary, ComponentRef]
+        self.right = None  # type: Union[Expression, Primary, ComponentRef]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
 
 
 class IfEquation(Node):
     def __init__(self, **kwargs):
-        super(IfEquation, self).__init__(**kwargs)
+        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.equations = []  # type: List[Union[Expression, ForEquation, ConnectClause, IfEquation]]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
 
 
 class ForIndex(Node):
     def __init__(self, **kwargs):
-        super(ForIndex, self).__init__(**kwargs)
+        self.name = ''  # type: str
+        self.expression = None  # type: Union[Expression, Primary, Slice]
+        super().__init__(**kwargs)
 
 
 class ForEquation(Node):
     def __init__(self, **kwargs):
-        super(ForEquation, self).__init__(**kwargs)
+        self.indices = []  # type: List[ForIndex]
+        self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
+        self.comment = None  # type: str
+        super().__init__(**kwargs)
 
 
 class ConnectClause(Node):
     def __init__(self, **kwargs):
-        super(ConnectClause, self).__init__(**kwargs)
+        self.left = ComponentRef()  # type: ComponentRef
+        self.right = ComponentRef()  # type: ComponentRef
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
 
 
 class AssignmentStatement(Node):
     def __init__(self, **kwargs):
-        super(AssignmentStatement, self).__init__(**kwargs)
+        self.left = []  # type: List[ComponentRef]
+        self.right = None  # type: Union[Expression, IfExpression, Primary, ComponentRef]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
 
 
 class IfStatement(Node):
     def __init__(self, **kwargs):
-        super(IfStatement, self).__init__(**kwargs)
+        self.expressions = []  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
 
 
 class ForStatement(Node):
     def __init__(self, **kwargs):
-        super(ForStatement, self).__init__(**kwargs)
+        self.indices = []  # type: List[ForIndex]
+        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
 
 
 class Symbol(Node):
-    def __init__(self, **kwargs):
-        super(Symbol, self).__init__(**kwargs)
-
+    """
+    A mathematical variable or state of the model
+    """
     ATTRIBUTES = ['min', 'max', 'start', 'fixed', 'nominal']
+
+    def __init__(self, **kwargs):
+        self.name = ''  # type: str
+        self.type = ComponentRef()  # type: ComponentRef
+        self.prefixes = []  # type: List[str]
+        self.redeclare = False  # type: bool
+        self.final = False  # type: bool
+        self.inner = False  # type: bool
+        self.outer = False  # type: bool
+        self.dimensions = [Primary(value=1)]  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.comment = ''  # type: str
+        # params start value is 0 by default from Modelica spec
+        self.start = Primary(value=0)  # type: Union[Expression, Primary, ComponentRef, Array]
+        self.min = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
+        self.max = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
+        self.nominal = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
+        self.value = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
+        self.fixed = Primary(value=False)  # type: Primary
+        self.id = 0  # type: int
+        self.order = 0  # type: int
+        self.visibility = Visibility.PRIVATE  # type: Visibility
+        self.class_modification = None  # type: ClassModification
+        super().__init__(**kwargs)
 
 
 class ComponentClause(Node):
     def __init__(self, **kwargs):
-        super(ComponentClause, self).__init__(**kwargs)
+        self.prefixes = []  # type: List[str]
+        self.type = ComponentRef()  # type: ComponentRef
+        self.dimensions = [Primary(value=1)]  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.comment = []  # type: List[str]
+        self.symbol_list = []  # type: List[Symbol]
+        super().__init__(**kwargs)
 
 
 class EquationSection(Node):
     def __init__(self, **kwargs):
-        super(EquationSection, self).__init__(**kwargs)
+        self.initial = False  # type: bool
+        self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
+        super().__init__(**kwargs)
 
 
 class AlgorithmSection(Node):
     def __init__(self, **kwargs):
-        super(AlgorithmSection, self).__init__(**kwargs)
+        self.initial = False  # type: bool
+        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        super().__init__(**kwargs)
 
 
 class ImportAsClause(Node):
     def __init__(self, **kwargs):
-        super(ImportAsClause, self).__init__(**kwargs)
+        self.component = ComponentRef()  # type: ComponentRef
+        self.name = ''  # type: str
+        super().__init__(**kwargs)
 
 
 class ImportFromClause(Node):
     def __init__(self, **kwargs):
-        super(ImportFromClause, self).__init__(**kwargs)
+        self.component = ComponentRef()  # type: ComponentRef
+        self.symbols = []  # type: List[str]
+        super().__init__(**kwargs)
 
 
 class ElementModification(Node):
+    # TODO: Check if ComponentRef modifiers are handled correctly. For example,
+    # check HomotopicLinear which extends PartialHomotopic with the modifier
+    # "H(min = H_b)".
     def __init__(self, **kwargs):
-        super(ElementModification, self).__init__(**kwargs)
+        self.component = ComponentRef()  # type: Union[ComponentRef]
+        self.modifications = []  # type: List[Union[Primary, Expression, ClassModification, Array, ComponentRef]]
+        super().__init__(**kwargs)
 
 
 class ShortClassDefinition(Node):
     def __init__(self, **kwargs):
-        super(ShortClassDefinition, self).__init__(**kwargs)
+        self.name = ''  # type: str
+        self.type = ''  # type: str
+        self.component = ComponentRef()  # type: ComponentRef
+        self.class_modification = ClassModification()  # type: ClassModification
+        super().__init__(**kwargs)
 
 
 class ElementReplaceable(Node):
     def __init__(self, **kwargs):
-        super(ElementReplaceable, self).__init__(**kwargs)
+        # TODO, add fields ?
+        super().__init__(**kwargs)
 
 
 class ClassModification(Node):
     def __init__(self, **kwargs):
-        super(ClassModification, self).__init__(**kwargs)
+        self.arguments = []  # type: List[Union[ElementModification, ComponentClause, ShortClassDefinition]]
+        super().__init__(**kwargs)
 
 
 class ExtendsClause(Node):
     def __init__(self, **kwargs):
-        super(ExtendsClause, self).__init__(**kwargs)
+        self.component = None  # type: ComponentRef
+        self.class_modification = None  # type: ClassModification
+        self.visibility = Visibility.PRIVATE  # type: Visibility
+        super().__init__(**kwargs)
 
 
 class Class(Node):
     def __init__(self, **kwargs):
-        super(Class, self).__init__(**kwargs)
+        self.name = None  # type: str
+        self.imports = []  # type: List[Union[ImportAsClause, ImportFromClause]]
+        self.extends = []  # type: List[ExtendsClause]
+        self.encapsulated = False  # type: bool
+        self.partial = False  # type: bool
+        self.final = False  # type: bool
+        self.type = ''  # type: str
+        self.comment = ''  # type: str
+        self.symbols = {}  # type: Dict[str, Symbol]
+        self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
+        self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
+        self.initial_statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.within = []  # type: List[ComponentRef]
+        super().__init__(**kwargs)
 
 
 class File(Node):
+    """
+    Represents a .mo file for use in pre-processing before flattening to a single class.
+    """
+
     def __init__(self, **kwargs):
-        super(File, self).__init__(**kwargs)
+        self.within = []  # type: List[ComponentRef]
+        self.classes = {}  # type: Dict[str, Class]
+        super().__init__(**kwargs)
 
-    def find_class(self, component_ref):
-        for c in self.classes:
-            if not component_ref.child:
-                return self.classes[component_ref.name]
+    def find_class(self, component_ref: ComponentRef) -> Class:
+        """
+        Find the class that a component is defined in
+        :param component_ref: component reference
+        :return: the class that contains the ref
+        """
+        name = component_ref.name
+        for c_name in self.classes.keys():
+            c = self.classes[c_name]
+            if component_ref.name in c.symbols.keys():
+                return c
+        raise KeyError('symbol {:s} not found'.format(name))
 
-        return self.classes[component_ref.name]
-
-    def find_symbol(self, c, component_ref):
+    def find_symbol(self, c: Class, component_ref: ComponentRef) -> Symbol:
+        """
+        Given a component ref, lookup the symbol in the given class
+        :param c: class to look in
+        :param component_ref: component reference
+        :return: the symbol
+        """
         sym = c.symbols[component_ref.name]
         if len(component_ref.child) > 0:
             c = self.find_class(sym.type)
@@ -338,13 +355,23 @@ class File(Node):
 
 
 class Collection(Node):
+    """
+    A list of modelica files, used in pre-processing packages etc. before flattening
+    to a single class.
+    """
+
     def __init__(self, **kwargs):
-        super(Collection, self).__init__(**kwargs)
+        self.files = []  # type: List[File]
+        super().__init__(**kwargs)
 
     def extend(self, other):
         self.files.extend(other.files)
 
-    def find_class(self, component_ref, within=[]):
+    def find_class(self, component_ref: Union[ComponentRef, str], within: list = None):
+
+        if within is None:
+            within = []
+
         if isinstance(component_ref, str):
             assert component_ref.find('.') == -1
             component_ref = ComponentRef(name=component_ref)
@@ -384,7 +411,9 @@ class Collection(Node):
             else:
                 extended_within = c_within
 
-            c = next((f.classes[class_name] for f in self.files if f.within and compare_component_ref(f.within[0], extended_within) and class_name in f.classes), None)
+            c = next((f.classes[class_name] for f in self.files if
+                      f.within and compare_component_ref(f.within[0], extended_within) and class_name in f.classes),
+                     None)
 
             # TODO: This could probably be cleaner if we do nested classes.
             # Then we could traverse up the tree until we found a match,
@@ -392,7 +421,8 @@ class Collection(Node):
             # the passed-in 'within').
             if c is None:
                 # Try again with root node lookup instead of relative
-                c = next((f.classes[class_name] for f in self.files if f.within and compare_component_ref(f.within[0], c_within) and class_name in f.classes), None)
+                c = next((f.classes[class_name] for f in self.files if
+                          f.within and compare_component_ref(f.within[0], c_within) and class_name in f.classes), None)
                 if c is None:
                     # TODO: How long do we traverse? Do we somehow force a stop at Real, Boolean, etc?
                     #       Now a force is stopped on anything in the Modelica library.
@@ -406,9 +436,7 @@ class Collection(Node):
             else:
                 return c
 
-
-
-    def find_symbol(self, c, component_ref):
+    def find_symbol(self, c: Class, component_ref: ComponentRef) -> Symbol:
         sym = c.symbols[component_ref.name]
         if len(component_ref.child) > 0:
             c = self.find_class(sym.type)
@@ -417,198 +445,17 @@ class Collection(Node):
             return sym
 
 
-VISIBILITY_PRIVATE = 0
-VISIBILITY_PROTECTED = 1
-VISIBILITY_PUBLIC = 2
+def compare_component_ref(this: ComponentRef, other: ComponentRef) -> bool:
+    """
+    Helper function to compare component references to each other without converting to JSON
+    :param this: 
+    :param other: 
+    :return: boolean, true if match
+    """
+    if len(this.child) != len(other.child):
+        return False
 
+    if this.child and other.child:
+        return compare_component_ref(this.child[0], other.child[0])
 
-# Here we define the AST specifications for all nodes
-# these are static variables shared between class instances
-# and are defined here to allow a class to list itself in
-# the allowed field types, this self referencing is not
-# possible when initially declaring a class in python
-
-Primary.ast_spec = {
-    'value' : Field([bool, float, int, str, type(None)]),
-}
-
-Array.ast_spec = {
-    'values' : FieldList([Expression, Primary, ComponentRef, Array]),
-}
-
-Slice.ast_spec = {
-    'start' : Field([Expression, Primary, ComponentRef], Primary(value=0)),
-    'stop' : Field([Expression, Primary, ComponentRef], Primary(value=-1)),
-    'step' : Field([Expression, Primary, ComponentRef], Primary(value=1)),
-}
-
-ComponentRef.ast_spec = {
-    'name' : Field([str]),
-    'indices' : FieldList([Expression, Slice, Primary, ComponentRef], []),
-    'child' : FieldList([ComponentRef], []),
-}
-
-Expression.ast_spec = {
-    'operator' : Field([str, ComponentRef]),
-    'operands' : FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
-}
-
-IfExpression.ast_spec = {
-    'conditions' : FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
-    'expressions' : FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
-}
-
-Equation.ast_spec = {
-    'left' : Field([Expression, Primary, ComponentRef]),
-    'right' : Field([Expression, Primary, ComponentRef]),
-    'comment' : Field([str]),
-}
-
-IfEquation.ast_spec = {
-    'conditions' : FieldList([Expression, Primary, ComponentRef]),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause, IfEquation], []),
-    'comment' : Field([str]),
-}
-
-ForIndex.ast_spec = {
-    'name' : Field([str]),
-    'expression' : Field([Expression, Primary, Slice]),
-}
-
-ForEquation.ast_spec = {
-    'indices' : FieldList([ForIndex]),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
-    'comment' : Field([str]),
-}
-
-ConnectClause.ast_spec = {
-    'left' : Field([ComponentRef]),
-    'right' : Field([ComponentRef]),
-    'comment' : Field([str]),
-}
-
-AssignmentStatement.ast_spec = {
-    'left' : FieldList([ComponentRef]),
-    'right' : Field([Expression, IfExpression, Primary, ComponentRef]),
-    'comment' : Field([str]),
-}
-
-IfStatement.ast_spec = {
-    'expressions' : FieldList([Expression, Primary, ComponentRef]),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'comment' : Field([str]),
-}
-
-ForStatement.ast_spec = {
-    'indices' : FieldList([ForIndex]),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'comment' : Field([str]),
-}
-
-Symbol.ast_spec = {
-    'name' : Field([str], ''),
-    'type' : Field([ComponentRef], ComponentRef()),
-    'prefixes' : FieldList([str], []),
-    'redeclare' : Field([bool], False),
-    'final' : Field([bool], False),
-    'inner' : Field([bool], False),
-    'outer' : Field([bool], False),
-    'dimensions' : FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
-    'comment' : Field([str], ''),
-    'start' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'min' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'max' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'nominal' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'value' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'fixed' : Field([Primary], False),
-    'id' : Field([int], 0),
-    'order' : Field([int], 0),
-    'visibility' : Field(int, VISIBILITY_PRIVATE),
-    'class_modification' : Field(ClassModification),
-}
-
-ComponentClause.ast_spec = {
-    'prefixes' : FieldList([str], []),
-    'type' : Field([ComponentRef], ComponentRef()),
-    'dimensions' : FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
-    'comment' : FieldList([str], []),
-    'symbol_list' : FieldList([Symbol], []),
-}
-
-EquationSection.ast_spec = {
-    'initial' : Field([bool], False),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
-}
-
-AlgorithmSection.ast_spec = {
-    'initial' : Field([bool], False),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
-}
-
-ImportAsClause.ast_spec = {
-    'component' : Field([ComponentRef]),
-    'name' : Field([str]),
-}
-
-ImportFromClause.ast_spec = {
-    'component' : Field([ComponentRef]),
-    'symbols' : FieldList([str]),
-}
-
-# TODO: Check if ComponentRef modifiers are handled correctly. For example,
-# check HomotopicLinear which extends PartialHomotopic with the modifier
-# "H(min = H_b)".
-ElementModification.ast_spec = {
-    'component': Field([ComponentRef], [ComponentRef()]),
-    'modifications' : FieldList([Primary, Expression, ClassModification, Array, ComponentRef], []),
-}
-
-ShortClassDefinition.ast_spec = {
-    'name' : Field(str),
-    'type' : Field(str, ''),
-    'component' : Field(ComponentRef),
-    'class_modification' : Field([ClassModification]),
-}
-
-ClassModification.ast_spec = {
-    'arguments' : FieldList([ElementModification, ComponentClause, ShortClassDefinition], []),
-}
-
-ExtendsClause.ast_spec = {
-    'component' : Field([ComponentRef]),
-    'class_modification' : Field([ClassModification]),
-    'visibility': Field(int, VISIBILITY_PRIVATE),
-}
-
-Class.ast_spec = {
-    'name' : Field(str),
-    'imports' : FieldList([ImportAsClause, ImportFromClause], []),
-    'extends' : FieldList([ExtendsClause], []),
-    'encapsulated' : Field([bool], False),
-    'partial' : Field([bool], False),
-    'final' : Field([bool], False),
-    'type' : Field([str], ''),
-    'comment' : Field(str, ''),
-    'symbols' : FieldDict([Symbol], {}),
-    'initial_equations' : FieldList([Equation, ForEquation], []),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
-    'initial_statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'within' : FieldList([ComponentRef], []),
-}
-
-File.ast_spec = {
-    'within' : FieldList([ComponentRef], []),
-    'classes' : FieldDict([Class], {}),
-}
-
-# TODO: The Modelica specification (v3.3, Ch. 4) seems to suggest that
-# everything can/should be stored in one single (root) class, that can contain
-# other classes (each in turn also storing classes). That would make both File
-# and Collection types obsolete, but could make processing certain files (e.g.
-# Package.mo) before others important. For example, a 'within' statement would
-# only make sense if that package actually already exists in our tree of
-# classes, otherwise we would have nowhere to add the classes in that file.
-Collection.ast_spec = {
-    'files': FieldList([File], []),
-}
+    return this.__dict__ == other.__dict__

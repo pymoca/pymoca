@@ -1,16 +1,15 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
-from collections import namedtuple
-from . import ast
-from .tree import TreeWalker, TreeListener, flatten
 
-import os
-import sys
-import copy
-import logging
 import itertools
+import logging
+from collections import namedtuple
 
 import casadi as ca
 import numpy as np
+from typing import Union
+
+from . import ast
+from .tree import TreeWalker, TreeListener, flatten
 
 logger = logging.getLogger("pymola")
 
@@ -31,12 +30,11 @@ OP_MAP = {'*': "__mul__",
           "max": "fmax",
           "abs": "fabs"}
 
-
 VariableMetadata = namedtuple('VariableMetadata', ['min', 'max', 'nominal'])
 
 
+# noinspection PyUnresolvedReferences
 class CasadiSysModel:
-
     def __init__(self):
         self.states = []
         self.state_metadata = []
@@ -75,7 +73,10 @@ class CasadiSysModel:
         if n_states - n_inputs == n_equations:
             logger.info("System is balanced.")
         else:
-            logger.warning("System is not balanced.  Number of states minus inputs is {}, number of equations is {}.".format(n_states - n_inputs, n_equations))
+            logger.warning(
+                "System is not balanced.  "
+                "Number of states minus inputs is {}, number of equations is {}.".format(
+                    n_states - n_inputs, n_equations))
 
     def simplify(self, replace_constants=True, replace_parameter_expressions=True):
         if replace_constants:
@@ -89,37 +90,47 @@ class CasadiSysModel:
             for e, v in zip(self.parameters, self.parameter_values):
                 is_composite = isinstance(v, ca.MX) and not v.is_constant()
                 (simple_parameters, composite_parameters)[is_composite].append(e)
-                (simple_parameter_values, composite_parameter_values)[is_composite].append(float(v) if not is_composite and isinstance(v, ca.MX) else v)
+                (simple_parameter_values, composite_parameter_values)[is_composite].append(
+                    float(v) if not is_composite and isinstance(v, ca.MX) else v)
 
             self.equations = ca.substitute(self.equations, composite_parameters, composite_parameter_values)
             self.parameters = simple_parameters
             self.parameter_values = simple_parameter_values
 
-        # TODO detect and eliminate aliases
-        # TODO eliminate protected variables without min/max attribute
-    
+            # TODO detect and eliminate aliases
+            # TODO eliminate protected variables without min/max attribute
+
     def dae_residual_function(self, group_arguments=True):
         if group_arguments:
-            return ca.Function('dae_residual', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states), ca.vertcat(*self.alg_states), ca.vertcat(*self.constants), ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
+            return ca.Function('dae_residual', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states),
+                                                ca.vertcat(*self.alg_states), ca.vertcat(*self.constants),
+                                                ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
         else:
-            return ca.Function('dae_residual', [self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters, self.equations)
+            return ca.Function('dae_residual', [
+                self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters,
+                               self.equations)
 
+    # noinspection PyUnusedLocal
     def initial_residual_function(self, group_arguments=True):
         # TODO
         return ca.Function('initial_residual', [self.time], [0])
 
+    # noinspection PyPep8Naming
     def state_metadata_function(self, group_arguments=True):
         m, M, n = [], [], []
-        for e, v in zip(itertools.chain(self.states, self.alg_states), itertools.chain(self.state_metadata, self.alg_state_metadata)):
+        for e, v in zip(itertools.chain(self.states, self.alg_states),
+                        itertools.chain(self.state_metadata, self.alg_state_metadata)):
             m_ = v.min if hasattr(v.min, '__iter__') else np.full(e.size(), v.min if v.min is not None else -np.inf)
             M_ = v.max if hasattr(v.max, '__iter__') else np.full(e.size(), v.max if v.max is not None else np.inf)
-            n_ = v.nominal if hasattr(v.nominal, '__iter__') else np.full(e.size(), v.nominal if v.nominal is not None else 1)
+            n_ = v.nominal if hasattr(v.nominal, '__iter__') else np.full(e.size(),
+                                                                          v.nominal if v.nominal is not None else 1)
             m.append(m_)
             M.append(M_)
             n.append(n_)
         out = ca.horzcat(ca.vertcat(*m), ca.vertcat(*M), ca.vertcat(*n))
         if group_arguments:
-            return ca.Function('state_metadata', [ca.vertcat(*self.parameters)], [out[:len(self.state_metadata), :], out[len(self.state_metadata):, :]])
+            return ca.Function('state_metadata', [ca.vertcat(*self.parameters)],
+                               [out[:len(self.state_metadata), :], out[len(self.state_metadata):, :]])
         else:
             return ca.Function('state_metadata', self.parameters, [out])
 
@@ -127,8 +138,8 @@ class CasadiSysModel:
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 
 
+# noinspection PyPep8Naming,PyUnresolvedReferences
 class ForLoop:
-
     def __init__(self, generator, tree):
         self.tree = tree
         self.generator = generator
@@ -145,7 +156,7 @@ class ForLoop:
     def register_indexed_symbol(self, e, tree, index_expr=None):
         if isinstance(index_expr, ca.MX):
             F = ca.Function('index_expr', [self.index_variable], [index_expr])
-            expr = lambda ar : np.array([F(a)[0] for a in ar], dtype=np.int)
+            # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=np.int)
             Fmap = F.map("map", "serial", len(self.values), [], [])
             res = Fmap.call([self.values])
             indices = np.array(res[0].T, dtype=np.int)
@@ -154,8 +165,8 @@ class ForLoop:
         self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, indices)
 
 
+# noinspection PyPep8Naming,PyUnresolvedReferences
 class CasadiGenerator(TreeListener):
-
     def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
         self.src = {}
@@ -174,8 +185,7 @@ class CasadiGenerator(TreeListener):
         outputs = []
         constants = []
         parameters = []
-        variables = []
-        symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
+        symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
         for s in symbols:
             if 'constant' in s.prefixes:
                 constants.append(s)
@@ -189,7 +199,7 @@ class CasadiGenerator(TreeListener):
                     outputs.append(s)
 
         def discard_empty(l):
-            return list(filter(lambda s : not s.is_empty(), l))
+            return list(filter(lambda x: not x.is_empty(), l))
 
         ode_states = []
         alg_states = []
@@ -199,11 +209,14 @@ class CasadiGenerator(TreeListener):
             else:
                 alg_states.append(s)
         self.model.states = discard_empty([self.get_mx(e) for e in ode_states])
-        self.model.state_metadata = [VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal)) for e in ode_states if not self.get_mx(e).is_empty()]
+        self.model.state_metadata = [VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal))
+                                     for e in ode_states if not self.get_mx(e).is_empty()]
         self.model.der_states = discard_empty([self.derivative[
-            self.get_mx(e)] for e in ode_states])
+                                                   self.get_mx(e)] for e in ode_states])
         self.model.alg_states = discard_empty([self.get_mx(e) for e in alg_states])
-        self.model.alg_state_metadata = [VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal)) for e in alg_states if not self.get_mx(e).is_empty()]
+        self.model.alg_state_metadata = [
+            VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal)) for e in alg_states if
+            not self.get_mx(e).is_empty()]
         assert len(self.model.alg_states) == len(self.model.alg_state_metadata)
         self.model.constants = discard_empty([self.get_mx(e) for e in constants])
         self.model.constant_values = [self.get_mx(e.value) for e in constants if not self.get_mx(e).is_empty()]
@@ -226,7 +239,7 @@ class CasadiGenerator(TreeListener):
             op = tree.operator
 
         if op == '*':
-            op = 'mtimes' # .* differs from *
+            op = 'mtimes'  # .* differs from *
         if op.startswith('.'):
             op = op[1:]
 
@@ -320,7 +333,7 @@ class CasadiGenerator(TreeListener):
     def exitIfExpression(self, tree):
         logger.debug('exitIfExpression')
 
-        assert(len(tree.conditions) + 1 == len(tree.expressions))
+        assert (len(tree.conditions) + 1 == len(tree.expressions))
 
         src = self.get_mx(tree.expressions[-1])
         for cond_index in range(len(tree.conditions)):
@@ -357,7 +370,8 @@ class CasadiGenerator(TreeListener):
             F = ca.Function('loop_body_' + f.name, all_args, [expr])
 
             indexed_symbols_full = [self.nodes[
-                f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in indexed_symbols]
+                                        f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in
+                                    indexed_symbols]
             Fmap = F.map("map", "serial", len(f.values), list(
                 range(len(args), len(all_args))), [])
             res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
@@ -369,7 +383,7 @@ class CasadiGenerator(TreeListener):
     def exitIfEquation(self, tree):
         logger.debug('exitIfEquation')
 
-        assert(len(tree.equations) % (len(tree.conditions) + 1) == 0)
+        assert (len(tree.equations) % (len(tree.conditions) + 1) == 0)
 
         equations_per_condition = int(
             len(tree.equations) / (len(tree.conditions) + 1))
@@ -385,14 +399,14 @@ class CasadiGenerator(TreeListener):
 
         self.src[tree] = src
 
-    def get_integer(self, tree):
+    def get_integer(self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]):
         # CasADi needs to know the dimensions of symbols at instantiation.
         # We therefore need a mechanism to evaluate expressions that define dimensions of symbols.
         if isinstance(tree, ast.Primary):
             return int(tree.value)
         if isinstance(tree, ast.ComponentRef):
             s = self.root.find_symbol(self.root.classes[self.class_name], tree)
-            assert(s.type.name == 'Integer')
+            assert (s.type.name == 'Integer')
             return self.get_integer(s.value)
         if isinstance(tree, ast.Expression):
             # Make sure that the expression has been converted to MX by (re)visiting the
@@ -401,6 +415,7 @@ class CasadiGenerator(TreeListener):
             ast_walker.walk(self, tree)
 
             # Obtain expression
+
             expr = self.get_mx(tree)
 
             # Obtain the symbols it depends on
@@ -414,11 +429,12 @@ class CasadiGenerator(TreeListener):
                     if (len(self.for_loops) > 0) and (dep.name() == self.for_loops[-1].name):
                         vals.append(self.for_loops[-1].index_variable)
                     else:
-                        vals.append(self.get_integer(self.root.find_symbol(self.root.classes[self.class_name], 
-                                    ast.ComponentRef(name=dep.name())).value))
+                        vals.append(self.get_integer(self.root.find_symbol(self.root.classes[self.class_name],
+                                                                           ast.ComponentRef(name=dep.name())).value))
 
             # Evaluate the expression
-            F = ca.Function('get_integer_{}'.format('_'.join([dep.name().replace('.', '_') for dep in deps])), deps, [expr])
+            F = ca.Function('get_integer_{}'.format('_'.join([dep.name().replace('.', '_') for dep in deps])), deps,
+                            [expr])
             ret = F.call(vals)
             if ret[0].is_constant():
                 return int(ret[0])
@@ -430,12 +446,12 @@ class CasadiGenerator(TreeListener):
             stop = self.get_integer(tree.stop)
             return np.arange(start, stop + step, step, dtype=np.int)
         else:
-            raise Exception('Unexpected node type {}'.format(i.__class__.__name__))
+            raise Exception('Unexpected node type {}'.format(tree.__class__.__name__))
 
     def get_symbol(self, tree):
         # Create symbol
         size = [self.get_integer(d) for d in tree.dimensions]
-        assert(len(size) <= 2)
+        assert (len(size) <= 2)
         s = ca.MX.sym(tree.name, *size)
         self.nodes[tree.name] = s
         return s
@@ -444,7 +460,7 @@ class CasadiGenerator(TreeListener):
         # Check whether we loop over an index of this symbol
         indices = []
         for index in tree.indices:
-            if isinstance(index, ast.ComponentRef):                
+            if isinstance(index, ast.ComponentRef):
                 for for_loop in self.for_loops:
                     if index.name == for_loop.name:
                         # TODO support nested loops
@@ -460,7 +476,7 @@ class CasadiGenerator(TreeListener):
                 return s
 
             # Modelica indexing starts from one;  Python from zero.
-            indices.append(sl - 1)        
+            indices.append(sl - 1)
         if len(indices) == 1:
             return s[indices[0]]
         elif len(indices) == 2:
@@ -484,10 +500,14 @@ class CasadiGenerator(TreeListener):
             s = self.get_indexed_symbol(tree, s)
         return s
 
-    def get_mx(self, tree):
-        # We pull components and symbols from the AST on demand.  
-        # This is to ensure that parametrized vector dimensions can be resolved.  Vector
-        # dimensions need to be known at CasADi MX creation time.
+    def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef, ast.Expression]) -> ca.MX:
+        """
+        We pull components and symbols from the AST on demand.  
+        This is to ensure that parametrized vector dimensions can be resolved.  Vector
+        dimensions need to be known at CasADi MX creation time.
+        :param tree: 
+        :return: 
+        """
         if tree not in self.src:
             if isinstance(tree, ast.Symbol):
                 s = self.get_symbol(tree)

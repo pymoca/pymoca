@@ -18,7 +18,7 @@ class Estimator(OdeModel):
         x = mech.dynamicsymbols('x')
         self.x = sympy.Matrix([x])
         self.x0 = {
-            x : 0.0,
+            x : 0,
             }
 
         # variables

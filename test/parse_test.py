@@ -6,16 +6,19 @@ from __future__ import print_function, absolute_import, division, print_function
 
 import os
 import sys
-import unittest
 import time
+import unittest
 
 from pymola import parser
 from pymola import tree
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
+
 class ParseTest(unittest.TestCase):
-    "Testing"
+    """
+    Parse test
+    """
 
     def setUp(self):
         pass
@@ -23,7 +26,8 @@ class ParseTest(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def flush(self):
+    @staticmethod
+    def flush():
         sys.stdout.flush()
         sys.stdout.flush()
         time.sleep(0.1)
@@ -78,6 +82,7 @@ class ParseTest(unittest.TestCase):
     def test_connector(self):
         with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
             txt = f.read()
+        # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         # states = ast_tree.classes['Aircraft'].states
         # names = sorted([state.name for state in states])
