@@ -6,6 +6,7 @@ from collections import namedtuple
 
 import casadi as ca
 import numpy as np
+from typing import Union
 
 from . import ast
 from .tree import TreeWalker, TreeListener, flatten
@@ -71,9 +72,10 @@ class CasadiSysModel:
         if n_states - n_inputs == n_equations:
             logger.info("System is balanced.")
         else:
-            logger.warning("System is not balanced.  " \
-                           "Number of states minus inputs is {}, number of equations is {}.".format(
-                n_states - n_inputs, n_equations))
+            logger.warning(
+                "System is not balanced.  "
+                "Number of states minus inputs is {}, number of equations is {}.".format(
+                    n_states - n_inputs, n_equations))
 
     def simplify(self, replace_constants=True, replace_parameter_expressions=True):
         if replace_constants:
@@ -111,6 +113,7 @@ class CasadiSysModel:
         # TODO
         return ca.Function('initial_residual', [self.time], [0])
 
+    # noinspection PyPep8Naming
     def state_metadata_function(self, group_arguments=True):
         m, M, n = [], [], []
         for e, v in zip(itertools.chain(self.states, self.alg_states),
@@ -133,6 +136,7 @@ class CasadiSysModel:
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 
 
+# noinspection PyPep8Naming
 class ForLoop:
     def __init__(self, generator, tree):
         self.tree = tree
@@ -150,7 +154,7 @@ class ForLoop:
     def register_indexed_symbol(self, e, tree, index_expr=None):
         if isinstance(index_expr, ca.MX):
             F = ca.Function('index_expr', [self.index_variable], [index_expr])
-            expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=np.int)
+            # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=np.int)
             Fmap = F.map("map", "serial", len(self.values), [], [])
             res = Fmap.call([self.values])
             indices = np.array(res[0].T, dtype=np.int)
@@ -159,6 +163,7 @@ class ForLoop:
         self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, indices)
 
 
+# noinspection PyPep8Naming
 class CasadiGenerator(TreeListener):
     def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
@@ -179,7 +184,7 @@ class CasadiGenerator(TreeListener):
         constants = []
         parameters = []
         variables = []
-        symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
+        symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
         for s in symbols:
             if 'constant' in s.prefixes:
                 constants.append(s)
@@ -193,7 +198,7 @@ class CasadiGenerator(TreeListener):
                     outputs.append(s)
 
         def discard_empty(l):
-            return list(filter(lambda s: not s.is_empty(), l))
+            return list(filter(lambda x: not x.is_empty(), l))
 
         ode_states = []
         alg_states = []
@@ -493,7 +498,7 @@ class CasadiGenerator(TreeListener):
             s = self.get_indexed_symbol(tree, s)
         return s
 
-    def get_mx(self, tree):
+    def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef]):
         # We pull components and symbols from the AST on demand.  
         # This is to ensure that parametrized vector dimensions can be resolved.  Vector
         # dimensions need to be known at CasADi MX creation time.

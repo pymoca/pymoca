@@ -25,7 +25,8 @@ class GenSympyTest(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def flush(self):
+    @staticmethod
+    def flush():
         sys.stdout.flush()
         sys.stdout.flush()
         time.sleep(0.01)

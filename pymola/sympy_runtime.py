@@ -7,6 +7,7 @@ import scipy.integrate
 import sympy
 
 
+# noinspection PyPep8Naming
 class OdeModel(object):
     def __init__(self):
         self.t = sympy.symbols('t')
@@ -21,6 +22,8 @@ class OdeModel(object):
         self.p0 = {}
         self.c0 = {}
         self.eqs = []
+        self.f = None
+        self.g = None
 
     def compute_fg(self):
         fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.v))
@@ -60,7 +63,7 @@ class OdeModel(object):
             ss_eval += [pl.matrix(ss[i].subs(ss_subs)).astype(float)]
         return ss_eval
 
-    def simulate(self, x0=None, u0=None, t0=0, tf=10, dt=0.01):
+    def simulate(self, x0: float=None, u0: float=None, t0: float=0, tf: float=10, dt: float=0.01):
         x_sym = sympy.DeferredVector('x')
         y_sym = sympy.DeferredVector('y')
         u_sym = sympy.DeferredVector('u')

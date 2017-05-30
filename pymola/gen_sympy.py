@@ -5,12 +5,12 @@ import os
 
 import jinja2
 
-from . import tree
+from .tree import TreeListener, TreeWalker, flatten
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-class SympyGenerator(tree.TreeListener):
+class SympyGenerator(TreeListener):
     def __init__(self):
         super(SympyGenerator, self).__init__()
         self.src = {}
@@ -44,7 +44,7 @@ from sympy import sin, cos, tan
         constants = []
         parameters = []
         variables = []
-        symbols = sorted(tree.symbols.values(), key=lambda s: s.order)
+        symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
         for s in symbols:
             if len(s.prefixes) == 0:
                 variables += [s]
@@ -187,8 +187,8 @@ class {{tree.name}}(OdeModel):
 
 def generate(ast_tree, model_name):
     ast_tree_new = copy.deepcopy(ast_tree)
-    ast_walker = tree.TreeWalker()
-    flat_tree = tree.flatten(ast_tree_new, model_name)
+    ast_walker = TreeWalker()
+    flat_tree = flatten(ast_tree_new, model_name)
     sympy_gen = SympyGenerator()
     ast_walker.walk(sympy_gen, flat_tree)
     return sympy_gen.src[flat_tree]

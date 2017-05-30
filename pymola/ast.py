@@ -6,7 +6,6 @@ from __future__ import print_function, absolute_import, division, print_function
 
 import copy
 import json
-import sys
 from collections import OrderedDict
 
 VALIDATE_AST = True
@@ -46,25 +45,11 @@ def to_json(var):
     return res
 
 
-# Helper function to compare component references to each other without converting to JSON
-def compare_component_ref(this, other):
-    if len(this.child) != len(other.child):
-        return False
-
-    if this.child and other.child:
-        return compare_component_ref(this.child[0], other.child[0])
-
-    return this.__dict__ == other.__dict__
-
-
 class Field(object):
     def __init__(self, types, default=None):
         if type(types) is type or not hasattr(types, '__iter__'):
             types = [types]
         types = list(types)
-        if sys.version_info < (3,):
-            if str in types:
-                types += [unicode]
         self.types = types
         self.default = default
 
@@ -80,14 +65,13 @@ class Field(object):
 
 
 class FieldList(list):
-    def __init__(self, types, default=[]):
+    def __init__(self, types, default=None):
+        if default is None:
+            default = []
         super(FieldList, self).__init__()
         if type(types) is type or not hasattr(types, '__iter__'):
             types = [types]
         types = list(types)
-        if sys.version_info < (3,):
-            if str in types:
-                types += [unicode]
         self.types = types
         self.default = default
 
@@ -123,17 +107,14 @@ class FieldDict(OrderedDict):
         if type(types) is type or not hasattr(types, '__iter__'):
             types = [types]
         types = list(types)
-        if sys.version_info < (3,):
-            if str in types:
-                types += [unicode]
         self.types = types
         self.default = default
 
-    def validate(self, name, key, val_dict, throw=True):
+    def validate(self, name: str, key: str, val_dict: dict, throw=True):
         if type(val_dict) != dict:
             if throw:
                 raise IOError('{:s}.{:s} requires types ({:s}), but got {:s}'.format(
-                    name, key, 'dict', type(val).__name__))
+                    name, key, 'dict', type(val_dict).__name__))
             else:
                 return False
 
@@ -147,7 +128,7 @@ class FieldDict(OrderedDict):
             else:
                 return True
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value, **kwargs):
         if VALIDATE_AST:
             if not type(value) in self.types:
                 raise IOError('{:s} requires dict values of type ({:s}), but got {:s}'.format(
@@ -345,7 +326,11 @@ class Collection(Node):
     def extend(self, other):
         self.files.extend(other.files)
 
-    def find_class(self, component_ref, within=[]):
+    def find_class(self, component_ref: str, within=None):
+
+        if within is None:
+            within = []
+
         if isinstance(component_ref, str):
             assert component_ref.find('.') == -1
             component_ref = ComponentRef(name=component_ref)
@@ -613,3 +598,19 @@ File.ast_spec = {
 Collection.ast_spec = {
     'files': FieldList([File], []),
 }
+
+
+def compare_component_ref(this: ComponentRef, other: ComponentRef) -> bool:
+    """
+    Helper function to compare component references to each other without converting to JSON
+    :param this: 
+    :param other: 
+    :return: boolean, true if match
+    """
+    if len(this.child) != len(other.child):
+        return False
+
+    if this.child and other.child:
+        return compare_component_ref(this.child[0], other.child[0])
+
+    return this.__dict__ == other.__dict__

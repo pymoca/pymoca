@@ -12,183 +12,205 @@ from collections import OrderedDict
 
 from . import ast
 
+CLASS_SEPARATOR = '.'
+
 logger = logging.getLogger("pymola")
 
 
 # TODO Flatten function vs. conversion classes
 
 
+# noinspection PyPep8Naming
+class TreeListener(object):
+    """
+    Defines interface for tree listeners.
+    """
+
+    def __init__(self):
+        self.context = {}
+
+    def enterEvery(self, tree: ast.Node) -> None:
+        self.context[type(tree).__name__] = tree
+
+    def exitEvery(self, tree: ast.Node):
+        self.context[type(tree).__name__] = None
+
+    def enterFile(self, tree: ast.File) -> None:
+        pass
+
+    def exitFile(self, tree: ast.File) -> None:
+        pass
+
+    def enterClass(self, tree: ast.Class) -> None:
+        pass
+
+    def exitClass(self, tree: ast.Class) -> None:
+        pass
+
+    def enterImportAsClause(self, tree: ast.ImportAsClause) -> None:
+        pass
+
+    def exitImportAsClause(self, tree: ast.ImportAsClause) -> None:
+        pass
+
+    def enterImportFromClause(self, tree: ast.ImportFromClause) -> None:
+        pass
+
+    def exitImportFromClause(self, tree: ast.ImportFromClause) -> None:
+        pass
+
+    def enterElementModification(self, tree: ast.ElementModification) -> None:
+        pass
+
+    def exitElementModification(self, tree: ast.ElementModification) -> None:
+        pass
+
+    def enterClassModification(self, tree: ast.ClassModification) -> None:
+        pass
+
+    def exitClassModification(self, tree: ast.ClassModification) -> None:
+        pass
+
+    def enterExtendsClause(self, tree: ast.ExtendsClause) -> None:
+        pass
+
+    def exitExtendsClause(self, tree: ast.ExtendsClause) -> None:
+        pass
+
+    def enterIfExpression(self, tree: ast.IfExpression) -> None:
+        pass
+
+    def exitIfExpression(self, tree: ast.IfExpression) -> None:
+        pass
+
+    def enterExpression(self, tree: ast.Expression) -> None:
+        pass
+
+    def exitExpression(self, tree: ast.Expression) -> None:
+        pass
+
+    def enterIfEquation(self, tree: ast.IfEquation) -> None:
+        pass
+
+    def exitIfEquation(self, tree: ast.IfEquation) -> None:
+        pass
+
+    def enterForIndex(self, tree: ast.ForIndex) -> None:
+        pass
+
+    def exitForIndex(self, tree: ast.ForIndex) -> None:
+        pass
+
+    def enterForEquation(self, tree: ast.ForEquation) -> None:
+        pass
+
+    def exitForEquation(self, tree: ast.ForEquation) -> None:
+        pass
+
+    def enterEquation(self, tree: ast.Equation) -> None:
+        pass
+
+    def exitEquation(self, tree: ast.Equation) -> None:
+        pass
+
+    def enterConnectClause(self, tree: ast.ConnectClause) -> None:
+        pass
+
+    def exitConnectClause(self, tree: ast.ConnectClause) -> None:
+        pass
+
+    def enterSymbol(self, tree: ast.Symbol) -> None:
+        pass
+
+    def exitSymbol(self, tree: ast.Symbol) -> None:
+        pass
+
+    def enterComponentClause(self, tree: ast.ComponentClause) -> None:
+        pass
+
+    def exitComponentClause(self, tree: ast.ComponentClause) -> None:
+        pass
+
+    def enterArray(self, tree: ast.Array) -> None:
+        pass
+
+    def exitArray(self, tree: ast.Array) -> None:
+        pass
+
+    def enterSlice(self, tree: ast.Slice) -> None:
+        pass
+
+    def exitSlice(self, tree: ast.Slice) -> None:
+        pass
+
+    def enterPrimary(self, tree: ast.Primary) -> None:
+        pass
+
+    def exitPrimary(self, tree: ast.Primary) -> None:
+        pass
+
+    def enterComponentRef(self, tree: ast.ComponentRef) -> None:
+        pass
+
+    def exitComponentRef(self, tree: ast.ComponentRef) -> None:
+        pass
+
+
 class TreeWalker(object):
-    def walk(self, listener, tree):
+    """
+    Defines methods for tree walker. Inherit from this to make your own.
+    """
+
+    def walk(self, listener: TreeListener, tree: ast.Node) -> None:
+        """
+        Walks an AST tree recursively
+        :param listener: 
+        :param tree: 
+        :return: None
+        """
         name = tree.__class__.__name__
         if hasattr(listener, 'enterEvery'):
             getattr(listener, 'enterEvery')(tree)
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.ast_spec.keys():
-            self.handle_walk(self, listener, tree.__dict__[child_name])
+            self.handle_walk(listener, tree.__dict__[child_name])
         if hasattr(listener, 'exitEvery'):
             getattr(listener, 'exitEvery')(tree)
         if hasattr(listener, 'exit' + name):
             getattr(listener, 'exit' + name)(tree)
 
-    @classmethod
-    def handle_walk(cls, walker, listener, tree):
+    def handle_walk(self, listener: TreeListener, tree: ast.Node) -> None:
+        """
+        Handles tree walking, has to account for dictionaries and lists
+        :param listener: listener that reacts to walked events
+        :param tree: the tree to walk
+        :return: None
+        """
         if isinstance(tree, ast.Node):
-            walker.walk(listener, tree)
+            self.walk(listener, tree)
         elif isinstance(tree, dict):
             for k in tree.keys():
-                cls.handle_walk(walker, listener, tree[k])
+                self.handle_walk(listener, tree[k])
         elif isinstance(tree, list):
             for i in range(len(tree)):
-                cls.handle_walk(walker, listener, tree[i])
+                self.handle_walk(listener, tree[i])
         else:
             pass
 
 
-class TreeListener(object):
-    def __init__(self):
-        self.context = {}
-
-    def enterEvery(self, tree):
-        self.context[type(tree).__name__] = tree
-
-    def exitEvery(self, tree):
-        self.context[type(tree).__name__] = None
-
-    def enterFile(self, tree):
-        pass
-
-    def exitFile(self, tree):
-        pass
-
-    def enterClass(self, tree):
-        pass
-
-    def exitClass(self, tree):
-        pass
-
-    def enterImportAsClause(self, tree):
-        pass
-
-    def exitImportAsClause(self, tree):
-        pass
-
-    def enterImportFromClause(self, tree):
-        pass
-
-    def exitImportFromClause(self, tree):
-        pass
-
-    def enterElementModification(self, tree):
-        pass
-
-    def exitElementModification(self, tree):
-        pass
-
-    def enterClassModification(self, tree):
-        pass
-
-    def exitClassModification(self, tree):
-        pass
-
-    def enterExtendsClause(self, tree):
-        pass
-
-    def exitExtendsClause(self, tree):
-        pass
-
-    def enterIfExpression(self, tree):
-        pass
-
-    def exitIfExpression(self, tree):
-        pass
-
-    def enterExpression(self, tree):
-        pass
-
-    def exitExpression(self, tree):
-        pass
-
-    def enterIfEquation(self, tree):
-        pass
-
-    def exitIfEquation(self, tree):
-        pass
-
-    def enterForIndex(self, tree):
-        pass
-
-    def exitForIndex(self, tree):
-        pass
-
-    def enterForEquation(self, tree):
-        pass
-
-    def exitForEquation(self, tree):
-        pass
-
-    def enterEquation(self, tree):
-        pass
-
-    def exitEquation(self, tree):
-        pass
-
-    def enterConnectClause(self, tree):
-        pass
-
-    def exitConnectClause(self, tree):
-        pass
-
-    def enterSymbol(self, tree):
-        pass
-
-    def exitSymbol(self, tree):
-        pass
-
-    def enterComponentClause(self, tree):
-        pass
-
-    def exitComponentClause(self, tree):
-        pass
-
-    def enterArray(self, tree):
-        pass
-
-    def exitArray(self, tree):
-        pass
-
-    def enterSlice(self, tree):
-        pass
-
-    def exitSlice(self, tree):
-        pass
-
-    def enterPrimary(self, tree):
-        pass
-
-    def exitPrimary(self, tree):
-        pass
-
-    def enterComponentRef(self, tree):
-        pass
-
-    def exitComponentRef(self, tree):
-        pass
-
-
-def flatten_class(root, orig_class, instance_name, class_modification=None):
+def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: str,
+                  class_modification: ast.ClassModification = None) -> ast.Class:
     """
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
     of the instance name passed.
     :param root: The root of the tree that contains all class definitions
     :param orig_class: The class we want to flatten
-    :param instance_name:
+    :param instance_name: 
+    :param class_modification: 
     :return: flat_class, the flattened class of type Class
     """
-
-    CLASS_SEPARATOR = '.'
 
     # create the returned class
     flat_class = ast.Class(
@@ -227,7 +249,13 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                 raise Exception('Unsupported class modification argument {}'.format(argument))
         return class_or_sym
 
-    def flatten_symbol(sym, instance_prefix):
+    def flatten_symbol(sym: ast.Symbol, instance_prefix: str) -> ast.Symbol:
+        """
+        Given a symbols and a prefix performs name mangling
+        :param sym: Symbol
+        :param instance_prefix: Prefix for instance
+        :return: flattened symbol
+        """
         sym_copy = copy.deepcopy(sym)
         sym_copy.name = instance_prefix + sym.name
         if len(instance_prefix) > 0:
@@ -240,7 +268,16 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                     pass
         return sym_copy
 
-    def flatten_component_refs(container, expression, instance_prefix):
+    def flatten_component_refs(container: ast.Class,
+                               expression: ast.Expression, instance_prefix: str) -> ast.Expression:
+        """
+        Flattens component refs in a tree
+        :param container: class
+        :param expression: original expression
+        :param instance_prefix: prefix for instance
+        :return: flattened expression
+        """
+
         expression_copy = copy.deepcopy(expression)
 
         class ComponentRefFlattener(TreeListener):
@@ -291,11 +328,18 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
 
         return expression_copy
 
-    def pull_functions(expression, instance_prefix):
+    def pull_functions(expression: ast.Expression, instance_prefix: str) -> set:
+        """
+        TODO: document
+        :param expression: 
+        :param instance_prefix: 
+        :return: 
+        """
+
         expression_copy = copy.deepcopy(expression)
 
         class FunctionPuller(TreeListener):
-            def __init__(self, instance_prefix, root, function_set):
+            def __init__(self, instance_prefix: str, root, function_set):
                 self.instance_prefix = instance_prefix
                 self.root = root
                 self.function_set = function_set
@@ -448,7 +492,8 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
     if len(flow_connections) > 0:
         # TODO Flatten first
         logger.warning(
-            "Note: Connections between connectors with flow variables are not supported across levels of the class hierarchy")
+            "Note: Connections between connectors with flow variables "
+            "are not supported across levels of the class hierarchy")
 
     processed = []  # OrderedDict is not hashable, so we cannot use sets.
     for connected_variables in flow_connections.values():
@@ -473,7 +518,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
     return flat_class
 
 
-def flatten(root, class_name):
+def flatten(root: ast.Collection, class_name: str) -> ast.File:
     """
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling

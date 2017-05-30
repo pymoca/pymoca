@@ -12,12 +12,12 @@ from .generated.ModelicaLexer import ModelicaLexer
 from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
 
-
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
 
+# noinspection PyPep8Naming
 class ASTListener(ModelicaListener):
     def __init__(self):
         self.ast = {}
@@ -34,6 +34,7 @@ class ASTListener(ModelicaListener):
     # FILE ===========================================================
 
     def enterStored_definition(self, ctx):
+
         file_node = ast.File()
         self.ast[ctx] = file_node
         self.file_node = file_node
@@ -486,9 +487,6 @@ class ASTListener(ModelicaListener):
             self.sym_count += 1
             self.ast[ctx] = sym
             self.symbol_node = sym
-
-    def exitElement_modification(self, ctx):
-        self.symbol_node = None
 
     def exitType_specifier(self, ctx):
         self.ast[ctx] = self.ast[ctx.component_reference()]
