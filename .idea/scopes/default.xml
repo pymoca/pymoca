@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="default" pattern="(file[pymola]:pymola//*&amp;&amp;!file[pymola]:pymola/generated//*&amp;&amp;!file:pymola/_version.py&amp;&amp;!file:pymola/Modelica.g4||file:test/*.py)&amp;&amp;!file[pymola]:test/generated//*" />
+</component>

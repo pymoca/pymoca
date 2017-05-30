@@ -1,16 +1,16 @@
 from __future__ import print_function, absolute_import, division, print_function, unicode_literals
-from . import tree
+
+import copy
+import os
 
 import jinja2
-import os
-import sys
-import copy
+
+from . import tree
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class SympyGenerator(tree.TreeListener):
-
     def __init__(self):
         super(SympyGenerator, self).__init__()
         self.src = {}
@@ -165,7 +165,7 @@ class {{tree.name}}(OdeModel):
         else:
             src = "({operator:s} ".format(**tree.__dict__)
             for operand in tree.operands:
-                src +=  ' ' + self.src[operand]
+                src += ' ' + self.src[operand]
             src += ")"
         self.src[tree] = src
 
@@ -174,10 +174,10 @@ class {{tree.name}}(OdeModel):
         self.src[tree] = "{:s}".format(val)
 
     def exitComponentRef(self, tree):
-        self.src[tree] = "{name:s}".format(name=tree.name.replace('.','__'))
+        self.src[tree] = "{name:s}".format(name=tree.name.replace('.', '__'))
 
     def exitSymbol(self, tree):
-        self.src[tree] = "{name:s}".format(name=tree.name.replace('.','__'))
+        self.src[tree] = "{name:s}".format(name=tree.name.replace('.', '__'))
 
     def exitEquation(self, tree):
         self.src[tree] = "{left:s} - ({right:s})".format(

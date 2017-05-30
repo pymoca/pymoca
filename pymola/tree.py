@@ -4,21 +4,21 @@ Tools for tree walking and visiting etc.
 """
 
 from __future__ import print_function, absolute_import, division, unicode_literals
-from collections import OrderedDict
-import logging
+
 import copy
-import json
+import logging
 import sys
+from collections import OrderedDict
 
 from . import ast
 
 logger = logging.getLogger("pymola")
 
+
 # TODO Flatten function vs. conversion classes
 
 
 class TreeWalker(object):
-
     def walk(self, listener, tree):
         name = tree.__class__.__name__
         if hasattr(listener, 'enterEvery'):
@@ -47,7 +47,6 @@ class TreeWalker(object):
 
 
 class TreeListener(object):
-
     def __init__(self):
         self.context = {}
 
@@ -223,7 +222,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                 for sym in class_or_sym.symbols.values():
                     if len(sym.type.child) == 0 and sym.type.name == argument.name:
                         sym.type = argument.component
-                # TODO class modifications to short class definition
+                        # TODO class modifications to short class definition
             else:
                 raise Exception('Unsupported class modification argument {}'.format(argument))
         return class_or_sym
@@ -361,9 +360,12 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
 
             # carry class dimensions over to symbols
             for flat_class_symbol in flat_sub_class.symbols.values():
-                if len(flat_class_symbol.dimensions) == 1 and isinstance(flat_class_symbol.dimensions[0], ast.Primary) and flat_class_symbol.dimensions[0].value == 1:
+                if len(flat_class_symbol.dimensions) == 1 \
+                        and isinstance(flat_class_symbol.dimensions[0], ast.Primary) \
+                        and flat_class_symbol.dimensions[0].value == 1:
                     flat_class_symbol.dimensions = flat_sym.dimensions
-                elif len(flat_sym.dimensions) == 1 and isinstance(flat_sym.dimensions[0], ast.Primary) and flat_sym.dimensions[0].value == 1:
+                elif len(flat_sym.dimensions) == 1 and isinstance(flat_sym.dimensions[0], ast.Primary) \
+                        and flat_sym.dimensions[0].value == 1:
                     flat_class_symbol.dimensions = flat_class_symbol.dimensions
                 else:
                     flat_class_symbol.dimensions = flat_sym.dimensions + flat_class_symbol.dimensions
@@ -398,7 +400,8 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                 class_left = root.find_class(sym_left.type)
                 class_right = root.find_class(sym_right.type)
             except KeyError:
-                logger.warning("Connector class {} or {} not defined.  Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
+                logger.warning("Connector class {} or {} not defined.  "
+                               "Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
 
                 connect_equation = ast.Equation(left=flat_equation.left, right=flat_equation.right)
                 connect_equations.append(connect_equation)
@@ -430,21 +433,24 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
                         for connected_variable in connected_variables:
                             flow_connections[connected_variable] = connected_variables
                     else:
-                        raise Exception("Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
+                        raise Exception(
+                            "Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
 
             flat_class.equations += connect_equations
         else:
             # flatten equation
             flat_class.equations += [flat_equation]
 
-    flat_class.statements += [flatten_component_refs(flat_class, e, instance_prefix) for e in extended_orig_class.statements]
+    flat_class.statements += [flatten_component_refs(flat_class, e, instance_prefix) for e in
+                              extended_orig_class.statements]
 
     # add flow equations
     if len(flow_connections) > 0:
         # TODO Flatten first
-        logger.warning("Note: Connections between connectors with flow variables are not supported across levels of the class hierarchy")
+        logger.warning(
+            "Note: Connections between connectors with flow variables are not supported across levels of the class hierarchy")
 
-    processed = [] # OrderedDict is not hashable, so we cannot use sets.
+    processed = []  # OrderedDict is not hashable, so we cannot use sets.
     for connected_variables in flow_connections.values():
         if connected_variables not in processed:
             operands = list(connected_variables.values())
@@ -465,6 +471,7 @@ def flatten_class(root, orig_class, instance_name, class_modification=None):
     #         flat_file.classes.update(flatten(root, f, instance_name).classes)
 
     return flat_class
+
 
 def flatten(root, class_name):
     """

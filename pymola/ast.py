@@ -45,6 +45,7 @@ def to_json(var):
         res = var
     return res
 
+
 # Helper function to compare component references to each other without converting to JSON
 def compare_component_ref(this, other):
     if len(this.child) != len(other.child):
@@ -94,7 +95,7 @@ class FieldList(list):
         if type(val_list) != list:
             if throw:
                 raise IOError('{:s}.{:s} requires types {:s}, but got {:s}'.format(
-                name, key, 'list', type(val_list).__name__))
+                    name, key, 'list', type(val_list).__name__))
             else:
                 return False
 
@@ -132,7 +133,7 @@ class FieldDict(OrderedDict):
         if type(val_dict) != dict:
             if throw:
                 raise IOError('{:s}.{:s} requires types ({:s}), but got {:s}'.format(
-                name, key, 'dict', type(val).__name__))
+                    name, key, 'dict', type(val).__name__))
             else:
                 return False
 
@@ -384,7 +385,9 @@ class Collection(Node):
             else:
                 extended_within = c_within
 
-            c = next((f.classes[class_name] for f in self.files if f.within and compare_component_ref(f.within[0], extended_within) and class_name in f.classes), None)
+            c = next((f.classes[class_name] for f in self.files if
+                      f.within and compare_component_ref(f.within[0], extended_within) and class_name in f.classes),
+                     None)
 
             # TODO: This could probably be cleaner if we do nested classes.
             # Then we could traverse up the tree until we found a match,
@@ -392,7 +395,8 @@ class Collection(Node):
             # the passed-in 'within').
             if c is None:
                 # Try again with root node lookup instead of relative
-                c = next((f.classes[class_name] for f in self.files if f.within and compare_component_ref(f.within[0], c_within) and class_name in f.classes), None)
+                c = next((f.classes[class_name] for f in self.files if
+                          f.within and compare_component_ref(f.within[0], c_within) and class_name in f.classes), None)
                 if c is None:
                     # TODO: How long do we traverse? Do we somehow force a stop at Real, Boolean, etc?
                     #       Now a force is stopped on anything in the Modelica library.
@@ -405,8 +409,6 @@ class Collection(Node):
                     return c
             else:
                 return c
-
-
 
     def find_symbol(self, c, component_ref):
         sym = c.symbols[component_ref.name]
@@ -421,7 +423,6 @@ VISIBILITY_PRIVATE = 0
 VISIBILITY_PROTECTED = 1
 VISIBILITY_PUBLIC = 2
 
-
 # Here we define the AST specifications for all nodes
 # these are static variables shared between class instances
 # and are defined here to allow a class to list itself in
@@ -429,130 +430,130 @@ VISIBILITY_PUBLIC = 2
 # possible when initially declaring a class in python
 
 Primary.ast_spec = {
-    'value' : Field([bool, float, int, str, type(None)]),
+    'value': Field([bool, float, int, str, type(None)]),
 }
 
 Array.ast_spec = {
-    'values' : FieldList([Expression, Primary, ComponentRef, Array]),
+    'values': FieldList([Expression, Primary, ComponentRef, Array]),
 }
 
 Slice.ast_spec = {
-    'start' : Field([Expression, Primary, ComponentRef], Primary(value=0)),
-    'stop' : Field([Expression, Primary, ComponentRef], Primary(value=-1)),
-    'step' : Field([Expression, Primary, ComponentRef], Primary(value=1)),
+    'start': Field([Expression, Primary, ComponentRef], Primary(value=0)),
+    'stop': Field([Expression, Primary, ComponentRef], Primary(value=-1)),
+    'step': Field([Expression, Primary, ComponentRef], Primary(value=1)),
 }
 
 ComponentRef.ast_spec = {
-    'name' : Field([str]),
-    'indices' : FieldList([Expression, Slice, Primary, ComponentRef], []),
-    'child' : FieldList([ComponentRef], []),
+    'name': Field([str]),
+    'indices': FieldList([Expression, Slice, Primary, ComponentRef], []),
+    'child': FieldList([ComponentRef], []),
 }
 
 Expression.ast_spec = {
-    'operator' : Field([str, ComponentRef]),
-    'operands' : FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
+    'operator': Field([str, ComponentRef]),
+    'operands': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
 }
 
 IfExpression.ast_spec = {
-    'conditions' : FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
-    'expressions' : FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
+    'conditions': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
+    'expressions': FieldList([Expression, Primary, ComponentRef, Array, IfExpression]),
 }
 
 Equation.ast_spec = {
-    'left' : Field([Expression, Primary, ComponentRef]),
-    'right' : Field([Expression, Primary, ComponentRef]),
-    'comment' : Field([str]),
+    'left': Field([Expression, Primary, ComponentRef]),
+    'right': Field([Expression, Primary, ComponentRef]),
+    'comment': Field([str]),
 }
 
 IfEquation.ast_spec = {
-    'conditions' : FieldList([Expression, Primary, ComponentRef]),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause, IfEquation], []),
-    'comment' : Field([str]),
+    'conditions': FieldList([Expression, Primary, ComponentRef]),
+    'equations': FieldList([Equation, ForEquation, ConnectClause, IfEquation], []),
+    'comment': Field([str]),
 }
 
 ForIndex.ast_spec = {
-    'name' : Field([str]),
-    'expression' : Field([Expression, Primary, Slice]),
+    'name': Field([str]),
+    'expression': Field([Expression, Primary, Slice]),
 }
 
 ForEquation.ast_spec = {
-    'indices' : FieldList([ForIndex]),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
-    'comment' : Field([str]),
+    'indices': FieldList([ForIndex]),
+    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
+    'comment': Field([str]),
 }
 
 ConnectClause.ast_spec = {
-    'left' : Field([ComponentRef]),
-    'right' : Field([ComponentRef]),
-    'comment' : Field([str]),
+    'left': Field([ComponentRef]),
+    'right': Field([ComponentRef]),
+    'comment': Field([str]),
 }
 
 AssignmentStatement.ast_spec = {
-    'left' : FieldList([ComponentRef]),
-    'right' : Field([Expression, IfExpression, Primary, ComponentRef]),
-    'comment' : Field([str]),
+    'left': FieldList([ComponentRef]),
+    'right': Field([Expression, IfExpression, Primary, ComponentRef]),
+    'comment': Field([str]),
 }
 
 IfStatement.ast_spec = {
-    'expressions' : FieldList([Expression, Primary, ComponentRef]),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'comment' : Field([str]),
+    'expressions': FieldList([Expression, Primary, ComponentRef]),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
+    'comment': Field([str]),
 }
 
 ForStatement.ast_spec = {
-    'indices' : FieldList([ForIndex]),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'comment' : Field([str]),
+    'indices': FieldList([ForIndex]),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
+    'comment': Field([str]),
 }
 
 Symbol.ast_spec = {
-    'name' : Field([str], ''),
-    'type' : Field([ComponentRef], ComponentRef()),
-    'prefixes' : FieldList([str], []),
-    'redeclare' : Field([bool], False),
-    'final' : Field([bool], False),
-    'inner' : Field([bool], False),
-    'outer' : Field([bool], False),
-    'dimensions' : FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
-    'comment' : Field([str], ''),
-    'start' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'min' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'max' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'nominal' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'value' : Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
-    'fixed' : Field([Primary], False),
-    'id' : Field([int], 0),
-    'order' : Field([int], 0),
-    'visibility' : Field(int, VISIBILITY_PRIVATE),
-    'class_modification' : Field(ClassModification),
+    'name': Field([str], ''),
+    'type': Field([ComponentRef], ComponentRef()),
+    'prefixes': FieldList([str], []),
+    'redeclare': Field([bool], False),
+    'final': Field([bool], False),
+    'inner': Field([bool], False),
+    'outer': Field([bool], False),
+    'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
+    'comment': Field([str], ''),
+    'start': Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'min': Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'max': Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'nominal': Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'value': Field([Expression, Primary, ComponentRef, Array], Primary(value=None)),
+    'fixed': Field([Primary], False),
+    'id': Field([int], 0),
+    'order': Field([int], 0),
+    'visibility': Field(int, VISIBILITY_PRIVATE),
+    'class_modification': Field(ClassModification),
 }
 
 ComponentClause.ast_spec = {
-    'prefixes' : FieldList([str], []),
-    'type' : Field([ComponentRef], ComponentRef()),
-    'dimensions' : FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
-    'comment' : FieldList([str], []),
-    'symbol_list' : FieldList([Symbol], []),
+    'prefixes': FieldList([str], []),
+    'type': Field([ComponentRef], ComponentRef()),
+    'dimensions': FieldList([Expression, Primary, ComponentRef], [Primary(value=1)]),
+    'comment': FieldList([str], []),
+    'symbol_list': FieldList([Symbol], []),
 }
 
 EquationSection.ast_spec = {
-    'initial' : Field([bool], False),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
+    'initial': Field([bool], False),
+    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
 }
 
 AlgorithmSection.ast_spec = {
-    'initial' : Field([bool], False),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
+    'initial': Field([bool], False),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
 }
 
 ImportAsClause.ast_spec = {
-    'component' : Field([ComponentRef]),
-    'name' : Field([str]),
+    'component': Field([ComponentRef]),
+    'name': Field([str]),
 }
 
 ImportFromClause.ast_spec = {
-    'component' : Field([ComponentRef]),
-    'symbols' : FieldList([str]),
+    'component': Field([ComponentRef]),
+    'symbols': FieldList([str]),
 }
 
 # TODO: Check if ComponentRef modifiers are handled correctly. For example,
@@ -560,46 +561,46 @@ ImportFromClause.ast_spec = {
 # "H(min = H_b)".
 ElementModification.ast_spec = {
     'component': Field([ComponentRef], [ComponentRef()]),
-    'modifications' : FieldList([Primary, Expression, ClassModification, Array, ComponentRef], []),
+    'modifications': FieldList([Primary, Expression, ClassModification, Array, ComponentRef], []),
 }
 
 ShortClassDefinition.ast_spec = {
-    'name' : Field(str),
-    'type' : Field(str, ''),
-    'component' : Field(ComponentRef),
-    'class_modification' : Field([ClassModification]),
+    'name': Field(str),
+    'type': Field(str, ''),
+    'component': Field(ComponentRef),
+    'class_modification': Field([ClassModification]),
 }
 
 ClassModification.ast_spec = {
-    'arguments' : FieldList([ElementModification, ComponentClause, ShortClassDefinition], []),
+    'arguments': FieldList([ElementModification, ComponentClause, ShortClassDefinition], []),
 }
 
 ExtendsClause.ast_spec = {
-    'component' : Field([ComponentRef]),
-    'class_modification' : Field([ClassModification]),
+    'component': Field([ComponentRef]),
+    'class_modification': Field([ClassModification]),
     'visibility': Field(int, VISIBILITY_PRIVATE),
 }
 
 Class.ast_spec = {
-    'name' : Field(str),
-    'imports' : FieldList([ImportAsClause, ImportFromClause], []),
-    'extends' : FieldList([ExtendsClause], []),
-    'encapsulated' : Field([bool], False),
-    'partial' : Field([bool], False),
-    'final' : Field([bool], False),
-    'type' : Field([str], ''),
-    'comment' : Field(str, ''),
-    'symbols' : FieldDict([Symbol], {}),
-    'initial_equations' : FieldList([Equation, ForEquation], []),
-    'equations' : FieldList([Equation, ForEquation, ConnectClause], []),
-    'initial_statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'statements' : FieldList([AssignmentStatement, ForStatement], []),
-    'within' : FieldList([ComponentRef], []),
+    'name': Field(str),
+    'imports': FieldList([ImportAsClause, ImportFromClause], []),
+    'extends': FieldList([ExtendsClause], []),
+    'encapsulated': Field([bool], False),
+    'partial': Field([bool], False),
+    'final': Field([bool], False),
+    'type': Field([str], ''),
+    'comment': Field(str, ''),
+    'symbols': FieldDict([Symbol], {}),
+    'initial_equations': FieldList([Equation, ForEquation], []),
+    'equations': FieldList([Equation, ForEquation, ConnectClause], []),
+    'initial_statements': FieldList([AssignmentStatement, ForStatement], []),
+    'statements': FieldList([AssignmentStatement, ForStatement], []),
+    'within': FieldList([ComponentRef], []),
 }
 
 File.ast_spec = {
-    'within' : FieldList([ComponentRef], []),
-    'classes' : FieldDict([Class], {}),
+    'within': FieldList([ComponentRef], []),
+    'classes': FieldDict([Class], {}),
 }
 
 # TODO: The Modelica specification (v3.3, Ch. 4) seems to suggest that

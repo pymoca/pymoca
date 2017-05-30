@@ -12,13 +12,13 @@ from .generated.ModelicaLexer import ModelicaLexer
 from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
 
+
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
 
 class ASTListener(ModelicaListener):
-
     def __init__(self):
         self.ast = {}
         self.ast_result = None
@@ -67,8 +67,8 @@ class ASTListener(ModelicaListener):
 
     def exitShort_class_definition(self, ctx):
         self.ast[ctx] = ast.ShortClassDefinition(name=ctx.IDENT().getText(),
-            type=ctx.class_prefixes().class_type().getText(),
-            component=self.ast[ctx.component_reference()])
+                                                 type=ctx.class_prefixes().class_type().getText(),
+                                                 component=self.ast[ctx.component_reference()])
 
     def enterClass_spec_comp(self, ctx):
         class_node = self.class_node
@@ -224,7 +224,8 @@ class ASTListener(ModelicaListener):
 
         right = ast.Expression(
             operator=all_comp_refs[-1],
-            operands=[self.ast[x.expression()] for x in ctx.function_call_args().function_arguments().function_argument()]
+            operands=[self.ast[x.expression()]
+                      for x in ctx.function_call_args().function_arguments().function_argument()]
         )
 
         self.ast[ctx] = ast.AssignmentStatement(
@@ -333,17 +334,19 @@ class ASTListener(ModelicaListener):
         #       E.g. self.ast[x] below, instead of self.ast[x.expression].
         self.ast[ctx] = ast.Expression(
             operator=self.ast[ctx.component_reference()],
-            operands=[self.ast[x.expression()] for x in ctx.function_call_args().function_arguments().function_argument()]
+            operands=[self.ast[x.expression()]
+                      for x in ctx.function_call_args().function_arguments().function_argument()]
         )
 
     def exitPrimary_derivative(self, ctx):
         self.ast[ctx] = ast.Expression(
             operator='der',
-            operands=[self.ast[x.expression()] for x in ctx.function_call_args().function_arguments().function_argument()]
+            operands=[self.ast[x.expression()]
+                      for x in ctx.function_call_args().function_arguments().function_argument()]
         )
         # TODO 'state' is not a standard prefix;  disable this for now as it does not work
         # when differentiating states defined in superclasses.
-        #if 'state' not in self.class_node.symbols[comp_name].prefixes:
+        # if 'state' not in self.class_node.symbols[comp_name].prefixes:
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
     def exitComponent_reference_element(self, ctx):
@@ -412,7 +415,7 @@ class ASTListener(ModelicaListener):
         else:
             class_modification = ast.ClassModification()
         self.ast[ctx] = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
-            class_modification=class_modification)
+                                          class_modification=class_modification)
         self.class_node.extends += [self.ast[ctx]]
 
     def exitRegular_element(self, ctx):
@@ -449,7 +452,7 @@ class ASTListener(ModelicaListener):
         clause = self.ast[ctx]
         # The component clause and all its symbols share the same type.
         # However, the type will only be turned into a component reference
-        # somewhere between the enterDeclarion and exitDeclaration functions
+        # somewhere between the enterDeclaration and exitDeclaration functions
         # of the symbols. Therefore, we need to keep the component clause's
         # type, and all its symbols' types, pointing at the same empty
         # (ComponentRef) object until we can fill it.
@@ -462,14 +465,14 @@ class ASTListener(ModelicaListener):
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
 
     def enterComponent_declaration(self, ctx):
-        sym = ast.Symbol(order = self.sym_count)
+        sym = ast.Symbol(order=self.sym_count)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
         self.comp_clause.symbol_list += [sym]
 
     def enterComponent_declaration1(self, ctx):
-        sym = ast.Symbol(order = self.sym_count)
+        sym = ast.Symbol(order=self.sym_count)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
@@ -479,7 +482,7 @@ class ASTListener(ModelicaListener):
         if self.symbol_node is not None:
             self.ast[ctx] = self.symbol_node
         else:
-            sym = ast.Symbol(order = self.sym_count)
+            sym = ast.Symbol(order=self.sym_count)
             self.sym_count += 1
             self.ast[ctx] = sym
             self.symbol_node = sym
@@ -579,13 +582,13 @@ def parse(text):
     lexer = ModelicaLexer(input_stream)
     stream = antlr4.CommonTokenStream(lexer)
     parser = ModelicaParser(stream)
-    #parser.buildParseTrees = False
+    # parser.buildParseTrees = False
     parse_tree = parser.stored_definition()
     ast_listener = ASTListener()
     parse_walker = antlr4.ParseTreeWalker()
     parse_walker.walk(ast_listener, parse_tree)
     ast_tree = ast_listener.ast_result
-    # TODO: This is not the prettiest way, but avoid having to instantialize a
+    # TODO: This is not the prettiest way, but avoid having to instantiate a
     # Collection every time we want to parse+flatten a single file.
     ast_tree = ast.Collection(files=[ast_tree])
     return ast_tree
