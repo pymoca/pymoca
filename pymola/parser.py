@@ -525,8 +525,17 @@ class ASTListener(ModelicaListener):
             for mod in self.ast[ctx.modification()]:
                 if isinstance(mod, ast.ClassModification):
                     sym.class_modification = mod
-                else:
+                elif isinstance(mod, ast.Primary):
                     sym.value = mod
+                    sym.start = mod
+                elif isinstance(mod, ast.Array):
+                    sym.value = mod
+                    sym.start.value = mod
+                elif isinstance(mod, ast.Expression):
+                    sym.value = mod
+                    sym.start.value = mod
+                else:
+                    raise IOError('unhandled modification type', type(mod))
 
     def exitElement_modification(self, ctx):
         component = self.ast[ctx.component_reference()]

@@ -1,2 +1,3 @@
 [run]
 source = pymola
+omit = pymola/_version.py

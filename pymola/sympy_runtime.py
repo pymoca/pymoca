@@ -27,11 +27,17 @@ class OdeModel(object):
         self.g = None
 
     def compute_fg(self):
+        n_states = len(self.x)
+        n_vars = len(self.v)
+        n_eqs = len(self.eqs)
+        if n_states + n_vars != n_eqs:
+            raise RuntimeError('# states: {:d} + # variables: {:d} != # equations {:d}'.format(
+                n_states, n_vars, n_eqs))
         fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.v))
         self.f = self.x.diff(self.t).subs(fg_sol)
-        assert (len(self.x) == len(self.f))
+        assert len(self.x) == len(self.f)
         self.g = self.y.subs(fg_sol)
-        assert (len(self.g) == len(self.y))
+        assert len(self.y) == len(self.g)
 
     def linearize_symbolic(self):
         A = sympy.Matrix([])
@@ -73,6 +79,7 @@ class OdeModel(object):
         u_sym = sympy.DeferredVector('u')
         ss_subs = {self.x[i]: x_sym[i] for i in range(len(self.x))}
         ss_subs.update({self.u[i]: u_sym[i] for i in range(len(self.u))})
+        ss_subs.update({self.y[i]: y_sym[i] for i in range(len(self.y))})
         ss_subs.update(self.p0)
         ss_subs.update(self.c0)
 

@@ -314,9 +314,10 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
                 # noinspection PyUnusedLocal
                 class_right = root.find_class(sym_right.type)
             except KeyError:
-                logger.warning("Connector class {} or {} not defined.  "
-                               "Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
-
+                primary_types = ['Real']
+                if sym_left.type.name not in primary_types or sym_right.type.name not in primary_types:
+                    logger.warning("Connector class {} or {} not defined.  "
+                                   "Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
                 connect_equation = ast.Equation(left=flat_equation.left, right=flat_equation.right)
                 connect_equations.append(connect_equation)
             else:

@@ -34,8 +34,8 @@ class Spring(OdeModel):
         c, k = sympy.symbols('c, k')
         self.p = sympy.Matrix([c, k])
         self.p0 = {
-            c : 0,
-            k : 0,
+            c : 0.1,
+            k : 2.0,
             }
 
         # inputs

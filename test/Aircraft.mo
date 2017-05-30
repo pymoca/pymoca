@@ -5,6 +5,7 @@ model RigidBody "the rigid body"
     input Real f_x;
     output Real x, v_x, a_x;
 equation
+    f_x = 1.0;
     der(x) = v_x;
     der(v_x) = a_x;
     f_x = m*a_x;
@@ -12,8 +13,8 @@ end RigidBody;
 
 model Accelerometer "an accelerometer"
     Bias b_x;
-    input Real a_x;
-    output Real ma_x;
+    input Real a_x "true acceleration";
+    output Real ma_x "measured acceleration";
 equation
     connect(b_x.u, a_x);
     ma_x = b_x.y;

@@ -15,17 +15,16 @@ class Aircraft(OdeModel):
         super(Aircraft, self).__init__()
 
         # states
-        body__x, body__v_x, body__a_x = mech.dynamicsymbols('body.x, body.v_x, body.a_x')
-        self.x = sympy.Matrix([body__x, body__v_x, body__a_x])
+        body__x, body__v_x = mech.dynamicsymbols('body.x, body.v_x')
+        self.x = sympy.Matrix([body__x, body__v_x])
         self.x0 = {
-            body__x : 0.0,
-            body__v_x : 0.0,
-            body__a_x : 0.0,
+            body__x : 0,
+            body__v_x : 0,
             }
 
         # variables
-        accel__ma_x, accel__b_x__y = mech.dynamicsymbols('accel.ma_x, accel.b_x.y')
-        self.v = sympy.Matrix([accel__ma_x, accel__b_x__y])
+        body__f_x, body__a_x, accel__a_x, accel__ma_x, accel__b_x__u, accel__b_x__y = mech.dynamicsymbols('body.f_x, body.a_x, accel.a_x, accel.ma_x, accel.b_x.u, accel.b_x.y')
+        self.v = sympy.Matrix([body__f_x, body__a_x, accel__a_x, accel__ma_x, accel__b_x__u, accel__b_x__y])
 
         # constants
         self.c = sympy.Matrix([])
@@ -43,27 +42,23 @@ class Aircraft(OdeModel):
             }
 
         # inputs
-        body__f_x, accel__a_x, accel__b_x__u = mech.dynamicsymbols('body.f_x, accel.a_x, accel.b_x.u')
-        self.u = sympy.Matrix([body__f_x, accel__a_x, accel__b_x__u])
+        self.u = sympy.Matrix([])
         self.u0 = {
-            body__f_x : 0.0,
-            accel__a_x : 0.0,
-            accel__b_x__u : 0.0,
             }
 
         # outputs
-        body__x, body__v_x, body__a_x, accel__ma_x, accel__b_x__y = mech.dynamicsymbols('body.x, body.v_x, body.a_x, accel.ma_x, accel.b_x.y')
-        self.y = sympy.Matrix([body__x, body__v_x, body__a_x, accel__ma_x, accel__b_x__y])
+        self.y = sympy.Matrix([])
 
         # equations
         self.eqs = [
-            body__a_x - (accel__a_x),
+            body__f_x - (1.0),
             (body__x).diff(self.t) - (body__v_x),
             (body__v_x).diff(self.t) - (body__a_x),
             body__f_x - (body__m * body__a_x),
+            accel__b_x__y - (accel__b_x__u + accel__b_x__b),
             accel__b_x__u - (accel__a_x),
             accel__ma_x - (accel__b_x__y),
-            accel__b_x__y - (accel__b_x__u + accel__b_x__b),
+            body__a_x - (accel__a_x),
             ]
 
         self.compute_fg()

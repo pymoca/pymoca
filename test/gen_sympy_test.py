@@ -42,6 +42,8 @@ class GenSympyTest(unittest.TestCase):
             f.write(text)
         from test.generated.Estimator import Estimator as Estimator
         e = Estimator()
+        e.linearize_symbolic()
+        e.linearize()
         # noinspection PyUnusedLocal
         res = e.simulate(x0=[1.0])
         self.flush()
@@ -55,6 +57,8 @@ class GenSympyTest(unittest.TestCase):
             f.write(text)
         from test.generated.Spring import Spring as Spring
         e = Spring()
+        e.linearize_symbolic()
+        e.linearize()
         # noinspection PyUnusedLocal
         res = e.simulate(x0=[1.0, 1.0])
         self.flush()
@@ -64,12 +68,15 @@ class GenSympyTest(unittest.TestCase):
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
-        # text = gen_sympy.generate(ast_tree, 'Aircraft')
-        # with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
-        #  f.write(text)
-        # from generated.Aircraft import Aircraft as Aircraft
-        # e = Aircraft()
-        # res = e.simulate()
+        text = gen_sympy.generate(ast_tree, 'Aircraft')
+        with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+            f.write(text)
+        from test.generated.Aircraft import Aircraft as Aircraft
+        e = Aircraft()
+        e.linearize_symbolic()
+        e.linearize()
+        # noinspection PyUnusedLocal
+        res = e.simulate()
         self.flush()
 
     @unittest.skip
