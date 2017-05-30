@@ -20,5 +20,14 @@
         </list>
       </option>
     </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="pymola.ast.Class.name" />
+          <option value="casadi.MX" />
+          <option value="casadi.vec" />
+        </list>
+      </option>
+    </inspection_tool>
   </profile>
 </component>

@@ -17,7 +17,7 @@ CasadiSysModel = gen_casadi.CasadiSysModel
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-# noinspection PyPep8Naming
+# noinspection PyPep8Naming,PyUnresolvedReferences
 class GenCasadiTest(unittest.TestCase):
     def assert_model_equivalent(self, A, B):
         def sstr(a): return set([str(e) for e in a])
@@ -125,7 +125,9 @@ class GenCasadiTest(unittest.TestCase):
         with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        # noinspection PyUnusedLocal
         casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
+        # noinspection PyUnusedLocal
         ref_model = CasadiSysModel()
         self.assertTrue(True)
 
@@ -323,6 +325,7 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym("x")
         der_x = ca.MX.sym("der(x)")
         y = ca.MX.sym("y")
+        # noinspection PyUnusedLocal
         der_y = ca.MX.sym("y")
         k = ca.MX.sym("k")
 
@@ -512,6 +515,7 @@ class GenCasadiTest(unittest.TestCase):
     def test_type(self):
         with open(os.path.join(TEST_DIR, 'Type.mo'), 'r') as f:
             txt = f.read()
+        # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         self.assertTrue(True)
 

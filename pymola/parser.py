@@ -6,11 +6,16 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 
 import antlr4
 import antlr4.Parser
+from typing import Dict
 
 from . import ast
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaLexer import ModelicaLexer
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaListener import ModelicaListener
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaParser import ModelicaParser
+
 
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
@@ -20,16 +25,16 @@ from .generated.ModelicaParser import ModelicaParser
 # noinspection PyPep8Naming
 class ASTListener(ModelicaListener):
     def __init__(self):
-        self.ast = {}
-        self.ast_result = None
-        self.file_node = None
-        self.class_node = None
-        self.comp_clause = None
-        self.eq_sect = None
-        self.alg_sect = None
-        self.symbol_node = None
-        self.eq_comment = None
-        self.sym_count = 0
+        self.ast = {}  # type: Dict[ast.Node]
+        self.ast_result = None  # type: ast.Node
+        self.file_node = None  # type: ast.File
+        self.class_node = None  # type: ast.Class
+        self.comp_clause = None  # type: ast.ComponentClause
+        self.eq_sect = None  # type: ast.EquationSection
+        self.alg_sect = None  # type: ast.AlgorithmSection
+        self.symbol_node = None  # type: ast.Symbol
+        self.eq_comment = None  # type: str
+        self.sym_count = 0  # type: int
 
     # FILE ===========================================================
 
@@ -83,25 +88,25 @@ class ASTListener(ModelicaListener):
         for clause in self.ast[ctx.epriv]:
             if isinstance(clause, ast.ComponentClause):
                 for symbol in clause.symbol_list:
-                    symbol.visibility = ast.VISIBILITY_PRIVATE
+                    symbol.visibility = ast.Visibility.PRIVATE
             elif isinstance(clause, ast.ExtendsClause):
-                clause.visibility = ast.VISIBILITY_PRIVATE
+                clause.visibility = ast.Visibility.PRIVATE
 
         if ctx.epub is not None:
             for clause in self.ast[ctx.epub]:
                 if isinstance(clause, ast.ComponentClause):
                     for symbol in clause.symbol_list:
-                        symbol.visibility = ast.VISIBILITY_PUBLIC
+                        symbol.visibility = ast.Visibility.PUBLIC
                 elif isinstance(clause, ast.ExtendsClause):
-                    clause.visibility = ast.VISIBILITY_PUBLIC
+                    clause.visibility = ast.Visibility.PUBLIC
 
         if ctx.epro is not None:
             for clause in self.ast[ctx.epro]:
                 if isinstance(clause, ast.ComponentClause):
                     for symbol in clause.symbol_list:
-                        symbol.visibility = ast.VISIBILITY_PROTECTED
+                        symbol.visibility = ast.Visibility.PROTECTED
                 elif isinstance(clause, ast.ExtendsClause):
-                    clause.visibility = ast.VISIBILITY_PROTECTED
+                    clause.visibility = ast.Visibility.PROTECTED
 
         for eqlist in [self.ast[e] for e in ctx.equation_section()]:
             if eqlist is not None:

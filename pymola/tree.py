@@ -10,6 +10,8 @@ import logging
 import sys
 from collections import OrderedDict
 
+from typing import Union
+
 from . import ast
 
 CLASS_SEPARATOR = '.'
@@ -173,14 +175,14 @@ class TreeWalker(object):
             getattr(listener, 'enterEvery')(tree)
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
-        for child_name in tree.ast_spec.keys():
+        for child_name in tree.__dict__.keys():
             self.handle_walk(listener, tree.__dict__[child_name])
         if hasattr(listener, 'exitEvery'):
             getattr(listener, 'exitEvery')(tree)
         if hasattr(listener, 'exit' + name):
             getattr(listener, 'exit' + name)(tree)
 
-    def handle_walk(self, listener: TreeListener, tree: ast.Node) -> None:
+    def handle_walk(self, listener: TreeListener, tree: Union[ast.Node, dict, list]) -> None:
         """
         Handles tree walking, has to account for dictionaries and lists
         :param listener: listener that reacts to walked events
@@ -223,140 +225,6 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     else:
         instance_prefix = instance_name
 
-    def modify_class(class_or_sym, modification):
-        class_or_sym = copy.deepcopy(class_or_sym)
-        for argument in modification.arguments:
-            if isinstance(argument, ast.ElementModification):
-                if argument.component.name in ast.Symbol.ATTRIBUTES:
-                    setattr(class_or_sym, argument.component.name, argument.modifications[0])
-                else:
-                    sym = root.find_symbol(class_or_sym, argument.component)
-                    for modification in argument.modifications:
-                        if isinstance(modification, ast.ClassModification):
-                            sym.__dict__.update(modify_class(sym, modification).__dict__)
-                        else:
-                            sym.value = modification
-            elif isinstance(argument, ast.ComponentClause):
-                for new_sym in argument.symbol_list:
-                    orig_sym = class_or_sym.symbols[new_sym.name]
-                    orig_sym.__dict__.update(new_sym.__dict__)
-            elif isinstance(argument, ast.ShortClassDefinition):
-                for sym in class_or_sym.symbols.values():
-                    if len(sym.type.child) == 0 and sym.type.name == argument.name:
-                        sym.type = argument.component
-                        # TODO class modifications to short class definition
-            else:
-                raise Exception('Unsupported class modification argument {}'.format(argument))
-        return class_or_sym
-
-    def flatten_symbol(sym: ast.Symbol, instance_prefix: str) -> ast.Symbol:
-        """
-        Given a symbols and a prefix performs name mangling
-        :param sym: Symbol
-        :param instance_prefix: Prefix for instance
-        :return: flattened symbol
-        """
-        sym_copy = copy.deepcopy(sym)
-        sym_copy.name = instance_prefix + sym.name
-        if len(instance_prefix) > 0:
-            # Strip 'input' and 'output' prefixes from nested symbols.
-            strip_keywords = ['input', 'output']
-            for strip_keyword in strip_keywords:
-                try:
-                    sym_copy.prefixes.remove(strip_keyword)
-                except ValueError:
-                    pass
-        return sym_copy
-
-    def flatten_component_refs(container: ast.Class,
-                               expression: ast.Expression, instance_prefix: str) -> ast.Expression:
-        """
-        Flattens component refs in a tree
-        :param container: class
-        :param expression: original expression
-        :param instance_prefix: prefix for instance
-        :return: flattened expression
-        """
-
-        expression_copy = copy.deepcopy(expression)
-
-        class ComponentRefFlattener(TreeListener):
-            def __init__(self, container, instance_prefix):
-                self.container = container
-                self.instance_prefix = instance_prefix
-                self.depth = 0
-                self.cutoff_depth = sys.maxsize
-
-                super(ComponentRefFlattener, self).__init__()
-
-            def enterComponentRef(self, tree):
-                self.depth += 1
-                if self.depth > self.cutoff_depth:
-                    return
-
-                # Compose flatted name
-                new_name = self.instance_prefix + tree.name
-                c = tree
-                while len(c.child) > 0:
-                    c = c.child[0]
-                    new_name += CLASS_SEPARATOR + c.name
-
-                # If the flattened name exists in the container, use it. 
-                # Otherwise, skip this reference.
-                try:
-                    root.find_symbol(self.container, ast.ComponentRef(name=new_name))
-                except KeyError:
-                    # The component was not found in the container.  We leave this
-                    # reference alone.
-                    self.cutoff_depth = self.depth
-                else:
-                    tree.name = new_name
-                    c = tree
-                    while len(c.child) > 0:
-                        c = c.child[0]
-                        if len(c.indices) > 0:
-                            tree.indices += c.indices
-                    tree.child = []
-
-            def exitComponentRef(self, tree):
-                self.depth -= 1
-                if self.depth < self.cutoff_depth:
-                    self.cutoff_depth = sys.maxsize
-
-        w = TreeWalker()
-        w.walk(ComponentRefFlattener(container, instance_prefix), expression_copy)
-
-        return expression_copy
-
-    def pull_functions(expression: ast.Expression, instance_prefix: str) -> set:
-        """
-        TODO: document
-        :param expression: 
-        :param instance_prefix: 
-        :return: 
-        """
-
-        expression_copy = copy.deepcopy(expression)
-
-        class FunctionPuller(TreeListener):
-            def __init__(self, instance_prefix: str, root, function_set):
-                self.instance_prefix = instance_prefix
-                self.root = root
-                self.function_set = function_set
-
-                super(FunctionPuller, self).__init__()
-
-            def exitExpression(self, tree):
-                if isinstance(tree.operator, ast.ComponentRef) and \
-                                tree.operator.name in self.root.classes:
-                    self.function_set.add(tree.operator.name)
-
-        w = TreeWalker()
-        function_set = set()
-        w.walk(FunctionPuller(instance_prefix, root, function_set), expression_copy)
-
-        return function_set
-
     extended_orig_class = ast.Class(
         name=orig_class.name,
     )
@@ -373,7 +241,8 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
         # set visibility
         for sym in flat_parent_class.symbols.values():
-            sym.visibility = min(sym.visibility, extends.visibility)
+            if sym.visibility > extends.visibility:
+                sym.visibility = extends.visibility
 
         # add parent class members symbols, equations and statements
         extended_orig_class.symbols.update(flat_parent_class.symbols)
@@ -381,14 +250,14 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
         extended_orig_class.statements += flat_parent_class.statements
 
         # carry out modifications
-        extended_orig_class = modify_class(extended_orig_class, extends.class_modification)
+        extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
 
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
     extended_orig_class.statements += orig_class.statements
 
     if class_modification is not None:
-        extended_orig_class = modify_class(extended_orig_class, class_modification)
+        extended_orig_class = modify_class(root, extended_orig_class, class_modification)
 
     # for all symbols in the original class
     for sym_name, sym in extended_orig_class.symbols.items():
@@ -426,13 +295,13 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
     # now resolve all references inside the symbol definitions
     for sym_name, sym in flat_class.symbols.items():
-        flat_sym = flatten_component_refs(flat_class, sym, instance_prefix)
+        flat_sym = flatten_component_refs(root, flat_class, sym, instance_prefix)
         flat_class.symbols[sym_name] = flat_sym
 
     # for all equations in original class
     flow_connections = OrderedDict()
     for equation in extended_orig_class.equations:
-        flat_equation = flatten_component_refs(flat_class, equation, instance_prefix)
+        flat_equation = flatten_component_refs(root, flat_class, equation, instance_prefix)
         if isinstance(equation, ast.ConnectClause):
             # expand connector
             connect_equations = []
@@ -442,6 +311,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
             try:
                 class_left = root.find_class(sym_left.type)
+                # noinspection PyUnusedLocal
                 class_right = root.find_class(sym_right.type)
             except KeyError:
                 logger.warning("Connector class {} or {} not defined.  "
@@ -485,7 +355,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             # flatten equation
             flat_class.equations += [flat_equation]
 
-    flat_class.statements += [flatten_component_refs(flat_class, e, instance_prefix) for e in
+    flat_class.statements += [flatten_component_refs(root, flat_class, e, instance_prefix) for e in
                               extended_orig_class.statements]
 
     # add flow equations
@@ -518,6 +388,175 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     return flat_class
 
 
+def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification):
+    """
+    Apply a modification to a class or symbol.
+    :param root: root tree for looking up symbols
+    :param class_or_sym: class or symbol to modify
+    :param modification: modification to apply
+    :return: 
+    """
+    class_or_sym = copy.deepcopy(class_or_sym)
+    for argument in modification.arguments:
+        if isinstance(argument, ast.ElementModification):
+            if argument.component.name in ast.Symbol.ATTRIBUTES:
+                setattr(class_or_sym, argument.component.name, argument.modifications[0])
+            else:
+                s = root.find_symbol(class_or_sym, argument.component)
+                for modification in argument.modifications:
+                    if isinstance(modification, ast.ClassModification):
+                        s.__dict__.update(modify_class(root, s, modification).__dict__)
+                    else:
+                        s.value = modification
+        elif isinstance(argument, ast.ComponentClause):
+            for new_sym in argument.symbol_list:
+                orig_sym = class_or_sym.symbols[new_sym.name]
+                orig_sym.__dict__.update(new_sym.__dict__)
+        elif isinstance(argument, ast.ShortClassDefinition):
+            for s in class_or_sym.symbols.values():
+                if len(s.type.child) == 0 and s.type.name == argument.name:
+                    s.type = argument.component
+                    # TODO class modifications to short class definition
+        else:
+            raise Exception('Unsupported class modification argument {}'.format(argument))
+    return class_or_sym
+
+
+def flatten_symbol(s: ast.Symbol, instance_prefix: str) -> ast.Symbol:
+    """
+    Given a symbols and a prefix performs name mangling
+    :param s: Symbol
+    :param instance_prefix: Prefix for instance
+    :return: flattened symbol
+    """
+    s_copy = copy.deepcopy(s)
+    s_copy.name = instance_prefix + s.name
+    if len(instance_prefix) > 0:
+        # Strip 'input' and 'output' prefixes from nested symbols.
+        strip_keywords = ['input', 'output']
+        for strip_keyword in strip_keywords:
+            try:
+                s_copy.prefixes.remove(strip_keyword)
+            except ValueError:
+                pass
+    return s_copy
+
+
+class ComponentRefFlattener(TreeListener):
+    """
+    A listener that flattens references to components and performs name mangling,
+    it also locates all symbols and determines which are states (
+    one of the equations contains a derivative of the symbol)
+    """
+    def __init__(self, root: ast.Collection, container: ast.Class, instance_prefix: str):
+        self.root = root
+        self.container = container
+        self.instance_prefix = instance_prefix
+        self.depth = 0
+        self.cutoff_depth = sys.maxsize
+
+        super(ComponentRefFlattener, self).__init__()
+
+    def enterComponentRef(self, tree: ast.ComponentRef):
+        self.depth += 1
+        if self.depth > self.cutoff_depth:
+            return
+
+        # Compose flatted name
+        new_name = self.instance_prefix + tree.name
+        c = tree
+        while len(c.child) > 0:
+            c = c.child[0]
+            new_name += CLASS_SEPARATOR + c.name
+
+        # If the flattened name exists in the container, use it.
+        # Otherwise, skip this reference.
+        try:
+            self.root.find_symbol(self.container, ast.ComponentRef(name=new_name))
+        except KeyError:
+            # The component was not found in the container.  We leave this
+            # reference alone.
+            self.cutoff_depth = self.depth
+        else:
+            tree.name = new_name
+            c = tree
+            while len(c.child) > 0:
+                c = c.child[0]
+                if len(c.indices) > 0:
+                    tree.indices += c.indices
+            tree.child = []
+
+    def exitComponentRef(self, tree: ast.ComponentRef):
+        self.depth -= 1
+        if self.depth < self.cutoff_depth:
+            self.cutoff_depth = sys.maxsize
+
+    def exitExpression(self, tree: ast.Expression):
+        """
+        When exiting an expression, check if it is a derivative, if it is
+        put state prefix on symbol
+        """
+        if tree.operator == 'der':
+            s = self.root.find_symbol(self.container, tree.operands[0])
+            s.prefixes.append('state')
+
+
+def flatten_component_refs(
+        root: ast.Collection, container: ast.Class,
+        expression: ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol],
+        instance_prefix: str) -> ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol]:
+    """
+    Flattens component refs in a tree
+    :param root: root node
+    :param container: class
+    :param expression: original expression
+    :param instance_prefix: prefix for instance
+    :return: flattened expression
+    """
+
+    expression_copy = copy.deepcopy(expression)
+
+    w = TreeWalker()
+    w.walk(ComponentRefFlattener(root, container, instance_prefix), expression_copy)
+
+    return expression_copy
+
+
+class FunctionPuller(TreeListener):
+    """
+    Listener to extract functions
+    """
+    def __init__(self, instance_prefix: str, root, function_set):
+        self.instance_prefix = instance_prefix
+        self.root = root
+        self.function_set = function_set
+
+        super(FunctionPuller, self).__init__()
+
+    def exitExpression(self, tree: ast.Expression):
+        if isinstance(tree.operator, ast.ComponentRef) and \
+                        tree.operator.name in self.root.classes:
+            self.function_set.add(tree.operator.name)
+
+
+# noinspection PyUnusedLocal
+def pull_functions(root: ast.Collection, expression: ast.Expression, instance_prefix: str) -> set:
+    """
+    TODO: document
+    :param root: collection for performing symbol lookup etc.
+    :param expression: 
+    :param instance_prefix: 
+    :return: 
+    """
+
+    expression_copy = copy.deepcopy(expression)
+
+    w = TreeWalker()
+    function_set = set()
+    w.walk(FunctionPuller(instance_prefix, root, function_set), expression_copy)
+    return function_set
+
+
 def flatten(root: ast.Collection, class_name: str) -> ast.File:
     """
     This function takes and flattens it so that all subclasses instances
@@ -539,6 +578,7 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
     # strip connector symbols
     for i, sym in list(flat_class.symbols.items()):
         try:
+            # noinspection PyUnusedLocal
             c = root.find_class(sym.type)
         except KeyError:
             pass

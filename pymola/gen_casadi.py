@@ -33,6 +33,7 @@ OP_MAP = {'*': "__mul__",
 VariableMetadata = namedtuple('VariableMetadata', ['min', 'max', 'nominal'])
 
 
+# noinspection PyUnresolvedReferences
 class CasadiSysModel:
     def __init__(self):
         self.states = []
@@ -109,6 +110,7 @@ class CasadiSysModel:
                 self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters,
                                self.equations)
 
+    # noinspection PyUnusedLocal
     def initial_residual_function(self, group_arguments=True):
         # TODO
         return ca.Function('initial_residual', [self.time], [0])
@@ -136,7 +138,7 @@ class CasadiSysModel:
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 
 
-# noinspection PyPep8Naming
+# noinspection PyPep8Naming,PyUnresolvedReferences
 class ForLoop:
     def __init__(self, generator, tree):
         self.tree = tree
@@ -163,7 +165,7 @@ class ForLoop:
         self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, indices)
 
 
-# noinspection PyPep8Naming
+# noinspection PyPep8Naming,PyUnresolvedReferences
 class CasadiGenerator(TreeListener):
     def __init__(self, root, class_name):
         super(CasadiGenerator, self).__init__()
@@ -183,7 +185,6 @@ class CasadiGenerator(TreeListener):
         outputs = []
         constants = []
         parameters = []
-        variables = []
         symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
         for s in symbols:
             if 'constant' in s.prefixes:
@@ -398,7 +399,7 @@ class CasadiGenerator(TreeListener):
 
         self.src[tree] = src
 
-    def get_integer(self, tree):
+    def get_integer(self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]):
         # CasADi needs to know the dimensions of symbols at instantiation.
         # We therefore need a mechanism to evaluate expressions that define dimensions of symbols.
         if isinstance(tree, ast.Primary):
@@ -414,6 +415,7 @@ class CasadiGenerator(TreeListener):
             ast_walker.walk(self, tree)
 
             # Obtain expression
+
             expr = self.get_mx(tree)
 
             # Obtain the symbols it depends on
@@ -444,7 +446,7 @@ class CasadiGenerator(TreeListener):
             stop = self.get_integer(tree.stop)
             return np.arange(start, stop + step, step, dtype=np.int)
         else:
-            raise Exception('Unexpected node type {}'.format(i.__class__.__name__))
+            raise Exception('Unexpected node type {}'.format(tree.__class__.__name__))
 
     def get_symbol(self, tree):
         # Create symbol
@@ -498,10 +500,14 @@ class CasadiGenerator(TreeListener):
             s = self.get_indexed_symbol(tree, s)
         return s
 
-    def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef]):
-        # We pull components and symbols from the AST on demand.  
-        # This is to ensure that parametrized vector dimensions can be resolved.  Vector
-        # dimensions need to be known at CasADi MX creation time.
+    def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef, ast.Expression]) -> ca.MX:
+        """
+        We pull components and symbols from the AST on demand.  
+        This is to ensure that parametrized vector dimensions can be resolved.  Vector
+        dimensions need to be known at CasADi MX creation time.
+        :param tree: 
+        :return: 
+        """
         if tree not in self.src:
             if isinstance(tree, ast.Symbol):
                 s = self.get_symbol(tree)

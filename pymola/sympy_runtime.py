@@ -5,6 +5,7 @@ from __future__ import print_function, division
 import pylab as pl
 import scipy.integrate
 import sympy
+from typing import List
 
 
 # noinspection PyPep8Naming
@@ -56,15 +57,18 @@ class OdeModel(object):
         ss_subs.update(self.p0)
         ss_subs.update(self.c0)
         if x0 is None:
+            # noinspection PyUnusedLocal
             x0 = self.x.subs(self.x0)[:]
         if u0 is None:
+            # noinspection PyUnusedLocal
             u0 = self.x.subs(self.u0)[:]
         for i in range(len(ss)):
             ss_eval += [pl.matrix(ss[i].subs(ss_subs)).astype(float)]
         return ss_eval
 
-    def simulate(self, x0: float=None, u0: float=None, t0: float=0, tf: float=10, dt: float=0.01):
+    def simulate(self, x0: List[float]=None, u0: float=None, t0: float=0, tf: float=10, dt: float=0.01) -> dict:
         x_sym = sympy.DeferredVector('x')
+        # noinspection PyUnusedLocal
         y_sym = sympy.DeferredVector('y')
         u_sym = sympy.DeferredVector('u')
         ss_subs = {self.x[i]: x_sym[i] for i in range(len(self.x))}
@@ -83,7 +87,7 @@ class OdeModel(object):
             jac_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.jacobian(self.x).subs(ss_subs))
             res = pl.array(jac_lam(0, pl.zeros(len(self.x)), pl.zeros(len(self.u))), dtype=float)
             if len(res.shape) == 2 and res.shape[0] != len(self.x):
-                raise IOError("jacobian doesn't return correct size", res.self.f)
+                raise IOError("jacobian doesn't return correct size", res['f'])
         else:
             jac_lam = None
 

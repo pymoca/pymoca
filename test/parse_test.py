@@ -16,7 +16,9 @@ TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class ParseTest(unittest.TestCase):
-    "Testing"
+    """
+    Parse test
+    """
 
     def setUp(self):
         pass
@@ -80,6 +82,7 @@ class ParseTest(unittest.TestCase):
     def test_connector(self):
         with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
             txt = f.read()
+        # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         # states = ast_tree.classes['Aircraft'].states
         # names = sorted([state.name for state in states])

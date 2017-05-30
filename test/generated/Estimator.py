@@ -15,13 +15,15 @@ class Estimator(OdeModel):
         super(Estimator, self).__init__()
 
         # states
-        self.x = sympy.Matrix([])
+        x = mech.dynamicsymbols('x')
+        self.x = sympy.Matrix([x])
         self.x0 = {
+            x : 0,
             }
 
         # variables
-        x, y = mech.dynamicsymbols('x, y')
-        self.v = sympy.Matrix([x, y])
+        y = mech.dynamicsymbols('y')
+        self.v = sympy.Matrix([y])
 
         # constants
         self.c = sympy.Matrix([])
