@@ -534,6 +534,8 @@ class ASTListener(ModelicaListener):
                 elif isinstance(mod, ast.Expression):
                     sym.value = mod
                     sym.start.value = mod
+                elif isinstance(mod, ast.ComponentRef):
+                    sym.value = mod
                 else:
                     raise IOError('unhandled modification type', type(mod))
 
