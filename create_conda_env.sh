@@ -1,13 +1,25 @@
 #!/bin/bash
 set -e
+if [ "$#" -eq 1 ]; then
+    config=$1
+else
+    echo "usage: $0 CONFIG"
+    echo "         possible configs (testing, enduser)"
+    exit 1
+fi
+
 conda update -q conda
-conda env remove -n pymola || echo "no old pymola env found"
 # Useful for debugging any issues with conda
 conda info -a
 conda config --add channels conda-forge
-conda create -n pymola python=3.5 numpy scipy sympy coverage \
-	matplotlib gcc cython jupyter lapack pydotplus casadi coveralls
+conda create -n pymola python=3.5 || echo "environment already created"
+conda install -n pymola numpy scipy sympy casadi matplotlib gcc cython casadi
 source activate pymola
-# for some reason conda install of casadi doesn't work correctly, works with pip
-# note this installs within the conda env as well since we source pymola above
-pip install antlr4-python3-runtime control slycot
+pip install antlr4-python3-runtime
+
+if [ "$config" == "testing" ]; then
+    conda install -n pymola coverage coveralls
+elif [ "$config" == "eneduser" ]; then
+    conda install -n pymola jupyter lapack pydotplus
+    pip install control slycot
+fi
