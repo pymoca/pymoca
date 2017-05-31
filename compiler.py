@@ -68,7 +68,7 @@ else:
     simplify_options = \
         {'replace_constants': True,
          'replace_parameter_expressions': True,
-         'replace_protected': True,
+         'eliminable_variable_expression': r'_\w+',
          'detect_aliases': True}
     model.simplify(simplify_options)
 

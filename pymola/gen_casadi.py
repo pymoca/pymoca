@@ -2,6 +2,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 
 import itertools
 import logging
+import re
 from collections import namedtuple, OrderedDict, MutableSet
 
 import casadi as ca
@@ -231,6 +232,53 @@ class CasadiSysModel:
             self.parameters = simple_parameters
             self.parameter_values = simple_parameter_values
 
+        if options.get('eliminable_variable_expression', None) is not None:
+            logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
+
+            p = re.compile(options['eliminable_variable_expression'])
+
+            alg_states = OrderedDict({s.name() : s for s in self.alg_states})
+
+            variables = []
+            values = []
+
+            reduced_equations = []
+            for eq in self.equations:
+                if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                    if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and p.match(eq.dep(0).name()):
+                        variable = eq.dep(0)
+                        value = eq.dep(1)
+                    elif eq.dep(1).is_symbolic() and eq.dep(1).name() in alg_states and p.match(eq.dep(1).name()):
+                        variable = eq.dep(1)
+                        value = eq.dep(0)
+                    else:
+                        variable = None
+                        value = None
+
+                    if variable is not None:
+                        del alg_states[variable]
+
+                        variables.append(variable)
+                        if eq.is_op(ca.OP_SUB):
+                            values.append(value)
+                        else:
+                            values.append(-value)
+
+                        # Skip this equation
+                        continue
+
+                # Keep this equation
+                reduced_equations.append(eq)
+
+            # Eliminate alias variables
+            self.alg_states = list(alg_states.values())
+            self.equations = reduced_equations
+
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, variables, values)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+
         if options.get('detect_aliases', False):
             logger.info("Detecting aliases")
 
@@ -426,6 +474,7 @@ class CasadiGenerator(TreeListener):
         self.model.der_states = discard_empty([self.derivative[
                                                    self.get_mx(e)] for e in ode_states])
         self.model.alg_states = discard_empty([self.get_mx(e) for e in alg_states])
+        # TODO move to setattr?
         self.model.alg_state_metadata = [
             VariableMetadata(self.get_mx(e.start), self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal), self.get_mx(e.fixed)) for e in alg_states if
             not self.get_mx(e).is_empty()]
