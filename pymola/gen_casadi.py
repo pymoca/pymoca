@@ -95,7 +95,7 @@ class OrderedSet(MutableSet):
 # End snippet
 
 
-# Code snippet from RTC-Tools, Copyright Stiching Deltares, originally under the terms of the GPL
+# Code snippet from RTC-Tools, copyright Stichting Deltares, originally under the terms of the GPL
 # version 3.  Relicensed with permission.
 class AliasRelation:
     def __init__(self):
