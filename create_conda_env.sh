@@ -13,7 +13,7 @@ conda update -q conda
 conda info -a
 conda config --add channels conda-forge
 conda create -n pymola python=3.5 || echo "environment already created"
-conda install -n pymola numpy scipy sympy casadi matplotlib gcc cython casadi
+conda install -n pymola numpy scipy sympy casadi matplotlib gcc cython casadi jinja2
 source activate pymola
 pip install antlr4-python3-runtime
 
