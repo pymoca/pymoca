@@ -2,7 +2,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 
 import itertools
 import logging
-from collections import namedtuple
+from collections import namedtuple, OrderedDict, MutableSet
 
 import casadi as ca
 import numpy as np
@@ -15,6 +15,128 @@ logger = logging.getLogger("pymola")
 
 # TODO
 #  - Nested for loops
+
+
+# From https://code.activestate.com/recipes/576694/
+class OrderedSet(MutableSet):
+
+    def __init__(self, iterable=None):
+        self.end = end = [] 
+        end += [None, end, end]         # sentinel node for doubly linked list
+        self.map = {}                   # key --> [key, prev, next]
+        if iterable is not None:
+            self |= iterable
+
+    def __len__(self):
+        return len(self.map)
+
+    def __contains__(self, key):
+        return key in self.map
+
+    def __getitem__(self, index):
+        # Method added by JB
+        if isinstance(index, slice):
+            start, stop, stride = index.indices(len(self))
+            return [self.__getitem__(i) for i in range(start, stop, stride)]
+        else:
+            end = self.end
+            curr = end[2]
+            i = 0
+            while curr is not end:
+                if i == index:
+                    return curr[0]
+                curr = curr[2]
+                i += 1
+            raise IndexError('set index {} out of range with length {}'.format(index, len(self)))
+
+    def add(self, key):
+        if key not in self.map:
+            end = self.end
+            curr = end[1]
+            curr[2] = end[1] = self.map[key] = [key, curr, end]
+
+    def discard(self, key):
+        if key in self.map:        
+            key, prev, next = self.map.pop(key)
+            prev[2] = next
+            next[1] = prev
+
+    def __iter__(self):
+        end = self.end
+        curr = end[2]
+        while curr is not end:
+            yield curr[0]
+            curr = curr[2]
+
+    def __reversed__(self):
+        end = self.end
+        curr = end[1]
+        while curr is not end:
+            yield curr[0]
+            curr = curr[1]
+
+    def pop(self, last=True):
+        if not self:
+            raise KeyError('set is empty')
+        key = self.end[1][0] if last else self.end[2][0]
+        self.discard(key)
+        return key
+
+    def __repr__(self):
+        if not self:
+            return '%s()' % (self.__class__.__name__,)
+        return '%s(%r)' % (self.__class__.__name__, list(self))
+
+    def __eq__(self, other):
+        if isinstance(other, OrderedSet):
+            return len(self) == len(other) and list(self) == list(other)
+        return set(self) == set(other)
+# End snippet
+
+
+# Code snippet from RTC-Tools, Copyright Stiching Deltares, originally under the terms of the GPL
+# version 3.  Relicensed with permission.
+class AliasRelation:
+    def __init__(self):
+        self._aliases = {}
+        self._canonical_variables = OrderedSet()
+
+    def add(self, a, b):
+        aliases = self.aliases(a)
+        for v in self.aliases(b):
+            aliases.add(v)
+        for v in aliases:
+            self._aliases[v] = aliases
+        self._canonical_variables.add(aliases[0])
+        for v in aliases[1:]:
+            try:
+                self._canonical_variables.remove(v)
+            except KeyError:
+                pass
+
+    def aliases(self, a):
+        return self._aliases.get(a, OrderedSet([a]))
+
+    def canonical_signed(self, a):
+        if a in self._aliases:
+            return self.aliases(a)[0], 1
+        else:
+            if a[0] == '-':
+                b = a[1:]
+            else:
+                b = '-' + a
+            if b in self._aliases:
+                return self.aliases(b)[0], -1
+            else:
+                return self.aliases(a)[0], 1
+
+    @property
+    def canonical_variables(self):
+        return self._canonical_variables
+
+    def __iter__(self):
+        return ((canonical_variable, self.aliases(canonical_variable)[1:]) for canonical_variable in self._canonical_variables)
+
 
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
@@ -80,8 +202,10 @@ class CasadiSysModel:
                 "Number of states minus inputs is {}, number of equations is {}.".format(
                     n_states - n_inputs, n_equations))
 
-    def simplify(self, replace_constants=True, replace_parameter_expressions=True):
-        if replace_constants:
+    def simplify(self, options):
+        if options.get('replace_constants', False):
+            logger.info("Replacing constants")
+
             if len(self.equations) > 0:
                 self.equations = ca.substitute(self.equations, self.constants, self.constant_values)
             if len(self.initial_equations) > 0:
@@ -89,7 +213,9 @@ class CasadiSysModel:
             self.constants = []
             self.constant_values = []
 
-        if replace_parameter_expressions:
+        if options.get('replace_parameter_expressions', False):
+            logger.info("Replacing parameter expressions")
+
             composite_parameters, simple_parameters = [], []
             composite_parameter_values, simple_parameter_values = [], []
             for e, v in zip(self.parameters, self.parameter_values):
@@ -105,8 +231,75 @@ class CasadiSysModel:
             self.parameters = simple_parameters
             self.parameter_values = simple_parameter_values
 
-            # TODO detect and eliminate aliases
-            # TODO eliminate protected variables without min/max attribute
+        if options.get('detect_aliases', False):
+            logger.info("Detecting aliases")
+
+            states = OrderedDict({s.name() : s for s in self.states})
+            alg_states = OrderedDict({s.name() : s for s in self.alg_states})
+            inputs = OrderedDict({s.name() : s for s in self.inputs})
+            outputs = OrderedDict({s.name() : s for s in self.outputs})
+
+            alias_rel = AliasRelation()
+
+            reduced_equations = []
+            for eq in self.equations:
+                if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                    if eq.dep(0).is_symbolic() and eq.dep(1).is_symbolic():
+                        if eq.dep(0).name() in alg_states:
+                            alg_state = eq.dep(0)
+                            other_state = eq.dep(1)
+                        elif eq.dep(1).name() in alg_states:
+                            alg_state = eq.dep(1)
+                            other_state = eq.dep(0)
+                        else:
+                            alg_state = None
+                            other_state = None
+
+                        if alg_state is not None:
+                            # Add alias
+                            if eq.is_op(ca.OP_SUB):
+                                alias_rel.add(other_state.name(), alg_state.name())
+                            else:
+                                alias_rel.add(other_state.name(), '-' + alg_state.name())
+
+                            # Skip this equation
+                            continue
+
+                # Keep this equation
+                reduced_equations.append(eq)
+
+            # Eliminate alias variables
+            variables, values = [], []
+            for canonical, aliases in alias_rel:
+                try:
+                    canonical_state = alg_states[canonical]
+                except KeyError:
+                    canonical_state = states[canonical]
+                setattr(canonical_state, 'aliases', aliases)
+                for alias in aliases:
+                    if alias[0] == '-':
+                        sign = -1
+                        alias = alias[1:]
+                    else:
+                        sign = 1
+                    variables.append(alg_states[alias])
+                    values.append(sign * canonical_state)
+
+                    del alg_states[alias]
+                    if alias in inputs:
+                        inputs[alias] = sign * canonical_state
+                    if alias in outputs:
+                        outputs[alias] = sign * canonical_state
+
+            self.alg_states = list(alg_states.values())
+            self.inputs = list(inputs.values())
+            self.outputs = list(outputs.values())
+            self.equations = reduced_equations
+
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, variables, values)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
     def dae_residual_function(self, group_arguments=True):
         if group_arguments:

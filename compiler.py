@@ -64,7 +64,15 @@ else:
     
     model = gen_casadi.generate(ast, model_name)
     model.check_balanced()
-    model.simplify(replace_constants=True, replace_parameter_expressions=True)
+
+    simplify_options = \
+        {'replace_constants': True,
+         'replace_parameter_expressions': True,
+         'replace_protected': True,
+         'detect_aliases': True}
+    model.simplify(simplify_options)
+
+    model.check_balanced()
 
     # Compile shared libraries
     if os.name == 'posix':
@@ -116,7 +124,7 @@ else:
         # Describe variables per category
         Variable = namedtuple('Variable', ['name', 'value', 'aliases'])
         for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs']:
-            db[key] = [Variable(e.name(), None, []) for e in getattr(model, key)]
+            db[key] = [Variable(e.name(), None, getattr(e, 'aliases', [])) for e in getattr(model, key)]
 
         db['parameters'] = [Variable(e.name(), v, []) for e, v in zip(model.parameters, model.parameter_values)]
 
