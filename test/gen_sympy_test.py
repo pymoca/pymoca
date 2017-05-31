@@ -49,14 +49,16 @@ class GenSympyTest(unittest.TestCase):
         self.flush()
 
     def test_spring(self):
-        with open(os.path.join(TEST_DIR, 'Spring.mo'), 'r') as f:
+        with open(os.path.join(TEST_DIR, 'SpringSystem.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Spring')
+        flat_tree = tree.flatten(ast_tree, 'SpringSystem')
+        print(flat_tree)
+        text = gen_sympy.generate(ast_tree, 'SpringSystem')
         with open(os.path.join(TEST_DIR, 'generated/Spring.py'), 'w') as f:
             f.write(text)
-        from test.generated.Spring import Spring as Spring
-        e = Spring()
+        from test.generated.Spring import SpringSystem as SpringSystem
+        e = SpringSystem()
         e.linearize_symbolic()
         e.linearize()
         # noinspection PyUnusedLocal

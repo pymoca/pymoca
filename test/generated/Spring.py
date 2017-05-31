@@ -8,22 +8,23 @@ from pymola.sympy_runtime import OdeModel
 from sympy import sin, cos, tan
 
 
-class Spring(OdeModel):
+class SpringSystem(OdeModel):
 
     def __init__(self):
 
-        super(Spring, self).__init__()
+        super(SpringSystem, self).__init__()
 
         # states
         x, v_x = mech.dynamicsymbols('x, v_x')
         self.x = sympy.Matrix([x, v_x])
         self.x0 = {
-            x : 0,
-            v_x : 0,
+            x : 1.0,
+            v_x : 1.0,
             }
 
         # variables
-        self.v = sympy.Matrix([])
+        spring__x, spring__f, damper__v, damper__f = mech.dynamicsymbols('spring.x, spring.f, damper.v, damper.f')
+        self.v = sympy.Matrix([spring__x, spring__f, damper__v, damper__f])
 
         # constants
         self.c = sympy.Matrix([])
@@ -31,25 +32,32 @@ class Spring(OdeModel):
             }
 
         # parameters
-        c, k = sympy.symbols('c, k')
-        self.p = sympy.Matrix([c, k])
+        spring__k, damper__c = sympy.symbols('spring.k, damper.c')
+        self.p = sympy.Matrix([spring__k, damper__c])
         self.p0 = {
-            c : 0.1,
-            k : 2.0,
+            spring__k : 2.0,
+            damper__c : 0.2,
             }
 
         # inputs
-        self.u = sympy.Matrix([])
+        u = mech.dynamicsymbols('u')
+        self.u = sympy.Matrix([u])
         self.u0 = {
+            u : 0,
             }
 
         # outputs
-        self.y = sympy.Matrix([])
+        x, v_x = mech.dynamicsymbols('x, v_x')
+        self.y = sympy.Matrix([x, v_x])
 
         # equations
         self.eqs = [
+            spring__f - (- spring__k * spring__x),
+            damper__f - (- damper__c * damper__v),
+            spring__x - (x),
+            damper__v - (v_x),
             (x).diff(self.t) - (v_x),
-            (v_x).diff(self.t) - (- k * x - c * v_x),
+            (v_x).diff(self.t) - (spring__f + damper__f - u),
             ]
 
         self.compute_fg()

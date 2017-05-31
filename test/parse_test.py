@@ -70,6 +70,15 @@ class ParseTest(unittest.TestCase):
         print('AST TREE FLAT\n', flat_tree)
         self.flush()
 
+    def test_spring_system(self):
+        with open(os.path.join(TEST_DIR, 'SpringSystem.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        print('AST TREE\n', ast_tree)
+        flat_tree = tree.flatten(ast_tree, 'SpringSystem')
+        print('AST TREE FLAT\n', flat_tree)
+        self.flush()
+
     def test_duplicate_state(self):
         with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
             txt = f.read()

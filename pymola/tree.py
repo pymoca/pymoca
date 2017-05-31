@@ -535,7 +535,8 @@ class StateAnnotator(TreeListener):
 
 def annotate_states(root: ast.Collection, node: ast.Node) -> None:
     """
-    TODO: document
+    Finds all derivative expressions and annotates all differentiated
+    symbols as states by adding state the prefix list
     :param root: collection for performing symbol lookup etc.
     :param node: node of tree to walk
     :return: 
@@ -581,11 +582,11 @@ def pull_functions(root: ast.Collection, expression: ast.Expression, instance_pr
 
 def flatten(root: ast.Collection, class_name: str) -> ast.File:
     """
-    This function takes and flattens it so that all subclasses instances
+    This function takes a Collection and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
     of the instance name passed.
-    :param root: The root of the tree that contains all files with all class definitions
-    :param class_name: The class we want to flatten
+    :param root: The Collection to flatten
+    :param class_name: The class that we want to create a flat model for
     :return: flat_file, a File containing the flattened class
     """
 
