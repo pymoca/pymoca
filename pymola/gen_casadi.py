@@ -48,6 +48,7 @@ class CasadiSysModel:
         self.parameters = []
         self.parameter_values = []
         self.equations = []
+        self.initial_equations = []
         self.time = ca.MX.sym('time')
         self.delayed_states = []
 
@@ -64,6 +65,7 @@ class CasadiSysModel:
         r += "constant_values: " + str(self.constant_values) + "\n"
         r += "parameters: " + str(self.parameters) + "\n"
         r += "equations: " + str(self.equations) + "\n"
+        r += "initial equations: " + str(self.initial_equations) + "\n"
         return r
 
     def check_balanced(self):
@@ -80,7 +82,10 @@ class CasadiSysModel:
 
     def simplify(self, replace_constants=True, replace_parameter_expressions=True):
         if replace_constants:
-            self.equations = ca.substitute(self.equations, self.constants, self.constant_values)
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, self.constants, self.constant_values)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, self.constants, self.constant_values)
             self.constants = []
             self.constant_values = []
 
@@ -93,7 +98,10 @@ class CasadiSysModel:
                 (simple_parameter_values, composite_parameter_values)[is_composite].append(
                     float(v) if not is_composite and isinstance(v, ca.MX) else v)
 
-            self.equations = ca.substitute(self.equations, composite_parameters, composite_parameter_values)
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, composite_parameters, composite_parameter_values)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, composite_parameters, composite_parameter_values)
             self.parameters = simple_parameters
             self.parameter_values = simple_parameter_values
 
@@ -112,8 +120,14 @@ class CasadiSysModel:
 
     # noinspection PyUnusedLocal
     def initial_residual_function(self, group_arguments=True):
-        # TODO
-        return ca.Function('initial_residual', [self.time], [0])
+        if group_arguments:
+            return ca.Function('initial_residual', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states),
+                                                ca.vertcat(*self.alg_states), ca.vertcat(*self.constants),
+                                                ca.vertcat(*self.parameters)], [ca.vertcat(*self.initial_equations)])
+        else:
+            return ca.Function('initial_residual', [
+                self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters,
+                               self.initial_equations)
 
     # noinspection PyPep8Naming
     def state_metadata_function(self, group_arguments=True):
@@ -225,6 +239,7 @@ class CasadiGenerator(TreeListener):
         self.model.inputs = discard_empty([self.get_mx(e) for e in inputs])
         self.model.outputs = discard_empty([self.get_mx(e) for e in outputs])
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
+        self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
 
     def exitArray(self, tree):
         self.src[tree] = [self.src[e] for e in tree.values]

@@ -34,6 +34,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(len(A.constant_values), len(B.constant_values))
         self.assertEqual(len(A.parameters), len(B.parameters))
         self.assertEqual(len(A.equations), len(B.equations))
+        self.assertEqual(len(A.initial_equations), len(B.initial_equations))
 
         for a, b in zip(A.constant_values, B.constant_values):
             delta = ca.vec(a - b)
@@ -41,43 +42,44 @@ class GenCasadiTest(unittest.TestCase):
                 test = float(delta[i]) <= tol
                 self.assertTrue(test)
 
-        this = A.dae_residual_function(group_arguments=False)
-        that = B.dae_residual_function(group_arguments=False)
+        for (f_name, m_name) in [('dae_residual', 'equations'), ('initial_residual', 'initial_equations')]:
+            this = getattr(A, f_name + '_function')(group_arguments=False)
+            that = getattr(B, f_name + '_function')(group_arguments=False)
 
-        this_mx = this.mx_in()
-        that_mx = that.mx_in()
-        this_in = [e.name() for e in this_mx if e.is_symbolic()]
-        that_in = [e.name() for e in that_mx if e.is_symbolic()]
+            this_mx = this.mx_in()
+            that_mx = that.mx_in()
+            this_in = [e.name() for e in this_mx if e.is_symbolic()]
+            that_in = [e.name() for e in that_mx if e.is_symbolic()]
 
-        that_from_this = []
-        this_mx_dict = dict(zip(this_in, this_mx))
-        that_mx_dict = dict(zip(that_in, that_mx))
-        for e in that_in:
-            self.assertTrue(e in this_in)
-            self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
-            self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
-            that_from_this.append(this_mx_dict[e])
+            that_from_this = []
+            this_mx_dict = dict(zip(this_in, this_mx))
+            that_mx_dict = dict(zip(that_in, that_mx))
+            for e in that_in:
+                self.assertTrue(e in this_in)
+                self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
+                self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
+                that_from_this.append(this_mx_dict[e])
 
-        that = ca.Function('f', this_mx, that.call(that_from_this))
+            that = ca.Function('f', this_mx, that.call(that_from_this))
 
-        np.random.seed(0)
+            np.random.seed(0)
 
-        args_in = []
-        for i in range(this.n_in()):
-            sp = this.sparsity_in(0)
-            r = ca.DM(sp, np.random.random(sp.nnz()))
-            args_in.append(r)
+            args_in = []
+            for i in range(this.n_in()):
+                sp = this.sparsity_in(0)
+                r = ca.DM(sp, np.random.random(sp.nnz()))
+                args_in.append(r)
 
-        this_out = this.call(args_in)
-        that_out = that.call(args_in)
+            this_out = this.call(args_in)
+            that_out = that.call(args_in)
 
-        for i, (a, b) in enumerate(zip(this_out, that_out)):
-            test = float(ca.norm_2(ca.vec(a - b))) <= tol
-            if not test:
-                print("Expr mismatch")
-                print("A: ", A.equations[i], a)
-                print("B: ", B.equations[i], b)
-            self.assertTrue(test)
+            for i, (a, b) in enumerate(zip(this_out, that_out)):
+                test = float(ca.norm_2(ca.vec(a - b))) <= tol
+                if not test:
+                    print("Expr mismatch")
+                    print("A: ", getattr(A, m_name)[i], a)
+                    print("B: ", getattr(B, m_name)[i], b)
+                self.assertTrue(test)
 
         return True
 

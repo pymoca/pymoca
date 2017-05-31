@@ -81,6 +81,7 @@ else:
     objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'state_metadata': ObjectData('state_metadata', False, '')}
     for o, d in objects.items():
         f = getattr(model, o + '_function')(group_arguments=True)
+        print(f.name())
         f.print_dimensions()
 
         # Generate C code
