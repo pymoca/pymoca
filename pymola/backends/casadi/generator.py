@@ -350,7 +350,7 @@ class CasadiGenerator(TreeListener):
     def get_symbol(self, tree):
         # Create symbol
         size = [self.get_integer(d) for d in tree.dimensions]
-        assert (len(size) <= 2)
+        assert(len(size) <= 2)
         s = ca.MX.sym(tree.name, *size)
         self.nodes[tree.name] = s
         return s

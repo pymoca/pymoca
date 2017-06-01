@@ -4,7 +4,6 @@ Compiler tool.
 """
 
 from optparse import OptionParser
-from collections import namedtuple
 import sys
 import os
 import fnmatch

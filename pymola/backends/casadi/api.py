@@ -23,28 +23,30 @@ class ObjectData:
         self.library = library
 
 def _compile_model(model_folder, model_name, compiler_options):
-    # TODO library folder
-    # Load folder
+    # Load folders
     ast = None
-    for root, dir, files in os.walk(model_folder, followlinks=True):
-        for item in fnmatch.filter(files, "*.mo"):
-            logger.info("Parsing {}".format(item))
+    for folder in [model_folder] + compiler_options.get('library_folders', []):
+        for root, dir, files in os.walk(folder, followlinks=True):
+            for item in fnmatch.filter(files, "*.mo"):
+                logger.info("Parsing {}".format(item))
 
-            with open(os.path.join(root, item), 'r') as f:
-                if ast is None:
-                    ast = parser.parse(f.read())
-                else:
-                    ast.extend(parser.parse(f.read()))
+                with open(os.path.join(root, item), 'r') as f:
+                    if ast is None:
+                        ast = parser.parse(f.read())
+                    else:
+                        ast.extend(parser.parse(f.read()))
 
     # Compile
     logger.info("Generating CasADi model")
     
     model = generator.generate(ast, model_name)
-    model.check_balanced()
+    if compiler_options.get('check_balanced', True):
+        model.check_balanced()
 
     model.simplify(compiler_options)
 
-    #model.check_balanced()
+    if compiler_options.get('verbose', False):
+        model.check_balanced()
 
     return model
 
@@ -97,6 +99,16 @@ def _save_model(model_folder, model_name, model):
         db['delayed_states'] = [DelayedVariable(t[0].name(), t[1].name(), t[2]) for t in model.delayed_states]
 
 def _load_model(model_folder, model_name, compiler_options):
+    # Mtime check
+    cache_mtime = os.path.getmtime(model_name)
+    ast = None
+    for folder in [model_folder] + compiler_options.get('library_folders', []):
+        for root, dir, files in os.walk(folder, followlinks=True):
+            for item in fnmatch.filter(files, "*.mo"):
+                filename = os.path.join(root, item)
+                if os.path.getmtime(filename) > cache_mtime:
+                    raise OSError("Cache out of date")
+
     model = CasadiSysModel()
 
     # Compile shared libraries
@@ -136,9 +148,7 @@ def _load_model(model_folder, model_name, compiler_options):
     return model
 
 def transfer_model(model_folder, model_name, compiler_options={}):
-    # TODO mtime of model
     if compiler_options.get('cache', True):
-        # Check whether a cached model exists
         try:
             return _load_model(model_folder, model_name, compiler_options)
         except OSError:
