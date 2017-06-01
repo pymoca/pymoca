@@ -10,7 +10,7 @@ import unittest
 import casadi as ca
 import numpy as np
 
-from pymola import gen_casadi
+import pymola.backends.casadi.generator as gen_casadi
 from pymola import parser
 
 CasadiSysModel = gen_casadi.CasadiSysModel

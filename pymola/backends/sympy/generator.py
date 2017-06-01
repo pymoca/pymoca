@@ -6,8 +6,8 @@ from typing import List
 
 import jinja2
 
-from . import ast
-from .tree import TreeListener, TreeWalker, flatten
+from pymola import ast
+from pymola.tree import TreeListener, TreeWalker, flatten
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 # noinspection PyUnresolvedReferences

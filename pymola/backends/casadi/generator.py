@@ -9,8 +9,8 @@ import casadi as ca
 import numpy as np
 from typing import Union
 
-from . import ast
-from .tree import TreeWalker, TreeListener, flatten
+from pymola import ast
+from pymola.tree import TreeWalker, TreeListener, flatten
 
 logger = logging.getLogger("pymola")
 

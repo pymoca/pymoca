@@ -38,7 +38,7 @@ if options.casadi_folder is not None:
 # Import rest of pymola
 from pymola import parser, tree
 if not options.flatten_only:
-    from pymola import gen_casadi
+    import pymola.backends.casadi.generator as gen_casadi
     import casadi as ca
 
 # Load folder
