@@ -1,6 +1,10 @@
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 import casadi as ca
+import itertools
 import logging
+import re
+
+from .alias_relation import AliasRelation
 
 logger = logging.getLogger("pymola")
 

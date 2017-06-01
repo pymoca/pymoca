@@ -1,8 +1,6 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
 
-import itertools
 import logging
-import re
 from collections import namedtuple
 
 import casadi as ca
