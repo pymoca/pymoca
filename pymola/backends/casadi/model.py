@@ -8,7 +8,7 @@ from .alias_relation import AliasRelation
 
 logger = logging.getLogger("pymola")
 
-VariableMetadata = namedtuple('VariableMetadata', ['start', 'min', 'max', 'nominal', 'fixed'])
+VariableMetadata = namedtuple('VariableMetadata', ['type', 'shape', 'value', 'start', 'min', 'max', 'nominal', 'fixed'])
 
 
 # noinspection PyUnresolvedReferences
@@ -49,7 +49,7 @@ class CasadiSysModel:
     def check_balanced(self):
         n_states = sum(v.size1() * v.size2() for v in itertools.chain(self.states, self.alg_states))
         n_inputs = sum(v.size1() * v.size2() for v in self.inputs)
-        n_equations = sum(e.size1() * e.size2() for e in self.equations)
+        n_equations = sum(e.size1() * e.size2() for e in self.dae_residual_function.mx_out())
         if n_states - n_inputs == n_equations:
             logger.info("System is balanced.")
         else:
@@ -127,6 +127,7 @@ class CasadiSysModel:
 
             # Eliminate alias variables
             self.alg_states = list(alg_states.values())
+            # TODO update metadata
             self.equations = reduced_equations
 
             if len(self.equations) > 0:
@@ -195,6 +196,7 @@ class CasadiSysModel:
                         outputs[alias] = sign * canonical_state
 
             self.alg_states = list(alg_states.values())
+            # TODO update metadata
             self.inputs = list(inputs.values())
             self.outputs = list(outputs.values())
             self.equations = reduced_equations
@@ -204,29 +206,22 @@ class CasadiSysModel:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
-    def dae_residual_function(self, group_arguments=True):
-        if group_arguments:
-            return ca.Function('dae_residual', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states),
-                                                ca.vertcat(*self.alg_states), ca.vertcat(*self.constants),
-                                                ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
-        else:
-            return ca.Function('dae_residual', [
-                self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters,
-                               self.equations)
+    @property
+    def dae_residual_function(self):
+        return ca.Function('dae_residual', [self.time, ca.veccat(*self.states), ca.veccat(*self.der_states),
+                                            ca.veccat(*self.alg_states), ca.veccat(*self.constants),
+                                            ca.veccat(*self.parameters)], [ca.veccat(*self.equations)])
 
     # noinspection PyUnusedLocal
-    def initial_residual_function(self, group_arguments=True):
-        if group_arguments:
-            return ca.Function('initial_residual', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states),
-                                                ca.vertcat(*self.alg_states), ca.vertcat(*self.constants),
-                                                ca.vertcat(*self.parameters)], [ca.vertcat(*self.initial_equations)])
-        else:
-            return ca.Function('initial_residual', [
-                self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters,
-                               self.initial_equations)
+    @property
+    def initial_residual_function(self):
+        return ca.Function('initial_residual', [self.time, ca.veccat(*self.states), ca.veccat(*self.der_states),
+                                            ca.veccat(*self.alg_states), ca.veccat(*self.constants),
+                                            ca.veccat(*self.parameters)], [ca.veccat(*self.initial_equations)])
 
     # noinspection PyPep8Naming
-    def state_metadata_function(self, group_arguments=True):
+    @property
+    def state_metadata_function(self):
         s, m, M, n, f = [], [], [], [], []
         for e, v in zip(itertools.chain(self.states, self.alg_states),
                         itertools.chain(self.state_metadata, self.alg_state_metadata)):
@@ -242,9 +237,6 @@ class CasadiSysModel:
             M.append(M_)
             n.append(n_)
             f.append(f_)
-        out = ca.horzcat(ca.vertcat(*s), ca.vertcat(*m), ca.vertcat(*M), ca.vertcat(*n), ca.vertcat(*f))
-        if group_arguments:
-            return ca.Function('state_metadata', [ca.vertcat(*self.parameters)],
-                               [out[:len(self.state_metadata), :], out[len(self.state_metadata):, :]])
-        else:
-            return ca.Function('state_metadata', self.parameters, [out])
+        out = ca.horzcat(ca.veccat(*s), ca.veccat(*m), ca.veccat(*M), ca.veccat(*n), ca.veccat(*f))
+        return ca.Function('state_metadata', [ca.veccat(*self.parameters)],
+                            [out[:len(self.state_metadata), :], out[len(self.state_metadata):, :]])

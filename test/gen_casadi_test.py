@@ -43,18 +43,20 @@ class GenCasadiTest(unittest.TestCase):
                 self.assertTrue(test)
 
         for (f_name, m_name) in [('dae_residual', 'equations'), ('initial_residual', 'initial_equations')]:
-            this = getattr(A, f_name + '_function')(group_arguments=False)
-            that = getattr(B, f_name + '_function')(group_arguments=False)
+            this = getattr(A, f_name + '_function')
+            that = getattr(B, f_name + '_function')
 
             this_mx = this.mx_in()
             that_mx = that.mx_in()
-            this_in = [e.name() for e in this_mx if e.is_symbolic()]
-            that_in = [e.name() for e in that_mx if e.is_symbolic()]
+            this_in = [repr(e) for e in this_mx] #if e.is_symbolic()]
+            that_in = [repr(e) for e in that_mx] #if e.is_symbolic()]
 
             that_from_this = []
             this_mx_dict = dict(zip(this_in, this_mx))
             that_mx_dict = dict(zip(that_in, that_mx))
             for e in that_in:
+                print(e)
+                print(this_in)
                 self.assertTrue(e in this_in)
                 self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
                 self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
@@ -361,7 +363,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.states = []
         ref_model.der_states = []
         ref_model.alg_states = [bcomp1_v, bcomp2_v, bcomp3_v]
-        ref_model.parameters = [bcomp1_a, bcomp1_b, bcomp2_a, bcomp2_b, bcomp3_a, bcomp3_b]
+        ref_model.parameters = [bcomp1_a, bcomp2_a, bcomp3_a, bcomp1_b, bcomp2_b, bcomp3_b]
         ref_model.equations = []
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -442,8 +444,8 @@ class GenCasadiTest(unittest.TestCase):
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = [a, c, d, e, scalar_f, g, arx, arcy, arcw, nested1z, nested2z, h]
-        ref_model.parameters = [d_dim, nested1n, nested2n]
+        ref_model.alg_states = [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]
+        ref_model.parameters = [nested1n, nested2n, d_dim]
         ref_model.outputs = [h]
         ref_model.constants = [b, c_dim, B, C, D, E]
         ref_model.constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2),

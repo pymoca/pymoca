@@ -8,6 +8,7 @@ import shelve
 
 from pymola import parser, tree
 from . import generator
+from .model import CasadiSysModel
 
 logger = logging.getLogger("pymola")
 
@@ -16,11 +17,40 @@ Variable = namedtuple('Variable', ['name', 'value', 'aliases'])
 
 DelayedVariable = namedtuple('DelayedVariable', ['name', 'origin', 'delay'])
 
+
+class CasadiSysModelCached(CasadiSysModel):
+    def __str__(self):
+        r = ""
+        r += "Model\n"
+        r += "time: " + str(self.time) + "\n"
+        r += "states: " + str(self.states) + "\n"
+        r += "der_states: " + str(self.der_states) + "\n"
+        r += "alg_states: " + str(self.alg_states) + "\n"
+        r += "inputs: " + str(self.inputs) + "\n"
+        r += "outputs: " + str(self.outputs) + "\n"
+        r += "constants: " + str(self.constants) + "\n"
+        r += "constant_values: " + str(self.constant_values) + "\n"
+        r += "parameters: " + str(self.parameters) + "\n"
+        return r
+
+    @property
+    def equations(self):
+        raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
+
+    @property
+    def initial_equations(self):
+        raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
+
+    def simplify(self, options):
+        raise NotImplementedError("Cannot simplify cached model")
+
+
 class ObjectData:
     def __init__(self, key, derivatives, library):
         self.key = key
         self.derivatives = derivatives
         self.library = library
+
 
 def _compile_model(model_folder, model_name, compiler_options):
     # Load folders
@@ -59,7 +89,7 @@ def _save_model(model_folder, model_name, model):
             
     objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'state_metadata': ObjectData('state_metadata', False, '')}
     for o, d in objects.items():
-        f = getattr(model, o + '_function')(group_arguments=True)
+        f = getattr(model, o + '_function')
         print(f.name())
         f.print_dimensions()
 
@@ -99,17 +129,19 @@ def _save_model(model_folder, model_name, model):
         db['delayed_states'] = [DelayedVariable(t[0].name(), t[1].name(), t[2]) for t in model.delayed_states]
 
 def _load_model(model_folder, model_name, compiler_options):
-    # Mtime check
-    cache_mtime = os.path.getmtime(model_name)
-    ast = None
-    for folder in [model_folder] + compiler_options.get('library_folders', []):
-        for root, dir, files in os.walk(folder, followlinks=True):
-            for item in fnmatch.filter(files, "*.mo"):
-                filename = os.path.join(root, item)
-                if os.path.getmtime(filename) > cache_mtime:
-                    raise OSError("Cache out of date")
+    if compiler_options.get('mtime_check', True):
+        # Mtime check
+        cache_mtime = os.path.getmtime(model_name)
+        ast = None
+        for folder in [model_folder] + compiler_options.get('library_folders', []):
+            for root, dir, files in os.walk(folder, followlinks=True):
+                for item in fnmatch.filter(files, "*.mo"):
+                    filename = os.path.join(root, item)
+                    if os.path.getmtime(filename) > cache_mtime:
+                        raise OSError("Cache out of date")
 
-    model = CasadiSysModel()
+    # Create empty model object
+    model = CasadiSysModelCached()
 
     # Compile shared libraries
     objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'state_metadata': ObjectData('state_metadata', False, '')}
@@ -125,7 +157,7 @@ def _load_model(model_folder, model_name, compiler_options):
             print(f.name())
             f.print_dimensions()
 
-            # TODO store function
+            setattr(model, o + '_function', f)
 
         # Describe variables per category
         for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs']:

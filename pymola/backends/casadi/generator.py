@@ -106,14 +106,13 @@ class CasadiGenerator(TreeListener):
             else:
                 alg_states.append(s)
         self.model.states = discard_empty([self.get_mx(e) for e in ode_states])
-        self.model.state_metadata = [VariableMetadata(self.get_mx(e.start), self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal), self.get_mx(e.fixed))
+        self.model.state_metadata = [VariableMetadata(self.get_python_type(e), self.get_shape(e), self.get_mx(e.value), self.get_mx(e.start), self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal), self.get_mx(e.fixed))
                                      for e in ode_states if not self.get_mx(e).is_empty()]
         self.model.der_states = discard_empty([self.derivative[
                                                    self.get_mx(e)] for e in ode_states])
         self.model.alg_states = discard_empty([self.get_mx(e) for e in alg_states])
-        # TODO move to setattr?
         self.model.alg_state_metadata = [
-            VariableMetadata(self.get_mx(e.start), self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal), self.get_mx(e.fixed)) for e in alg_states if
+            VariableMetadata(self.get_python_type(e), self.get_shape(e), self.get_mx(e.value), self.get_mx(e.start), self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal), self.get_mx(e.fixed)) for e in alg_states if
             not self.get_mx(e).is_empty()]
         assert len(self.model.alg_states) == len(self.model.alg_state_metadata)
         self.model.constants = discard_empty([self.get_mx(e) for e in constants])
@@ -124,6 +123,8 @@ class CasadiGenerator(TreeListener):
         self.model.outputs = discard_empty([self.get_mx(e) for e in outputs])
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
+
+        # TODO values vs metadata vs getattr/setattr
 
     def exitArray(self, tree):
         self.src[tree] = [self.src[e] for e in tree.values]
@@ -347,11 +348,22 @@ class CasadiGenerator(TreeListener):
         else:
             raise Exception('Unexpected node type {}'.format(tree.__class__.__name__))
 
+    def get_python_type(self, tree):
+        if tree.type == 'Boolean':
+            return bool
+        elif tree.type == 'Integer':
+            return int
+        else:
+            return float
+
+    def get_shape(self, tree):
+        return [self.get_integer(d) for d in tree.dimensions]
+
     def get_symbol(self, tree):
         # Create symbol
-        size = [self.get_integer(d) for d in tree.dimensions]
-        assert(len(size) <= 2)
-        s = ca.MX.sym(tree.name, *size)
+        shape = self.get_shape(tree)
+        assert(len(shape) <= 2)
+        s = ca.MX.sym(tree.name, *shape)
         self.nodes[tree.name] = s
         return s
 
