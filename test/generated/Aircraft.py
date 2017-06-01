@@ -4,7 +4,7 @@
 from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
-from pymola.sympy_runtime import OdeModel
+from pymola.backends.sympy.runtime import OdeModel
 from sympy import sin, cos, tan
 
 
