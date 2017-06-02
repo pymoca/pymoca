@@ -66,7 +66,8 @@ else:
          'replace_parameter_expressions': True,
          'eliminable_variable_expression': r'_\w+',
          'detect_aliases': True,
-         'cache': False}
+         'expand': False,
+         'cache': True}
 
     model = transfer_model(model_folder, model_name, compiler_options)
     print(model)

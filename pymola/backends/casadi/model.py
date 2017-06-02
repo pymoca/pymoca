@@ -15,6 +15,12 @@ class Variable:
         self.python_type = python_type
         self.aliases = aliases
 
+    def __str__(self):
+        return self.symbol.name()
+
+    def __repr__(self):
+        return '{}[{},{}]:{}'.format(self.symbol.name(), self.symbol.size1(), self.symbol.size2(), self.python_type.__name__)
+
     def to_dict(self):
         d = {}
         d['name'] = self.symbol.name()
@@ -88,30 +94,29 @@ class Model:
             self.constants = []
 
         if options.get('replace_parameter_expressions', False):
-            # TODO
             logger.info("Replacing parameter expressions")
 
-            composite_parameters, simple_parameters = [], []
-            composite_parameter_values, simple_parameter_values = [], []
-            for e, v in zip(self.parameters, self.parameter_values):
-                is_composite = isinstance(v, ca.MX) and not v.is_constant()
-                (simple_parameters, composite_parameters)[is_composite].append(e)
-                (simple_parameter_values, composite_parameter_values)[is_composite].append(
-                    float(v) if not is_composite and isinstance(v, ca.MX) else v)
+            simple_parameters, symbols, values = [], [], []
+            for p in self.parameters:
+                is_composite = isinstance(p.value, ca.MX) and not p.value.is_constant()
+                if is_composite:
+                    symbols.append(p.symbol)
+                    values.append(p.value)
+                else:
+                    simple_parameters.append(p)
 
             if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, composite_parameters, composite_parameter_values)
+                self.equations = ca.substitute(self.equations, symbols, values)
             if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, composite_parameters, composite_parameter_values)
+                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.parameters = simple_parameters
 
         if options.get('eliminable_variable_expression', None) is not None:
-            # TODO
             logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
 
             p = re.compile(options['eliminable_variable_expression'])
 
-            alg_states = OrderedDict({s.name() : s for s in self.alg_states})
+            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
 
             variables = []
             values = []
@@ -132,7 +137,7 @@ class Model:
                     if variable is not None:
                         del alg_states[variable]
 
-                        variables.append(variable)
+                        variables.append(variable.symbol)
                         if eq.is_op(ca.OP_SUB):
                             values.append(value)
                         else:
@@ -154,13 +159,12 @@ class Model:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
         if options.get('detect_aliases', False):
-            # TODO
             logger.info("Detecting aliases")
 
-            states = OrderedDict({s.name() : s for s in self.states})
-            alg_states = OrderedDict({s.name() : s for s in self.alg_states})
-            inputs = OrderedDict({s.name() : s for s in self.inputs})
-            outputs = OrderedDict({s.name() : s for s in self.outputs})
+            states = OrderedDict({s.symbol.name() : s for s in self.states})
+            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
+            inputs = OrderedDict({s.symbol.name() : s for s in self.inputs})
+            outputs = OrderedDict({s.symbol.name() : s for s in self.outputs})
 
             alias_rel = AliasRelation()
 
@@ -205,14 +209,14 @@ class Model:
                         alias = alias[1:]
                     else:
                         sign = 1
-                    variables.append(alg_states[alias])
-                    values.append(sign * canonical_state)
+                    variables.append(alg_states[alias].symbol)
+                    values.append(sign * canonical_state.symbol)
 
                     del alg_states[alias]
                     if alias in inputs:
-                        inputs[alias] = sign * canonical_state
+                        inputs[alias].symbol = sign * canonical_state.symbol
                     if alias in outputs:
-                        outputs[alias] = sign * canonical_state
+                        outputs[alias].symbol = sign * canonical_state.symbol
 
             self.alg_states = list(alg_states.values())
             self.inputs = list(inputs.values())
@@ -223,6 +227,14 @@ class Model:
                 self.equations = ca.substitute(self.equations, variables, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+
+        if options.get('expand', False):
+            logger.info("Expanding MX graph")
+            
+            if len(self.equations) > 0:
+                self.equations = ca.matrix_expand(self.equations)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.matrix_expand(self.initial_equations)
 
     @property
     def dae_residual_function(self):
@@ -235,22 +247,23 @@ class Model:
     def initial_residual_function(self):
         return ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
                                             ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.constants)),
-                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)])
+                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
 
     VARIABLE_METADATA = ['value', 'start', 'min', 'max', 'nominal', 'fixed']
 
     # noinspection PyPep8Naming
     @property
     def variable_metadata_function(self):
-        v, s, m, M, n, f = [], [], [], [], []
-        for e, v in itertools.chain(self.states, self.alg_states, self.parameters, self.constants):
-            v_ = v.value if hasattr(v.value, '__iter__') else np.full(e.size(), v.value if v.value is not None else np.nan)
-            s_ = v.start if hasattr(v.start, '__iter__') else np.full(e.size(), v.start if v.start is not None else np.nan)
-            m_ = v.min if hasattr(v.min, '__iter__') else np.full(e.size(), v.min if v.min is not None else -np.inf)
-            M_ = v.max if hasattr(v.max, '__iter__') else np.full(e.size(), v.max if v.max is not None else np.inf)
-            n_ = v.nominal if hasattr(v.nominal, '__iter__') else np.full(e.size(),
+        v, s, m, M, n, f = [], [], [], [], [], []
+        for v in itertools.chain(self.states, self.alg_states, self.parameters, self.constants):
+            # TODO
+            v_ = v.value if hasattr(v.value, '__iter__') else np.full(v.symbol.size(), v.value if hasattr(v, 'value') else np.nan)
+            s_ = v.start if hasattr(v.start, '__iter__') else np.full(v.symbol.size(), v.start if hasattr(v, 'start') is not None else np.nan)
+            m_ = v.min if hasattr(v.min, '__iter__') else np.full(v.symbol.size(), v.min if hasattr(v, 'min') is not None else -np.inf)
+            M_ = v.max if hasattr(v.max, '__iter__') else np.full(v.symbol.size(), v.max if hasattr(v, 'max') is not None else np.inf)
+            n_ = v.nominal if hasattr(v.nominal, '__iter__') else np.full(v.symbol.size(),
                                                                           v.nominal if v.nominal is not None else 1)
-            f_ = v.fixed if hasattr(v.fixed, '__iter__') else np.full(e.size(), v.fixed)
+            f_ = v.fixed if hasattr(v.fixed, '__iter__') else np.full(v.symbol.size(), v.fixed)
 
             v.append(v_)
             s.append(s_)
