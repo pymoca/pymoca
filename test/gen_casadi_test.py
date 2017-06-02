@@ -11,9 +11,9 @@ import casadi as ca
 import numpy as np
 
 import pymola.backends.casadi.generator as gen_casadi
+from pymola.backends.casadi.model import Model, Variable
 from pymola import parser
 
-CasadiSysModel = gen_casadi.CasadiSysModel
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -31,13 +31,12 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(len(A.inputs), len(B.inputs))
         self.assertEqual(len(A.outputs), len(B.outputs))
         self.assertEqual(len(A.constants), len(B.constants))
-        self.assertEqual(len(A.constant_values), len(B.constant_values))
         self.assertEqual(len(A.parameters), len(B.parameters))
         self.assertEqual(len(A.equations), len(B.equations))
         self.assertEqual(len(A.initial_equations), len(B.initial_equations))
 
-        for a, b in zip(A.constant_values, B.constant_values):
-            delta = ca.vec(a - b)
+        for a, b in zip(A.constants, B.constants):
+            delta = ca.vec(a.value - b.value)
             for i in range(delta.size1()):
                 test = float(delta[i]) <= tol
                 self.assertTrue(test)
@@ -90,7 +89,7 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Spring')
-        ref_model = CasadiSysModel()
+        ref_model = Model()
         print(casadi_model)
         x = ca.MX.sym("x")
         v_x = ca.MX.sym("v_x")
@@ -98,9 +97,9 @@ class GenCasadiTest(unittest.TestCase):
         der_v_x = ca.MX.sym("der(v_x)")
         k = ca.MX.sym("k")
         c = ca.MX.sym("c")
-        ref_model.states = [x, v_x]
-        ref_model.der_states = [der_x, der_v_x]
-        ref_model.parameters = [c, k]
+        ref_model.states = list(map(Variable, [x, v_x]))
+        ref_model.der_states = list(map(Variable, [der_x, der_v_x]))
+        ref_model.parameters = list(map(Variable, [c, k]))
         ref_model.equations = [der_x - v_x, der_v_x - (-k * x - c * v_x)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -110,17 +109,17 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Estimator')
-        ref_model = CasadiSysModel()
+        ref_model = Model()
         print(casadi_model)
 
         x = ca.MX.sym("x")
         der_x = ca.MX.sym("der(x)")
         y = ca.MX.sym("y")
 
-        ref_model.states = [x]
-        ref_model.der_states = [der_x]
-        ref_model.alg_states = [y]
-        ref_model.outputs = [y]
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [y]))
+        ref_model.outputs = list(map(Variable, [y]))
         ref_model.equations = [der_x + x, y - x]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -132,7 +131,7 @@ class GenCasadiTest(unittest.TestCase):
         # noinspection PyUnusedLocal
         casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
         # noinspection PyUnusedLocal
-        ref_model = CasadiSysModel()
+        ref_model = Model()
         self.assertTrue(True)
 
     def test_connector(self):
@@ -140,7 +139,7 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'System')
-        ref_model = CasadiSysModel()
+        ref_model = Model()
         print(casadi_model)
 
         a__up__H = ca.MX.sym("a.up.H")
@@ -166,9 +165,9 @@ class GenCasadiTest(unittest.TestCase):
         hb__up__H = ca.MX.sym("hb.up.H")
         hb__up__Q = ca.MX.sym("hb.up.Q")
 
-        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
+        ref_model.alg_states = map(Variable, [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
                                 b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q,
-                                b__down__Q, qc__down__Q, a__down__Q]
+                                b__down__Q, qc__down__Q, a__down__Q])
 
         ref_model.equations = [a__up__H - a__down__H,
                                a__up__Q + a__down__Q,
@@ -202,7 +201,7 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'SystemZ')
-        ref_model = CasadiSysModel()
+        ref_model = Model()
         print(casadi_model)
 
         a__up__H = ca.MX.sym("a.up.H")
@@ -237,10 +236,10 @@ class GenCasadiTest(unittest.TestCase):
         hb__up__Q = ca.MX.sym("hb.up.Q")
         hb__up__Z = ca.MX.sym("hb.up.Z")
 
-        ref_model.alg_states = [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
+        ref_model.alg_states = list(map(Variable, [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
                                 b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q,
                                 b__down__Q, qc__down__Q, a__down__Q, a__up__Z, a__down__Z, b__up__Z, b__down__Z,
-                                c__up__Z, c__down__Z, qa__down__Z, qc__down__Z, hb__up__Z]
+                                c__up__Z, c__down__Z, qa__down__Z, qc__down__Z, hb__up__Z]))
 
         ref_model.equations = [a__up__H - a__down__H,
                                a__up__Q + a__down__Q,
@@ -281,15 +280,15 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'DuplicateState')
         print(casadi_model)
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         x = ca.MX.sym("x")
         der_x = ca.MX.sym("der(x)")
         y = ca.MX.sym("y")
         der_y = ca.MX.sym("der(y)")
 
-        ref_model.states = [x, y]
-        ref_model.der_states = [der_x, der_y]
+        ref_model.states = list(map(Variable, [x, y]))
+        ref_model.der_states = list(map(Variable, [der_x, der_y]))
         ref_model.equations = [der_x + der_y - 1, der_x - 2]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -299,7 +298,7 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'IfElse')
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         x = ca.MX.sym("x")
         y1 = ca.MX.sym("y1")
@@ -307,10 +306,10 @@ class GenCasadiTest(unittest.TestCase):
         y3 = ca.MX.sym("y3")
         y_max = ca.MX.sym("y_max")
 
-        ref_model.inputs = [x]
-        ref_model.outputs = [y1, y2, y3]
-        ref_model.alg_states = [x, y1, y2, y3]
-        ref_model.parameters = [y_max]
+        ref_model.inputs = list(map(Variable, [x]))
+        ref_model.outputs = list(map(Variable, [y1, y2, y3]))
+        ref_model.alg_states = list(map(Variable, [x, y1, y2, y3]))
+        ref_model.parameters = list(map(Variable, [y_max]))
         ref_model.equations = [
             y1 - ca.if_else(x > 0, 1, 0) * y_max,
             ca.if_else(x > 1, ca.vertcat(y3 - 100, y2 - y_max),
@@ -324,7 +323,7 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Sub')
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         x = ca.MX.sym("x")
         der_x = ca.MX.sym("der(x)")
@@ -333,10 +332,10 @@ class GenCasadiTest(unittest.TestCase):
         der_y = ca.MX.sym("y")
         k = ca.MX.sym("k")
 
-        ref_model.states = [x]
-        ref_model.der_states = [der_x]
-        ref_model.alg_states = [y]
-        ref_model.parameters = [k]
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [y]))
+        ref_model.parameters = list(map(Variable, [k]))
         ref_model.equations = [der_x - k * x, x + y - 3]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -346,7 +345,7 @@ class GenCasadiTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'C2')
-        ref_model = CasadiSysModel()
+        ref_model = Model()
         print(casadi_model)
 
         bcomp1_a = ca.MX.sym('bcomp1.a')
@@ -362,8 +361,8 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = []
         ref_model.der_states = []
-        ref_model.alg_states = [bcomp1_v, bcomp2_v, bcomp3_v]
-        ref_model.parameters = [bcomp1_a, bcomp2_a, bcomp3_a, bcomp1_b, bcomp2_b, bcomp3_b]
+        ref_model.alg_states = list(map(Variable, [bcomp1_v, bcomp2_v, bcomp3_v]))
+        ref_model.parameters = list(map(Variable, [bcomp1_a, bcomp2_a, bcomp3_a, bcomp1_b, bcomp2_b, bcomp3_b]))
         ref_model.equations = []
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -374,7 +373,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'BuiltinFunctions')
         print("BuiltinFunctions", casadi_model)
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         x = ca.MX.sym("x")
         y = ca.MX.sym("y")
@@ -382,9 +381,9 @@ class GenCasadiTest(unittest.TestCase):
         w = ca.MX.sym("w")
         u = ca.MX.sym("u")
 
-        ref_model.inputs = [x]
-        ref_model.outputs = [y, z, w, u]
-        ref_model.alg_states = [x, y, z, w, u]
+        ref_model.inputs = list(map(Variable, [x]))
+        ref_model.outputs = list(map(Variable, [y, z, w, u]))
+        ref_model.alg_states = list(map(Variable, [x, y, z, w, u]))
         ref_model.equations = [y - ca.sin(ref_model.time), z - ca.cos(x), w - ca.fmin(y, z), u - ca.fabs(w)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -395,7 +394,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'ForLoop')
         print(casadi_model)
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         x = ca.MX.sym("x", 10)
         y = ca.MX.sym("y", 10)
@@ -404,8 +403,8 @@ class GenCasadiTest(unittest.TestCase):
         b = ca.MX.sym("b")
         n = ca.MX.sym("n")
 
-        ref_model.alg_states = [x, y, z, w, b]
-        ref_model.parameters = [n]
+        ref_model.alg_states = list(map(Variable, [x, y, z, w, b]))
+        ref_model.parameters = list(map(Variable, [n]))
         ref_model.equations = [
             ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2)),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
@@ -419,7 +418,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'ArrayExpressions')
         print(casadi_model)
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         a = ca.MX.sym("a", 3)
         b = ca.MX.sym("b", 4)
@@ -444,12 +443,14 @@ class GenCasadiTest(unittest.TestCase):
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]
-        ref_model.parameters = [nested1n, nested2n, d_dim]
-        ref_model.outputs = [h]
-        ref_model.constants = [b, c_dim, B, C, D, E]
-        ref_model.constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2),
+        ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]))
+        ref_model.parameters = list(map(Variable, [nested1n, nested2n, d_dim]))
+        ref_model.outputs = list(map(Variable, [h]))
+        ref_model.constants = list(map(Variable, [b, c_dim, B, C, D, E]))
+        constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2),
                                      ca.DM.zeros(3), ca.DM.ones(2)]
+        for const, val in zip(ref_model.constants, constant_values):
+            const.value = val
         ref_model.equations = [c - (a + b[0:3] * e), d - (ca.sin(a / b[1:4])), e - (d + scalar_f), g - ca.sum1(c),
                                h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - ca.DM.zeros(3),
                                nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1],
@@ -463,7 +464,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'MatrixExpressions')
         print(casadi_model)
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         A = ca.MX.sym("A", 3, 3)
         b = ca.MX.sym("b", 3)
@@ -475,10 +476,12 @@ class GenCasadiTest(unittest.TestCase):
         I = ca.MX.sym("I", 5, 5)
         F = ca.MX.sym("F", 3, 3)
 
-        ref_model.alg_states = [A, b, c, d]
-        ref_model.constants = [C, D, E, I, F]
-        ref_model.constant_values = [1.7 * ca.DM.ones(2, 3), ca.DM.zeros(3, 2), ca.DM.ones(2, 3), ca.DM.eye(5),
+        ref_model.alg_states = list(map(Variable, [A, b, c, d]))
+        ref_model.constants = list(map(Variable, [C, D, E, I, F]))
+        constant_values = [1.7 * ca.DM.ones(2, 3), ca.DM.zeros(3, 2), ca.DM.ones(2, 3), ca.DM.eye(5),
                                      ca.DM.triplet([0, 1, 2], [0, 1, 2], [1, 2, 3], 3, 3)]
+        for const, val in zip(ref_model.constants, constant_values):
+            const.value = val
         ref_model.equations = [ca.mtimes(A, b) - c, ca.mtimes(A.T, b) - d, F[1, 2]]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -489,7 +492,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Attributes')
         print(casadi_model)
-        ref_model = CasadiSysModel()
+        ref_model = Model()
 
         i = ca.MX.sym("int")
         b = ca.MX.sym("bool")
@@ -503,14 +506,16 @@ class GenCasadiTest(unittest.TestCase):
         prm = ca.MX.sym("prm")
         protected_variable = ca.MX.sym("protected_variable")
 
-        ref_model.states = [r]
-        ref_model.der_states = [der_r]
-        ref_model.alg_states = [i, b, i1, i2, i3, i4, protected_variable]
-        ref_model.inputs = [i1, i2, i3]
-        ref_model.outputs = [i4, protected_variable]
-        ref_model.constants = [cst]
-        ref_model.constant_values = [1]
-        ref_model.parameters = [prm]
+        ref_model.states = list(map(Variable, [r]))
+        ref_model.der_states = list(map(Variable, [der_r]))
+        ref_model.alg_states = list(map(Variable, [i, b, i1, i2, i3, i4, protected_variable]))
+        ref_model.inputs = list(map(Variable, [i1, i2, i3]))
+        ref_model.outputs = list(map(Variable, [i4, protected_variable]))
+        ref_model.constants = list(map(Variable, [cst]))
+        constant_values = [1]
+        for c, v in zip(ref_model.constants, constant_values):
+            c.value = v
+        ref_model.parameters = list(map(Variable, [prm]))
         ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0) * i),
                                protected_variable - (i1 + i2)]
 

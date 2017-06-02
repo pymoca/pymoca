@@ -8,23 +8,38 @@ from .alias_relation import AliasRelation
 
 logger = logging.getLogger("pymola")
 
-VariableMetadata = namedtuple('VariableMetadata', ['type', 'shape', 'value', 'start', 'min', 'max', 'nominal', 'fixed'])
+
+class Variable:
+    def __init__(self, symbol, python_type=float, aliases=[]):
+        self.symbol = symbol
+        self.python_type = python_type
+        self.aliases = aliases
+
+    def to_dict(self):
+        d = {}
+        d['name'] = self.symbol.name()
+        d['shape'] = (self.symbol.size1(), self.symbol.size2())
+        d['python_type'] = self.python_type
+        d['aliases'] = self.aliases
+        return d
+
+    @staticmethod
+    def from_dict(cls, d):
+        variable = cls(MX.sym(d['name'], *d['shape']), d['python_type'])
+        variable.aliases = d['aliases']
+        return variable
 
 
 # noinspection PyUnresolvedReferences
-class CasadiSysModel:
+class Model:
     def __init__(self):
         self.states = []
-        self.state_metadata = []
         self.der_states = []
         self.alg_states = []
-        self.alg_state_metadata = []
         self.inputs = []
         self.outputs = []
         self.constants = []
-        self.constant_values = []
         self.parameters = []
-        self.parameter_values = []
         self.equations = []
         self.initial_equations = []
         self.time = ca.MX.sym('time')
@@ -40,15 +55,14 @@ class CasadiSysModel:
         r += "inputs: " + str(self.inputs) + "\n"
         r += "outputs: " + str(self.outputs) + "\n"
         r += "constants: " + str(self.constants) + "\n"
-        r += "constant_values: " + str(self.constant_values) + "\n"
         r += "parameters: " + str(self.parameters) + "\n"
         r += "equations: " + str(self.equations) + "\n"
         r += "initial equations: " + str(self.initial_equations) + "\n"
         return r
 
     def check_balanced(self):
-        n_states = sum(v.size1() * v.size2() for v in itertools.chain(self.states, self.alg_states))
-        n_inputs = sum(v.size1() * v.size2() for v in self.inputs)
+        n_states = sum(v.symbol.size1() * v.symbol.size2() for v in itertools.chain(self.states, self.alg_states))
+        n_inputs = sum(v.symbol.size1() * v.symbol.size2() for v in self.inputs)
         n_equations = sum(e.size1() * e.size2() for e in self.dae_residual_function.mx_out())
         if n_states - n_inputs == n_equations:
             logger.info("System is balanced.")
@@ -58,18 +72,23 @@ class CasadiSysModel:
                 "Number of states minus inputs is {}, number of equations is {}.".format(
                     n_states - n_inputs, n_equations))
 
+    def _symbols(self, l):
+        return [v.symbol for v in l]
+
     def simplify(self, options):
         if options.get('replace_constants', False):
             logger.info("Replacing constants")
 
+            symbols = self._symbols(self.constants)
+            values = [v.value for v in self.constants]
             if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, self.constants, self.constant_values)
+                self.equations = ca.substitute(self.equations, symbols, values)
             if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, self.constants, self.constant_values)
+                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.constants = []
-            self.constant_values = []
 
         if options.get('replace_parameter_expressions', False):
+            # TODO
             logger.info("Replacing parameter expressions")
 
             composite_parameters, simple_parameters = [], []
@@ -85,9 +104,9 @@ class CasadiSysModel:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, composite_parameters, composite_parameter_values)
             self.parameters = simple_parameters
-            self.parameter_values = simple_parameter_values
 
         if options.get('eliminable_variable_expression', None) is not None:
+            # TODO
             logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
 
             p = re.compile(options['eliminable_variable_expression'])
@@ -127,7 +146,6 @@ class CasadiSysModel:
 
             # Eliminate alias variables
             self.alg_states = list(alg_states.values())
-            # TODO update metadata
             self.equations = reduced_equations
 
             if len(self.equations) > 0:
@@ -136,6 +154,7 @@ class CasadiSysModel:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
         if options.get('detect_aliases', False):
+            # TODO
             logger.info("Detecting aliases")
 
             states = OrderedDict({s.name() : s for s in self.states})
@@ -196,7 +215,6 @@ class CasadiSysModel:
                         outputs[alias] = sign * canonical_state
 
             self.alg_states = list(alg_states.values())
-            # TODO update metadata
             self.inputs = list(inputs.values())
             self.outputs = list(outputs.values())
             self.equations = reduced_equations
@@ -208,23 +226,25 @@ class CasadiSysModel:
 
     @property
     def dae_residual_function(self):
-        return ca.Function('dae_residual', [self.time, ca.veccat(*self.states), ca.veccat(*self.der_states),
-                                            ca.veccat(*self.alg_states), ca.veccat(*self.constants),
-                                            ca.veccat(*self.parameters)], [ca.veccat(*self.equations)])
+        return ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
+                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.constants)),
+                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)])
 
     # noinspection PyUnusedLocal
     @property
     def initial_residual_function(self):
-        return ca.Function('initial_residual', [self.time, ca.veccat(*self.states), ca.veccat(*self.der_states),
-                                            ca.veccat(*self.alg_states), ca.veccat(*self.constants),
-                                            ca.veccat(*self.parameters)], [ca.veccat(*self.initial_equations)])
+        return ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
+                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.constants)),
+                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)])
+
+    VARIABLE_METADATA = ['value', 'start', 'min', 'max', 'nominal', 'fixed']
 
     # noinspection PyPep8Naming
     @property
-    def state_metadata_function(self):
-        s, m, M, n, f = [], [], [], [], []
-        for e, v in zip(itertools.chain(self.states, self.alg_states),
-                        itertools.chain(self.state_metadata, self.alg_state_metadata)):
+    def variable_metadata_function(self):
+        v, s, m, M, n, f = [], [], [], [], []
+        for e, v in itertools.chain(self.states, self.alg_states, self.parameters, self.constants):
+            v_ = v.value if hasattr(v.value, '__iter__') else np.full(e.size(), v.value if v.value is not None else np.nan)
             s_ = v.start if hasattr(v.start, '__iter__') else np.full(e.size(), v.start if v.start is not None else np.nan)
             m_ = v.min if hasattr(v.min, '__iter__') else np.full(e.size(), v.min if v.min is not None else -np.inf)
             M_ = v.max if hasattr(v.max, '__iter__') else np.full(e.size(), v.max if v.max is not None else np.inf)
@@ -232,11 +252,12 @@ class CasadiSysModel:
                                                                           v.nominal if v.nominal is not None else 1)
             f_ = v.fixed if hasattr(v.fixed, '__iter__') else np.full(e.size(), v.fixed)
 
+            v.append(v_)
             s.append(s_)
             m.append(m_)
             M.append(M_)
             n.append(n_)
             f.append(f_)
-        out = ca.horzcat(ca.veccat(*s), ca.veccat(*m), ca.veccat(*M), ca.veccat(*n), ca.veccat(*f))
-        return ca.Function('state_metadata', [ca.veccat(*self.parameters)],
-                            [out[:len(self.state_metadata), :], out[len(self.state_metadata):, :]])
+        out = ca.horzcat(ca.veccat(*v), ca.veccat(*s), ca.veccat(*m), ca.veccat(*M), ca.veccat(*n), ca.veccat(*f))
+        return ca.Function('variable_metadata', [ca.veccat(*self.parameters)],
+                            [out[:len(self.states), :], out[len(self.states):len(self.states) + len(self.alg_states), :], out[len(self.states) + len(self.alg_states):len(self.states) + len(self.alg_states) + len(self.parameters), :], out[len(self.states) + len(self.alg_states) + len(self.parameters):, :]])

@@ -8,17 +8,14 @@ import shelve
 
 from pymola import parser, tree
 from . import generator
-from .model import CasadiSysModel
+from .model import Model, Variable
 
 logger = logging.getLogger("pymola")
-
-# TODO dimensions
-Variable = namedtuple('Variable', ['name', 'value', 'aliases'])
 
 DelayedVariable = namedtuple('DelayedVariable', ['name', 'origin', 'delay'])
 
 
-class CasadiSysModelCached(CasadiSysModel):
+class CachedModel(Model):
     def __str__(self):
         r = ""
         r += "Model\n"
@@ -87,7 +84,7 @@ def _save_model(model_folder, model_name, model):
     else:
         ext = 'dll'
             
-    objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'state_metadata': ObjectData('state_metadata', False, '')}
+    objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'variable_metadata': ObjectData('variable_metadata', False, '')}
     for o, d in objects.items():
         f = getattr(model, o + '_function')
         print(f.name())
@@ -122,11 +119,10 @@ def _save_model(model_folder, model_name, model):
         db['library_os'] = os.name
 
         # Describe variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs']:
-            db[key] = [Variable(e.name(), None, getattr(e, 'aliases', [])) for e in getattr(model, key)]
+        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters']:
+            db[key] = [e.to_dict() for e in getattr(model, key)]
 
-        db['parameters'] = [Variable(e.name(), v, []) for e, v in zip(model.parameters, model.parameter_values)]
-        db['delayed_states'] = [DelayedVariable(t[0].name(), t[1].name(), t[2]) for t in model.delayed_states]
+        db['delayed_states'] = [DelayedVariable(t[0], t[1], t[2]) for t in model.delayed_states]
 
 def _load_model(model_folder, model_name, compiler_options):
     if compiler_options.get('mtime_check', True):
@@ -141,10 +137,10 @@ def _load_model(model_folder, model_name, compiler_options):
                         raise OSError("Cache out of date")
 
     # Create empty model object
-    model = CasadiSysModelCached()
+    model = CachedModel()
 
     # Compile shared libraries
-    objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'state_metadata': ObjectData('state_metadata', False, '')}
+    objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'variable_metadata': ObjectData('variable_metadata', False, '')}
 
     # Load metadata        
     with shelve.open(model_name, 'r') as db:
@@ -159,21 +155,20 @@ def _load_model(model_folder, model_name, compiler_options):
 
             setattr(model, o + '_function', f)
 
-        # Describe variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs']:
-            syms = getattr(model, key)
-            for var in db[key]:
-                sym = MX.sym(var.name) # TODO dims
-                sym.aliases = var.aliases
-                syms.append(sym)
+        # Evaluate state metadata
+        model.parameters = [Variable.from_dict(d) for d in db['parameters']]
+        metadata = dict(zip(['states', 'alg_states', 'parameters', 'constants'], model.variable_metadata_function(ca.veccat(*[p.symbol for p in model.parameters]))))
 
-        for var in db['parameters']:
-            sym = MX.sym(var.name) # TODO dims
-            model.parameters.append(sym) 
-            model.parameter_values.append(var.value) # TODO symbolic values
+        # Describe variables per category
+        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters']:
+            variables = getattr(model, key)
+            for i, d in enumerate(db[key]):
+                variable = Variable.from_dict(d)
+                for j, tmp in enumerate(model.VARIABLE_METADATA):
+                    setattr(variable, tmp, metadata[key][i, j])
+                variables.append(variable)
 
         for var in db['delayed_states']:
-            # TODO map to symbols
             model.delayed_states.append((var.name, var.origin, var.delay))
     
     # Done

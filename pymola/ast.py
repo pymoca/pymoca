@@ -193,7 +193,7 @@ class Symbol(Node):
     """
     A mathematical variable or state of the model
     """
-    ATTRIBUTES = ['min', 'max', 'start', 'fixed', 'nominal']
+    ATTRIBUTES = ['value', 'min', 'max', 'start', 'fixed', 'nominal']
 
     def __init__(self, **kwargs):
         self.name = ''  # type: str

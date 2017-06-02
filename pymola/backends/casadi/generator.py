@@ -5,13 +5,14 @@ from collections import namedtuple
 
 import casadi as ca
 import numpy as np
+import itertools
 from typing import Union
 
 from pymola import ast
 from pymola.tree import TreeWalker, TreeListener, flatten
 
 from .alias_relation import AliasRelation
-from .model import CasadiSysModel, VariableMetadata
+from .model import Model, Variable
 
 logger = logging.getLogger("pymola")
 
@@ -63,23 +64,40 @@ class ForLoop:
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
-class CasadiGenerator(TreeListener):
+class Generator(TreeListener):
     def __init__(self, root, class_name):
-        super(CasadiGenerator, self).__init__()
+        super(Generator, self).__init__()
         self.src = {}
-        self.model = CasadiSysModel()
+        self.model = Model()
         self.nodes = {'time': self.model.time}
         self.derivative = {}
         self.root = root
         self.class_name = class_name
         self.for_loops = []
 
+    def _ast_symbols_to_variables(self, ast_symbols, differentiate=False):
+        variables = []
+        for ast_symbol in ast_symbols:
+            mx_symbol = self.get_mx(ast_symbol)
+            if mx_symbol.is_empty():
+                continue
+            if differentiate:
+                mx_symbol = self.derivative[mx_symbol]
+            python_type = self.get_python_type(ast_symbol)
+            variable = Variable(mx_symbol, python_type)
+            if not differentiate:
+                for a in ast.Symbol.ATTRIBUTES:
+                    v = self.get_mx(getattr(ast_symbol, a))
+                    if v is not None:
+                        setattr(variable, a, v)
+                variable.prefixes = ast_symbol.prefixes
+            variables.append(variable)
+        return variables
+
     def exitClass(self, tree):
         logger.debug('exitClass {}'.format(tree.name))
 
         states = []
-        inputs = []
-        outputs = []
         constants = []
         parameters = []
         symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
@@ -90,13 +108,6 @@ class CasadiGenerator(TreeListener):
                 parameters.append(s)
             else:
                 states.append(s)
-                if 'input' in s.prefixes:
-                    inputs.append(s)
-                elif 'output' in s.prefixes:
-                    outputs.append(s)
-
-        def discard_empty(l):
-            return list(filter(lambda x: not x.is_empty(), l))
 
         ode_states = []
         alg_states = []
@@ -105,26 +116,19 @@ class CasadiGenerator(TreeListener):
                 ode_states.append(s)
             else:
                 alg_states.append(s)
-        self.model.states = discard_empty([self.get_mx(e) for e in ode_states])
-        self.model.state_metadata = [VariableMetadata(self.get_python_type(e), self.get_shape(e), self.get_mx(e.value), self.get_mx(e.start), self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal), self.get_mx(e.fixed))
-                                     for e in ode_states if not self.get_mx(e).is_empty()]
-        self.model.der_states = discard_empty([self.derivative[
-                                                   self.get_mx(e)] for e in ode_states])
-        self.model.alg_states = discard_empty([self.get_mx(e) for e in alg_states])
-        self.model.alg_state_metadata = [
-            VariableMetadata(self.get_python_type(e), self.get_shape(e), self.get_mx(e.value), self.get_mx(e.start), self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal), self.get_mx(e.fixed)) for e in alg_states if
-            not self.get_mx(e).is_empty()]
-        assert len(self.model.alg_states) == len(self.model.alg_state_metadata)
-        self.model.constants = discard_empty([self.get_mx(e) for e in constants])
-        self.model.constant_values = [self.get_mx(e.value) for e in constants if not self.get_mx(e).is_empty()]
-        self.model.parameters = discard_empty([self.get_mx(e) for e in parameters])
-        self.model.parameter_values = [self.get_mx(e.value) for e in parameters if not self.get_mx(e).is_empty()]
-        self.model.inputs = discard_empty([self.get_mx(e) for e in inputs])
-        self.model.outputs = discard_empty([self.get_mx(e) for e in outputs])
+        self.model.states = self._ast_symbols_to_variables(ode_states)
+        self.model.der_states = self._ast_symbols_to_variables(ode_states, differentiate=True)
+        self.model.alg_states = self._ast_symbols_to_variables(alg_states)
+        self.model.constants = self._ast_symbols_to_variables(constants)
+        self.model.parameters = self._ast_symbols_to_variables(parameters)
+        self.model.inputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'input' in v.prefixes]
+        self.model.outputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
+
+        def discard_empty(l):
+            return list(filter(lambda x: not x.is_empty(), l))
+
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
-
-        # TODO values vs metadata vs getattr/setattr
 
     def exitArray(self, tree):
         self.src[tree] = [self.src[e] for e in tree.values]
@@ -206,9 +210,10 @@ class CasadiGenerator(TreeListener):
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
             assert isinstance(expr, MX)
+            assert expr.is_symbolic()
             src = ca.MX.sym('{}_delayed_{}'.format(
                 expr.name(), delay_time), expr.size1(), expr.size2())
-            self.model.delayed_states.append((src, expr, delay_time))
+            self.model.delayed_states.append((src.name(), expr.name(), delay_time))
         elif op in OP_MAP and n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
             rhs = self.get_mx(tree.operands[1])
@@ -436,6 +441,6 @@ def generate(ast_tree, model_name):
 
     flat_tree = flatten(ast_tree, model_name)
 
-    casadi_gen = CasadiGenerator(flat_tree, model_name)
+    casadi_gen = Generator(flat_tree, model_name)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model
