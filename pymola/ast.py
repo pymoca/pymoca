@@ -285,7 +285,14 @@ class ElementReplaceable(Node):
 
 class ClassModification(Node):
     def __init__(self, **kwargs):
-        self.arguments = []  # type: List[Union[ElementModification, ComponentClause, ShortClassDefinition]]
+        self.arguments = []  # type: List[ClassModificationArgument]
+        super().__init__(**kwargs)
+
+
+class ClassModificationArgument(Node):
+    def __init__(self, **kwargs):
+        self.value = []  # type: Union[ElementModification, ComponentClause, ShortClassDefinition]
+        self.redeclare = False
         super().__init__(**kwargs)
 
 

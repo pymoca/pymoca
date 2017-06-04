@@ -124,10 +124,14 @@ class ASTListener(ModelicaListener):
                     self.class_node.statements += alglist.statements
 
     def exitArgument(self, ctx):
+        argument = ast.ClassModificationArgument()
         if ctx.element_modification_or_replaceable() is not None:
-            self.ast[ctx] = self.ast[ctx.element_modification_or_replaceable()]
+            argument.value = self.ast[ctx.element_modification_or_replaceable()]
+            argument.redeclare = False
         else:
-            self.ast[ctx] = self.ast[ctx.element_redeclaration()]
+            argument.value = self.ast[ctx.element_redeclaration()]
+            argument.redeclare = True
+        self.ast[ctx] = argument
 
     def exitArgument_list(self, ctx):
         self.ast[ctx] = [self.ast[a] for a in ctx.argument()]

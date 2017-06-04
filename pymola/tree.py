@@ -235,15 +235,40 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     # looking for class names in symbols.
     check_sub_class = True
 
-    if full_ref_tuple in root._flattened_class_cache:
-        extended_orig_class = pickle.loads(pickle.dumps(root._flattened_class_cache[full_ref_tuple], -1))
+    replacing_modifications = ast.ClassModification()
+    if class_modification is not None:
+        # TODO: Instead of checking on short class definition, check on "redeclare" prefix
+        replacing_modifications.arguments = [x for x in class_modification.arguments if x.redeclare]
+        class_modification.arguments = [x for x in class_modification.arguments if not x.redeclare]
+
+        if len(replacing_modifications.arguments) == 0:
+            replacing_modifications = None
+
+        if len(class_modification.arguments) == 0:
+            class_modification = None
+
+        # Lists are not hashable, but tuples are. Make sure we have the same order
+        replacing_modifications_key = None
+        if replacing_modifications is not None:
+            replacing_modifications_key = str(tuple(sorted(replacing_modifications.arguments, key=str)))
+    else:
+        replacing_modifications = None
+        replacing_modifications_key = None
+
+    cache_key = (full_ref_tuple, replacing_modifications_key)
+
+    if cache_key in root._flattened_class_cache:
+        extended_orig_class = pickle.loads(pickle.dumps(root._flattened_class_cache[cache_key], -1))
         check_sub_class = False
     elif instance_name or class_modification is not None:
-        extended_orig_class = flatten_class(root, orig_class, '')  # NOTE: this will add the current class it to cache
+        extended_orig_class = flatten_class(root, orig_class, '', replacing_modifications)  # NOTE: this will add the current class it to cache
         check_sub_class = False
     else:
         # The current flatten_class call will be the one to put the class in cache
         extended_orig_class = pull_extends(root, orig_class)
+
+        if replacing_modifications is not None:
+            extended_orig_class = modify_class(root, extended_orig_class, replacing_modifications, inplace=True)
 
     # Regardless of whether we found a cache version of ourselves, or whether we
     # still have to, we have to take the following steps.
@@ -390,8 +415,8 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     #     if f not in flat_file.classes:
     #         flat_file.classes.update(flatten(root, f, instance_name).classes)
 
-    if not instance_name and class_modification is None and not full_ref_tuple in root._flattened_class_cache and store_cache:
-        root._flattened_class_cache[full_ref_tuple] = pickle.loads(pickle.dumps(flat_class, -1))
+    if not instance_name and class_modification is None and not cache_key in root._flattened_class_cache and store_cache:
+        root._flattened_class_cache[cache_key] = pickle.loads(pickle.dumps(flat_class, -1))
 
     return flat_class
 
@@ -445,7 +470,8 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
     if not inplace:
         class_or_sym = pickle.loads(pickle.dumps(class_or_sym, -1))
 
-    for argument in modification.arguments:
+    for class_mod_argument in modification.arguments:
+        argument = class_mod_argument.value
         if isinstance(argument, ast.ElementModification):
             if argument.component.name in ast.Symbol.ATTRIBUTES:
                 setattr(class_or_sym, argument.component.name, argument.modifications[0])
