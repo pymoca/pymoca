@@ -364,77 +364,64 @@ class Collection(Node):
         self.files = []  # type: List[File]
         super().__init__(**kwargs)
 
+        # TODO: Should be directly build the class_lookup, or wait until the first call to find_class?
+        self._class_lookup = None
+
+    def _build_class_lookup(self):
+        self._class_lookup = {}
+
+        for f in self.files:
+            for class_name, c in f.classes.items():
+                if class_name is None:
+                    # FIXME: Short class definitions are not parsed correctly, and class_name is then None.
+                    continue
+                if f.within:
+                    full_name = merge_component_ref(f.within[0], ComponentRef(name=class_name))
+                else:
+                    full_name = ComponentRef(name=class_name)
+
+                # FIXME: Do we have to convert to string?
+                self._class_lookup[component_ref_to_tuple(full_name)] = c
+
     def extend(self, other):
         self.files.extend(other.files)
 
     def find_class(self, component_ref: Union[ComponentRef, str], within: list = None):
 
-        if within is None:
-            within = []
+        if self._class_lookup is None:
+            self._build_class_lookup()
 
         if isinstance(component_ref, str):
             assert component_ref.find('.') == -1
             component_ref = ComponentRef(name=component_ref)
 
-        # First we try to the find the file matching the right 'within'
-        if not component_ref.child and not within:
-            for f in self.files:
-                if not f.within:
-                    try:
-                        return f.classes[component_ref.name]
-                    except KeyError:
-                        continue
-
-            # Could not find symbol. Assume it is an elementary type
-            # TODO: Is this a correct assumption? What if we have an undefined type that is not elementary?
-            raise KeyError(component_ref.name)
+        if within:
+            full_name = merge_component_ref(within[0], component_ref)
         else:
-            # TODO: Should we move this to a 'get_parent' method in the ComponentRef class
-            c_within = copy.deepcopy(component_ref)
+            full_name = component_ref
 
-            n = c_within
-            while n.child[0].child:
-                n = n.child[0]
-            class_name = n.child[0].name
-            n.child = []
+        c = None
 
-            # Merge the within passed in, and the within we split from the
-            # class to be looked up
-            extended_within = copy.deepcopy(within)
+        # Try relative lookup
+        c = self._class_lookup.get(component_ref_to_tuple(full_name), None)
 
-            if extended_within:
-                n = extended_within[0]
-                while n.child:
-                    n = n.child[0]
-                n.child.append(c_within)
-                extended_within = extended_within[0]
+        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
+        # TODO: Should we traverse up the tree, or just try twice (once relative to current class, once absolute = relative to root)
+
+        # Try absolute lookup
+        if c is None:
+            c = self._class_lookup.get(component_ref_to_tuple(component_ref), None)
+
+        if c is None:
+            # Class not found
+            if full_name.name in ("Real", "Integer", "Boolean", "String", "Modelica", "SI"):
+                # FIXME: To support an "ignore" in the flattener, we raise a
+                # KeyError for what are likely to be elementary types
+                raise KeyError
             else:
-                extended_within = c_within
+                raise Exception("Could not find class {}".format(component_ref))
 
-            c = next((f.classes[class_name] for f in self.files if
-                      f.within and compare_component_ref(f.within[0], extended_within) and class_name in f.classes),
-                     None)
-
-            # TODO: This could probably be cleaner if we do nested classes.
-            # Then we could traverse up the tree until we found a match,
-            # instead of just trying twice (once with, once without prepending
-            # the passed-in 'within').
-            if c is None:
-                # Try again with root node lookup instead of relative
-                c = next((f.classes[class_name] for f in self.files if
-                          f.within and compare_component_ref(f.within[0], c_within) and class_name in f.classes), None)
-                if c is None:
-                    # TODO: How long do we traverse? Do we somehow force a stop at Real, Boolean, etc?
-                    #       Now a force is stopped on anything in the Modelica library.
-                    # FIXME: The "SI" part should be removed when we can handle import statements.
-                    if c_within.name in ("Modelica", "SI"):
-                        raise KeyError(c_within.name)
-                    else:
-                        raise Exception("Could not find class {} in {}".format(class_name, c_within))
-                else:
-                    return c
-            else:
-                return c
+        return c
 
     def find_symbol(self, node, component_ref: ComponentRef) -> Symbol:
         sym = node.symbols[component_ref.name]
@@ -459,3 +446,38 @@ def compare_component_ref(this: ComponentRef, other: ComponentRef) -> bool:
         return compare_component_ref(this.child[0], other.child[0])
 
     return this.__dict__ == other.__dict__
+
+
+def merge_component_ref(a: ComponentRef, b: ComponentRef) -> ComponentRef:
+    """
+    Helper function to append two component references to eachother, e.g.
+    a "within" component ref and an "object type" component ref.
+    :param a:
+    :param b:
+    :return: component reference, with b appended to a.
+    """
+
+    a = copy.deepcopy(a)
+    b = copy.deepcopy(b)  # Not strictly necessary
+
+    n = a
+    while n.child:
+        n = n.child[0]
+    n.child = [b]
+
+    return a
+
+
+def component_ref_to_tuple(c: ComponentRef) -> tuple:
+    """
+    Convert the nested component reference to flat tuple of names, which is
+    hashable and can therefore be used as dictionary key. Note that this
+    function ignores any array indices in the component reference.
+    :param c:
+    :return: flattened tuple of c's names
+    """
+
+    if c.child:
+        return (c.name, ) + component_ref_to_tuple(c.child[0])
+    else:
+        return (c.name, )
