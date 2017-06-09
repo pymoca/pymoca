@@ -448,8 +448,8 @@ class Collection(Node):
 def compare_component_ref(this: ComponentRef, other: ComponentRef) -> bool:
     """
     Helper function to compare component references to each other without converting to JSON
-    :param this: 
-    :param other: 
+    :param this:
+    :param other:
     :return: boolean, true if match
     """
     if len(this.child) != len(other.child):
