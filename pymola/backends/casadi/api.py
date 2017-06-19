@@ -125,11 +125,11 @@ def _save_model(model_folder, model_name, model):
             cg.add(f.forward(1))
             cg.add(f.reverse(1))
             cg.add(f.reverse(1).forward(1))
-        cg.generate()
+        cg.generate(model_folder + '/')
 
-        file_name = library_name + '.c'
+        file_name = os.path.join(model_folder, library_name + '.c')
 
-        d.library = '{}.{}'.format(library_name, ext)
+        d.library = os.path.join(model_folder, '{}.{}'.format(library_name, ext))
         cc = os.getenv('CC', 'gcc')
         cflags = os.getenv('CFLAGS', '-O3')
         try:
@@ -139,8 +139,9 @@ def _save_model(model_folder, model_name, model):
         finally:
             os.remove(file_name)
 
-    # Output metadata        
-    with shelve.open(model_name, 'n') as db:
+    # Output metadata     
+    shelve_file = os.path.join(model_folder, model_name)   
+    with shelve.open(shelve_file, 'n') as db:
         # Include references to the shared libraries
         for o, d in objects.items():
             db[d.key] = d.library
@@ -153,9 +154,11 @@ def _save_model(model_folder, model_name, model):
         db['delayed_states'] = [DelayedVariable(t[0], t[1], t[2]) for t in model.delayed_states]
 
 def _load_model(model_folder, model_name, compiler_options):
+    shelve_file = os.path.join(model_folder, model_name)
+
     if compiler_options.get('mtime_check', True):
         # Mtime check
-        cache_mtime = os.path.getmtime(model_name)
+        cache_mtime = os.path.getmtime(shelve_file)
         ast = None
         for folder in [model_folder] + compiler_options.get('library_folders', []):
             for root, dir, files in os.walk(folder, followlinks=True):
@@ -171,7 +174,7 @@ def _load_model(model_folder, model_name, compiler_options):
     objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'variable_metadata': ObjectData('variable_metadata', False, '')}
 
     # Load metadata        
-    with shelve.open(model_name, 'r') as db:
+    with shelve.open(shelve_file, 'r') as db:
         if db['library_os'] != os.name:
             raise OSError('Cache generated for incompatible OS')
 
