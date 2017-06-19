@@ -163,9 +163,15 @@ class Model:
             logger.info("Detecting aliases")
 
             states = OrderedDict({s.symbol.name() : s for s in self.states})
+            der_states = OrderedDict({s.symbol.name() : s for s in self.der_states})
             alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
             inputs = OrderedDict({s.symbol.name() : s for s in self.inputs})
             outputs = OrderedDict({s.symbol.name() : s for s in self.outputs})
+
+            all_states = {}
+            all_states.update(states)
+            all_states.update(der_states)
+            all_states.update(alg_states)
 
             alias_rel = AliasRelation()
 
@@ -199,10 +205,7 @@ class Model:
             # Eliminate alias variables
             variables, values = [], []
             for canonical, aliases in alias_rel:
-                try:
-                    canonical_state = alg_states[canonical]
-                except KeyError:
-                    canonical_state = states[canonical]
+                canonical_state = all_states[canonical]
                 setattr(canonical_state, 'aliases', aliases)
                 for alias in aliases:
                     if alias[0] == '-':
@@ -210,16 +213,16 @@ class Model:
                         alias = alias[1:]
                     else:
                         sign = 1
-                    variables.append(alg_states[alias].symbol)
+                    variables.append(all_states[alias].symbol)
                     values.append(sign * canonical_state.symbol)
 
-                    del alg_states[alias]
+                    del all_states[alias]
                     if alias in inputs:
                         inputs[alias].symbol = sign * canonical_state.symbol
                     if alias in outputs:
                         outputs[alias].symbol = sign * canonical_state.symbol
 
-            self.alg_states = list(alg_states.values())
+            self.alg_states = [v for k, v in all_states.items() if k in alg_states]
             self.inputs = list(inputs.values())
             self.outputs = list(outputs.values())
             self.equations = reduced_equations
