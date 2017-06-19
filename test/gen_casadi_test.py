@@ -12,6 +12,7 @@ import numpy as np
 
 import pymola.backends.casadi.generator as gen_casadi
 from pymola.backends.casadi.model import Model, Variable
+from pymola.backends.casadi.api import transfer_model, CachedModel
 from pymola import parser
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -32,8 +33,10 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(len(A.outputs), len(B.outputs))
         self.assertEqual(len(A.constants), len(B.constants))
         self.assertEqual(len(A.parameters), len(B.parameters))
-        self.assertEqual(len(A.equations), len(B.equations))
-        self.assertEqual(len(A.initial_equations), len(B.initial_equations))
+        
+        if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
+            self.assertEqual(len(A.equations), len(B.equations))
+            self.assertEqual(len(A.initial_equations), len(B.initial_equations))
 
         for a, b in zip(A.constants, B.constants):
             delta = ca.vec(a.value - b.value)
@@ -527,6 +530,28 @@ class GenCasadiTest(unittest.TestCase):
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         self.assertTrue(True)
+
+    def test_caching(self):
+        # Clear cache
+        shelve_file = os.path.join(TEST_DIR, 'DistributionModel')
+        try:
+            os.remove(shelve_file)
+        except:
+            pass
+
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'replace_constants': False,
+             'replace_parameter_expressions': False,
+             'detect_aliases': False,
+             'expand': False,
+             'cache': True}
+
+        ref_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
+        cached_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
+
+        # Compare
+        self.assert_model_equivalent_numeric(ref_model, cached_model)
 
 
 if __name__ == "__main__":
