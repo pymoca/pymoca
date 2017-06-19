@@ -69,15 +69,14 @@ class Model:
 
     def check_balanced(self):
         n_states = sum(v.symbol.size1() * v.symbol.size2() for v in itertools.chain(self.states, self.alg_states))
-        n_inputs = sum(v.symbol.size1() * v.symbol.size2() for v in self.inputs)
         n_equations = sum(e.size1() * e.size2() for e in self.dae_residual_function.mx_out())
-        if n_states - n_inputs == n_equations:
+        if n_states == n_equations:
             logger.info("System is balanced.")
         else:
             logger.warning(
                 "System is not balanced.  "
-                "Number of states minus inputs is {}, number of equations is {}.".format(
-                    n_states - n_inputs, n_equations))
+                "Number of states is {}, number of equations is {}.".format(
+                    n_states, n_equations))
 
     def _symbols(self, l):
         return [v.symbol for v in l]
@@ -172,6 +171,7 @@ class Model:
             all_states.update(states)
             all_states.update(der_states)
             all_states.update(alg_states)
+            all_states.update(inputs)
 
             alias_rel = AliasRelation()
 
@@ -217,15 +217,13 @@ class Model:
                     values.append(sign * canonical_state.symbol)
 
                     del all_states[alias]
-                    if alias in inputs:
-                        inputs[alias].symbol = sign * canonical_state.symbol
                     if alias in outputs:
                         outputs[alias].symbol = sign * canonical_state.symbol
 
             self.states = [v for k, v in all_states.items() if k in states]
             self.der_states = [v for k, v in all_states.items() if k in der_states]
             self.alg_states = [v for k, v in all_states.items() if k in alg_states]
-            self.inputs = list(inputs.values())
+            self.inputs = [v for k, v in all_states.items() if k in inputs]
             self.outputs = list(outputs.values())
             self.equations = reduced_equations
 
@@ -245,14 +243,14 @@ class Model:
     @property
     def dae_residual_function(self):
         return ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
-                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.constants)),
+                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
                                             ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)])
 
     # noinspection PyUnusedLocal
     @property
     def initial_residual_function(self):
         return ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
-                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.constants)),
+                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
                                             ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
 
     VARIABLE_METADATA = ['value', 'start', 'min', 'max', 'nominal', 'fixed']
@@ -261,7 +259,7 @@ class Model:
     @property
     def variable_metadata_function(self):
         out = []
-        for l in [self.states, self.alg_states, self.parameters, self.constants]:
+        for l in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
             v, s, m, M, n, f = [], [], [], [], [], []
             for variable in l:
                 tmp = ca.MX(getattr(variable, 'value', np.nan))

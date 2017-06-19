@@ -33,7 +33,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(len(A.outputs), len(B.outputs))
         self.assertEqual(len(A.constants), len(B.constants))
         self.assertEqual(len(A.parameters), len(B.parameters))
-        
+
         if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
             self.assertEqual(len(A.equations), len(B.equations))
             self.assertEqual(len(A.initial_equations), len(B.initial_equations))
@@ -48,23 +48,22 @@ class GenCasadiTest(unittest.TestCase):
             this = getattr(A, f_name + '_function')
             that = getattr(B, f_name + '_function')
 
-            this_mx = this.mx_in()
-            that_mx = that.mx_in()
-            this_in = [repr(e) for e in this_mx] #if e.is_symbolic()]
-            that_in = [repr(e) for e in that_mx] #if e.is_symbolic()]
+            if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
+                this_mx = this.mx_in()
+                that_mx = that.mx_in()
+                this_in = [repr(e) for e in this_mx] #if e.is_symbolic()]
+                that_in = [repr(e) for e in that_mx] #if e.is_symbolic()]
 
-            that_from_this = []
-            this_mx_dict = dict(zip(this_in, this_mx))
-            that_mx_dict = dict(zip(that_in, that_mx))
-            for e in that_in:
-                print(e)
-                print(this_in)
-                self.assertTrue(e in this_in)
-                self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
-                self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
-                that_from_this.append(this_mx_dict[e])
+                that_from_this = []
+                this_mx_dict = dict(zip(this_in, this_mx))
+                that_mx_dict = dict(zip(that_in, that_mx))
+                for e in that_in:
+                    self.assertTrue(e in this_in)
+                    self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
+                    self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
+                    that_from_this.append(this_mx_dict[e])
 
-            that = ca.Function('f', this_mx, that.call(that_from_this))
+                that = ca.Function('f', this_mx, that.call(that_from_this))
 
             np.random.seed(0)
 
@@ -311,7 +310,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.inputs = list(map(Variable, [x]))
         ref_model.outputs = list(map(Variable, [y1, y2, y3]))
-        ref_model.alg_states = list(map(Variable, [x, y1, y2, y3]))
+        ref_model.alg_states = list(map(Variable, [y1, y2, y3]))
         ref_model.parameters = list(map(Variable, [y_max]))
         ref_model.equations = [
             y1 - ca.if_else(x > 0, 1, 0) * y_max,
@@ -386,7 +385,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.inputs = list(map(Variable, [x]))
         ref_model.outputs = list(map(Variable, [y, z, w, u]))
-        ref_model.alg_states = list(map(Variable, [x, y, z, w, u]))
+        ref_model.alg_states = list(map(Variable, [y, z, w, u]))
         ref_model.equations = [y - ca.sin(ref_model.time), z - ca.cos(x), w - ca.fmin(y, z), u - ca.fabs(w)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -511,7 +510,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = list(map(Variable, [r]))
         ref_model.der_states = list(map(Variable, [der_r]))
-        ref_model.alg_states = list(map(Variable, [i, b, i1, i2, i3, i4, protected_variable]))
+        ref_model.alg_states = list(map(Variable, [i, b, i4, protected_variable]))
         ref_model.inputs = list(map(Variable, [i1, i2, i3]))
         ref_model.outputs = list(map(Variable, [i4, protected_variable]))
         ref_model.constants = list(map(Variable, [cst]))
@@ -533,7 +532,7 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_caching(self):
         # Clear cache
-        shelve_file = os.path.join(TEST_DIR, 'DistributionModel')
+        shelve_file = os.path.join(TEST_DIR, 'Aircraft')
         try:
             os.remove(shelve_file)
         except:

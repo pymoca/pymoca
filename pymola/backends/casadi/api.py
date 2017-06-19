@@ -187,8 +187,7 @@ def _load_model(model_folder, model_name, compiler_options):
             setattr(model, '_' + o + '_function', f)
 
         # Evaluate variable metadata
-        model.parameters = [Variable.from_dict(d) for d in db['parameters']]
-        metadata = dict(zip(['states', 'alg_states', 'parameters', 'constants'], model.variable_metadata_function(ca.veccat(*[p.symbol for p in model.parameters]))))
+        metadata = dict(zip(['states', 'alg_states', 'inputs', 'parameters', 'constants'], model.variable_metadata_function(ca.veccat(*[p.symbol for p in model.parameters]))))
 
         # Load variables per category
         variable_dict = {}
@@ -202,7 +201,6 @@ def _load_model(model_folder, model_name, compiler_options):
                 variable_dict[variable.symbol.name()] = variable
 
         model.der_states = [Variable.from_dict(d) for d in db['der_states']]
-        model.inputs = [variable_dict[v['name']] for v in db['inputs']]
         model.outputs = [variable_dict[v['name']] for v in db['outputs']]
 
         for var in db['delayed_states']:

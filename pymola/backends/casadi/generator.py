@@ -99,6 +99,7 @@ class Generator(TreeListener):
         logger.debug('exitClass {}'.format(tree.name))
 
         states = []
+        inputs = []
         constants = []
         parameters = []
         symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
@@ -107,6 +108,8 @@ class Generator(TreeListener):
                 constants.append(s)
             elif 'parameter' in s.prefixes:
                 parameters.append(s)
+            elif 'input' in s.prefixes:
+                inputs.append(s)
             else:
                 states.append(s)
 
@@ -114,7 +117,7 @@ class Generator(TreeListener):
         alg_states = []
         for s in states:
             if self.get_mx(s) in self.derivative:
-                ode_states.append(s)
+                ode_states.append(s) 
             else:
                 alg_states.append(s)
         self.model.states = self._ast_symbols_to_variables(ode_states)
@@ -122,7 +125,7 @@ class Generator(TreeListener):
         self.model.alg_states = self._ast_symbols_to_variables(alg_states)
         self.model.constants = self._ast_symbols_to_variables(constants)
         self.model.parameters = self._ast_symbols_to_variables(parameters)
-        self.model.inputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'input' in v.prefixes]
+        self.model.inputs = self._ast_symbols_to_variables(inputs)
         self.model.outputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
 
         def discard_empty(l):
