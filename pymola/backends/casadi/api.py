@@ -201,7 +201,7 @@ def _load_model(model_folder, model_name, compiler_options):
                 variables.append(variable)
                 variable_dict[variable.symbol.name()] = variable
 
-        model.der_states = [ca.MX.sym('der({})'.format(state.symbol.name()), *state.symbol.size()) for state in model.states]
+        model.der_states = [Variable.from_dict(d) for d in db['der_states']]
         model.inputs = [variable_dict[v['name']] for v in db['inputs']]
         model.outputs = [variable_dict[v['name']] for v in db['outputs']]
 
