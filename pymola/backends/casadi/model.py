@@ -1,5 +1,6 @@
 from collections import namedtuple, OrderedDict
 import casadi as ca
+import numpy as np
 import itertools
 import logging
 import re
@@ -255,15 +256,24 @@ class Model:
     @property
     def variable_metadata_function(self):
         v, s, m, M, n, f = [], [], [], [], [], []
-        for v in itertools.chain(self.states, self.alg_states, self.parameters, self.constants):
-            # TODO
-            v_ = v.value if hasattr(v.value, '__iter__') else np.full(v.symbol.size(), v.value if hasattr(v, 'value') else np.nan)
-            s_ = v.start if hasattr(v.start, '__iter__') else np.full(v.symbol.size(), v.start if hasattr(v, 'start') is not None else np.nan)
-            m_ = v.min if hasattr(v.min, '__iter__') else np.full(v.symbol.size(), v.min if hasattr(v, 'min') is not None else -np.inf)
-            M_ = v.max if hasattr(v.max, '__iter__') else np.full(v.symbol.size(), v.max if hasattr(v, 'max') is not None else np.inf)
-            n_ = v.nominal if hasattr(v.nominal, '__iter__') else np.full(v.symbol.size(),
-                                                                          v.nominal if v.nominal is not None else 1)
-            f_ = v.fixed if hasattr(v.fixed, '__iter__') else np.full(v.symbol.size(), v.fixed)
+        for variable in itertools.chain(self.states, self.alg_states, self.parameters, self.constants):
+            tmp = getattr(variable, 'value', np.nan)
+            v_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+
+            tmp = getattr(variable, 'start', np.nan)
+            s_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+
+            tmp = getattr(variable, 'min', -np.inf)
+            m_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+
+            tmp = getattr(variable, 'max', np.inf)
+            M_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+
+            tmp = getattr(variable, 'nominal', 1)
+            n_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+
+            tmp = getattr(variable, 'fixed', False)
+            f_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
 
             v.append(v_)
             s.append(s_)
@@ -272,5 +282,5 @@ class Model:
             n.append(n_)
             f.append(f_)
         out = ca.horzcat(ca.veccat(*v), ca.veccat(*s), ca.veccat(*m), ca.veccat(*M), ca.veccat(*n), ca.veccat(*f))
-        return ca.Function('variable_metadata', [ca.veccat(*self.parameters)],
+        return ca.Function('variable_metadata', [ca.veccat(*self._symbols(self.parameters))],
                             [out[:len(self.states), :], out[len(self.states):len(self.states) + len(self.alg_states), :], out[len(self.states) + len(self.alg_states):len(self.states) + len(self.alg_states) + len(self.parameters), :], out[len(self.states) + len(self.alg_states) + len(self.parameters):, :]])
