@@ -264,23 +264,23 @@ class Model:
         for l in [self.states, self.alg_states, self.parameters, self.constants]:
             v, s, m, M, n, f = [], [], [], [], [], []
             for variable in l:
-                tmp = getattr(variable, 'value', np.nan)
-                v_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = ca.MX(getattr(variable, 'value', np.nan))
+                v_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
 
-                tmp = getattr(variable, 'start', np.nan)
-                s_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = ca.MX(getattr(variable, 'start', np.nan))
+                s_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
 
-                tmp = getattr(variable, 'min', -np.inf)
-                m_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = ca.MX(getattr(variable, 'min', -np.inf))
+                m_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
 
-                tmp = getattr(variable, 'max', np.inf)
-                M_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = ca.MX(getattr(variable, 'max', np.inf))
+                M_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
 
-                tmp = getattr(variable, 'nominal', 1)
-                n_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = ca.MX(getattr(variable, 'nominal', 1))
+                n_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
 
-                tmp = getattr(variable, 'fixed', False)
-                f_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = ca.MX(getattr(variable, 'fixed', False))
+                f_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
 
                 v.append(v_)
                 s.append(s_)
