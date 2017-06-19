@@ -23,6 +23,7 @@ OP_MAP = {'*': "__mul__",
           '+': "__add__",
           "-": "__sub__",
           "/": "__div__",
+          '^': "__pow__",
           '>': '__gt__',
           '<': '__lt__',
           '<=': '__le__',
@@ -225,11 +226,11 @@ class Generator(TreeListener):
             src = lhs_op()
         elif n_operands == 1:
             src = self.get_mx(tree.operands[0])
-            src = getattr(src, tree.operator.name)()
+            src = getattr(src, op)()
         elif n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
             rhs = self.get_mx(tree.operands[1])
-            lhs_op = getattr(lhs, tree.operator.name)
+            lhs_op = getattr(lhs, op)
             src = lhs_op(rhs)
         else:
             raise Exception("Unknown operator {}({})".format(op, ','.join(n_operands * ['.'])))
