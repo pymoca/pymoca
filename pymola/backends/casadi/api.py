@@ -16,6 +16,21 @@ DelayedVariable = namedtuple('DelayedVariable', ['name', 'origin', 'delay'])
 
 
 class CachedModel(Model):
+    def __init__(self):
+        self.states = []
+        self.der_states = []
+        self.alg_states = []
+        self.inputs = []
+        self.outputs = []
+        self.constants = []
+        self.parameters = []
+        self.time = ca.MX.sym('time')
+        self.delayed_states = []
+
+        self._dae_residual_function = None
+        self._initial_residual_function = None
+        self._variable_metadata_function = None
+
     def __str__(self):
         r = ""
         r += "Model\n"
@@ -26,9 +41,20 @@ class CachedModel(Model):
         r += "inputs: " + str(self.inputs) + "\n"
         r += "outputs: " + str(self.outputs) + "\n"
         r += "constants: " + str(self.constants) + "\n"
-        r += "constant_values: " + str(self.constant_values) + "\n"
         r += "parameters: " + str(self.parameters) + "\n"
         return r
+
+    @property
+    def dae_residual_function(self):
+        return self._dae_residual_function
+
+    @property
+    def initial_residual_function(self):
+        return self._initial_residual_function
+
+    @property
+    def variable_metadata_function(self):
+        return self._variable_metadata_function
 
     @property
     def equations(self):
@@ -119,7 +145,7 @@ def _save_model(model_folder, model_name, model):
         db['library_os'] = os.name
 
         # Describe variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters']:
+        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters', 'constants']:
             db[key] = [e.to_dict() for e in getattr(model, key)]
 
         db['delayed_states'] = [DelayedVariable(t[0], t[1], t[2]) for t in model.delayed_states]
@@ -153,20 +179,26 @@ def _load_model(model_folder, model_name, compiler_options):
             print(f.name())
             f.print_dimensions()
 
-            setattr(model, o + '_function', f)
+            setattr(model, '_' + o + '_function', f)
 
         # Evaluate variable metadata
         model.parameters = [Variable.from_dict(d) for d in db['parameters']]
         metadata = dict(zip(['states', 'alg_states', 'parameters', 'constants'], model.variable_metadata_function(ca.veccat(*[p.symbol for p in model.parameters]))))
 
         # Load variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters']:
+        variable_dict = {}
+        for key in metadata.keys():
             variables = getattr(model, key)
             for i, d in enumerate(db[key]):
                 variable = Variable.from_dict(d)
                 for j, tmp in enumerate(model.VARIABLE_METADATA):
                     setattr(variable, tmp, metadata[key][i, j])
                 variables.append(variable)
+                variable_dict[variable.symbol.name()] = variable
+
+        model.der_states = [ca.MX.sym('der({})'.format(state.symbol.name()), *state.symbol.size()) for state in model.states]
+        model.inputs = [variable_dict[v['name']] for v in db['inputs']]
+        model.outputs = [variable_dict[v['name']] for v in db['outputs']]
 
         for var in db['delayed_states']:
             model.delayed_states.append((var.name, var.origin, var.delay))

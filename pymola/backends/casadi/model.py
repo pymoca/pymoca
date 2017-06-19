@@ -30,9 +30,9 @@ class Variable:
         d['aliases'] = self.aliases
         return d
 
-    @staticmethod
+    @classmethod
     def from_dict(cls, d):
-        variable = cls(MX.sym(d['name'], *d['shape']), d['python_type'])
+        variable = cls(ca.MX.sym(d['name'], *d['shape']), d['python_type'])
         variable.aliases = d['aliases']
         return variable
 
@@ -255,32 +255,33 @@ class Model:
     # noinspection PyPep8Naming
     @property
     def variable_metadata_function(self):
-        v, s, m, M, n, f = [], [], [], [], [], []
-        for variable in itertools.chain(self.states, self.alg_states, self.parameters, self.constants):
-            tmp = getattr(variable, 'value', np.nan)
-            v_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+        out = []
+        for l in [self.states, self.alg_states, self.parameters, self.constants]:
+            v, s, m, M, n, f = [], [], [], [], [], []
+            for variable in l:
+                tmp = getattr(variable, 'value', np.nan)
+                v_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
 
-            tmp = getattr(variable, 'start', np.nan)
-            s_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = getattr(variable, 'start', np.nan)
+                s_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
 
-            tmp = getattr(variable, 'min', -np.inf)
-            m_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = getattr(variable, 'min', -np.inf)
+                m_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
 
-            tmp = getattr(variable, 'max', np.inf)
-            M_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = getattr(variable, 'max', np.inf)
+                M_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
 
-            tmp = getattr(variable, 'nominal', 1)
-            n_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = getattr(variable, 'nominal', 1)
+                n_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
 
-            tmp = getattr(variable, 'fixed', False)
-            f_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
+                tmp = getattr(variable, 'fixed', False)
+                f_ = tmp if hasattr(tmp, '__iter__') else np.full(variable.symbol.size(), tmp)
 
-            v.append(v_)
-            s.append(s_)
-            m.append(m_)
-            M.append(M_)
-            n.append(n_)
-            f.append(f_)
-        out = ca.horzcat(ca.veccat(*v), ca.veccat(*s), ca.veccat(*m), ca.veccat(*M), ca.veccat(*n), ca.veccat(*f))
-        return ca.Function('variable_metadata', [ca.veccat(*self._symbols(self.parameters))],
-                            [out[:len(self.states), :], out[len(self.states):len(self.states) + len(self.alg_states), :], out[len(self.states) + len(self.alg_states):len(self.states) + len(self.alg_states) + len(self.parameters), :], out[len(self.states) + len(self.alg_states) + len(self.parameters):, :]])
+                v.append(v_)
+                s.append(s_)
+                m.append(m_)
+                M.append(M_)
+                n.append(n_)
+                f.append(f_)
+            out.append(ca.horzcat(ca.veccat(*v), ca.veccat(*s), ca.veccat(*m), ca.veccat(*M), ca.veccat(*n), ca.veccat(*f)))
+        return ca.Function('variable_metadata', [ca.veccat(*self._symbols(self.parameters))], out) 
