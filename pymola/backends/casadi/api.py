@@ -130,8 +130,10 @@ def _save_model(model_folder, model_name, model):
         file_name = library_name + '.c'
 
         d.library = '{}.{}'.format(library_name, ext)
+        cc = os.getenv('CC', 'gcc')
+        cflags = os.getenv('CFLAGS', '-O3')
         try:
-            os.system("clang -shared {} -o {}".format(file_name, d.library))
+            os.system("{} {} -shared {} -o {}".format(cc, cflags, file_name, d.library))
         except:
             raise
         finally:
