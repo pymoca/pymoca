@@ -222,6 +222,8 @@ class Model:
                     if alias in outputs:
                         outputs[alias].symbol = sign * canonical_state.symbol
 
+            self.states = [v for k, v in all_states.items() if k in states]
+            self.der_states = [v for k, v in all_states.items() if k in der_states]
             self.alg_states = [v for k, v in all_states.items() if k in alg_states]
             self.inputs = list(inputs.values())
             self.outputs = list(outputs.values())
