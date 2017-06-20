@@ -73,6 +73,7 @@ class ObjectData:
         self.derivatives = derivatives
         self.library = library
 
+
 def _compile_model(model_folder, model_name, compiler_options):
     # Load folders
     ast = None
@@ -215,6 +216,4 @@ def transfer_model(model_folder, model_name, compiler_options={}):
             return model
     else:
         return _compile_model(model_folder, model_name, compiler_options)
-
-
-    
+        

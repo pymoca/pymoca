@@ -93,17 +93,6 @@ class Model:
         return [v.symbol for v in l]
 
     def simplify(self, options):
-        if options.get('replace_constants', False):
-            logger.info("Replacing constants")
-
-            symbols = self._symbols(self.constants)
-            values = [v.value for v in self.constants]
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, symbols, values)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
-            self.constants = []
-
         if options.get('replace_parameter_expressions', False):
             logger.info("Replacing parameter expressions")
 
@@ -121,6 +110,42 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.parameters = simple_parameters
+
+        if options.get('replace_parameter_values', False):
+            logger.info("Replacing parameter values")
+
+            # N.B. Any parameter expression elimination must be done first.
+            unspecified_parameters, symbols, values = [], [], []
+            for p in self.parameters:
+                has_value = not isinstance(p.value, ca.MX) or p.value.is_constant()
+                if has_value:
+                    symbols.append(p.symbol)
+                    values.append(p.value)
+                else:
+                    unspecified_parameters.append(p)
+
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, symbols, values)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+            self.parameters = unspecified_parameters
+
+        if options.get('replace_constant_values', False):
+            logger.info("Replacing constant values")
+
+            # N.B. Any parameter expression elimination must be done first.
+            symbols = self._symbols(self.constants)
+            values = [v.value for v in self.constants]
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, symbols, values)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+            self.constants = []
+
+        if options.get('replace_state_values', False):
+            logger.info("Replacing state values")
+
+            raise NotImplementedError
 
         if options.get('eliminable_variable_expression', None) is not None:
             logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
