@@ -45,6 +45,9 @@ class Variable:
         return variable
 
 
+DelayedState = namedtuple('DelayedState', ['name', 'origin', 'delay'])
+
+
 # noinspection PyUnresolvedReferences
 class Model:
     def __init__(self):

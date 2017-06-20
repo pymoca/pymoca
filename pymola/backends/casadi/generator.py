@@ -12,7 +12,7 @@ from pymola import ast
 from pymola.tree import TreeWalker, TreeListener, flatten
 
 from .alias_relation import AliasRelation
-from .model import Model, Variable
+from .model import Model, Variable, DelayedState
 
 logger = logging.getLogger("pymola")
 
@@ -217,7 +217,8 @@ class Generator(TreeListener):
             assert expr.is_symbolic()
             src = ca.MX.sym('{}_delayed_{}'.format(
                 expr.name(), delay_time), expr.size1(), expr.size2())
-            self.model.delayed_states.append((src.name(), expr.name(), delay_time))
+            delayed_state = DelayedState(src.name(), expr.name(), delay_time)
+            self.model.delayed_states.append(delayed_state)
         elif op in OP_MAP and n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
             rhs = self.get_mx(tree.operands[1])

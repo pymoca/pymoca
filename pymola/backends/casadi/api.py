@@ -12,8 +12,6 @@ from .model import Model, Variable
 
 logger = logging.getLogger("pymola")
 
-DelayedVariable = namedtuple('DelayedVariable', ['name', 'origin', 'delay'])
-
 
 class CachedModel(Model):
     def __init__(self):
@@ -69,11 +67,11 @@ class CachedModel(Model):
 
 
 class ObjectData:
+    # This is not a named tuple, since we need read/write access to 'library'
     def __init__(self, key, derivatives, library):
         self.key = key
         self.derivatives = derivatives
         self.library = library
-
 
 def _compile_model(model_folder, model_name, compiler_options):
     # Load folders
@@ -151,7 +149,7 @@ def _save_model(model_folder, model_name, model):
         for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters', 'constants']:
             db[key] = [e.to_dict() for e in getattr(model, key)]
 
-        db['delayed_states'] = [DelayedVariable(t[0], t[1], t[2]) for t in model.delayed_states]
+        db['delayed_states'] = model.delayed_states
 
 def _load_model(model_folder, model_name, compiler_options):
     shelve_file = os.path.join(model_folder, model_name)
@@ -202,9 +200,7 @@ def _load_model(model_folder, model_name, compiler_options):
 
         model.der_states = [Variable.from_dict(d) for d in db['der_states']]
         model.outputs = [variable_dict[v['name']] for v in db['outputs']]
-
-        for var in db['delayed_states']:
-            model.delayed_states.append((var.name, var.origin, var.delay))
+        model.delayed_states = db['delayed_states']
     
     # Done
     return model
