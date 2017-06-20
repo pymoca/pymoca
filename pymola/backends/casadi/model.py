@@ -16,6 +16,14 @@ class Variable:
         self.python_type = python_type
         self.aliases = aliases
 
+        # Default attribute values
+        self.value = np.nan
+        self.start = np.nan
+        self.min = -np.inf
+        self.max = np.inf
+        self.nominal = 1
+        self.fixed = False
+
     def __str__(self):
         return self.symbol.name()
 
@@ -259,32 +267,12 @@ class Model:
     @property
     def variable_metadata_function(self):
         out = []
-        for l in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
-            v, s, m, M, n, f = [], [], [], [], [], []
-            for variable in l:
-                tmp = ca.MX(getattr(variable, 'value', np.nan))
-                v_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
-
-                tmp = ca.MX(getattr(variable, 'start', np.nan))
-                s_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
-
-                tmp = ca.MX(getattr(variable, 'min', -np.inf))
-                m_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
-
-                tmp = ca.MX(getattr(variable, 'max', np.inf))
-                M_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
-
-                tmp = ca.MX(getattr(variable, 'nominal', 1))
-                n_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
-
-                tmp = ca.MX(getattr(variable, 'fixed', False))
-                f_ = tmp if tmp.numel() != 1 else ca.repmat(tmp, *variable.symbol.size())
-
-                v.append(v_)
-                s.append(s_)
-                m.append(m_)
-                M.append(M_)
-                n.append(n_)
-                f.append(f_)
-            out.append(ca.horzcat(ca.veccat(*v), ca.veccat(*s), ca.veccat(*m), ca.veccat(*M), ca.veccat(*n), ca.veccat(*f)))
+        for variable_list in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
+            attribute_lists = len(self.VARIABLE_METADATA) * [[]]
+            for variable in variable_list:
+                for attribute_list_index, attribute in enumerate(self.VARIABLE_METADATA):
+                    value = ca.MX(getattr(variable, attribute))
+                    value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
+                    attribute_lists[attribute_list_index].append(value)
+            out.append(ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists]))
         return ca.Function('variable_metadata', [ca.veccat(*self._symbols(self.parameters))], out) 
