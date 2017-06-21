@@ -295,7 +295,7 @@ class Model:
     def variable_metadata_function(self):
         out = []
         for variable_list in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
-            attribute_lists = len(ast.Symbol.ATTRIBUTES) * [[]]
+            attribute_lists = [[] for i in range(len(ast.Symbol.ATTRIBUTES))]
             for variable in variable_list:
                 for attribute_list_index, attribute in enumerate(ast.Symbol.ATTRIBUTES):
                     value = ca.MX(getattr(variable, attribute))
