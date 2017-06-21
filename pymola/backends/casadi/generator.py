@@ -325,7 +325,6 @@ class Generator(TreeListener):
             ast_walker.walk(self, tree)
 
             # Obtain expression
-
             expr = self.get_mx(tree)
 
             # Obtain the symbols it depends on

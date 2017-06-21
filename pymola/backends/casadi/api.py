@@ -1,5 +1,6 @@
 from collections import namedtuple
 import casadi as ca
+import numpy as np
 import sys
 import os
 import fnmatch
@@ -184,23 +185,45 @@ def _load_model(model_folder, model_name, compiler_options):
 
             setattr(model, '_' + o + '_function', f)
 
-        # Evaluate variable metadata
-        metadata = dict(zip(['states', 'alg_states', 'inputs', 'parameters', 'constants'], model.variable_metadata_function(ca.veccat(*[p.symbol for p in model.parameters]))))
-
         # Load variables per category
+        variables_with_metadata = ['states', 'alg_states', 'inputs', 'parameters', 'constants']
         variable_dict = {}
-        for key in metadata.keys():
+        for key in variables_with_metadata:
             variables = getattr(model, key)
             for i, d in enumerate(db[key]):
                 variable = Variable.from_dict(d)
-                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
-                    setattr(variable, tmp, metadata[key][i, j])
                 variables.append(variable)
                 variable_dict[variable.symbol.name()] = variable
 
         model.der_states = [Variable.from_dict(d) for d in db['der_states']]
         model.outputs = [variable_dict[v['name']] for v in db['outputs']]
         model.delayed_states = db['delayed_states']
+
+        # Evaluate variable metadata
+        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters]))))
+        for key in variables_with_metadata:
+            for i, d in enumerate(db[key]):
+                variable = variable_dict[d['name']]
+                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
+                    setattr(variable, tmp, metadata[key][i, j])
+
+        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else np.nan for v in model.parameters]))))
+        for key in variables_with_metadata:
+            for i, d in enumerate(db[key]):
+                variable = variable_dict[d['name']]
+                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
+                    setattr(variable, tmp, metadata[key][i, j])
+
+        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else v.symbol for v in model.parameters]))))
+        for key in variables_with_metadata:
+            for i, d in enumerate(db[key]):
+                variable = variable_dict[d['name']]
+                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
+                    if not getattr(variable, tmp).is_regular():
+                        setattr(variable, tmp, metadata[key][i, j])
+
+    # TODO nan can be a valid value
+    # TODO run function with another value than nan, and those that remain nan are really nan.
     
     # Done
     return model
