@@ -303,7 +303,7 @@ class Model:
     def dae_residual_function(self):
         return ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
                                             ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)])
+                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [])
 
     # noinspection PyUnusedLocal
     @property
