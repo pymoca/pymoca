@@ -112,8 +112,6 @@ def _save_model(model_folder, model_name, model):
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
     for o, d in objects.items():
         f = getattr(model, o + '_function')
-        print(f.name())
-        f.print_dimensions()
 
         # Generate C code
         library_name = '{}_{}'.format(model_name, o)
@@ -178,8 +176,6 @@ def _load_model(model_folder, model_name, compiler_options):
         # Include references to the shared libraries
         for o, d in objects.items():
             f = ca.external(o, db[d.key])
-            print(f.name())
-            f.print_dimensions()
 
             setattr(model, '_' + o + '_function', f)
 
