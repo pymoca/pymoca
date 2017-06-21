@@ -6,7 +6,7 @@ import fnmatch
 import logging
 import shelve
 
-from pymola import parser, tree
+from pymola import parser, tree, ast
 from . import generator
 from .model import Model, Variable
 
@@ -76,22 +76,22 @@ class ObjectData:
 
 def _compile_model(model_folder, model_name, compiler_options):
     # Load folders
-    ast = None
+    tree = None
     for folder in [model_folder] + compiler_options.get('library_folders', []):
         for root, dir, files in os.walk(folder, followlinks=True):
             for item in fnmatch.filter(files, "*.mo"):
                 logger.info("Parsing {}".format(item))
 
                 with open(os.path.join(root, item), 'r') as f:
-                    if ast is None:
-                        ast = parser.parse(f.read())
+                    if tree is None:
+                        tree = parser.parse(f.read())
                     else:
-                        ast.extend(parser.parse(f.read()))
+                        tree.extend(parser.parse(f.read()))
 
     # Compile
     logger.info("Generating CasADi model")
     
-    model = generator.generate(ast, model_name)
+    model = generator.generate(tree, model_name)
     if compiler_options.get('check_balanced', True):
         model.check_balanced()
 
@@ -158,7 +158,6 @@ def _load_model(model_folder, model_name, compiler_options):
     if compiler_options.get('mtime_check', True):
         # Mtime check
         cache_mtime = os.path.getmtime(shelve_file)
-        ast = None
         for folder in [model_folder] + compiler_options.get('library_folders', []):
             for root, dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
@@ -194,7 +193,7 @@ def _load_model(model_folder, model_name, compiler_options):
             variables = getattr(model, key)
             for i, d in enumerate(db[key]):
                 variable = Variable.from_dict(d)
-                for j, tmp in enumerate(model.VARIABLE_METADATA):
+                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
                     setattr(variable, tmp, metadata[key][i, j])
                 variables.append(variable)
                 variable_dict[variable.symbol.name()] = variable

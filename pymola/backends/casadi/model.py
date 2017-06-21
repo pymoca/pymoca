@@ -5,6 +5,7 @@ import itertools
 import logging
 import re
 
+from pymola import ast
 from .alias_relation import AliasRelation
 
 logger = logging.getLogger("pymola")
@@ -289,16 +290,14 @@ class Model:
                                             ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
                                             ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
 
-    VARIABLE_METADATA = ['value', 'start', 'min', 'max', 'nominal', 'fixed']
-
     # noinspection PyPep8Naming
     @property
     def variable_metadata_function(self):
         out = []
         for variable_list in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
-            attribute_lists = len(self.VARIABLE_METADATA) * [[]]
+            attribute_lists = len(ast.Symbol.ATTRIBUTES) * [[]]
             for variable in variable_list:
-                for attribute_list_index, attribute in enumerate(self.VARIABLE_METADATA):
+                for attribute_list_index, attribute in enumerate(ast.Symbol.ATTRIBUTES):
                     value = ca.MX(getattr(variable, attribute))
                     value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
                     attribute_lists[attribute_list_index].append(value)
