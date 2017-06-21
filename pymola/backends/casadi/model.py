@@ -99,12 +99,11 @@ class Model:
 
             simple_parameters, symbols, values = [], [], []
             for p in self.parameters:
-                is_composite = isinstance(p.value, ca.MX) and not p.value.is_constant()
-                if is_composite:
-                    symbols.append(p.symbol)
-                    values.append(p.value)
-                else:
+                if ca.MX(p.value).is_constant():
                     simple_parameters.append(p)
+                else:
+                    symbols.append(p.symbol)
+                    values.append(p.value)   
 
             if len(self.equations) > 0:
                 self.equations = ca.substitute(self.equations, symbols, values)
@@ -112,14 +111,21 @@ class Model:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.parameters = simple_parameters
 
+            # Replace parameter expressions in metadata
+            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                for attribute in ast.Symbol.ATTRIBUTES:
+                    value = getattr(variable, attribute)
+                    if isinstance(value, ca.MX):
+                        [value] = ca.substitute([value], symbols, values)
+                        setattr(variable, attribute, value)
+
         if options.get('replace_parameter_values', False):
             logger.info("Replacing parameter values")
 
             # N.B. Any parameter expression elimination must be done first.
             unspecified_parameters, symbols, values = [], [], []
             for p in self.parameters:
-                has_value = not isinstance(p.value, ca.MX) or p.value.is_constant()
-                if has_value:
+                if ca.MX(p.value).is_constant():
                     symbols.append(p.symbol)
                     values.append(p.value)
                 else:
@@ -130,6 +136,14 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.parameters = unspecified_parameters
+
+            # Replace parameter values in metadata
+            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                for attribute in ast.Symbol.ATTRIBUTES:
+                    value = getattr(variable, attribute)
+                    if isinstance(value, ca.MX):
+                        [value] = ca.substitute([value], symbols, values)
+                        setattr(variable, attribute, value)
 
         if options.get('replace_constant_values', False):
             logger.info("Replacing constant values")
@@ -142,6 +156,14 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.constants = []
+
+            # Replace constant values in metadata
+            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                for attribute in ast.Symbol.ATTRIBUTES:
+                    value = getattr(variable, attribute)
+                    if isinstance(value, ca.MX):
+                        [value] = ca.substitute([value], symbols, values)
+                        setattr(variable, attribute, value)
 
         if options.get('replace_state_values', False):
             logger.info("Replacing state values")

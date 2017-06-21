@@ -69,9 +69,8 @@ class CachedModel(Model):
 
 class ObjectData:
     # This is not a named tuple, since we need read/write access to 'library'
-    def __init__(self, key, derivatives, library):
+    def __init__(self, key, library):
         self.key = key
-        self.derivatives = derivatives
         self.library = library
 
 
@@ -110,7 +109,7 @@ def _save_model(model_folder, model_name, model):
     else:
         ext = 'dll'
             
-    objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'variable_metadata': ObjectData('variable_metadata', False, '')}
+    objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
     for o, d in objects.items():
         f = getattr(model, o + '_function')
         print(f.name())
@@ -121,10 +120,9 @@ def _save_model(model_folder, model_name, model):
 
         cg = ca.CodeGenerator(library_name)
         cg.add(f)
-        if d.derivatives:
-            cg.add(f.forward(1))
-            cg.add(f.reverse(1))
-            cg.add(f.reverse(1).forward(1))
+        cg.add(f.forward(1))
+        cg.add(f.reverse(1))
+        cg.add(f.reverse(1).forward(1))
         cg.generate(model_folder + '/')
 
         file_name = os.path.join(model_folder, library_name + '.c')
@@ -170,7 +168,7 @@ def _load_model(model_folder, model_name, compiler_options):
     model = CachedModel()
 
     # Compile shared libraries
-    objects = {'dae_residual': ObjectData('dae_residual', True, ''), 'initial_residual': ObjectData('initial_residual', True, ''), 'variable_metadata': ObjectData('variable_metadata', False, '')}
+    objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
 
     # Load metadata        
     with shelve.open(shelve_file, 'r') as db:
@@ -199,7 +197,11 @@ def _load_model(model_folder, model_name, compiler_options):
         model.outputs = [variable_dict[v['name']] for v in db['outputs']]
         model.delayed_states = db['delayed_states']
 
-        # Evaluate variable metadata
+        # Evaluate variable metadata:
+        # We do this in three passes, so that we have constant attributes available through the API,
+        # and non-constant expressions as Function calls.
+
+        # 1.  Extract independent parameter values
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters]))))
         for key in variables_with_metadata:
             for i, d in enumerate(db[key]):
@@ -207,6 +209,8 @@ def _load_model(model_folder, model_name, compiler_options):
                 for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
                     setattr(variable, tmp, metadata[key][i, j])
 
+        # 2.  Plug independent values back into metadata function, to obtain values (such as bounds, or starting values)
+        # dependent upon independent parameter values.
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else np.nan for v in model.parameters]))))
         for key in variables_with_metadata:
             for i, d in enumerate(db[key]):
@@ -214,16 +218,19 @@ def _load_model(model_folder, model_name, compiler_options):
                 for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
                     setattr(variable, tmp, metadata[key][i, j])
 
+        # 3.  Fill in any irregular elements with expressions to be evaluated later.
+        # Note that an expression is neccessary only if the function value actually depends on the inputs.
+        # Otherwise, we would be dealing with a genuine NaN value.
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else v.symbol for v in model.parameters]))))
-        for key in variables_with_metadata:
+        for k, key in enumerate(variables_with_metadata):
+            sparsity = model.variable_metadata_function.sparsity_jac(0, k)
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
                     if not getattr(variable, tmp).is_regular():
-                        setattr(variable, tmp, metadata[key][i, j])
-
-    # TODO nan can be a valid value
-    # TODO run function with another value than nan, and those that remain nan are really nan.
+                        depends_on_parameters = np.any([sparsity.has_nz(i * len(ast.Symbol.ATTRIBUTES) + j, l) for l in range(len(model.parameters))])
+                        if depends_on_parameters:
+                            setattr(variable, tmp, metadata[key][i, j])
     
     # Done
     return model
