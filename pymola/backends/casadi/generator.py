@@ -120,12 +120,17 @@ class Generator(TreeListener):
                 ode_states.append(s) 
             else:
                 alg_states.append(s)
+
         self.model.states = self._ast_symbols_to_variables(ode_states)
         self.model.der_states = self._ast_symbols_to_variables(ode_states, differentiate=True)
         self.model.alg_states = self._ast_symbols_to_variables(alg_states)
         self.model.constants = self._ast_symbols_to_variables(constants)
         self.model.parameters = self._ast_symbols_to_variables(parameters)
-        self.model.inputs = self._ast_symbols_to_variables(inputs)
+
+        # We extend the input list, as it is already populated with delayed states.
+        self.model.inputs.extend(self._ast_symbols_to_variables(inputs))
+
+        # The outputs are a subset of the states.
         self.model.outputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
 
         def discard_empty(l):
@@ -213,12 +218,13 @@ class Generator(TreeListener):
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
-            assert isinstance(expr, MX)
-            assert expr.is_symbolic()
+            if not isinstance(expr, ca.MX) or not expr.is_symbolic():
+                raise NotImplementedError('Currently, delay() is only supported with a variable as argument.')
             src = ca.MX.sym('{}_delayed_{}'.format(
-                expr.name(), delay_time), expr.size1(), expr.size2())
+                expr.name(), delay_time), *expr.size())
             delayed_state = DelayedState(src.name(), expr.name(), delay_time)
             self.model.delayed_states.append(delayed_state)
+            self.model.inputs.append(Variable(src))
         elif op in OP_MAP and n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
             rhs = self.get_mx(tree.operands[1])
