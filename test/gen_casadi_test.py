@@ -456,7 +456,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [c - (a + b[0:3] * e), d - (ca.sin(a / b[1:4])), e - (d + scalar_f), g - ca.sum1(c),
                                h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - ca.DM.zeros(3),
                                nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1],
-                               arcw[0] + arcw[1]]
+                               arcw[0] + arcw[1], a - np.array([1, 2, 3]), scalar_f - 1.3]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

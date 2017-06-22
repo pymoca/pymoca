@@ -608,6 +608,16 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
     # flatten class
     flat_class = flatten_class(root, root.find_class(class_name), '')
 
+    # add equations for state symbol values
+    # we do this here, instead of in flatten_class, because symbol values
+    # inside flattened classes may be modified later by modify_class().
+    non_state_prefixes = set(['constant', 'parameter'])
+    for sym in flat_class.symbols.values():
+        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
+            if len(non_state_prefixes & set(sym.prefixes)) == 0:
+                flat_class.equations.append(ast.Equation(left=sym, right=sym.value))
+                sym.value = ast.Primary(value=None)
+
     # strip connector symbols
     for i, sym in list(flat_class.symbols.items()):
         try:

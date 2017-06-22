@@ -165,11 +165,6 @@ class Model:
                         [value] = ca.substitute([value], symbols, values)
                         setattr(variable, attribute, value)
 
-        if options.get('replace_state_values', False):
-            logger.info("Replacing state values")
-
-            raise NotImplementedError
-
         if options.get('eliminable_variable_expression', None) is not None:
             logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
 
