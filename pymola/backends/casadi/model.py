@@ -291,6 +291,27 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
+        if options.get('reduce_matvec', False):
+            logger.info("Collapsing model into a matrix-vector product")
+
+            for equation_list in ['equations', 'initial_equations']:
+                equations = getattr(self, equation_list)
+                if len(equations) > 0:
+                    states = ca.veccat(*self._symbols(itertools.chain(self.states, self.der_states, self.alg_states, self.inputs)))
+                    constants = ca.veccat(*self._symbols(self.constants))
+                    parameters = ca.veccat(*self._symbols(self.parameters))
+
+                    equations = ca.veccat(*equations)
+
+                    Af = ca.Function('Af', [constants, parameters], [ca.jacobian(equations, states)])
+                    A = Af(constants, parameters)
+
+                    bf = ca.Function('bf', [states, constants, parameters], [equations])
+                    b = bf(0, constants, parameters)
+
+                    equations = [ca.reshape(ca.mtimes(A, states), equations.shape) + b]
+                    setattr(self, equation_list, equations)
+
         if options.get('expand', False):
             logger.info("Expanding MX graph")
             
