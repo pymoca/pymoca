@@ -18,6 +18,8 @@ logger = logging.getLogger("pymola")
 
 # TODO
 #  - Nested for loops
+#  - Delay operator on arbitrary expressions
+#  - Pre operator
 
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
@@ -219,6 +221,7 @@ class Generator(TreeListener):
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
             if not isinstance(expr, ca.MX) or not expr.is_symbolic():
+                # TODO
                 raise NotImplementedError('Currently, delay() is only supported with a variable as argument.')
             src = ca.MX.sym('{}_delayed_{}'.format(
                 expr.name(), delay_time), *expr.size())
