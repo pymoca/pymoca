@@ -38,7 +38,7 @@ class Aircraft(OdeModel):
             body__g : 9.81,
             body__c : 0.9,
             body__m : 1.0,
-            accel__b_x__b : 0.0,
+            accel__b_x__b : 0,
             }
 
         # inputs
