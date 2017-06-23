@@ -127,7 +127,7 @@ def _save_model(model_folder, model_name, model):
 
         d.library = os.path.join(model_folder, '{}.{}'.format(library_name, ext))
         cc = os.getenv('CC', 'gcc')
-        cflags = os.getenv('CFLAGS', '-O3')
+        cflags = os.getenv('CFLAGS', '-O3 -fPIC')
         try:
             os.system("{} {} -shared {} -o {}".format(cc, cflags, file_name, d.library))
         except:
