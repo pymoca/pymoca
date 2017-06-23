@@ -540,17 +540,374 @@ class GenCasadiTest(unittest.TestCase):
 
         # Create model, cache it, and load the cache
         compiler_options = \
-            {'replace_constant_values': False,
-             'replace_parameter_expressions': False,
-             'detect_aliases': False,
-             'expand': False,
-             'cache': True}
+            {'cache': True}
 
         ref_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
         cached_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
 
         # Compare
         self.assert_model_equivalent_numeric(ref_model, cached_model)
+
+    def test_simplify_replace_constant_values(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'replace_constant_values': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        p1 = ca.MX.sym('p1')
+        p2 = ca.MX.sym('p2')
+        p3 = ca.MX.sym('p3')
+        p4 = ca.MX.sym('p4')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        alias = ca.MX.sym('alias')
+        y = ca.MX.sym('y')
+        _tmp = ca.MX.sym('_tmp')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, []))
+        constant_values = []
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p1, p2, p3, p4]))
+        parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - 3 - _tmp, _tmp - 0.1 * x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_simplify_replace_parameter_expressions(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'replace_parameter_expressions': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        c = ca.MX.sym('c')
+        p1 = ca.MX.sym('p1')
+        p3 = ca.MX.sym('p3')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        alias = ca.MX.sym('alias')
+        y = ca.MX.sym('y')
+        _tmp = ca.MX.sym('_tmp')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, [c]))
+        constant_values = [3]
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p1, p3]))
+        parameter_values = [2.0, np.nan]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [der_x - x - 3 * p1 - 3 * p3, alias - x, y - x - c - _tmp, _tmp - 0.1 * x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_simplify_replace_parameter_values(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'replace_parameter_values': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        c = ca.MX.sym('c')
+        p2 = ca.MX.sym('p2')
+        p3 = ca.MX.sym('p3')
+        p4 = ca.MX.sym('p4')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        alias = ca.MX.sym('alias')
+        y = ca.MX.sym('y')
+        _tmp = ca.MX.sym('_tmp')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, [c]))
+        constant_values = [3]
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p2, p3, p4]))
+        parameter_values = [4, np.nan, 2 * p3]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [der_x - x - 2 - p2 - p3 - p4, alias - x, y - x - c - _tmp, _tmp - 0.1 * x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_simplify_replace_parameter_values_and_expressions(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'replace_parameter_values': True,
+             'replace_parameter_expressions': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        c = ca.MX.sym('c')
+        p3 = ca.MX.sym('p3')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        alias = ca.MX.sym('alias')
+        y = ca.MX.sym('y')
+        _tmp = ca.MX.sym('_tmp')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, [c]))
+        constant_values = [3]
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p3]))
+        parameter_values = [np.nan]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [der_x - x - 6 - 3 * p3, alias - x, y - x - c - _tmp, _tmp - 0.1 * x]
+
+        print(casadi_model)
+        print(ref_model)
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_simplify_eliminable_variable_expression(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'eliminable_variable_expression': r'_\w+'}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        c = ca.MX.sym('c')
+        p1 = ca.MX.sym('p1')
+        p2 = ca.MX.sym('p2')
+        p3 = ca.MX.sym('p3')
+        p4 = ca.MX.sym('p4')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        alias = ca.MX.sym('alias')
+        y = ca.MX.sym('y')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [alias, y]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, [c]))
+        constant_values = [3]
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p1, p2, p3, p4]))
+        parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - c - 0.1 * x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_simplify_detect_aliases(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'detect_aliases': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        c = ca.MX.sym('c')
+        p1 = ca.MX.sym('p1')
+        p2 = ca.MX.sym('p2')
+        p3 = ca.MX.sym('p3')
+        p4 = ca.MX.sym('p4')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        y = ca.MX.sym('y')
+        _tmp = ca.MX.sym('_tmp')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [y, _tmp]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, [c]))
+        constant_values = [3]
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p1, p2, p3, p4]))
+        parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, y - x - c - _tmp, _tmp - 0.1 * x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+        self.assertEquals(casadi_model.states[0].aliases, ['alias'])
+
+    def test_simplify_reduce_affine_expression(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'reduce_affine_expression': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        c = ca.MX.sym('c')
+        p1 = ca.MX.sym('p1')
+        p2 = ca.MX.sym('p2')
+        p3 = ca.MX.sym('p3')
+        p4 = ca.MX.sym('p4')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        alias = ca.MX.sym('alias')
+        y = ca.MX.sym('y')
+        _tmp = ca.MX.sym('_tmp')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, [c]))
+        constant_values = [3]
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p1, p2, p3, p4]))
+        parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+
+        A = ca.MX(4, 5)
+        A[0, 0] = -1.0
+        A[0, 1] = 1.0
+        A[1, 2] = 1.0
+        A[1, 0] = -1.0
+        A[2, 0] = -1.0
+        A[2, 3] = 1.0
+        A[2, 4] = -1.0
+        A[3, 0] = -0.1
+        A[3, 4] = 1.0
+        b = ca.MX(4, 1)
+        b[0] = -p1 - p2 - p3 - p4
+        b[2] = -c
+        x = ca.vertcat(x, der_x, alias, y, _tmp)
+        ref_model.equations = [ca.mtimes(A, x) + b]
+            
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_simplify_all(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'replace_constant_values': True,
+             'replace_parameter_values': True,
+             'replace_parameter_expressions': True,
+             'detect_aliases': True,
+             'eliminable_variable_expression': r'_\w+',
+             'reduce_affine_expression': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        p3 = ca.MX.sym('p3')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        y = ca.MX.sym('y')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [y]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, []))
+        constant_values = []
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p3]))
+        parameter_values = [np.nan]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+
+        A = ca.MX(2, 3)
+        A[0, 0] = -1.0
+        A[0, 1] = 1.0
+        A[1, 0] = -1.1
+        A[1, 2] = 1.0
+        b = ca.MX(2, 1)
+        b[0] = -6 - 3 * p3
+        b[1] = -3
+        x = ca.vertcat(x, der_x, y)
+        ref_model.equations = [ca.mtimes(A, x) + b]
+            
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_simplify_expand(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'expand': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+
+        ref_model = Model()
+
+        c = ca.MX.sym('c')
+        p1 = ca.MX.sym('p1')
+        p2 = ca.MX.sym('p2')
+        p3 = ca.MX.sym('p3')
+        p4 = ca.MX.sym('p4')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        alias = ca.MX.sym('alias')
+        y = ca.MX.sym('y')
+        _tmp = ca.MX.sym('_tmp')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.constants = list(map(Variable, [c]))
+        constant_values = [3]
+        for cst, v in zip(ref_model.constants, constant_values):
+            cst.value = v
+        ref_model.parameters = list(map(Variable, [p1, p2, p3, p4]))
+        parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - c - _tmp, _tmp - 0.1 * x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
 
 if __name__ == "__main__":

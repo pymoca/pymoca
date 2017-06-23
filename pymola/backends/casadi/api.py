@@ -232,7 +232,7 @@ def _load_model(model_folder, model_name, compiler_options):
     return model
 
 def transfer_model(model_folder, model_name, compiler_options={}):
-    if compiler_options.get('cache', True):
+    if compiler_options.get('cache', False):
         try:
             return _load_model(model_folder, model_name, compiler_options)
         except OSError:

@@ -125,7 +125,7 @@ class Model:
             # N.B. Any parameter expression elimination must be done first.
             unspecified_parameters, symbols, values = [], [], []
             for p in self.parameters:
-                if ca.MX(p.value).is_constant():
+                if ca.MX(p.value).is_constant() and ca.MX(p.value).is_regular():
                     symbols.append(p.symbol)
                     values.append(p.value)
                 else:
@@ -189,9 +189,9 @@ class Model:
                         value = None
 
                     if variable is not None:
-                        del alg_states[variable]
+                        del alg_states[variable.name()]
 
-                        variables.append(variable.symbol)
+                        variables.append(variable)
                         if eq.is_op(ca.OP_SUB):
                             values.append(value)
                         else:
@@ -286,8 +286,8 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
-        if options.get('reduce_matvec', False):
-            logger.info("Collapsing model into a matrix-vector product")
+        if options.get('reduce_affine_expression', False):
+            logger.info("Collapsing model into an affine expression")
 
             for equation_list in ['equations', 'initial_equations']:
                 equations = getattr(self, equation_list)
