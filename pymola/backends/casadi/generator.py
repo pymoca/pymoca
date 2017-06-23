@@ -1,25 +1,31 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
 
-import itertools
 import logging
 from collections import namedtuple
 
 import casadi as ca
 import numpy as np
+import itertools
 from typing import Union
 
-from . import ast
-from .tree import TreeWalker, TreeListener, flatten
+from pymola import ast
+from pymola.tree import TreeWalker, TreeListener, flatten
+
+from .alias_relation import AliasRelation
+from .model import Model, Variable, DelayedState
 
 logger = logging.getLogger("pymola")
 
 # TODO
 #  - Nested for loops
+#  - Delay operator on arbitrary expressions
+#  - Pre operator
 
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
           "-": "__sub__",
           "/": "__div__",
+          '^': "__pow__",
           '>': '__gt__',
           '<': '__lt__',
           '<=': '__le__',
@@ -29,111 +35,6 @@ OP_MAP = {'*': "__mul__",
           "min": "fmin",
           "max": "fmax",
           "abs": "fabs"}
-
-VariableMetadata = namedtuple('VariableMetadata', ['min', 'max', 'nominal'])
-
-
-# noinspection PyUnresolvedReferences
-class CasadiSysModel:
-    def __init__(self):
-        self.states = []
-        self.state_metadata = []
-        self.der_states = []
-        self.alg_states = []
-        self.alg_state_metadata = []
-        self.inputs = []
-        self.outputs = []
-        self.constants = []
-        self.constant_values = []
-        self.parameters = []
-        self.parameter_values = []
-        self.equations = []
-        self.time = ca.MX.sym('time')
-        self.delayed_states = []
-
-    def __str__(self):
-        r = ""
-        r += "Model\n"
-        r += "time: " + str(self.time) + "\n"
-        r += "states: " + str(self.states) + "\n"
-        r += "der_states: " + str(self.der_states) + "\n"
-        r += "alg_states: " + str(self.alg_states) + "\n"
-        r += "inputs: " + str(self.inputs) + "\n"
-        r += "outputs: " + str(self.outputs) + "\n"
-        r += "constants: " + str(self.constants) + "\n"
-        r += "constant_values: " + str(self.constant_values) + "\n"
-        r += "parameters: " + str(self.parameters) + "\n"
-        r += "equations: " + str(self.equations) + "\n"
-        return r
-
-    def check_balanced(self):
-        n_states = sum(v.size1() * v.size2() for v in itertools.chain(self.states, self.alg_states))
-        n_inputs = sum(v.size1() * v.size2() for v in self.inputs)
-        n_equations = sum(e.size1() * e.size2() for e in self.equations)
-        if n_states - n_inputs == n_equations:
-            logger.info("System is balanced.")
-        else:
-            logger.warning(
-                "System is not balanced.  "
-                "Number of states minus inputs is {}, number of equations is {}.".format(
-                    n_states - n_inputs, n_equations))
-
-    def simplify(self, replace_constants=True, replace_parameter_expressions=True):
-        if replace_constants:
-            self.equations = ca.substitute(self.equations, self.constants, self.constant_values)
-            self.constants = []
-            self.constant_values = []
-
-        if replace_parameter_expressions:
-            composite_parameters, simple_parameters = [], []
-            composite_parameter_values, simple_parameter_values = [], []
-            for e, v in zip(self.parameters, self.parameter_values):
-                is_composite = isinstance(v, ca.MX) and not v.is_constant()
-                (simple_parameters, composite_parameters)[is_composite].append(e)
-                (simple_parameter_values, composite_parameter_values)[is_composite].append(
-                    float(v) if not is_composite and isinstance(v, ca.MX) else v)
-
-            self.equations = ca.substitute(self.equations, composite_parameters, composite_parameter_values)
-            self.parameters = simple_parameters
-            self.parameter_values = simple_parameter_values
-
-            # TODO detect and eliminate aliases
-            # TODO eliminate protected variables without min/max attribute
-
-    def dae_residual_function(self, group_arguments=True):
-        if group_arguments:
-            return ca.Function('dae_residual', [self.time, ca.vertcat(*self.states), ca.vertcat(*self.der_states),
-                                                ca.vertcat(*self.alg_states), ca.vertcat(*self.constants),
-                                                ca.vertcat(*self.parameters)], [ca.vertcat(*self.equations)])
-        else:
-            return ca.Function('dae_residual', [
-                self.time] + self.states + self.der_states + self.alg_states + self.constants + self.parameters,
-                               self.equations)
-
-    # noinspection PyUnusedLocal
-    def initial_residual_function(self, group_arguments=True):
-        # TODO
-        return ca.Function('initial_residual', [self.time], [0])
-
-    # noinspection PyPep8Naming
-    def state_metadata_function(self, group_arguments=True):
-        m, M, n = [], [], []
-        for e, v in zip(itertools.chain(self.states, self.alg_states),
-                        itertools.chain(self.state_metadata, self.alg_state_metadata)):
-            m_ = v.min if hasattr(v.min, '__iter__') else np.full(e.size(), v.min if v.min is not None else -np.inf)
-            M_ = v.max if hasattr(v.max, '__iter__') else np.full(e.size(), v.max if v.max is not None else np.inf)
-            n_ = v.nominal if hasattr(v.nominal, '__iter__') else np.full(e.size(),
-                                                                          v.nominal if v.nominal is not None else 1)
-            m.append(m_)
-            M.append(M_)
-            n.append(n_)
-        out = ca.horzcat(ca.vertcat(*m), ca.vertcat(*M), ca.vertcat(*n))
-        if group_arguments:
-            return ca.Function('state_metadata', [ca.vertcat(*self.parameters)],
-                               [out[:len(self.state_metadata), :], out[len(self.state_metadata):, :]])
-        else:
-            return ca.Function('state_metadata', self.parameters, [out])
-
 
 ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
 
@@ -166,23 +67,41 @@ class ForLoop:
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
-class CasadiGenerator(TreeListener):
+class Generator(TreeListener):
     def __init__(self, root, class_name):
-        super(CasadiGenerator, self).__init__()
+        super(Generator, self).__init__()
         self.src = {}
-        self.model = CasadiSysModel()
+        self.model = Model()
         self.nodes = {'time': self.model.time}
         self.derivative = {}
         self.root = root
         self.class_name = class_name
         self.for_loops = []
 
+    def _ast_symbols_to_variables(self, ast_symbols, differentiate=False):
+        variables = []
+        for ast_symbol in ast_symbols:
+            mx_symbol = self.get_mx(ast_symbol)
+            if mx_symbol.is_empty():
+                continue
+            if differentiate:
+                mx_symbol = self.derivative[mx_symbol]
+            python_type = self.get_python_type(ast_symbol)
+            variable = Variable(mx_symbol, python_type)
+            if not differentiate:
+                for a in ast.Symbol.ATTRIBUTES:
+                    v = self.get_mx(getattr(ast_symbol, a))
+                    if v is not None:
+                        setattr(variable, a, v)
+                variable.prefixes = ast_symbol.prefixes
+            variables.append(variable)
+        return variables
+
     def exitClass(self, tree):
         logger.debug('exitClass {}'.format(tree.name))
 
         states = []
         inputs = []
-        outputs = []
         constants = []
         parameters = []
         symbols = sorted(tree.symbols.values(), key=lambda x: x.order)
@@ -191,40 +110,36 @@ class CasadiGenerator(TreeListener):
                 constants.append(s)
             elif 'parameter' in s.prefixes:
                 parameters.append(s)
+            elif 'input' in s.prefixes:
+                inputs.append(s)
             else:
                 states.append(s)
-                if 'input' in s.prefixes:
-                    inputs.append(s)
-                elif 'output' in s.prefixes:
-                    outputs.append(s)
-
-        def discard_empty(l):
-            return list(filter(lambda x: not x.is_empty(), l))
 
         ode_states = []
         alg_states = []
         for s in states:
             if self.get_mx(s) in self.derivative:
-                ode_states.append(s)
+                ode_states.append(s) 
             else:
                 alg_states.append(s)
-        self.model.states = discard_empty([self.get_mx(e) for e in ode_states])
-        self.model.state_metadata = [VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal))
-                                     for e in ode_states if not self.get_mx(e).is_empty()]
-        self.model.der_states = discard_empty([self.derivative[
-                                                   self.get_mx(e)] for e in ode_states])
-        self.model.alg_states = discard_empty([self.get_mx(e) for e in alg_states])
-        self.model.alg_state_metadata = [
-            VariableMetadata(self.get_mx(e.min), self.get_mx(e.max), self.get_mx(e.nominal)) for e in alg_states if
-            not self.get_mx(e).is_empty()]
-        assert len(self.model.alg_states) == len(self.model.alg_state_metadata)
-        self.model.constants = discard_empty([self.get_mx(e) for e in constants])
-        self.model.constant_values = [self.get_mx(e.value) for e in constants if not self.get_mx(e).is_empty()]
-        self.model.parameters = discard_empty([self.get_mx(e) for e in parameters])
-        self.model.parameter_values = [self.get_mx(e.value) for e in parameters if not self.get_mx(e).is_empty()]
-        self.model.inputs = discard_empty([self.get_mx(e) for e in inputs])
-        self.model.outputs = discard_empty([self.get_mx(e) for e in outputs])
+
+        self.model.states = self._ast_symbols_to_variables(ode_states)
+        self.model.der_states = self._ast_symbols_to_variables(ode_states, differentiate=True)
+        self.model.alg_states = self._ast_symbols_to_variables(alg_states)
+        self.model.constants = self._ast_symbols_to_variables(constants)
+        self.model.parameters = self._ast_symbols_to_variables(parameters)
+
+        # We extend the input list, as it is already populated with delayed states.
+        self.model.inputs.extend(self._ast_symbols_to_variables(inputs))
+
+        # The outputs are a subset of the states.
+        self.model.outputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
+
+        def discard_empty(l):
+            return list(filter(lambda x: not x.is_empty(), l))
+
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
+        self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
 
     def exitArray(self, tree):
         self.src[tree] = [self.src[e] for e in tree.values]
@@ -305,10 +220,14 @@ class CasadiGenerator(TreeListener):
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
-            assert isinstance(expr, MX)
+            if not isinstance(expr, ca.MX) or not expr.is_symbolic():
+                # TODO
+                raise NotImplementedError('Currently, delay() is only supported with a variable as argument.')
             src = ca.MX.sym('{}_delayed_{}'.format(
-                expr.name(), delay_time), expr.size1(), expr.size2())
-            self.model.delayed_states.append((src, expr, delay_time))
+                expr.name(), delay_time), *expr.size())
+            delayed_state = DelayedState(src.name(), expr.name(), delay_time)
+            self.model.delayed_states.append(delayed_state)
+            self.model.inputs.append(Variable(src))
         elif op in OP_MAP and n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
             rhs = self.get_mx(tree.operands[1])
@@ -320,11 +239,11 @@ class CasadiGenerator(TreeListener):
             src = lhs_op()
         elif n_operands == 1:
             src = self.get_mx(tree.operands[0])
-            src = getattr(src, tree.operator.name)()
+            src = getattr(src, op)()
         elif n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
             rhs = self.get_mx(tree.operands[1])
-            lhs_op = getattr(lhs, tree.operator.name)
+            lhs_op = getattr(lhs, op)
             src = lhs_op(rhs)
         else:
             raise Exception("Unknown operator {}({})".format(op, ','.join(n_operands * ['.'])))
@@ -415,7 +334,6 @@ class CasadiGenerator(TreeListener):
             ast_walker.walk(self, tree)
 
             # Obtain expression
-
             expr = self.get_mx(tree)
 
             # Obtain the symbols it depends on
@@ -448,11 +366,22 @@ class CasadiGenerator(TreeListener):
         else:
             raise Exception('Unexpected node type {}'.format(tree.__class__.__name__))
 
+    def get_python_type(self, tree):
+        if tree.type == 'Boolean':
+            return bool
+        elif tree.type == 'Integer':
+            return int
+        else:
+            return float
+
+    def get_shape(self, tree):
+        return [self.get_integer(d) for d in tree.dimensions]
+
     def get_symbol(self, tree):
         # Create symbol
-        size = [self.get_integer(d) for d in tree.dimensions]
-        assert (len(size) <= 2)
-        s = ca.MX.sym(tree.name, *size)
+        shape = self.get_shape(tree)
+        assert(len(shape) <= 2)
+        s = ca.MX.sym(tree.name, *shape)
         self.nodes[tree.name] = s
         return s
 
@@ -525,6 +454,6 @@ def generate(ast_tree, model_name):
 
     flat_tree = flatten(ast_tree, model_name)
 
-    casadi_gen = CasadiGenerator(flat_tree, model_name)
+    casadi_gen = Generator(flat_tree, model_name)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model

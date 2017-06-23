@@ -191,7 +191,7 @@ declaration :
 // B.2.5.1 ------------------------------------------------
 modification :
     class_modification ('=' expression)?    # modification_class
-    | '=' expression                        # modification_asesignment
+    | '=' expression                        # modification_assignment
     | ':=' expression                       # modification_assignment2
     ;
 

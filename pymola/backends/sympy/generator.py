@@ -6,8 +6,8 @@ from typing import List
 
 import jinja2
 
-from . import ast
-from .tree import TreeListener, TreeWalker, flatten
+from pymola import ast
+from pymola.tree import TreeListener, TreeWalker, flatten
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 # noinspection PyUnresolvedReferences
@@ -30,7 +30,7 @@ class SympyGenerator(TreeListener):
 from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
-from pymola.sympy_runtime import OdeModel
+from pymola.backends.sympy.runtime import OdeModel
 from sympy import sin, cos, tan
 {%- for class_key, class in tree.classes.items() %}
 {{ render.src[class] }}
@@ -98,7 +98,7 @@ class {{tree.name}}(OdeModel):
         self.x = sympy.Matrix([{{ states_str }}])
         self.x0 = {
             {% for s in states -%}
-            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].value.value if tree.symbols[s.name].value.value else tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # variables
@@ -114,7 +114,7 @@ class {{tree.name}}(OdeModel):
         self.c = sympy.Matrix([{{ constants_str }}])
         self.c0 = {
             {% for s in constants -%}
-            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].value.value if tree.symbols[s.name].value.value else tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # parameters
@@ -124,7 +124,7 @@ class {{tree.name}}(OdeModel):
         self.p = sympy.Matrix([{{ parameters_str }}])
         self.p0 = {
             {% for s in parameters -%}
-            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].value.value if tree.symbols[s.name].value.value else tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # inputs
@@ -134,7 +134,7 @@ class {{tree.name}}(OdeModel):
         self.u = sympy.Matrix([{{ inputs_str }}])
         self.u0 = {
             {% for s in inputs -%}
-            {{render.src[s]}} : {{tree.symbols[s.name].start.value}},
+            {{render.src[s]}} : {{tree.symbols[s.name].value.value if tree.symbols[s.name].value.value else tree.symbols[s.name].start.value}},
             {% endfor -%}}
 
         # outputs

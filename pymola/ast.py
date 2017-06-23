@@ -193,7 +193,7 @@ class Symbol(Node):
     """
     A mathematical variable or state of the model
     """
-    ATTRIBUTES = ['min', 'max', 'start', 'fixed', 'nominal']
+    ATTRIBUTES = ['value', 'min', 'max', 'start', 'fixed', 'nominal']
 
     def __init__(self, **kwargs):
         self.name = ''  # type: str
@@ -211,7 +211,7 @@ class Symbol(Node):
         self.max = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.nominal = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.value = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
-        self.fixed = False  # type: bool
+        self.fixed = Primary(value=False)  # type: Primary
         self.id = 0  # type: int
         self.order = 0  # type: int
         self.visibility = Visibility.PRIVATE  # type: Visibility
