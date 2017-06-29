@@ -6,6 +6,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 
 import os
 import unittest
+import itertools
 
 import casadi as ca
 import numpy as np
@@ -38,6 +39,7 @@ class GenCasadiTest(unittest.TestCase):
             self.assertEqual(len(A.equations), len(B.equations))
             self.assertEqual(len(A.initial_equations), len(B.initial_equations))
 
+        # TODO test this using metadata function.
         for a, b in zip(A.constants, B.constants):
             delta = ca.vec(a.value - b.value)
             for i in range(delta.size1()):
@@ -49,21 +51,23 @@ class GenCasadiTest(unittest.TestCase):
             that = getattr(B, f_name + '_function')
 
             if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
-                this_mx = this.mx_in()
-                that_mx = that.mx_in()
-                this_in = [repr(e) for e in this_mx] #if e.is_symbolic()]
-                that_in = [repr(e) for e in that_mx] #if e.is_symbolic()]
+                # Since arguments are grouped, we first split them into their constituent parts.
+                # This is to render the test insensitive to the order in which arguments are declared.
+                this_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in this.mx_in()]
+                that_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in that.mx_in()]
+                this_in = [[repr(e) for e in l] for l in this_mx]
+                that_in = [[repr(e) for e in l] for l in that_mx]
 
                 that_from_this = []
-                this_mx_dict = dict(zip(this_in, this_mx))
-                that_mx_dict = dict(zip(that_in, that_mx))
-                for e in that_in:
-                    self.assertTrue(e in this_in)
-                    self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
-                    self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
-                    that_from_this.append(this_mx_dict[e])
-
-                that = ca.Function('f', this_mx, that.call(that_from_this))
+                this_mx_dict = dict(zip(itertools.chain(*this_in), itertools.chain(*this_mx)))
+                that_mx_dict = dict(zip(itertools.chain(*that_in), itertools.chain(*that_mx)))
+                for this_l, that_l in zip(this_in, that_in):
+                    self.assertEqual(set(this_l), set(that_l))
+                    for e in this_l:
+                        self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
+                        self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
+                    that_from_this.append(ca.vertcat(*[this_mx_dict[e] for e in that_l]))
+                that = ca.Function('f', [ca.vertcat(*l) for l in this_mx], that.call(that_from_this))
 
             np.random.seed(0)
 
@@ -76,6 +80,7 @@ class GenCasadiTest(unittest.TestCase):
             this_out = this.call(args_in)
             that_out = that.call(args_in)
 
+            # TODO order
             for i, (a, b) in enumerate(zip(this_out, that_out)):
                 test = float(ca.norm_2(ca.vec(a - b))) <= tol
                 if not test:
@@ -446,7 +451,7 @@ class GenCasadiTest(unittest.TestCase):
         d_dim = ca.MX.sym("d_dim")
 
         ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]))
-        ref_model.parameters = list(map(Variable, [nested1n, nested2n, d_dim]))
+        ref_model.parameters = list(map(Variable, [nested2n, nested1n, d_dim]))
         ref_model.outputs = list(map(Variable, [h]))
         ref_model.constants = list(map(Variable, [b, c_dim, B, C, D, E]))
         constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2),
