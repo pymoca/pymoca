@@ -1,4 +1,5 @@
 from collections import namedtuple
+import distutils.ccompiler
 import casadi as ca
 import numpy as np
 import sys
@@ -109,9 +110,11 @@ def _compile_model(model_folder, model_name, compiler_options):
 def _save_model(model_folder, model_name, model):
     # Compile shared libraries
     if os.name == 'posix':
-        ext = 'so'
+        compiler_flags = ['-O2', '-fPIC']
+        linker_flags = ['-fPIC']
     else:
-        ext = 'dll'
+        compiler_flags = ['/O2', '/wd4101']  # Shut up unused local variable warnings.
+        linker_flags = ['/DLL']
 
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
     for o, d in objects.items():
@@ -127,17 +130,27 @@ def _save_model(model_folder, model_name, model):
         cg.add(f.reverse(1).forward(1))
         cg.generate(model_folder + '/')
 
-        file_name = os.path.join(model_folder, library_name + '.c')
+        compiler = distutils.ccompiler.new_compiler()
 
-        d.library = os.path.join(model_folder, '{}.{}'.format(library_name, ext))
-        cc = os.getenv('CC', 'gcc')
-        cflags = os.getenv('CFLAGS', '-O3 -fPIC')
+        file_name = os.path.join(model_folder, library_name + '.c')
+        object_name = compiler.object_filenames([file_name])[0]
+        d.library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
         try:
-            os.system("{} {} -shared {} -o {}".format(cc, cflags, file_name, d.library))
+            # NOTE: For some reason running in debug mode in PyCharm (2017.1)
+            # on Windows causes cl.exe to fail on its own binary name (?!) and
+            # the include paths. This does not happen when running directly
+            # from cmd.exe / PowerShell or e.g. with debug mode in VS Code.
+            compiler.compile([file_name], extra_postargs=compiler_flags)
+
+            # We do not want the "lib" prefix on POSIX systems, so we call
+            # link() directly with our desired filename instead of
+            # link_shared_lib().
+            compiler.link(compiler.SHARED_LIBRARY, [object_name], d.library, extra_preargs=linker_flags)
         except:
             raise
         finally:
             os.remove(file_name)
+            os.remove(object_name)
 
     # Output metadata
     db_file = os.path.join(model_folder, model_name)
