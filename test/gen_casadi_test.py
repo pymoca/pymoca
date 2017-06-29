@@ -502,6 +502,7 @@ class GenCasadiTest(unittest.TestCase):
         b = ca.MX.sym("bool")
         r = ca.MX.sym("real")
         der_r = ca.MX.sym("der(real)")
+        test_state = ca.MX.sym("test_state")
         i1 = ca.MX.sym("i1")
         i2 = ca.MX.sym("i2")
         i3 = ca.MX.sym("i3")
@@ -512,7 +513,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = list(map(Variable, [r]))
         ref_model.der_states = list(map(Variable, [der_r]))
-        ref_model.alg_states = list(map(Variable, [i, b, i4, protected_variable]))
+        ref_model.alg_states = list(map(Variable, [i, b, i4, test_state, protected_variable]))
         ref_model.inputs = list(map(Variable, [i1, i2, i3]))
         ref_model.outputs = list(map(Variable, [i4, protected_variable]))
         ref_model.constants = list(map(Variable, [cst]))
@@ -524,7 +525,7 @@ class GenCasadiTest(unittest.TestCase):
         for c, v in zip(ref_model.parameters, parameter_values):
             c.value = v
         ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0) * i),
-                               protected_variable - (i1 + i2)]
+                               protected_variable - (i1 + i2), test_state - r]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

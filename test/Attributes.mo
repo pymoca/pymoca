@@ -14,6 +14,7 @@ model Attributes
 	output Modelica.SIunits.Temperature i4;
 	constant Real cst = 1;
 	parameter Real prm = 2;
+	Real test_state = real; // Generates an additional equation.
 protected
 	output Real protected_variable;
 equation
