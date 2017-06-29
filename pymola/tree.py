@@ -246,14 +246,18 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
         # add parent class members symbols, equations and statements
         extended_orig_class.symbols.update(flat_parent_class.symbols)
         extended_orig_class.equations += flat_parent_class.equations
+        extended_orig_class.initial_equations += flat_parent_class.initial_equations
         extended_orig_class.statements += flat_parent_class.statements
+        extended_orig_class.initial_statements += flat_parent_class.initial_statements
 
         # carry out modifications
         extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
 
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
+    extended_orig_class.initial_equations += orig_class.initial_equations
     extended_orig_class.statements += orig_class.statements
+    extended_orig_class.initial_statements += orig_class.initial_statements
 
     if class_modification is not None:
         extended_orig_class = modify_class(root, extended_orig_class, class_modification)
@@ -285,7 +289,9 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             # add sub_class members symbols and equations
             flat_class.symbols.update(flat_sub_class.symbols)
             flat_class.equations += flat_sub_class.equations
+            flat_class.initial_equations += flat_sub_class.initial_equations
             flat_class.statements += flat_sub_class.statements
+            flat_class.initial_statements += flat_sub_class.initial_statements
 
             # we keep connectors in the class hierarchy, as we may refer to them further
             # up using connect() clauses
@@ -355,8 +361,12 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             # flatten equation
             flat_class.equations += [flat_equation]
 
+    flat_class.initial_equations += [flatten_component_refs(root, flat_class, e, instance_prefix) for e in
+                              extended_orig_class.initial_equations]
     flat_class.statements += [flatten_component_refs(root, flat_class, e, instance_prefix) for e in
                               extended_orig_class.statements]
+    flat_class.initial_statements += [flatten_component_refs(root, flat_class, e, instance_prefix) for e in
+                              extended_orig_class.initial_statements]
 
     # add flow equations
     if len(flow_connections) > 0:
@@ -597,6 +607,16 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
 
     # flatten class
     flat_class = flatten_class(root, root.find_class(class_name), '')
+
+    # add equations for state symbol values
+    # we do this here, instead of in flatten_class, because symbol values
+    # inside flattened classes may be modified later by modify_class().
+    non_state_prefixes = set(['constant', 'parameter'])
+    for sym in flat_class.symbols.values():
+        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
+            if len(non_state_prefixes & set(sym.prefixes)) == 0:
+                flat_class.equations.append(ast.Equation(left=sym, right=sym.value))
+                sym.value = ast.Primary(value=None)
 
     # strip connector symbols
     for i, sym in list(flat_class.symbols.items()):

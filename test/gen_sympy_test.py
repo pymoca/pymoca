@@ -9,7 +9,7 @@ import sys
 import time
 import unittest
 
-from pymola import gen_sympy
+import pymola.backends.sympy.generator as gen_sympy
 from pymola import parser
 from pymola import tree
 

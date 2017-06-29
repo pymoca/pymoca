@@ -107,12 +107,12 @@ def setup_package():
     with open('requirements.txt', 'r') as req_file:
         install_reqs = req_file.read().split('\n')
     # pprint.pprint(install_reqs)
-
-    # Disable compiler optimization.  We have to do this, as the default -O3 triggers a bug in clang causing an initialization failure.
-    #os.environ['CFLAGS'] = '-O0'
-    # Or alternatively, use gcc:
     
-    os.environ['CC'] = 'gcc'
+    if sys.platform == 'darwin':
+        # Disable compiler optimization.  We have to do this, as the default -O3 triggers a bug in clang causing an initialization failure.
+        #os.environ['CFLAGS'] = '-O0'
+        # Or alternatively, use gcc:
+        os.environ['CC'] = 'gcc-6'
 
     # Without disabling this, it will reach a limit
     # on tracking and disable tracking and then recompile, which is slow
