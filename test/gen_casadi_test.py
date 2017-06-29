@@ -496,6 +496,8 @@ class GenCasadiTest(unittest.TestCase):
         print(casadi_model)
         ref_model = Model()
 
+        nested_p1 = ca.MX.sym('nested.p1')
+        nested_p = ca.MX.sym('nested.p')
         i = ca.MX.sym("int")
         b = ca.MX.sym("bool")
         r = ca.MX.sym("real")
@@ -517,7 +519,10 @@ class GenCasadiTest(unittest.TestCase):
         constant_values = [1]
         for c, v in zip(ref_model.constants, constant_values):
             c.value = v
-        ref_model.parameters = list(map(Variable, [prm]))
+        ref_model.parameters = list(map(Variable, [nested_p1, nested_p, prm]))
+        parameter_values = [2, 2 * nested_p1, 1]
+        for c, v in zip(ref_model.parameters, parameter_values):
+            c.value = v
         ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0) * i),
                                protected_variable - (i1 + i2)]
 
