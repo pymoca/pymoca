@@ -221,7 +221,7 @@ class Model:
             inputs = OrderedDict({s.symbol.name() : s for s in self.inputs})
             outputs = OrderedDict({s.symbol.name() : s for s in self.outputs})
 
-            all_states = {}
+            all_states = OrderedDict()
             all_states.update(states)
             all_states.update(der_states)
             all_states.update(alg_states)

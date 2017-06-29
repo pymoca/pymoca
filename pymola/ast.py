@@ -8,6 +8,7 @@ import copy
 import json
 from enum import Enum
 from typing import List, Union, Dict
+from collections import OrderedDict
 
 
 class Visibility(Enum):
@@ -306,7 +307,7 @@ class Class(Node):
         self.final = False  # type: bool
         self.type = ''  # type: str
         self.comment = ''  # type: str
-        self.symbols = {}  # type: Dict[str, Symbol]
+        self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
         self.initial_statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
@@ -322,7 +323,7 @@ class File(Node):
 
     def __init__(self, **kwargs):
         self.within = []  # type: List[ComponentRef]
-        self.classes = {}  # type: Dict[str, Class]
+        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         super().__init__(**kwargs)
 
     def find_class(self, component_ref: ComponentRef) -> Class:
