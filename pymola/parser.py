@@ -16,6 +16,7 @@ from .generated.ModelicaListener import ModelicaListener
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaParser import ModelicaParser
 
+import pickle
 
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
@@ -123,10 +124,14 @@ class ASTListener(ModelicaListener):
                     self.class_node.statements += alglist.statements
 
     def exitArgument(self, ctx):
+        argument = ast.ClassModificationArgument()
         if ctx.element_modification_or_replaceable() is not None:
-            self.ast[ctx] = self.ast[ctx.element_modification_or_replaceable()]
+            argument.value = self.ast[ctx.element_modification_or_replaceable()]
+            argument.redeclare = False
         else:
-            self.ast[ctx] = self.ast[ctx.element_redeclaration()]
+            argument.value = self.ast[ctx.element_redeclaration()]
+            argument.redeclare = True
+        self.ast[ctx] = argument
 
     def exitArgument_list(self, ctx):
         self.ast[ctx] = [self.ast[a] for a in ctx.argument()]
@@ -461,14 +466,28 @@ class ASTListener(ModelicaListener):
         # somewhere between the enterDeclaration and exitDeclaration functions
         # of the symbols. Therefore, we need to keep the component clause's
         # type, and all its symbols' types, pointing at the same empty
-        # (ComponentRef) object until we can fill it.
+        # (ComponentRef) object until we can fill it. When we are done, we
+        # make sure that all references to the objects are unique per symbol
+        # by copying.
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
 
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = pickle.loads(pickle.dumps(clause.type, -1))
+
     def exitComponent_clause1(self, ctx):
         clause = self.ast[ctx]
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
+
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = pickle.loads(pickle.dumps(clause.type, -1))
 
     def enterComponent_declaration(self, ctx):
         sym = ast.Symbol(order=self.sym_count)
@@ -527,13 +546,12 @@ class ASTListener(ModelicaListener):
                     sym.class_modification = mod
                 elif isinstance(mod, ast.Primary):
                     sym.value = mod
-                    sym.start = mod
                 elif isinstance(mod, ast.Array):
                     sym.value = mod
-                    sym.start.value = mod
                 elif isinstance(mod, ast.Expression):
                     sym.value = mod
-                    sym.start.value = mod
+                elif isinstance(mod, ast.ComponentRef):
+                    sym.value = mod
                 else:
                     raise IOError('unhandled modification type', type(mod))
 

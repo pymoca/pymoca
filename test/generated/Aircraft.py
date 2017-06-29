@@ -4,7 +4,7 @@
 from __future__ import print_function, division
 import sympy
 import sympy.physics.mechanics as mech
-from pymola.sympy_runtime import OdeModel
+from pymola.backends.sympy.runtime import OdeModel
 from sympy import sin, cos, tan
 
 
@@ -38,7 +38,7 @@ class Aircraft(OdeModel):
             body__g : 9.81,
             body__c : 0.9,
             body__m : 1.0,
-            accel__b_x__b : 0.0,
+            accel__b_x__b : 0,
             }
 
         # inputs

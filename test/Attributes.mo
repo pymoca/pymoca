@@ -1,4 +1,11 @@
+model NestedAttributes
+    parameter Real p1 = 1;
+	parameter Real p = 2 * p1;
+	Real s = 3 * p;
+end NestedAttributes;
+
 model Attributes
+    NestedAttributes nested;
 	Integer int(min = -5, max = 10);
 	Boolean bool;
 	Real real(start = 20.0);
@@ -8,6 +15,7 @@ model Attributes
 	output Modelica.SIunits.Temperature i4;
 	constant Real cst = 1;
 	parameter Real prm = 2;
+	Real test_state = real; // Generates an additional equation.
 protected
 	output Real protected_variable;
 equation
