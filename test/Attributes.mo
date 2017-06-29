@@ -1,6 +1,7 @@
 model NestedAttributes
     parameter Real p1 = 1;
 	parameter Real p = 2 * p1;
+	Real s = 3 * p;
 end NestedAttributes;
 
 model Attributes
