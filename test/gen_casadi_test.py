@@ -39,20 +39,13 @@ class GenCasadiTest(unittest.TestCase):
             self.assertEqual(len(A.equations), len(B.equations))
             self.assertEqual(len(A.initial_equations), len(B.initial_equations))
 
-        # TODO test this using metadata function.
-        for a, b in zip(A.constants, B.constants):
-            delta = ca.vec(a.value - b.value)
-            for i in range(delta.size1()):
-                test = float(delta[i]) <= tol
-                self.assertTrue(test)
-
-        for (f_name, m_name) in [('dae_residual', 'equations'), ('initial_residual', 'initial_equations')]:
+        for f_name in ['dae_residual', 'initial_residual', 'variable_metadata']:
             this = getattr(A, f_name + '_function')
             that = getattr(B, f_name + '_function')
 
             if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
                 # Since arguments are grouped, we first split them into their constituent parts.
-                # This is to render the test insensitive to the order in which arguments are declared.
+                # This is to render the test insensitive to the order in which variables are declared in the model.
                 this_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in this.mx_in()]
                 that_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in that.mx_in()]
                 this_in = [[repr(e) for e in l] for l in this_mx]
@@ -80,14 +73,10 @@ class GenCasadiTest(unittest.TestCase):
             this_out = this.call(args_in)
             that_out = that.call(args_in)
 
-            # TODO order
+            # N.B. Here we require that the order of the equations in the two models is identical.
             for i, (a, b) in enumerate(zip(this_out, that_out)):
-                test = float(ca.norm_2(ca.vec(a - b))) <= tol
-                if not test:
-                    print("Expr mismatch")
-                    print("A: ", getattr(A, m_name)[i], a)
-                    print("B: ", getattr(B, m_name)[i], b)
-                self.assertTrue(test)
+                if a.is_regular() or b.is_regular():
+                    self.assertTrue(float(ca.norm_2(ca.vec(a - b))) <= tol)
 
         return True
 
