@@ -389,6 +389,7 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    @unittest.expectedFailure
     def test_nested_classes(self):
         with open(os.path.join(TEST_DIR, 'NestedClasses.mo'), 'r') as f:
             txt = f.read()
