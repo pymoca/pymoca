@@ -106,13 +106,11 @@ def _compile_model(model_folder, model_name, compiler_options):
 def _save_model(model_folder, model_name, model):
     # Compile shared libraries
     if os.name == 'posix':
-        compiler_flags = ['-O2', '-fPIC']
+        compiler_flags = ['-O2']
         linker_flags = ['-fPIC']
-        ext = '.so'
     else:
         compiler_flags = ['/O2']
         linker_flags = ['/DLL']
-        ext = ''
 
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
     for o, d in objects.items():
@@ -132,7 +130,7 @@ def _save_model(model_folder, model_name, model):
 
         file_name = os.path.join(model_folder, library_name + '.c')
         object_name = compiler.object_filenames([file_name])[0]
-        d.library = os.path.join(model_folder, library_name + ext)
+        d.library = os.path.join(model_folder, library_name)
         try:
             compiler.compile([file_name], extra_preargs=compiler_flags)
             compiler.link_shared_lib([object_name], d.library, extra_preargs=linker_flags)
