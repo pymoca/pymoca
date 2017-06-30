@@ -405,6 +405,23 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    @unittest.expectedFailure
+    def test_function_call(self):
+        with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
+        print("FunctionCall", casadi_model)
+        ref_model = Model()
+
+        c = ca.MX.sym("c")
+        a = ca.MX.sym("a")
+        r = ca.MX.sym("r")
+        ref_model.alg_states = list(map(Variable, [c, a, r]))
+        ref_model.equations = [c - 3.14159*r*2, a - 3.14159*r**2]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_forloop(self):
         with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
             txt = f.read()
