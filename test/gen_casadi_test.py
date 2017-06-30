@@ -5,6 +5,7 @@ Modelica parse Tree to AST tree.
 from __future__ import print_function, absolute_import, division, unicode_literals
 
 import os
+import glob
 import unittest
 import itertools
 
@@ -538,6 +539,13 @@ class GenCasadiTest(unittest.TestCase):
             os.remove(shelve_file)
         except:
             pass
+
+        for f in glob.glob(os.path.join(TEST_DIR, "Aircraft*.so")):
+            os.remove(f)
+        for f in glob.glob(os.path.join(TEST_DIR, "Aircraft*.dll")):
+            os.remove(f)
+        for f in glob.glob(os.path.join(TEST_DIR, "Aircraft*.dylib")):
+            os.remove(f)
 
         # Create model, cache it, and load the cache
         compiler_options = \
