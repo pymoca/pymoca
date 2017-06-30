@@ -33,6 +33,7 @@ model SystemZ
 	ChannelZ a(redeclare connector port = HQZ);
 	ChannelZ b(redeclare connector port = HQZ);
 	ChannelZ c(redeclare connector port = HQZ);
+	ChannelZ d;
 	QBCZ qa;
 	QBCZ qc;
 	HBCZ hb;
