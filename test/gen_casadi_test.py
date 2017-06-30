@@ -544,7 +544,12 @@ class GenCasadiTest(unittest.TestCase):
             {'cache': True}
 
         ref_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
+        self.assertIsInstance(ref_model, Model)
+        self.assertNotIsInstance(ref_model, CachedModel)
+
         cached_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
+        self.assertIsInstance(cached_model, Model)
+        self.assertIsInstance(cached_model, CachedModel)
 
         # Compare
         self.assert_model_equivalent_numeric(ref_model, cached_model)
