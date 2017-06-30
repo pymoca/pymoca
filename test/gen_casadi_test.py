@@ -76,8 +76,17 @@ class GenCasadiTest(unittest.TestCase):
 
             # N.B. Here we require that the order of the equations in the two models is identical.
             for i, (a, b) in enumerate(zip(this_out, that_out)):
-                if a.is_regular() or b.is_regular():
-                    self.assertTrue(float(ca.norm_2(ca.vec(a - b))) <= tol)
+                for j in range(a.size1()):
+                    for k in range(a.size2()):
+                        if a[j, k].is_regular() or b[j, k].is_regular():
+                            test = float(ca.norm_2(ca.vec(a[j, k] - b[j, k]))) <= tol
+                            if not test:
+                                print(j)
+                                print(k)
+                                print(a[j,k])
+                                print(b[j,k])
+                                print(f_name)
+                            self.assertTrue(test)
 
         return True
 
@@ -97,6 +106,8 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.states = list(map(Variable, [x, v_x]))
         ref_model.der_states = list(map(Variable, [der_x, der_v_x]))
         ref_model.parameters = list(map(Variable, [c, k]))
+        ref_model.parameters[0].value = 0.1
+        ref_model.parameters[1].value = 2
         ref_model.equations = [der_x - v_x, der_v_x - (-k * x - c * v_x)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -307,6 +318,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.outputs = list(map(Variable, [y1, y2, y3]))
         ref_model.alg_states = list(map(Variable, [y1, y2, y3]))
         ref_model.parameters = list(map(Variable, [y_max]))
+        ref_model.parameters[0].value = 10
         ref_model.equations = [
             y1 - ca.if_else(x > 0, 1, 0) * y_max,
             ca.if_else(x > 1, ca.vertcat(y3 - 100, y2 - y_max),
@@ -330,9 +342,11 @@ class GenCasadiTest(unittest.TestCase):
         k = ca.MX.sym("k")
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].max = 30.0
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [y]))
         ref_model.parameters = list(map(Variable, [k]))
+        ref_model.parameters[0].value = -1.0
         ref_model.equations = [der_x - k * x, x + y - 3]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -360,6 +374,12 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = []
         ref_model.alg_states = list(map(Variable, [bcomp1_v, bcomp2_v, bcomp3_v]))
         ref_model.parameters = list(map(Variable, [bcomp1_a, bcomp2_a, bcomp3_a, bcomp1_b, bcomp2_b, bcomp3_b]))
+        ref_model.parameters[0].value = 0
+        ref_model.parameters[1].value = 0
+        ref_model.parameters[2].value = 1
+        ref_model.parameters[3].value = 3
+        ref_model.parameters[4].value = 4
+        ref_model.parameters[5].value = 2
         ref_model.equations = []
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -402,6 +422,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.alg_states = list(map(Variable, [x, y, z, w, b]))
         ref_model.parameters = list(map(Variable, [n]))
+        ref_model.parameters[0].value = 10
         ref_model.equations = [
             ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2)),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
@@ -441,10 +462,14 @@ class GenCasadiTest(unittest.TestCase):
         d_dim = ca.MX.sym("d_dim")
 
         ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]))
+        ref_model.alg_states[6].min = [0, 0, 0]
         ref_model.parameters = list(map(Variable, [nested2n, nested1n, d_dim]))
+        parameter_values = [np.array([3, 3]), 3, 3]
+        for const, val in zip(ref_model.parameters, parameter_values):
+            const.value = val
         ref_model.outputs = list(map(Variable, [h]))
         ref_model.constants = list(map(Variable, [b, c_dim, B, C, D, E]))
-        constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1, 2, 3), 1.7 * ca.DM.ones(2),
+        constant_values = [np.array([2.7, 3.7, 4.7, 5.7]), 2, ca.linspace(1., 2., 3), 1.7 * ca.DM.ones(2),
                                      ca.DM.zeros(3), ca.DM.ones(2)]
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
@@ -508,16 +533,20 @@ class GenCasadiTest(unittest.TestCase):
         protected_variable = ca.MX.sym("protected_variable")
 
         ref_model.states = list(map(Variable, [r]))
+        ref_model.states[0].start = 20
         ref_model.der_states = list(map(Variable, [der_r]))
         ref_model.alg_states = list(map(Variable, [nested_s, i, b, i4, test_state, protected_variable]))
+        ref_model.alg_states[1].min = -5
+        ref_model.alg_states[1].max = 10
         ref_model.inputs = list(map(Variable, [i1, i2, i3]))
+        ref_model.inputs[0].fixed = True
         ref_model.outputs = list(map(Variable, [i4, protected_variable]))
         ref_model.constants = list(map(Variable, [cst]))
         constant_values = [1]
         for c, v in zip(ref_model.constants, constant_values):
             c.value = v
         ref_model.parameters = list(map(Variable, [nested_p1, nested_p, prm]))
-        parameter_values = [2, 2 * nested_p1, 1]
+        parameter_values = [1, 2 * nested_p1, 2]
         for c, v in zip(ref_model.parameters, parameter_values):
             c.value = v
         ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0) * i),
