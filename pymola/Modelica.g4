@@ -45,7 +45,7 @@ class_type:
 // B.2.2.3 ------------------------------------------------
 class_specifier :
     IDENT string_comment composition 'end' IDENT                    # class_spec_comp
-    | IDENT '=' base_prefix name array_subscripts?
+    | IDENT '=' base_prefix component_reference
         class_modification? comment                                 # class_spec_base
     | IDENT '=' 'enumeration' '(' (enum_list? | ':') ')' comment    # class_spec_enum
     | IDENT '=' 'der' '(' name ',' IDENT (',' IDENT )* ')' comment  # class_spec_der
