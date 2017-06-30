@@ -1,4 +1,5 @@
 from collections import namedtuple
+import distutils.ccompiler
 import casadi as ca
 import numpy as np
 import sys
@@ -105,10 +106,14 @@ def _compile_model(model_folder, model_name, compiler_options):
 def _save_model(model_folder, model_name, model):
     # Compile shared libraries
     if os.name == 'posix':
-        ext = 'so'
+        compiler_flags = ['-O2', '-fPIC']
+        linker_flags = ['-fPIC']
+        ext = '.so'
     else:
-        ext = 'dll'
-            
+        compiler_flags = ['/O2']
+        linker_flags = ['/DLL']
+        ext = ''
+
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
     for o, d in objects.items():
         f = getattr(model, o + '_function')
@@ -123,17 +128,19 @@ def _save_model(model_folder, model_name, model):
         cg.add(f.reverse(1).forward(1))
         cg.generate(model_folder + '/')
 
-        file_name = os.path.join(model_folder, library_name + '.c')
+        compiler = distutils.ccompiler.new_compiler()
 
-        d.library = os.path.join(model_folder, '{}.{}'.format(library_name, ext))
-        cc = os.getenv('CC', 'gcc')
-        cflags = os.getenv('CFLAGS', '-O3 -fPIC')
+        file_name = os.path.join(model_folder, library_name + '.c')
+        object_name = compiler.object_filenames([file_name])[0]
+        d.library = os.path.join(model_folder, library_name + ext)
         try:
-            os.system("{} {} -shared {} -o {}".format(cc, cflags, file_name, d.library))
+            compiler.compile([file_name], extra_preargs=compiler_flags)
+            compiler.link_shared_lib([object_name], d.library, extra_preargs=linker_flags)
         except:
             raise
         finally:
             os.remove(file_name)
+            os.remove(object_name)
 
     # Output metadata     
     shelve_file = os.path.join(model_folder, model_name)   
