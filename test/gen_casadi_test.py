@@ -602,9 +602,9 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_caching(self):
         # Clear cache
-        shelve_file = os.path.join(TEST_DIR, 'Aircraft')
+        db_file = os.path.join(TEST_DIR, 'Aircraft')
         try:
-            os.remove(shelve_file)
+            os.remove(db_file)
         except:
             pass
 

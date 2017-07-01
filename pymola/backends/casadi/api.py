@@ -5,7 +5,7 @@ import sys
 import os
 import fnmatch
 import logging
-import shelve
+import pickle
 
 from pymola import parser, tree, ast, __version__
 from . import generator
@@ -94,7 +94,7 @@ def _compile_model(model_folder, model_name, compiler_options):
 
     # Compile
     logger.info("Generating CasADi model")
-    
+
     model = generator.generate(tree, model_name)
     if compiler_options.get('check_balanced', True):
         model.check_balanced()
@@ -112,7 +112,7 @@ def _save_model(model_folder, model_name, model):
         ext = 'so'
     else:
         ext = 'dll'
-            
+
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
     for o, d in objects.items():
         f = getattr(model, o + '_function')
@@ -139,9 +139,11 @@ def _save_model(model_folder, model_name, model):
         finally:
             os.remove(file_name)
 
-    # Output metadata     
-    shelve_file = os.path.join(model_folder, model_name)   
-    with shelve.open(shelve_file, 'n') as db:
+    # Output metadata
+    db_file = os.path.join(model_folder, model_name)
+    with open(db_file, 'wb') as f:
+        db = {}
+
         # Store version
         db['version'] = __version__
 
@@ -156,12 +158,14 @@ def _save_model(model_folder, model_name, model):
 
         db['delayed_states'] = model.delayed_states
 
+        pickle.dump(db, f)
+
 def _load_model(model_folder, model_name, compiler_options):
-    shelve_file = os.path.join(model_folder, model_name)
+    db_file = os.path.join(model_folder, model_name)
 
     if compiler_options.get('mtime_check', True):
         # Mtime check
-        cache_mtime = os.path.getmtime(shelve_file)
+        cache_mtime = os.path.getmtime(db_file)
         for folder in [model_folder] + compiler_options.get('library_folders', []):
             for root, dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
@@ -175,8 +179,10 @@ def _load_model(model_folder, model_name, compiler_options):
     # Compile shared libraries
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
 
-    # Load metadata        
-    with shelve.open(shelve_file, 'r') as db:
+    # Load metadata
+    with open(db_file, 'rb') as f:
+        db = pickle.load(f)
+
         if db['version'] != __version__:
             raise InvalidCacheError('Cache generated for a different version of pymola')
 
@@ -237,7 +243,7 @@ def _load_model(model_folder, model_name, compiler_options):
                         depends_on_parameters = np.any([sparsity.has_nz(i * len(ast.Symbol.ATTRIBUTES) + j, l) for l in range(len(model.parameters))])
                         if depends_on_parameters:
                             setattr(variable, tmp, metadata[key][i, j])
-    
+
     # Done
     return model
 
@@ -251,4 +257,3 @@ def transfer_model(model_folder, model_name, compiler_options={}):
             return model
     else:
         return _compile_model(model_folder, model_name, compiler_options)
-        
