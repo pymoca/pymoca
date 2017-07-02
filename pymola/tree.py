@@ -245,6 +245,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
                 sym.visibility = extends.visibility
 
         # add parent class members symbols, equations and statements
+        extended_orig_class.classes.update(flat_parent_class.classes)
         extended_orig_class.symbols.update(flat_parent_class.symbols)
         extended_orig_class.equations += flat_parent_class.equations
         extended_orig_class.initial_equations += flat_parent_class.initial_equations
@@ -254,6 +255,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
         # carry out modifications
         extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
 
+    extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
     extended_orig_class.initial_equations += orig_class.initial_equations
