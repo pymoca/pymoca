@@ -106,7 +106,7 @@ class ParseTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, 'C2')
 
-        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp.b'].value.value, 3.0)
+        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp1.b'].value.value, 3.0)
 
     # TODO: Currently nested (local) classes are not parsed correctly. Not
     # entirely sure if their scope is local, or other (non-extending) classes
