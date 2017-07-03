@@ -408,6 +408,8 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = []
         ref_model.alg_states = list(map(Variable, [v1, v2]))
         ref_model.equations = []
+        ref_model.alg_states[0].nominal = 1000.0
+        ref_model.alg_states[1].nominal = 1000.0
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
