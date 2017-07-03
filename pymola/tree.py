@@ -269,7 +269,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             extended_orig_class.initial_statements += flat_parent_class.initial_statements
 
             # carry out modifications
-            extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
+            extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification, orig_class.within)
 
     extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
@@ -305,7 +305,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
             # If not found, do a lookup in the class tree
             if c is None:
-                c = root.find_class(sym.type)
+                c = root.find_class(sym.type, orig_class.within)
 
             if c.type == "__builtin":
                 flat_class.symbols[flat_sym.name] = flat_sym
@@ -381,7 +381,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     return flat_class
 
 
-def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification):
+def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification, within=[]):
     """
     Apply a modification to a class or symbol.
     :param root: root tree for looking up symbols
@@ -416,7 +416,7 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
                 orig_sym = class_or_sym.symbols[new_sym.name]
                 orig_sym.__dict__.update(new_sym.__dict__)
         elif isinstance(argument, ast.ShortClassDefinition):
-            class_or_sym.classes[argument.name] = root.find_class(argument.component)
+            class_or_sym.classes[argument.name] = root.find_class(argument.component, within)
         else:
             raise Exception('Unsupported class modification argument {}'.format(argument))
     return class_or_sym

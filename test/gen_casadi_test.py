@@ -15,7 +15,7 @@ import numpy as np
 import pymola.backends.casadi.generator as gen_casadi
 from pymola.backends.casadi.model import Model, Variable
 from pymola.backends.casadi.api import transfer_model, CachedModel
-from pymola import parser
+from pymola import parser, ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -283,6 +283,37 @@ class GenCasadiTest(unittest.TestCase):
                                d__down__Q]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_tree_lookup(self):
+        with open(os.path.join(TEST_DIR, 'TreeLookup.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        # The class we want to flatten. We first have to turn it into a
+        # full-fledged ComponentRef.
+        comp_ref_tuple = ("Level1", "Level2", "Level3", "Test")
+
+        comp_ref = ast.ComponentRef(name=comp_ref_tuple[0])
+        c = comp_ref
+        for l in comp_ref_tuple[1:]:
+            c.child = [ast.ComponentRef(name=l)]
+            c = c.child[0]
+
+        casadi_model = gen_casadi.generate(ast_tree, comp_ref)
+        ref_model = Model()
+        print(casadi_model)
+
+        elem__tc__i = ca.MX.sym("elem.tc.i")
+        elem__tc__a = ca.MX.sym("elem.tc.a")
+        b = ca.MX.sym("b")
+
+        ref_model.alg_states = map(Variable, [elem__tc__i, elem__tc__a, b])
+
+        ref_model.equations = [elem__tc__i - 1,
+                               elem__tc__a - b]
+
+        print(ref_model)
+        self.assert_model_equivalent(ref_model, casadi_model)
 
     def test_duplicate(self):
         with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:

@@ -11,6 +11,7 @@ import unittest
 
 from pymola import parser
 from pymola import tree
+from pymola import ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -132,6 +133,29 @@ class ParseTest(unittest.TestCase):
         flat_tree = tree.flatten(ast_tree, 'MainModel')
 
         self.assertEqual(flat_tree.classes['MainModel'].symbols['e.HQ.H'].min.name, "e.H_b")
+
+    def test_tree_lookup(self):
+        with open(os.path.join(TEST_DIR, 'TreeLookup.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        # The class we want to flatten. We first have to turn it into a
+        # full-fledged ComponentRef.
+        comp_ref_tuple = ("Level1", "Level2", "Level3", "Test")
+
+        comp_ref = ast.ComponentRef(name=comp_ref_tuple[0])
+        c = comp_ref
+        for l in comp_ref_tuple[1:]:
+            c.child = [ast.ComponentRef(name=l)]
+            c = c.child[0]
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        # NOTE: We currently do not flatten the component ref in the final
+        # tree's keys, so we use it once again to lookup the flattened class.
+        self.assertIn('elem.tc.i', flat_tree.classes[comp_ref].symbols.keys())
+        self.assertIn('elem.tc.a', flat_tree.classes[comp_ref].symbols.keys())
+        self.assertIn('b',         flat_tree.classes[comp_ref].symbols.keys())
 
 if __name__ == "__main__":
     unittest.main()

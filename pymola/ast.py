@@ -413,22 +413,29 @@ class Collection(Node):
             assert component_ref.find('.') == -1
             component_ref = ComponentRef(name=component_ref)
 
-        if within:
-            full_name = merge_component_ref(within[0], component_ref)
-        else:
-            full_name = component_ref
+        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
+        # Odds are that these types of lookups are not parsed yet. We would expet an empty first name, with a non-empty child.
 
+        # Lookup the referenced class, walking up the tree from the current
+        # node until the root node.
         c = None
 
-        # Try relative lookup
-        c = self._class_lookup.get(component_ref_to_tuple(full_name), None)
+        if within:
+            within_tuple = component_ref_to_tuple(within[0])
+        else:
+            within_tuple = tuple()
 
-        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
-        # TODO: Should we traverse up the tree, or just try twice (once relative to current class, once absolute = relative to root)
+        cref_tuple = component_ref_to_tuple(component_ref)
 
-        # Try absolute lookup
-        if c is None:
-            c = self._class_lookup.get(component_ref_to_tuple(component_ref), None)
+        while c is None:
+            c = self._class_lookup.get(within_tuple + cref_tuple, None)
+
+            if within_tuple:
+                within_tuple = within_tuple[:-1]
+            else:
+                # Finished traversing up the tree all the way to the root. No
+                # more lookups possible.
+                break
 
         if c is None:
             # Class not found
