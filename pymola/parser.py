@@ -16,6 +16,7 @@ from .generated.ModelicaListener import ModelicaListener
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaParser import ModelicaParser
 
+import pickle
 
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
@@ -466,9 +467,24 @@ class ASTListener(ModelicaListener):
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
 
+        # We make sure that all references to the objects are unique per
+        # symbol making copies. Note that if there is only one symbol in the
+        # component clause, it is already unique.
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = pickle.loads(pickle.dumps(clause.type, -1))
+
     def exitComponent_clause1(self, ctx):
         clause = self.ast[ctx]
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
+
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = pickle.loads(pickle.dumps(clause.type, -1))
 
     def enterComponent_declaration(self, ctx):
         sym = ast.Symbol(order=self.sym_count)

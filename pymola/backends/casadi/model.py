@@ -19,7 +19,7 @@ class Variable:
 
         # Default attribute values
         self.value = np.nan
-        self.start = np.nan
+        self.start = 0
         self.min = -np.inf
         self.max = np.inf
         self.nominal = 1
