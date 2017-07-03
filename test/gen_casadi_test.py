@@ -262,6 +262,9 @@ class GenCasadiTest(unittest.TestCase):
                                b__up__H - b__down__H,
                                b__up__Q + b__down__Q,
 
+                               d__up__H - d__down__H,
+                               d__up__Q + d__down__Q,
+
                                qa__down__Q,
                                qc__down__Q,
 
