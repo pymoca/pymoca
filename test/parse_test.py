@@ -125,5 +125,13 @@ class ParseTest(unittest.TestCase):
 
         self.assertEqual(flat_tree.classes['Sub'].symbols['x'].max.value, 30.0)
 
+    def test_extends_modification(self):
+        with open(os.path.join(TEST_DIR, 'ExtendsModification.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, 'MainModel')
+
+        self.assertEqual(flat_tree.classes['MainModel'].symbols['e.HQ.H'].min.name, "e.H_b")
+
 if __name__ == "__main__":
     unittest.main()
