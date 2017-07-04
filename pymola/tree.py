@@ -434,8 +434,8 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     for connected_variables in flow_connections.values():
         if connected_variables not in processed:
             operands = list(connected_variables.values())
-            expr = ast.Expression(operator='+', operands=operands[-2:])
-            for op in reversed(operands[:-2]):
+            expr = operands[-1]
+            for op in reversed(operands[:-1]):
                 expr = ast.Expression(operator='+', operands=[op, expr])
             connect_equation = ast.Equation(left=expr, right=ast.Primary(value=0))
             flat_class.equations += [connect_equation]
