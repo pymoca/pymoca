@@ -355,9 +355,9 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
         flat_class.symbols[sym_name] = flat_sym
 
     # for all equations in original class
-    flow_connections = OrderedDict()
     for equation in extended_orig_class.equations:
         flat_equation = flatten_component_refs(root, flat_class, equation, instance_prefix)
+<<<<<<< 9f2d3107e89fed8eb22d515ad7ae2287f2f4a99c
         if isinstance(equation, ast.ConnectClause):
             # expand connector
             connect_equations = []
@@ -440,6 +440,20 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             connect_equation = ast.Equation(left=expr, right=ast.Primary(value=0))
             flat_class.equations += [connect_equation]
             processed.append(connected_variables)
+=======
+        flat_class.equations.append(flat_equation)
+        if isinstance(flat_equation, ast.ConnectClause):
+            # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
+            flat_equation.__left_inner = CLASS_SEPARATOR in flat_equation.left.name
+            flat_equation.__right_inner = CLASS_SEPARATOR in flat_equation.right.name
+
+    flat_class.initial_equations += \
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_equations]
+    flat_class.statements += \
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.statements]
+    flat_class.initial_statements += \
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_statements]
+>>>>>>> Move expansion of connect statements to toplevel flatten() method,
 
     # TODO: Also drag along any functions we need
     # function_set = set()
@@ -584,6 +598,106 @@ def flatten_component_refs(
     return expression_copy
 
 
+def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
+    # TODO vectors
+    # set up dict of flow connections
+    # following section 9.2 of the Modelica spec, we initialize it with all flow variables, so that
+    # flow variables that are not connected to any other are equated to zero.
+    flow_connections = OrderedDict()
+    for sym in node.symbols.values():
+        if 'flow' in sym.prefixes:
+            comp_ref = ast.ComponentRef(name=sym.name, indices=[])
+            comp_ref_repr = repr(comp_ref)
+            flow_connections[comp_ref_repr] = OrderedDict({comp_ref_repr: comp_ref})
+
+    # add flow equations
+    # for all equations in original class
+    orig_equations = node.equations[:]
+    node.equations = []
+    for equation in orig_equations:
+        if isinstance(equation, ast.ConnectClause):
+            # expand connector
+            sym_left = root.find_symbol(node, equation.left)
+            sym_right = root.find_symbol(node, equation.right)
+
+            try:
+                class_left = root.find_class(sym_left.type)
+                # noinspection PyUnusedLocal
+                class_right = root.find_class(sym_right.type)
+            except KeyError:
+                primary_types = ['Real']
+                # TODO
+                if sym_left.type.name not in primary_types or sym_right.type.name not in primary_types:
+                    logger.warning("Connector class {} or {} not defined.  "
+                                   "Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
+                connect_equation = ast.Equation(left=equation.left, right=equation.right)
+                node.equations.append(connect_equation)
+            else:
+                # TODO: Add check about matching inputs and outputs
+
+                flat_class_left = flatten_class(root, class_left, '')
+
+                for connector_variable in flat_class_left.symbols.values():
+                    left_name = equation.left.name + CLASS_SEPARATOR + connector_variable.name
+                    right_name = equation.right.name + CLASS_SEPARATOR + connector_variable.name
+                    left = ast.ComponentRef(name=left_name, indices=equation.left.indices)
+                    right = ast.ComponentRef(name=right_name, indices=equation.right.indices)
+                    if len(connector_variable.prefixes) == 0 or connector_variable.prefixes[0] in ['input', 'output']:
+                        connect_equation = ast.Equation(left=left, right=right)
+                        node.equations.append(connect_equation)
+                    elif connector_variable.prefixes == ['flow']:
+                        left_repr = repr(left)
+                        right_repr = repr(right)
+
+                        left_connected_variables = flow_connections.get(left_repr, OrderedDict())
+                        right_connected_variables = flow_connections.get(right_repr, OrderedDict())
+
+                        left_connected_variables.update(right_connected_variables)
+                        connected_variables = left_connected_variables
+                        connected_variables[left_repr] = left if equation.__left_inner else ast.Expression(operator='-', operands=[left])
+                        connected_variables[right_repr] = right if equation.__right_inner else ast.Expression(operator='-', operands=[right])
+
+                        for connected_variable in connected_variables:
+                            flow_connections[connected_variable] = connected_variables
+                    else:
+                        raise Exception(
+                            "Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
+        else:
+            node.equations.append(equation)
+
+    processed = []  # OrderedDict is not hashable, so we cannot use sets.
+    for connected_variables in flow_connections.values():
+        if connected_variables not in processed:
+            operands = list(connected_variables.values())
+            expr = operands[-1]
+            for op in reversed(operands[:-1]):
+                expr = ast.Expression(operator='+', operands=[op, expr])
+            connect_equation = ast.Equation(left=expr, right=ast.Primary(value=0))
+            node.equations.append(connect_equation)
+            processed.append(connected_variables)
+
+    # strip connector symbols
+    for i, sym in list(node.symbols.items()):
+        try:
+            # noinspection PyUnusedLocal
+            c = root.find_class(sym.type)
+        except KeyError:
+            pass
+        else:
+            del node.symbols[i]
+
+
+def add_state_value_equations(root: ast.Collection, node: ast.Node) -> None:
+    # we do this here, instead of in flatten_class, because symbol values
+    # inside flattened classes may be modified later by modify_class().
+    non_state_prefixes = set(['constant', 'parameter'])
+    for sym in node.symbols.values():
+        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
+            if len(non_state_prefixes & set(sym.prefixes)) == 0:
+                node.equations.append(ast.Equation(left=sym, right=sym.value))
+                sym.value = ast.Primary(value=None)
+
+
 class StateAnnotator(TreeListener):
     """
     This finds all variables that are differentiated and annotates them with the state prefix
@@ -670,20 +784,11 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
     # flatten class
     flat_class = flatten_class(root, root.find_class(class_name), '')
 
-    # add equations for state symbol values
-    # we do this here, instead of in flatten_class, because symbol values
-    # inside flattened classes may be modified later by modify_class().
-    non_state_prefixes = set(['constant', 'parameter'])
-    for sym in flat_class.symbols.values():
-        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
-            if len(non_state_prefixes & set(sym.prefixes)) == 0:
-                flat_class.equations.append(ast.Equation(left=sym, right=sym.value))
-                sym.value = ast.Primary(value=None)
+    # expand connectors
+    expand_connectors(root, flat_class)
 
-    # strip connector symbols
-    for i, sym in list(flat_class.symbols.items()):
-        if hasattr(sym, '_connector_type'):
-            del flat_class.symbols[i]
+    # add equations for state symbol values
+    add_state_value_equations(root, flat_class)
 
     # annotate states
     annotate_states(root, flat_class)

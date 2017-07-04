@@ -25,7 +25,7 @@ class GenCasadiTest(unittest.TestCase):
     def assert_model_equivalent(self, A, B):
         def sstr(a): return set([str(e) for e in a])
 
-        for l in ["states", "der_states", "inputs", "outputs", "constants", "parameters", "equations"]:
+        for l in ["states", "der_states", "inputs", "outputs", "constants", "parameters"]:
             self.assertEqual(sstr(getattr(A, l)), sstr(getattr(B, l)))
 
     def assert_model_equivalent_numeric(self, A, B, tol=1e-9):
@@ -173,9 +173,12 @@ class GenCasadiTest(unittest.TestCase):
         hb__up__H = ca.MX.sym("hb.up.H")
         hb__up__Q = ca.MX.sym("hb.up.Q")
 
+        zerotest__H = ca.MX.sym("zerotest.H")
+        zerotest__Q = ca.MX.sym("zerotest.Q")
+
         ref_model.alg_states = map(Variable, [p__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
                                 b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q,
-                                b__down__Q, p__Q, a__down__Q])
+                                b__down__Q, p__Q, a__down__Q, zerotest__H, zerotest__Q])
 
         ref_model.equations = [a__up__H - a__down__H,
                                a__up__Q + a__down__Q,
@@ -199,9 +202,10 @@ class GenCasadiTest(unittest.TestCase):
                                a__down__Q + (b__up__Q + c__down__Q),
                                -p__Q + c__up__Q,
                                b__down__Q + hb__up__Q,
-                               qa__down__Q + a__up__Q]
+                               qa__down__Q + a__up__Q,
 
-        print(ref_model)
+                               zerotest__Q]
+
         self.assert_model_equivalent(ref_model, casadi_model)
 
     def test_connector_hqz(self):
