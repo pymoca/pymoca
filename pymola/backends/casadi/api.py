@@ -7,8 +7,7 @@ import fnmatch
 import logging
 import shelve
 
-from pymola import parser, tree, ast
-from pymola.version import version as pymola_version
+from pymola import parser, tree, ast, __version__
 from . import generator
 from .model import Model, Variable
 
@@ -144,7 +143,7 @@ def _save_model(model_folder, model_name, model):
     shelve_file = os.path.join(model_folder, model_name)   
     with shelve.open(shelve_file, 'n') as db:
         # Store version
-        db['version'] = pymola_version
+        db['version'] = __version__
 
         # Include references to the shared libraries
         for o, d in objects.items():
@@ -178,7 +177,7 @@ def _load_model(model_folder, model_name, compiler_options):
 
     # Load metadata        
     with shelve.open(shelve_file, 'r') as db:
-        if db['version'] != pymola_version:
+        if db['version'] != __version__:
             raise InvalidCacheError('Cache generated for a different version of pymola')
 
         if db['library_os'] != os.name:
