@@ -395,7 +395,16 @@ class Collection(Node):
     def extend(self, other):
         self.files.extend(other.files)
 
-    def find_class(self, component_ref: Union[ComponentRef, str], within: list = None):
+    def find_class(self, component_ref: Union[ComponentRef, str], within: list = None, check_builtin_classes=False):
+        if check_builtin_classes:
+            if component_ref.name in ["Real", "Integer", "String", "Boolean"]:
+                c = Class(name=component_ref.name)
+                c.type = "__builtin"
+
+                s = Symbol(name="__value", type=ComponentRef(name=component_ref.name))
+                c.symbols[s.name] = s
+
+                return c
 
         if self._class_lookup is None:
             self._build_class_lookup()
