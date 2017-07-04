@@ -376,6 +376,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
                     class_right = root.find_class(sym_right.type)
             except KeyError:
                 primary_types = ['Real']
+                # TODO
                 if sym_left.type.name not in primary_types or sym_right.type.name not in primary_types:
                     logger.warning("Connector class {} or {} not defined.  "
                                    "Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
@@ -425,12 +426,6 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
                               extended_orig_class.initial_statements]
 
     # add flow equations
-    if len(flow_connections) > 0:
-        # TODO Flatten first
-        logger.warning(
-            "Note: Connections between connectors with flow variables "
-            "are not supported across levels of the class hierarchy")
-
     processed = []  # OrderedDict is not hashable, so we cannot use sets.
     for connected_variables in flow_connections.values():
         if connected_variables not in processed:

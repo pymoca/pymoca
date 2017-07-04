@@ -142,7 +142,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model = Model()
         self.assertTrue(True)
 
-    def test_connector(self):
+    def test_connector_hq(self):
         with open(os.path.join(TEST_DIR, 'ConnectorHQ.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
@@ -167,15 +167,16 @@ class GenCasadiTest(unittest.TestCase):
 
         qa__down__H = ca.MX.sym("qa.down.H")
         qa__down__Q = ca.MX.sym("qa.down.Q")
-        qc__down__H = ca.MX.sym("qc.down.H")
-        qc__down__Q = ca.MX.sym("qc.down.Q")
+        
+        p__H = ca.MX.sym("p.H")
+        p__Q = ca.MX.sym("p.Q")
 
         hb__up__H = ca.MX.sym("hb.up.H")
         hb__up__Q = ca.MX.sym("hb.up.Q")
 
-        ref_model.alg_states = map(Variable, [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
+        ref_model.alg_states = map(Variable, [p__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
                                 b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q,
-                                b__down__Q, qc__down__Q, a__down__Q])
+                                b__down__Q, p__Q, a__down__Q])
 
         ref_model.equations = [a__up__H - a__down__H,
                                a__up__Q + a__down__Q,
@@ -186,18 +187,18 @@ class GenCasadiTest(unittest.TestCase):
                                b__up__Q + b__down__Q,
 
                                qa__down__Q,
-                               qc__down__Q,
+                               p__Q,
 
                                hb__up__H,
 
                                qa__down__H - a__up__H,
-                               qc__down__H - c__up__H,
+                               p__H - c__up__H,
                                a__down__H - b__up__H,
                                c__down__H - b__up__H,
                                b__down__H - hb__up__H,
 
                                a__down__Q + (b__up__Q + c__down__Q),
-                               qc__down__Q + c__up__Q,
+                               p__Q + c__up__Q,
                                b__down__Q + hb__up__Q,
                                qa__down__Q + a__up__Q]
 
