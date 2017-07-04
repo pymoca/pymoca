@@ -167,7 +167,6 @@ class GenCasadiTest(unittest.TestCase):
 
         qa__down__H = ca.MX.sym("qa.down.H")
         qa__down__Q = ca.MX.sym("qa.down.Q")
-
         p__H = ca.MX.sym("p.H")
         p__Q = ca.MX.sym("p.Q")
 
