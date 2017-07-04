@@ -514,19 +514,15 @@ def flatten_component_refs(
 
 
 def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
-    # TODO vectors
-    # set up dict of flow connections
-    # following section 9.2 of the Modelica spec, we initialize it with all flow variables, so that
-    # flow variables that are not connected to any other are equated to zero.
-    flow_connections = OrderedDict()
+    # keep track of which flow variables have been connected to, and which ones haven't
+    disconnected_flow_variables = OrderedDict()
     for sym in node.symbols.values():
         if 'flow' in sym.prefixes:
-            comp_ref = ast.ComponentRef(name=sym.name, indices=[])
-            comp_ref_repr = repr(comp_ref)
-            flow_connections[comp_ref_repr] = OrderedDict({comp_ref_repr: comp_ref})
+            disconnected_flow_variables[sym.name] = sym
 
     # add flow equations
     # for all equations in original class
+    flow_connections = OrderedDict()
     orig_equations = node.equations[:]
     node.equations = []
     for equation in orig_equations:
@@ -578,6 +574,13 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
 
                         for connected_variable in connected_variables:
                             flow_connections[connected_variable] = connected_variables
+
+                        # TODO When dealing with an array of connectors, we can lose
+                        # disconnected flow variables in this way.  We don't initialize
+                        # all components of vectors to zero in 'flow_connections' as we
+                        # do not always know the length of vectors a priori.
+                        disconnected_flow_variables.pop(left_name, None)
+                        disconnected_flow_variables.pop(right_name, None)
                     else:
                         raise Exception(
                             "Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
@@ -594,6 +597,11 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
             connect_equation = ast.Equation(left=expr, right=ast.Primary(value=0))
             node.equations.append(connect_equation)
             processed.append(connected_variables)
+
+    # disconnected flow variables default to 0
+    for sym in disconnected_flow_variables.values():
+        connect_equation = ast.Equation(left=sym, right=ast.Primary(value=0))
+        node.equations.append(connect_equation)
 
     # strip connector symbols
     for i, sym in list(node.symbols.items()):
