@@ -165,8 +165,8 @@ class TreeWalker(object):
     def walk(self, listener: TreeListener, tree: ast.Node) -> None:
         """
         Walks an AST tree recursively
-        :param listener: 
-        :param tree: 
+        :param listener:
+        :param tree:
         :return: None
         """
         name = tree.__class__.__name__
@@ -208,8 +208,8 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     of the instance name passed.
     :param root: The root of the tree that contains all class definitions
     :param orig_class: The class we want to flatten
-    :param instance_name: 
-    :param class_modification: 
+    :param instance_name:
+    :param class_modification:
     :return: flat_class, the flattened class of type Class
     """
 
@@ -403,7 +403,7 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
     :param root: root tree for looking up symbols
     :param class_or_sym: class or symbol to modify
     :param modification: modification to apply
-    :return: 
+    :return:
     """
     class_or_sym = copy.deepcopy(class_or_sym)
     for argument in modification.arguments:
@@ -549,7 +549,7 @@ def annotate_states(root: ast.Collection, node: ast.Node) -> None:
     symbols as states by adding state the prefix list
     :param root: collection for performing symbol lookup etc.
     :param node: node of tree to walk
-    :return: 
+    :return:
     """
     w = TreeWalker()
     w.walk(StateAnnotator(root, node), node)
@@ -577,9 +577,9 @@ def pull_functions(root: ast.Collection, expression: ast.Expression, instance_pr
     """
     TODO: document
     :param root: collection for performing symbol lookup etc.
-    :param expression: 
-    :param instance_prefix: 
-    :return: 
+    :param expression:
+    :param instance_prefix:
+    :return:
     """
 
     expression_copy = copy.deepcopy(expression)

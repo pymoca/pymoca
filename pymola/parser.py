@@ -7,6 +7,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 import antlr4
 import antlr4.Parser
 from typing import Dict
+import copy
 
 from . import ast
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
@@ -466,9 +467,24 @@ class ASTListener(ModelicaListener):
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
 
+        # We make sure that all references to the objects are unique per
+        # symbol making copies. Note that if there is only one symbol in the
+        # component clause, it is already unique.
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = copy.deepcopy(clause.type)
+
     def exitComponent_clause1(self, ctx):
         clause = self.ast[ctx]
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
+
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = copy.deepcopy(clause.type)
 
     def enterComponent_declaration(self, ctx):
         sym = ast.Symbol(order=self.sym_count)
