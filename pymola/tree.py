@@ -385,6 +385,10 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             else:
                 # TODO: Add check about matching inputs and outputs
 
+                # See section 9.2 of the Modelica specification
+                left_inner = CLASS_SEPARATOR in flat_equation.left.name
+                right_inner = CLASS_SEPARATOR in flat_equation.right.name
+
                 flat_class_left = flatten_class(root, class_left, '')
 
                 for connector_variable in flat_class_left.symbols.values():
@@ -404,8 +408,8 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
                         left_connected_variables.update(right_connected_variables)
                         connected_variables = left_connected_variables
-                        connected_variables[left_repr] = left
-                        connected_variables[right_repr] = right
+                        connected_variables[left_repr] = left if left_inner else ast.Expression(operator='-', operands=[left])
+                        connected_variables[right_repr] = right if right_inner else ast.Expression(operator='-', operands=[right])
 
                         for connected_variable in connected_variables:
                             flow_connections[connected_variable] = connected_variables
