@@ -233,6 +233,11 @@ class GenCasadiTest(unittest.TestCase):
         c__down__Q = ca.MX.sym("c.down.Q")
         c__down__Z = ca.MX.sym("c.down.Z")
 
+        d__up__H = ca.MX.sym("d.up.H")
+        d__up__Q = ca.MX.sym("d.up.Q")
+        d__down__H = ca.MX.sym("d.down.H")
+        d__down__Q = ca.MX.sym("d.down.Q")
+
         qa__down__H = ca.MX.sym("qa.down.H")
         qa__down__Q = ca.MX.sym("qa.down.Q")
         qa__down__Z = ca.MX.sym("qa.down.Z")
@@ -247,7 +252,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states = list(map(Variable, [qc__down__H, a__down__H, b__down__H, c__down__H, c__up__H, hb__up__H, a__up__H,
                                 b__up__H, qa__down__H, a__up__Q, qa__down__Q, c__down__Q, hb__up__Q, c__up__Q, b__up__Q,
                                 b__down__Q, qc__down__Q, a__down__Q, a__up__Z, a__down__Z, b__up__Z, b__down__Z,
-                                c__up__Z, c__down__Z, qa__down__Z, qc__down__Z, hb__up__Z]))
+                                c__up__Z, c__down__Z, d__up__H, d__up__Q, d__down__Q, d__down__H, qa__down__Z, qc__down__Z, hb__up__Z]))
 
         ref_model.equations = [a__up__H - a__down__H,
                                a__up__Q + a__down__Q,
@@ -256,6 +261,9 @@ class GenCasadiTest(unittest.TestCase):
 
                                b__up__H - b__down__H,
                                b__up__Q + b__down__Q,
+
+                               d__up__H - d__down__H,
+                               d__up__Q + d__down__Q,
 
                                qa__down__Q,
                                qc__down__Q,
@@ -381,6 +389,26 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters[4].value = 4
         ref_model.parameters[5].value = 2
         ref_model.equations = []
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_nested_classes(self):
+        with open(os.path.join(TEST_DIR, 'NestedClasses.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'C2')
+        ref_model = Model()
+        print(casadi_model)
+
+        v1 = ca.MX.sym('v1')
+        v2 = ca.MX.sym('v2')
+
+        ref_model.states = []
+        ref_model.der_states = []
+        ref_model.alg_states = list(map(Variable, [v1, v2]))
+        ref_model.equations = []
+        ref_model.alg_states[0].nominal = 1000.0
+        ref_model.alg_states[1].nominal = 1000.0
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

@@ -7,6 +7,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 
 import copy
 import logging
+import copy # TODO
 import sys
 from collections import OrderedDict
 from typing import Union
@@ -201,7 +202,8 @@ class TreeWalker(object):
 
 
 def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: str,
-                  class_modification: ast.ClassModification = None) -> ast.Class:
+                  class_modification: ast.ClassModification = None,
+                  flatten_symbols=True) -> ast.Class:
     """
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
@@ -210,12 +212,14 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     :param orig_class: The class we want to flatten
     :param instance_name:
     :param class_modification:
+    :param flatten_symbols:
     :return: flat_class, the flattened class of type Class
     """
 
     # create the returned class
     flat_class = ast.Class(
         name=orig_class.name,
+        type=orig_class.type,
     )
 
     # append period to non empty instance_name
@@ -226,47 +230,89 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
     extended_orig_class = ast.Class(
         name=orig_class.name,
+        type=orig_class.type,
     )
 
     for extends in orig_class.extends:
-        c = root.find_class(extends.component, orig_class.within)
+        c = root.find_class(extends.component, orig_class.within, check_builtin_classes=True)
 
-        # recursively call flatten on the parent class
-        # NOTE: We do not to pass the instance name along. The symbol renaming
-        # is handled at the current level, not at the level of the base class.
-        # That way we can properly apply class modifications to inherited
-        # symbols.
-        flat_parent_class = flatten_class(root, c, '')
+        if c.type == "__builtin":
+            if len(orig_class.extends) > 1:
+                raise Exception("When extending a built-in class (Real, Integer, ...), extending from other as well classes is not allowed.")
 
-        # set visibility
-        for sym in flat_parent_class.symbols.values():
-            if sym.visibility > extends.visibility:
-                sym.visibility = extends.visibility
+            # We need to apply the class modifications to the elementary
+            # symbol instead of the class.
+            extended_orig_class.symbols.update(c.symbols)
+            extended_orig_class.symbols['__value'] = modify_class(root, extended_orig_class.symbols['__value'], extends.class_modification)
 
-        # add parent class members symbols, equations and statements
-        extended_orig_class.symbols.update(flat_parent_class.symbols)
-        extended_orig_class.equations += flat_parent_class.equations
-        extended_orig_class.initial_equations += flat_parent_class.initial_equations
-        extended_orig_class.statements += flat_parent_class.statements
-        extended_orig_class.initial_statements += flat_parent_class.initial_statements
+            # We make our new class also be of type "__builtin", so we can
+            # handle it differently later on by checking on this property.
+            extended_orig_class.type = c.type
+        else:
+            # recursively call flatten on the parent class. We shouldn't
+            # flatten symbols yet, as we can only do that after applying any
+            # extends modifications there may be.
+            flat_parent_class = flatten_class(root, c, '', flatten_symbols=False)
 
-        # carry out modifications
-        extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
+            # set visibility
+            for sym in flat_parent_class.symbols.values():
+                if sym.visibility > extends.visibility:
+                    sym.visibility = extends.visibility
 
+            # add parent class members symbols, equations and statements
+            extended_orig_class.classes.update(flat_parent_class.classes)
+            extended_orig_class.symbols.update(flat_parent_class.symbols)
+            extended_orig_class.equations += flat_parent_class.equations
+            extended_orig_class.initial_equations += flat_parent_class.initial_equations
+            extended_orig_class.statements += flat_parent_class.statements
+            extended_orig_class.initial_statements += flat_parent_class.initial_statements
+
+            # carry out modifications
+            extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
+
+    extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
     extended_orig_class.initial_equations += orig_class.initial_equations
     extended_orig_class.statements += orig_class.statements
     extended_orig_class.initial_statements += orig_class.initial_statements
 
+    # Modify the main class with any class modifications
     if class_modification is not None:
         extended_orig_class = modify_class(root, extended_orig_class, class_modification)
+
+    # Flatten local classes first, and apply any modifications to them.
+    # TODO: How about we shift extends modifications etc to the main class as
+    # modifications (i.e. prepending the "class_modification" list), and apply
+    # them in order just before symbol flattening? That way we can flatten
+    # local classes _after_ the early terminations.
+    for class_name, c in extended_orig_class.classes.items():
+        extended_orig_class.classes[class_name] = flatten_class(root, c, '')
+
+    if extended_orig_class.type == "__builtin":
+         return extended_orig_class
+
+    if not flatten_symbols:
+        return extended_orig_class
 
     # for all symbols in the original class
     for sym_name, sym in extended_orig_class.symbols.items():
         flat_sym = flatten_symbol(sym, instance_prefix)
         try:
-            c = root.find_class(flat_sym.type)
+            # First try a lookup in the local classes
+            c = copy.deepcopy(extended_orig_class.classes.get(sym.type.name, None))
+
+            # If not found, do a lookup in the class tree
+            if c is None:
+                c = root.find_class(sym.type)
+
+            if c.type == "__builtin":
+                flat_class.symbols[flat_sym.name] = flat_sym
+                for att in flat_sym.ATTRIBUTES + ["type"]:
+                    setattr(flat_class.symbols[flat_sym.name], att, getattr(c.symbols['__value'], att))
+
+                continue
+
         except KeyError:
             # append original symbol to flat class
             flat_class.symbols[flat_sym.name] = flat_sym
@@ -287,6 +333,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
                     flat_class_symbol.dimensions = flat_sym.dimensions + flat_class_symbol.dimensions
 
             # add sub_class members symbols and equations
+            flat_class.classes.update(flat_sub_class.classes)
             flat_class.symbols.update(flat_sub_class.symbols)
             flat_class.equations += flat_sub_class.equations
             flat_class.initial_equations += flat_sub_class.initial_equations
@@ -296,11 +343,15 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             # we keep connectors in the class hierarchy, as we may refer to them further
             # up using connect() clauses
             if c.type == 'connector':
+                flat_sym._connector_type = c
                 flat_class.symbols[flat_sym.name] = flat_sym
 
     # now resolve all references inside the symbol definitions
     for sym_name, sym in flat_class.symbols.items():
         flat_sym = flatten_component_refs(root, flat_class, sym, instance_prefix)
+
+        if hasattr(sym, '_connector_type'):
+            flat_sym._connector_type = sym._connector_type
         flat_class.symbols[sym_name] = flat_sym
 
     # for all equations in original class
@@ -315,9 +366,14 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             sym_right = root.find_symbol(flat_class, flat_equation.right)
 
             try:
-                class_left = root.find_class(sym_left.type)
+                class_left = getattr(sym_left, '_connector_type', None)
+                if class_left is None:
+                    class_left = root.find_class(sym_left.type)
+
                 # noinspection PyUnusedLocal
-                class_right = root.find_class(sym_right.type)
+                class_right = getattr(sym_right, '_connector_type', None)
+                if class_right is None:
+                    class_right = root.find_class(sym_right.type)
             except KeyError:
                 primary_types = ['Real']
                 if sym_left.type.name not in primary_types or sym_right.type.name not in primary_types:
@@ -411,7 +467,17 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
             if argument.component.name in ast.Symbol.ATTRIBUTES:
                 setattr(class_or_sym, argument.component.name, argument.modifications[0])
             else:
-                s = root.find_symbol(class_or_sym, argument.component)
+                if isinstance(class_or_sym, ast.Class):
+                    # First we check the local class definitions
+                    s = class_or_sym.classes.get(argument.component.name, None)
+                    if s is None:
+                        s = root.find_symbol(class_or_sym, argument.component)
+                    elif s.type == "__builtin":
+                        # We need to do any modifications on the containing symbol
+                        s = s.symbols['__value']
+                else:
+                    s = root.find_symbol(class_or_sym, argument.component)
+
                 for modification in argument.modifications:
                     if isinstance(modification, ast.ClassModification):
                         s.__dict__.update(modify_class(root, s, modification).__dict__)
@@ -422,10 +488,7 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
                 orig_sym = class_or_sym.symbols[new_sym.name]
                 orig_sym.__dict__.update(new_sym.__dict__)
         elif isinstance(argument, ast.ShortClassDefinition):
-            for s in class_or_sym.symbols.values():
-                if len(s.type.child) == 0 and s.type.name == argument.name:
-                    s.type = argument.component
-                    # TODO class modifications to short class definition
+            class_or_sym.classes[argument.name] = root.find_class(argument.component)
         else:
             raise Exception('Unsupported class modification argument {}'.format(argument))
     return class_or_sym
@@ -620,12 +683,7 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
 
     # strip connector symbols
     for i, sym in list(flat_class.symbols.items()):
-        try:
-            # noinspection PyUnusedLocal
-            c = root.find_class(sym.type)
-        except KeyError:
-            pass
-        else:
+        if hasattr(sym, '_connector_type'):
             del flat_class.symbols[i]
 
     # annotate states

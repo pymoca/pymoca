@@ -307,6 +307,7 @@ class Class(Node):
         self.final = False  # type: bool
         self.type = ''  # type: str
         self.comment = ''  # type: str
+        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
@@ -367,26 +368,43 @@ class Collection(Node):
         # TODO: Should be directly build the class_lookup, or wait until the first call to find_class?
         self._class_lookup = None
 
+    def _build_class_lookup_for_class(self, c, within):
+        if within:
+            full_name = merge_component_ref(within, ComponentRef(name=c.name))
+        else:
+            full_name = ComponentRef(name=c.name)
+
+        # FIXME: Do we have to convert to string?
+        self._class_lookup[component_ref_to_tuple(full_name)] = c
+
+        if within:
+            within = merge_component_ref(within, ComponentRef(name=c.name))
+        else:
+            within = ComponentRef(name=c.name)
+        for nested_c in c.classes.values():
+            self._build_class_lookup_for_class(nested_c, within)
+
     def _build_class_lookup(self):
         self._class_lookup = {}
 
         for f in self.files:
-            for class_name, c in f.classes.items():
-                if class_name is None:
-                    # FIXME: Short class definitions are not parsed correctly, and class_name is then None.
-                    continue
-                if f.within:
-                    full_name = merge_component_ref(f.within[0], ComponentRef(name=class_name))
-                else:
-                    full_name = ComponentRef(name=class_name)
-
-                # FIXME: Do we have to convert to string?
-                self._class_lookup[component_ref_to_tuple(full_name)] = c
+            within = f.within[0] if f.within else None
+            for c in f.classes.values():
+                self._build_class_lookup_for_class(c, within)
 
     def extend(self, other):
         self.files.extend(other.files)
 
-    def find_class(self, component_ref: Union[ComponentRef, str], within: list = None):
+    def find_class(self, component_ref: Union[ComponentRef, str], within: list = None, check_builtin_classes=False):
+        if check_builtin_classes:
+            if component_ref.name in ["Real", "Integer", "String", "Boolean"]:
+                c = Class(name=component_ref.name)
+                c.type = "__builtin"
+
+                s = Symbol(name="__value", type=ComponentRef(name=component_ref.name))
+                c.symbols[s.name] = s
+
+                return c
 
         if self._class_lookup is None:
             self._build_class_lookup()
@@ -414,7 +432,7 @@ class Collection(Node):
 
         if c is None:
             # Class not found
-            if full_name.name in ("Real", "Integer", "Boolean", "String", "Modelica", "SI"):
+            if component_ref.name in ("Real", "Integer", "Boolean", "String", "Modelica", "SI"):
                 # FIXME: To support an "ignore" in the flattener, we raise a
                 # KeyError for what are likely to be elementary types
                 raise KeyError
