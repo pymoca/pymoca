@@ -8,6 +8,7 @@ import logging
 import shelve
 
 from pymola import parser, tree, ast
+from pymola.version import version as pymola_version
 from . import generator
 from .model import Model, Variable
 
@@ -65,6 +66,10 @@ class CachedModel(Model):
 
     def simplify(self, options):
         raise NotImplementedError("Cannot simplify cached model")
+
+
+class InvalidCacheError(Exception):
+    pass
 
 
 class ObjectData:
@@ -138,6 +143,9 @@ def _save_model(model_folder, model_name, model):
     # Output metadata     
     shelve_file = os.path.join(model_folder, model_name)   
     with shelve.open(shelve_file, 'n') as db:
+        # Store version
+        db['version'] = pymola_version
+
         # Include references to the shared libraries
         for o, d in objects.items():
             db[d.key] = d.library
@@ -160,7 +168,7 @@ def _load_model(model_folder, model_name, compiler_options):
                 for item in fnmatch.filter(files, "*.mo"):
                     filename = os.path.join(root, item)
                     if os.path.getmtime(filename) > cache_mtime:
-                        raise OSError("Cache out of date")
+                        raise InvalidCacheError("Cache out of date")
 
     # Create empty model object
     model = CachedModel()
@@ -170,8 +178,11 @@ def _load_model(model_folder, model_name, compiler_options):
 
     # Load metadata        
     with shelve.open(shelve_file, 'r') as db:
+        if db['version'] != pymola_version:
+            raise InvalidCacheError('Cache generated for a different version of pymola')
+
         if db['library_os'] != os.name:
-            raise OSError('Cache generated for incompatible OS')
+            raise InvalidCacheError('Cache generated for incompatible OS')
 
         # Include references to the shared libraries
         for o, d in objects.items():
@@ -235,7 +246,7 @@ def transfer_model(model_folder, model_name, compiler_options={}):
     if compiler_options.get('cache', False):
         try:
             return _load_model(model_folder, model_name, compiler_options)
-        except OSError:
+        except (FileNotFoundError, InvalidCacheError):
             model = _compile_model(model_folder, model_name, compiler_options)
             _save_model(model_folder, model_name, model)
             return model
