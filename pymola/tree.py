@@ -202,7 +202,8 @@ class TreeWalker(object):
 
 
 def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: str,
-                  class_modification: ast.ClassModification = None) -> ast.Class:
+                  class_modification: ast.ClassModification = None,
+                  flatten_symbols=True) -> ast.Class:
     """
     This function takes and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
@@ -211,6 +212,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     :param orig_class: The class we want to flatten
     :param instance_name:
     :param class_modification:
+    :param flatten_symbols:
     :return: flat_class, the flattened class of type Class
     """
 
@@ -232,12 +234,10 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     for extends in orig_class.extends:
         c = root.find_class(extends.component, orig_class.within)
 
-        # recursively call flatten on the parent class
-        # NOTE: We do not to pass the instance name along. The symbol renaming
-        # is handled at the current level, not at the level of the base class.
-        # That way we can properly apply class modifications to inherited
-        # symbols.
-        flat_parent_class = flatten_class(root, c, '')
+        # recursively call flatten on the parent class. We shouldn't
+        # flatten symbols yet, as we can only do that after applying any
+        # extends modifications there may be.
+        flat_parent_class = flatten_class(root, c, '', flatten_symbols=False)
 
         # set visibility
         for sym in flat_parent_class.symbols.values():
@@ -262,15 +262,29 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     extended_orig_class.statements += orig_class.statements
     extended_orig_class.initial_statements += orig_class.initial_statements
 
+    # Modify the main class with any class modifications
     if class_modification is not None:
         extended_orig_class = modify_class(root, extended_orig_class, class_modification)
+
+    # Flatten local classes first, and apply any modifications to them.
+    # TODO: How about we shift extends modifications etc to the main class as
+    # modifications (i.e. prepending the "class_modification" list), and apply
+    # them in order just before symbol flattening? That way we can flatten
+    # local classes _after_ the early terminations.
+    for class_name, c in extended_orig_class.classes.items():
+        extended_orig_class.classes[class_name] = flatten_class(root, c, '')
+
+    if not flatten_symbols:
+        return extended_orig_class
 
     # for all symbols in the original class
     for sym_name, sym in extended_orig_class.symbols.items():
         flat_sym = flatten_symbol(sym, instance_prefix)
         try:
-            # TODO use find_class on class
-            c = extended_orig_class.classes.get(sym.type.name, None)
+            # First try a lookup in the local classes
+            c = copy.deepcopy(extended_orig_class.classes.get(sym.type.name, None))
+
+            # If not found, do a lookup in the class tree
             if c is None:
                 c = root.find_class(sym.type)
         except KeyError:
@@ -427,7 +441,14 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
             if argument.component.name in ast.Symbol.ATTRIBUTES:
                 setattr(class_or_sym, argument.component.name, argument.modifications[0])
             else:
-                s = root.find_symbol(class_or_sym, argument.component)
+                if isinstance(class_or_sym, ast.Class):
+                    # First we check the local class definitions
+                    s = class_or_sym.classes.get(argument.component.name, None)
+                    if s is None:
+                        s = root.find_symbol(class_or_sym, argument.component)
+                else:
+                    s = root.find_symbol(class_or_sym, argument.component)
+
                 for modification in argument.modifications:
                     if isinstance(modification, ast.ClassModification):
                         s.__dict__.update(modify_class(root, s, modification).__dict__)
@@ -438,8 +459,7 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
                 orig_sym = class_or_sym.symbols[new_sym.name]
                 orig_sym.__dict__.update(new_sym.__dict__)
         elif isinstance(argument, ast.ShortClassDefinition):
-            for s in class_or_sym.symbols.values():
-                class_or_sym.classes[argument.name] = root.find_class(argument.component)
+            class_or_sym.classes[argument.name] = root.find_class(argument.component)
         else:
             raise Exception('Unsupported class modification argument {}'.format(argument))
     return class_or_sym
