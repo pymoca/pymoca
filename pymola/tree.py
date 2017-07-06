@@ -360,8 +360,10 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
         flat_class.equations.append(flat_equation)
         if isinstance(flat_equation, ast.ConnectClause):
             # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
-            flat_equation.__left_inner = CLASS_SEPARATOR in flat_equation.left.name
-            flat_equation.__right_inner = CLASS_SEPARATOR in flat_equation.right.name
+            if not hasattr(flat_equation, '__left_inner'):
+                flat_equation.__left_inner = len(equation.left.child) > 0
+            if not hasattr(flat_equation, '__right_inner'):
+                flat_equation.__right_inner = len(equation.right.child) > 0
 
     flat_class.initial_equations += \
         [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_equations]
@@ -561,16 +563,17 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
                         connect_equation = ast.Equation(left=left, right=right)
                         node.equations.append(connect_equation)
                     elif connector_variable.prefixes == ['flow']:
-                        left_repr = repr(left)
-                        right_repr = repr(right)
+                        # TODO generic way to get a tuple representation of a component ref, including indices.
+                        left_key = (left_name, tuple(i.value for i in left.indices), equation.__left_inner)
+                        right_key = (right_name, tuple(i.value for i in right.indices), equation.__right_inner)
 
-                        left_connected_variables = flow_connections.get(left_repr, OrderedDict())
-                        right_connected_variables = flow_connections.get(right_repr, OrderedDict())
+                        left_connected_variables = flow_connections.get(left_key, OrderedDict())
+                        right_connected_variables = flow_connections.get(right_key, OrderedDict())
 
                         left_connected_variables.update(right_connected_variables)
                         connected_variables = left_connected_variables
-                        connected_variables[left_repr] = left if equation.__left_inner else ast.Expression(operator='-', operands=[left])
-                        connected_variables[right_repr] = right if equation.__right_inner else ast.Expression(operator='-', operands=[right])
+                        connected_variables[left_key] = left if equation.__left_inner else ast.Expression(operator='-', operands=[left])
+                        connected_variables[right_key] = right if equation.__right_inner else ast.Expression(operator='-', operands=[right])
 
                         for connected_variable in connected_variables:
                             flow_connections[connected_variable] = connected_variables
