@@ -807,21 +807,22 @@ class GenCasadiTest(unittest.TestCase):
         alias = ca.MX.sym('alias')
         y = ca.MX.sym('y')
         _tmp = ca.MX.sym('_tmp')
+        cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
-        ref_model.constants = list(map(Variable, [c]))
-        constant_values = [3]
+        ref_model.constants = list(map(Variable, [c, cst]))
+        constant_values = [3, 4]
         for _cst, v in zip(ref_model.constants, constant_values):
             _cst.value = v
         ref_model.parameters = list(map(Variable, [p1, p2, p3, p4]))
         parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
-        ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - c - _tmp - 4, _tmp - 0.1 * x]
+        ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - c - _tmp - cst, _tmp - 0.1 * x]
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
