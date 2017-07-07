@@ -965,6 +965,7 @@ class GenCasadiTest(unittest.TestCase):
         # Create model, cache it, and load the cache
         compiler_options = \
             {'replace_constant_values': True,
+             'replace_constant_expressions': True,
              'replace_parameter_values': True,
              'replace_parameter_expressions': True,
              'eliminate_constant_assignments': True,
