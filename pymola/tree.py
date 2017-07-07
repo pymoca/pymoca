@@ -5,6 +5,7 @@ Tools for tree walking and visiting etc.
 
 from __future__ import print_function, absolute_import, division, unicode_literals
 
+import numpy as np
 import copy
 import logging
 import copy # TODO
@@ -572,8 +573,8 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
 
                         left_connected_variables.update(right_connected_variables)
                         connected_variables = left_connected_variables
-                        connected_variables[left_key] = left if equation.__left_inner else ast.Expression(operator='-', operands=[left])
-                        connected_variables[right_key] = right if equation.__right_inner else ast.Expression(operator='-', operands=[right])
+                        connected_variables[left_key] = (left, equation.__left_inner)
+                        connected_variables[right_key] = (right, equation.__right_inner)
 
                         for connected_variable in connected_variables:
                             flow_connections[connected_variable] = connected_variables
@@ -593,7 +594,12 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
     processed = []  # OrderedDict is not hashable, so we cannot use sets.
     for connected_variables in flow_connections.values():
         if connected_variables not in processed:
-            operands = list(connected_variables.values())
+            operand_specs = list(connected_variables.values())
+            if np.all([not op_spec[1] for op_spec in operand_specs]):
+                # All outer variables. Don't include unnecessary minus expressions.
+                operands = [op_spec[0] for op_spec in operand_specs]
+            else:
+                operands = [op_spec[0] if op_spec[1] else ast.Expression(operator='-', operands=[op_spec[0]]) for op_spec in operand_specs]
             expr = operands[-1]
             for op in reversed(operands[:-1]):
                 expr = ast.Expression(operator='+', operands=[op, expr])
