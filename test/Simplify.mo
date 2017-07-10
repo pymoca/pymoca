@@ -8,9 +8,11 @@ model Simplify
     Real alias;
     Real y;
     Real _tmp;
+    Real cst;
 equation
     der(x) = x + p1 + p2 + p3 + p4;
     alias = x;
-    y = x + c + _tmp;
+    y = x + c + _tmp + cst;
     _tmp = 0.1 * x;
+    cst = 4;
 end Simplify;

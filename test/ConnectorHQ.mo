@@ -7,8 +7,7 @@ model Channel
 	HQ up;
 	HQ down;
 equation
-	up.H = down.H;
-	up.Q + down.Q = 0;
+	connect(up, down);
 end Channel;
 
 model HBC
@@ -28,11 +27,13 @@ model System
 	Channel b;
 	Channel c;
 	QBC qa;
-	QBC qc;
+	HQ p;
 	HBC hb;
+	HQ zerotest;
 equation
+    p.Q = 0;
 	connect(qa.down, a.up);
-	connect(qc.down, c.up);
+	connect(p, c.up);
 	connect(a.down, b.up);
 	connect(c.down, b.up);
 	connect(b.down, hb.up);

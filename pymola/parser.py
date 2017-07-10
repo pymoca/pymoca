@@ -7,6 +7,8 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 import antlr4
 import antlr4.Parser
 from typing import Dict
+from collections import deque
+import copy
 
 from . import ast
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
@@ -28,13 +30,17 @@ class ASTListener(ModelicaListener):
         self.ast = {}  # type: Dict[ast.Node]
         self.ast_result = None  # type: ast.Node
         self.file_node = None  # type: ast.File
-        self.class_node = None  # type: ast.Class
+        self.class_nodes = deque([ast.Class()])  # type: deque[ast.Class]
         self.comp_clause = None  # type: ast.ComponentClause
         self.eq_sect = None  # type: ast.EquationSection
         self.alg_sect = None  # type: ast.AlgorithmSection
         self.symbol_node = None  # type: ast.Symbol
         self.eq_comment = None  # type: str
         self.sym_count = 0  # type: int
+
+    @property
+    def class_node(self):
+        return self.class_nodes[-1]
 
     # FILE ===========================================================
 
@@ -56,33 +62,47 @@ class ASTListener(ModelicaListener):
 
     # CLASS ===========================================================
 
-    def enterStored_definition_class(self, ctx):
-        class_node = ast.Class()
+    def exitStored_definition_class(self, ctx):
+        class_node = self.ast[ctx.class_definition()]
         class_node.final = ctx.FINAL() is not None
-        class_node.encapsulated = ctx.class_definition().ENCAPSULATED() is not None
-        class_node.partial = ctx.class_definition().class_prefixes().PARTIAL() is not None
-        class_node.type = ctx.class_definition().class_prefixes().class_type().getText()
-        self.class_node = class_node
         self.ast[ctx] = class_node
 
-    def exitStored_definition_class(self, ctx):
-        pass
-
     def enterClass_definition(self, ctx):
-        self.ast[ctx] = self.class_node
+        class_node = ast.Class()
+        class_node.encapsulated = ctx.ENCAPSULATED() is not None
+        class_node.partial = ctx.class_prefixes().PARTIAL() is not None
+        class_node.type = ctx.class_prefixes().class_type().getText()
+
+        self.class_nodes.append(class_node)
+
+        self.ast[ctx] = class_node
+
+    def exitClass_definition(self, ctx):
+        class_node = self.class_nodes.pop()
+        self.class_node.classes[class_node.name] = class_node
 
     def exitShort_class_definition(self, ctx):
         self.ast[ctx] = ast.ShortClassDefinition(name=ctx.IDENT().getText(),
                                                  type=ctx.class_prefixes().class_type().getText(),
                                                  component=self.ast[ctx.component_reference()])
 
-    def enterClass_spec_comp(self, ctx):
-        class_node = self.class_node
-        class_node.name = ctx.IDENT()[0].getText()
-
     def exitClass_spec_comp(self, ctx):
         class_node = self.class_node
+        class_node.name = ctx.IDENT()[0].getText()
         class_node.comment = self.ast[ctx.string_comment()]
+
+    def exitClass_spec_base(self, ctx):
+        class_node = self.class_node
+        class_node.name = ctx.IDENT().getText()
+        class_node.comment = self.ast[ctx.comment()]
+
+        if ctx.class_modification() is not None:
+            class_modification = self.ast[ctx.class_modification()]
+        else:
+            class_modification = ast.ClassModification()
+        extends_clause = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
+                                          class_modification=class_modification)
+        class_node.extends.append(extends_clause)
 
     def exitComposition(self, ctx):
         for clause in self.ast[ctx.epriv]:
@@ -466,9 +486,24 @@ class ASTListener(ModelicaListener):
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
 
+        # We make sure that all references to the objects are unique per
+        # symbol making copies. Note that if there is only one symbol in the
+        # component clause, it is already unique.
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = copy.deepcopy(clause.type)
+
     def exitComponent_clause1(self, ctx):
         clause = self.ast[ctx]
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
+
+        for sym in self.comp_clause.symbol_list[1:]:
+            s = self.class_node.symbols[sym.name]
+            s.dimensions = list(s.dimensions)
+            s.prefixes = list(s.prefixes)
+            s.type = copy.deepcopy(clause.type)
 
     def enterComponent_declaration(self, ctx):
         sym = ast.Symbol(order=self.sym_count)

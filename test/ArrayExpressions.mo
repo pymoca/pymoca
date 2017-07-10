@@ -16,7 +16,7 @@ end NestedArrayExpressions;
 model ArrayExpressions
     Real a[3] = {1.0, 2.0, 3.0};
     constant Real b[4] = {2.7, 3.7, 4.7, 5.7}; // Can also be done with 2.7:5.7
-    Real c[3];
+    Real c[3](each min = 0.0);
     Real d[3];
     Real e[3];
     Real scalar_f = 1.3;

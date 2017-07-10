@@ -1,13 +1,14 @@
 from collections import namedtuple
+import distutils.ccompiler
 import casadi as ca
 import numpy as np
 import sys
 import os
 import fnmatch
 import logging
-import shelve
+import pickle
 
-from pymola import parser, tree, ast
+from pymola import parser, tree, ast, __version__
 from . import generator
 from .model import Model, Variable
 
@@ -67,6 +68,10 @@ class CachedModel(Model):
         raise NotImplementedError("Cannot simplify cached model")
 
 
+class InvalidCacheError(Exception):
+    pass
+
+
 class ObjectData:
     # This is not a named tuple, since we need read/write access to 'library'
     def __init__(self, key, library):
@@ -90,7 +95,7 @@ def _compile_model(model_folder, model_name, compiler_options):
 
     # Compile
     logger.info("Generating CasADi model")
-    
+
     model = generator.generate(tree, model_name)
     if compiler_options.get('check_balanced', True):
         model.check_balanced()
@@ -105,10 +110,12 @@ def _compile_model(model_folder, model_name, compiler_options):
 def _save_model(model_folder, model_name, model):
     # Compile shared libraries
     if os.name == 'posix':
-        ext = 'so'
+        compiler_flags = ['-O2', '-fPIC']
+        linker_flags = ['-fPIC']
     else:
-        ext = 'dll'
-            
+        compiler_flags = ['/O2', '/wd4101']  # Shut up unused local variable warnings.
+        linker_flags = ['/DLL']
+
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
     for o, d in objects.items():
         f = getattr(model, o + '_function')
@@ -123,21 +130,36 @@ def _save_model(model_folder, model_name, model):
         cg.add(f.reverse(1).forward(1))
         cg.generate(model_folder + '/')
 
-        file_name = os.path.join(model_folder, library_name + '.c')
+        compiler = distutils.ccompiler.new_compiler()
 
-        d.library = os.path.join(model_folder, '{}.{}'.format(library_name, ext))
-        cc = os.getenv('CC', 'gcc')
-        cflags = os.getenv('CFLAGS', '-O3 -fPIC')
+        file_name = os.path.join(model_folder, library_name + '.c')
+        object_name = compiler.object_filenames([file_name])[0]
+        d.library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
         try:
-            os.system("{} {} -shared {} -o {}".format(cc, cflags, file_name, d.library))
+            # NOTE: For some reason running in debug mode in PyCharm (2017.1)
+            # on Windows causes cl.exe to fail on its own binary name (?!) and
+            # the include paths. This does not happen when running directly
+            # from cmd.exe / PowerShell or e.g. with debug mode in VS Code.
+            compiler.compile([file_name], extra_postargs=compiler_flags)
+
+            # We do not want the "lib" prefix on POSIX systems, so we call
+            # link() directly with our desired filename instead of
+            # link_shared_lib().
+            compiler.link(compiler.SHARED_LIBRARY, [object_name], d.library, extra_preargs=linker_flags)
         except:
             raise
         finally:
             os.remove(file_name)
+            os.remove(object_name)
 
-    # Output metadata     
-    shelve_file = os.path.join(model_folder, model_name)   
-    with shelve.open(shelve_file, 'n') as db:
+    # Output metadata
+    db_file = os.path.join(model_folder, model_name)
+    with open(db_file, 'wb') as f:
+        db = {}
+
+        # Store version
+        db['version'] = __version__
+
         # Include references to the shared libraries
         for o, d in objects.items():
             db[d.key] = d.library
@@ -149,18 +171,20 @@ def _save_model(model_folder, model_name, model):
 
         db['delayed_states'] = model.delayed_states
 
+        pickle.dump(db, f)
+
 def _load_model(model_folder, model_name, compiler_options):
-    shelve_file = os.path.join(model_folder, model_name)
+    db_file = os.path.join(model_folder, model_name)
 
     if compiler_options.get('mtime_check', True):
         # Mtime check
-        cache_mtime = os.path.getmtime(shelve_file)
+        cache_mtime = os.path.getmtime(db_file)
         for folder in [model_folder] + compiler_options.get('library_folders', []):
             for root, dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
                     filename = os.path.join(root, item)
                     if os.path.getmtime(filename) > cache_mtime:
-                        raise OSError("Cache out of date")
+                        raise InvalidCacheError("Cache out of date")
 
     # Create empty model object
     model = CachedModel()
@@ -168,10 +192,15 @@ def _load_model(model_folder, model_name, compiler_options):
     # Compile shared libraries
     objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
 
-    # Load metadata        
-    with shelve.open(shelve_file, 'r') as db:
+    # Load metadata
+    with open(db_file, 'rb') as f:
+        db = pickle.load(f)
+
+        if db['version'] != __version__:
+            raise InvalidCacheError('Cache generated for a different version of pymola')
+
         if db['library_os'] != os.name:
-            raise OSError('Cache generated for incompatible OS')
+            raise InvalidCacheError('Cache generated for incompatible OS')
 
         # Include references to the shared libraries
         for o, d in objects.items():
@@ -227,7 +256,7 @@ def _load_model(model_folder, model_name, compiler_options):
                         depends_on_parameters = np.any([sparsity.has_nz(i * len(ast.Symbol.ATTRIBUTES) + j, l) for l in range(len(model.parameters))])
                         if depends_on_parameters:
                             setattr(variable, tmp, metadata[key][i, j])
-    
+
     # Done
     return model
 
@@ -235,10 +264,9 @@ def transfer_model(model_folder, model_name, compiler_options={}):
     if compiler_options.get('cache', False):
         try:
             return _load_model(model_folder, model_name, compiler_options)
-        except OSError:
+        except (FileNotFoundError, InvalidCacheError):
             model = _compile_model(model_folder, model_name, compiler_options)
             _save_model(model_folder, model_name, model)
             return model
     else:
         return _compile_model(model_folder, model_name, compiler_options)
-        

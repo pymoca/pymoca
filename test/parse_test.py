@@ -106,20 +106,16 @@ class ParseTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, 'C2')
 
-        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp.b'].value.value, 3.0)
+        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp1.b'].value.value, 3.0)
 
-    # TODO: Currently nested (local) classes are not parsed correctly. Not
-    # entirely sure if their scope is local, or other (non-extending) classes
-    # can make instantiations as well. That will likely influence the way they
-    # need to be stored.
-    @unittest.skip
-    def test_inheritance(self):
-        with open(os.path.join(TEST_DIR, 'InheritanceInstantiation.mo'), 'r') as f:
+    def test_nested_classes(self):
+        with open(os.path.join(TEST_DIR, 'NestedClasses.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, 'C2')
 
-        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp.b'].value.value, 3.0)
+        self.assertEqual(flat_tree.classes['C2'].symbols['v1'].nominal.value, 1000.0)
+        self.assertEqual(flat_tree.classes['C2'].symbols['v2'].nominal.value, 1000.0)
 
     def test_inheritance_symbol_modifiers(self):
         with open(os.path.join(TEST_DIR, 'Inheritance.mo'), 'r') as f:
@@ -128,6 +124,14 @@ class ParseTest(unittest.TestCase):
         flat_tree = tree.flatten(ast_tree, 'Sub')
 
         self.assertEqual(flat_tree.classes['Sub'].symbols['x'].max.value, 30.0)
+
+    def test_extends_modification(self):
+        with open(os.path.join(TEST_DIR, 'ExtendsModification.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, 'MainModel')
+
+        self.assertEqual(flat_tree.classes['MainModel'].symbols['e.HQ.H'].min.name, "e.H_b")
 
 if __name__ == "__main__":
     unittest.main()
