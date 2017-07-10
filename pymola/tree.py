@@ -350,9 +350,6 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     # now resolve all references inside the symbol definitions
     for sym_name, sym in flat_class.symbols.items():
         flat_sym = flatten_component_refs(root, flat_class, sym, instance_prefix)
-
-        if hasattr(sym, '__connector_type'):
-            flat_sym.__connector_type = sym.__connector_type
         flat_class.symbols[sym_name] = flat_sym
 
     # for all equations in original class
@@ -537,10 +534,12 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
             try:
                 class_left = getattr(sym_left, '__connector_type', None)
                 if class_left is None:
+                    # We may be connecting classes which are not connectors, such as Reals.
                     class_left = root.find_class(sym_left.type)
                 # noinspection PyUnusedLocal
                 class_right = getattr(sym_right, '__connector_type', None)
                 if class_right is None:
+                    # We may be connecting classes which are not connectors, such as Reals.
                     class_right = root.find_class(sym_right.type)
             except KeyError:
                 primary_types = ['Real']
