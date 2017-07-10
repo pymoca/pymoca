@@ -119,6 +119,69 @@ class Model:
                         [value] = ca.substitute([value], symbols, values)
                         setattr(variable, attribute, value)
 
+        if options.get('replace_constant_expressions', False):
+            logger.info("Replacing constant expressions")
+
+            simple_constants, symbols, values = [], [], []
+            for c in self.constants:
+                if ca.MX(c.value).is_constant():
+                    simple_constants.append(c)
+                else:
+                    symbols.append(c.symbol)
+                    values.append(c.value)
+
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, symbols, values)
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+            self.constants = simple_constants
+
+            # Replace constant expressions in metadata
+            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                for attribute in ast.Symbol.ATTRIBUTES:
+                    value = getattr(variable, attribute)
+                    if isinstance(value, ca.MX):
+                        [value] = ca.substitute([value], symbols, values)
+                        setattr(variable, attribute, value)
+
+        if options.get('eliminate_constant_assignments', False):
+            logger.info("Elimating constant variable assignments")
+
+            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
+
+            reduced_equations = []
+            for eq in self.equations:
+                if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                    if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and eq.dep(1).is_constant():
+                        variable = eq.dep(0)
+                        value = eq.dep(1)
+                    elif eq.dep(1).is_symbolic() and eq.dep(1).name() in alg_states and eq.dep(0).is_constant():
+                        variable = eq.dep(1)
+                        value = eq.dep(0)
+                    else:
+                        variable = None
+                        value = None
+
+                    if variable is not None:
+                        constant = alg_states.pop(variable.name())
+
+                        if eq.is_op(ca.OP_SUB):
+                            constant.value = value
+                        else:
+                            constant.value = -value
+
+                        self.constants.append(constant)
+
+                        # Skip this equation
+                        continue
+
+                # Keep this equation
+                reduced_equations.append(eq)
+
+            # Eliminate alias variables
+            self.alg_states = list(alg_states.values())
+            self.equations = reduced_equations
+
         if options.get('replace_parameter_values', False):
             logger.info("Replacing parameter values")
 
