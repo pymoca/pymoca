@@ -18,7 +18,8 @@ jupyter notebook
 ```
 
 ## Examples
-[Simple IPython Notebook Example](test/Spring.ipynb)
+[Sympy Example](test/Spring.ipynb)
+[Casadi Example](test/Casadi.ipynb)
 
 ## Roadmap
 
