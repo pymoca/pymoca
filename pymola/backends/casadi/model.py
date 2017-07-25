@@ -323,19 +323,56 @@ class Model:
             variables, values = [], []
             for canonical, aliases in alias_rel:
                 canonical_state = all_states[canonical]
-                setattr(canonical_state, 'aliases', aliases)
+
+                python_type = canonical_state.python_type
+                start = canonical_state.start
+                m, M = canonical_state.min, canonical_state.max
+                nominal = canonical_state.nominal
+                fixed = canonical_state.fixed
+
                 for alias in aliases:
+                    alias_state = all_states[alias]
+
                     if alias[0] == '-':
                         sign = -1
                         alias = alias[1:]
                     else:
                         sign = 1
-                    variables.append(all_states[alias].symbol)
+
+                    variables.append(alias_state.symbol)
                     values.append(sign * canonical_state.symbol)
+
+                    # If any of the aliases has a nonstandard type, apply it to
+                    # the canonical state as well
+                    if alias_state.python_type != float:
+                        python_type = alias_state.python_type
+
+                    # If any of the aliases has a nondefault start value, apply it to
+                    # the canonical state as well
+                    if np.isfinite(alias_state.start) and alias_state.start != 0:
+                        start = alias_state.start
+
+                    # The intersection of all bound ranges applies
+                    m = max(m, alias_state.min)
+                    M = min(M, alias_state.max)
+
+                    # Take the largest nominal of all aliases
+                    nominal = max(nominal, alias_state.nominal)
+
+                    # If any of the aliases is fixed, the canonical state is as well
+                    fixed = max(fixed, alias_state.fixed)
 
                     del all_states[alias]
                     if alias in outputs:
                         outputs[alias].symbol = sign * canonical_state.symbol
+
+                canonical_state.aliases = aliases
+                canonical_state.python_type = python_type
+                canonical_state.start = start
+                canonical_state.min = m
+                canonical_state.max = M
+                canonical_state.nominal = nominal
+                canonical_state.fixed = fixed
 
             self.states = [v for k, v in all_states.items() if k in states]
             self.der_states = [v for k, v in all_states.items() if k in der_states]
