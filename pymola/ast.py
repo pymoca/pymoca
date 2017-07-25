@@ -327,33 +327,6 @@ class File(Node):
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         super().__init__(**kwargs)
 
-    def find_class(self, component_ref: ComponentRef) -> Class:
-        """
-        Find the class that a component is defined in
-        :param component_ref: component reference
-        :return: the class that contains the ref
-        """
-        name = component_ref.name
-        for c_name in self.classes.keys():
-            c = self.classes[c_name]
-            if component_ref.name in c.symbols.keys():
-                return c
-        raise KeyError(name)
-
-    def find_symbol(self, c: Class, component_ref: ComponentRef) -> Symbol:
-        """
-        Given a component ref, lookup the symbol in the given class
-        :param c: class to look in
-        :param component_ref: component reference
-        :return: the symbol
-        """
-        sym = c.symbols[component_ref.name]
-        if len(component_ref.child) > 0:
-            c = self.(sym.type)
-            return self.find_symbol(c, component_ref.child[0])
-        else:
-            return sym
-
 
 class Collection(Node):
     """
