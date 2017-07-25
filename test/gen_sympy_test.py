@@ -12,6 +12,7 @@ import unittest
 import pymola.backends.sympy.generator as gen_sympy
 from pymola import parser
 from pymola import tree
+from pymola import ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -52,7 +53,7 @@ class GenSympyTest(unittest.TestCase):
         with open(os.path.join(TEST_DIR, 'SpringSystem.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        flat_tree = tree.flatten(ast_tree, 'SpringSystem')
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='SpringSystem'))
         print(flat_tree)
         text = gen_sympy.generate(ast_tree, 'SpringSystem')
         with open(os.path.join(TEST_DIR, 'generated/Spring.py'), 'w') as f:
@@ -105,7 +106,7 @@ class GenSympyTest(unittest.TestCase):
         # print(ast_tree)
 
         # noinspection PyUnusedLocal
-        flat_tree = tree.flatten(ast_tree, 'Aircraft')
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='Aircraft'))
         # print(flat_tree)
 
         # noinspection PyUnusedLocal

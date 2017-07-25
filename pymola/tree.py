@@ -696,7 +696,7 @@ def pull_functions(root: ast.Collection, expression: ast.Expression, instance_pr
     return function_set
 
 
-def flatten(root: ast.Collection, class_name: str) -> ast.File:
+def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:
     """
     This function takes a Collection and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
@@ -712,7 +712,7 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
             c.within = f.within
 
     # flatten class
-    flat_class = flatten_class(root, root.find_class(class_name), '')
+    flat_class = flatten_class(root, root.find_class(component_ref), '')
 
     # expand connectors
     expand_connectors(root, flat_class)
@@ -725,6 +725,6 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
 
     # flat file
     flat_file = ast.File()
-    flat_file.classes[class_name] = flat_class
+    flat_file.classes[flat_class.name] = flat_class
 
     return flat_file
