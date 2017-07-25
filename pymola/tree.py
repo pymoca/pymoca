@@ -269,7 +269,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             extended_orig_class.initial_statements += flat_parent_class.initial_statements
 
             # carry out modifications
-            extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
+            extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification, orig_class.within)
 
     extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
@@ -305,7 +305,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
             # If not found, do a lookup in the class tree
             if c is None:
-                c = root.find_class(sym.type)
+                c = root.find_class(sym.type, orig_class.within)
 
             if c.type == "__builtin":
                 flat_class.symbols[flat_sym.name] = flat_sym
@@ -381,7 +381,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     return flat_class
 
 
-def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification):
+def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification, within=[]):
     """
     Apply a modification to a class or symbol.
     :param root: root tree for looking up symbols
@@ -416,7 +416,7 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
                 orig_sym = class_or_sym.symbols[new_sym.name]
                 orig_sym.__dict__.update(new_sym.__dict__)
         elif isinstance(argument, ast.ShortClassDefinition):
-            class_or_sym.classes[argument.name] = root.find_class(argument.component)
+            class_or_sym.classes[argument.name] = root.find_class(argument.component, within)
         else:
             raise Exception('Unsupported class modification argument {}'.format(argument))
     return class_or_sym
@@ -696,7 +696,7 @@ def pull_functions(root: ast.Collection, expression: ast.Expression, instance_pr
     return function_set
 
 
-def flatten(root: ast.Collection, class_name: str) -> ast.File:
+def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:
     """
     This function takes a Collection and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
@@ -712,7 +712,7 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
             c.within = f.within
 
     # flatten class
-    flat_class = flatten_class(root, root.find_class(class_name), '')
+    flat_class = flatten_class(root, root.find_class(component_ref), '')
 
     # expand connectors
     expand_connectors(root, flat_class)
@@ -725,6 +725,6 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
 
     # flat file
     flat_file = ast.File()
-    flat_file.classes[class_name] = flat_class
+    flat_file.classes[flat_class.name] = flat_class
 
     return flat_file

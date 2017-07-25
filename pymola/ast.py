@@ -327,33 +327,6 @@ class File(Node):
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         super().__init__(**kwargs)
 
-    def find_class(self, component_ref: ComponentRef) -> Class:
-        """
-        Find the class that a component is defined in
-        :param component_ref: component reference
-        :return: the class that contains the ref
-        """
-        name = component_ref.name
-        for c_name in self.classes.keys():
-            c = self.classes[c_name]
-            if component_ref.name in c.symbols.keys():
-                return c
-        raise KeyError('symbol {:s} not found'.format(name))
-
-    def find_symbol(self, c: Class, component_ref: ComponentRef) -> Symbol:
-        """
-        Given a component ref, lookup the symbol in the given class
-        :param c: class to look in
-        :param component_ref: component reference
-        :return: the symbol
-        """
-        sym = c.symbols[component_ref.name]
-        if len(component_ref.child) > 0:
-            c = self.find_class(sym.type)
-            return self.find_symbol(c, component_ref.child[0])
-        else:
-            return sym
-
 
 class Collection(Node):
     """
@@ -395,7 +368,7 @@ class Collection(Node):
     def extend(self, other):
         self.files.extend(other.files)
 
-    def find_class(self, component_ref: Union[ComponentRef, str], within: list = None, check_builtin_classes=False):
+    def find_class(self, component_ref: ComponentRef, within: list = None, check_builtin_classes=False):
         if check_builtin_classes:
             if component_ref.name in ["Real", "Integer", "String", "Boolean"]:
                 c = Class(name=component_ref.name)
@@ -409,26 +382,29 @@ class Collection(Node):
         if self._class_lookup is None:
             self._build_class_lookup()
 
-        if isinstance(component_ref, str):
-            assert component_ref.find('.') == -1
-            component_ref = ComponentRef(name=component_ref)
+        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
+        # Odds are that these types of lookups are not parsed yet. We would expet an empty first name, with a non-empty child.
 
-        if within:
-            full_name = merge_component_ref(within[0], component_ref)
-        else:
-            full_name = component_ref
-
+        # Lookup the referenced class, walking up the tree from the current
+        # node until the root node.
         c = None
 
-        # Try relative lookup
-        c = self._class_lookup.get(component_ref_to_tuple(full_name), None)
+        if within:
+            within_tuple = component_ref_to_tuple(within[0])
+        else:
+            within_tuple = tuple()
 
-        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
-        # TODO: Should we traverse up the tree, or just try twice (once relative to current class, once absolute = relative to root)
+        cref_tuple = component_ref_to_tuple(component_ref)
 
-        # Try absolute lookup
-        if c is None:
-            c = self._class_lookup.get(component_ref_to_tuple(component_ref), None)
+        while c is None:
+            c = self._class_lookup.get(within_tuple + cref_tuple, None)
+
+            if within_tuple:
+                within_tuple = within_tuple[:-1]
+            else:
+                # Finished traversing up the tree all the way to the root. No
+                # more lookups possible.
+                break
 
         if c is None:
             # Class not found
@@ -499,3 +475,20 @@ def component_ref_to_tuple(c: ComponentRef) -> tuple:
         return (c.name, ) + component_ref_to_tuple(c.child[0])
     else:
         return (c.name, )
+
+
+def component_ref_from_string(s: str) -> ComponentRef:
+    """
+    Convert the string pointing to a component using dot notation to
+    a component reference.
+    :param s: string pointing to component using dot notation
+    :return: ComponentRef
+    """
+
+    components = s.split('.')
+    component_ref = ComponentRef(name=components[0], child=[])
+    c = component_ref
+    for component in components[1:]:
+        c.child.append(ComponentRef(name=component, child=[]))
+        c = c.child[0]
+    return component_ref

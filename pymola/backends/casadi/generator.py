@@ -68,14 +68,13 @@ class ForLoop:
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
-    def __init__(self, root, class_name):
+    def __init__(self, cls: ast.Class):
         super(Generator, self).__init__()
         self.src = {}
         self.model = Model()
         self.nodes = {'time': self.model.time}
         self.derivative = {}
-        self.root = root
-        self.class_name = class_name
+        self.cls = cls
         self.for_loops = []
 
     def _ast_symbols_to_variables(self, ast_symbols, differentiate=False):
@@ -324,7 +323,7 @@ class Generator(TreeListener):
         if isinstance(tree, ast.Primary):
             return int(tree.value)
         if isinstance(tree, ast.ComponentRef):
-            s = self.root.find_symbol(self.root.classes[self.class_name], tree)
+            s = self.cls.symbols[tree.name]
             assert (s.type.name == 'Integer')
             return self.get_integer(s.value)
         if isinstance(tree, ast.Expression):
@@ -347,8 +346,7 @@ class Generator(TreeListener):
                     if (len(self.for_loops) > 0) and (dep.name() == self.for_loops[-1].name):
                         vals.append(self.for_loops[-1].index_variable)
                     else:
-                        vals.append(self.get_integer(self.root.find_symbol(self.root.classes[self.class_name],
-                                                                           ast.ComponentRef(name=dep.name())).value))
+                        vals.append(self.get_integer(self.cls.symbols[dep.name()].value))
 
             # Evaluate the expression
             F = ca.Function('get_integer_{}'.format('_'.join([dep.name().replace('.', '_') for dep in deps])), deps,
@@ -423,7 +421,7 @@ class Generator(TreeListener):
                     return f.index_variable
 
         # Check ordinary symbols
-        symbol = self.root.find_symbol(self.root.classes[self.class_name], tree)
+        symbol = self.cls.symbols[tree.name]
         s = self.get_mx(symbol)
         if len(tree.indices) > 0:
             s = self.get_indexed_symbol(tree, s)
@@ -448,12 +446,16 @@ class Generator(TreeListener):
         return self.src[tree]
 
 
-def generate(ast_tree, model_name):
-    # create a walker
+def generate(ast_tree: ast.Collection, model_name: str) -> Model:
+    """
+    :param ast_tree: AST to generate from
+    :param model_name: class to generate
+    :return: casadi model
+    """
+    component_ref = ast.component_ref_from_string(model_name)
     ast_walker = TreeWalker()
-
-    flat_tree = flatten(ast_tree, model_name)
-
-    casadi_gen = Generator(flat_tree, model_name)
+    flat_tree = flatten(ast_tree, component_ref)
+    component_ref_tuple = ast.component_ref_to_tuple(component_ref)
+    casadi_gen = Generator(flat_tree.classes[component_ref_tuple[-1]])
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model

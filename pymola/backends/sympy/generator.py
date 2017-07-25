@@ -202,14 +202,14 @@ class {{tree.name}}(OdeModel):
 
 def generate(ast_tree: ast.Collection, model_name: str):
     """
-    
     :param ast_tree: AST to generate from
     :param model_name: class to generate
     :return: sympy source code for model
     """
+    component_ref = ast.component_ref_from_string(model_name)
     ast_tree_new = copy.deepcopy(ast_tree)
     ast_walker = TreeWalker()
-    flat_tree = flatten(ast_tree_new, model_name)
+    flat_tree = flatten(ast_tree_new, component_ref)
     sympy_gen = SympyGenerator()
     ast_walker.walk(sympy_gen, flat_tree)
     return sympy_gen.src[flat_tree]
