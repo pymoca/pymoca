@@ -331,13 +331,13 @@ class Model:
                 fixed = canonical_state.fixed
 
                 for alias in aliases:
-                    alias_state = all_states[alias]
-
                     if alias[0] == '-':
                         sign = -1
                         alias = alias[1:]
                     else:
                         sign = 1
+
+                    alias_state = all_states[alias]
 
                     variables.append(alias_state.symbol)
                     values.append(sign * canonical_state.symbol)
@@ -350,11 +350,11 @@ class Model:
                     # If any of the aliases has a nondefault start value, apply it to
                     # the canonical state as well
                     if np.isfinite(alias_state.start) and alias_state.start != 0:
-                        start = alias_state.start
+                        start = sign * alias_state.start
 
                     # The intersection of all bound ranges applies
-                    m = max(m, alias_state.min)
-                    M = min(M, alias_state.max)
+                    m = max(m, alias_state.min if sign == 1 else -alias_state.max)
+                    M = min(M, alias_state.max if sign == 1 else -alias_state.min)
 
                     # Take the largest nominal of all aliases
                     nominal = max(nominal, alias_state.nominal)

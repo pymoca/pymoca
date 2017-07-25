@@ -937,6 +937,32 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEquals(casadi_model.states[0].aliases, ['alias'])
 
+    def test_simplify_detect_negative_alias(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'detect_aliases': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'NegativeAlias', compiler_options)
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 1
+        ref_model.states[0].max = 2
+        ref_model.states[0].nominal = 10
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, []))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.equations = [der_x - x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+        self.assertEquals(casadi_model.states[0].aliases, ['-alias'])
+
     def test_simplify_reduce_affine_expression(self):
         # Create model, cache it, and load the cache
         compiler_options = \
