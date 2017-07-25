@@ -38,15 +38,16 @@ class GenSympyTest(unittest.TestCase):
         with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Estimator')
-        with open(os.path.join(TEST_DIR, 'generated/Estimator.py'), 'w') as f:
-            f.write(text)
-        from test.generated.Estimator import Estimator as Estimator
-        e = Estimator()
-        e.linearize_symbolic()
-        e.linearize()
+        dae = gen_sympy.generate(ast_tree, 'Estimator')
+        print(dae)
+        #with open(os.path.join(TEST_DIR, 'generated/Estimator.py'), 'w') as f:
+        #    f.write(text)
+        #from test.generated.Estimator import Estimator as Estimator
+        #e = Estimator()
+        #e.linearize_symbolic()
+        #e.linearize()
         # noinspection PyUnusedLocal
-        res = e.simulate(x0=[1.0])
+        #res = e.simulate(x0=[1.0])
         self.flush()
 
     def test_spring(self):
@@ -54,16 +55,17 @@ class GenSympyTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='SpringSystem'))
-        print(flat_tree)
-        text = gen_sympy.generate(ast_tree, 'SpringSystem')
-        with open(os.path.join(TEST_DIR, 'generated/Spring.py'), 'w') as f:
-            f.write(text)
-        from test.generated.Spring import SpringSystem as SpringSystem
-        e = SpringSystem()
-        e.linearize_symbolic()
-        e.linearize()
+        #print(flat_tree)
+        dae = gen_sympy.generate(ast_tree, 'SpringSystem')
+        print(dae)
+        #with open(os.path.join(TEST_DIR, 'generated/Spring.py'), 'w') as f:
+        #    f.write(text)
+        #from test.generated.Spring import SpringSystem as SpringSystem
+        #e = SpringSystem()
+        #e.linearize_symbolic()
+        #e.linearize()
         # noinspection PyUnusedLocal
-        res = e.simulate(x0=[1.0, 1.0])
+        #res = e.simulate(x0=[1.0, 1.0])
         self.flush()
 
     def test_aircraft(self):
@@ -71,15 +73,15 @@ class GenSympyTest(unittest.TestCase):
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Aircraft')
-        with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
-            f.write(text)
-        from test.generated.Aircraft import Aircraft as Aircraft
-        e = Aircraft()
-        e.linearize_symbolic()
-        e.linearize()
+        dae = gen_sympy.generate(ast_tree, 'Aircraft')
+        #with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+        #    f.write(text)
+        #from test.generated.Aircraft import Aircraft as Aircraft
+        #e = Aircraft()
+        #e.linearize_symbolic()
+        #e.linearize()
         # noinspection PyUnusedLocal
-        res = e.simulate()
+        #res = e.simulate()
         self.flush()
 
     def test_quad(self):
@@ -87,15 +89,15 @@ class GenSympyTest(unittest.TestCase):
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Quad')
-        with open(os.path.join(TEST_DIR, 'generated/Quad.py'), 'w') as f:
-            f.write(text)
-        from test.generated.Quad import Quad as Quad
-        e = Quad()
-        e.linearize_symbolic()
-        e.linearize()
+        dae = gen_sympy.generate(ast_tree, 'Quad')
+        #with open(os.path.join(TEST_DIR, 'generated/Quad.py'), 'w') as f:
+        #    f.write(text)
+        #from test.generated.Quad import Quad as Quad
+        #e = Quad()
+        #e.linearize_symbolic()
+        #e.linearize()
         # noinspection PyUnusedLocal
-        res = e.simulate()
+        #res = e.simulate()
         self.flush()
 
     @unittest.skip
@@ -138,6 +140,41 @@ class GenSympyTest(unittest.TestCase):
         # from generated.Connect import Aircraft as Aircraft
         # e = Aircraft()
         # res = e.simulate()
+        self.flush()
+
+    @unittest.skip
+    def test_new_aircraft(self):
+        with open(os.path.join(TEST_DIR, 'AircraftNew.mo'), 'r') as f:
+            txt = f.read()
+        # noinspection PyUnusedLocal
+        ast_tree = parser.parse(txt)
+        dae = gen_sympy.generate(ast_tree, 'AircraftNew')
+        print(dae)
+        #with open(os.path.join(TEST_DIR, 'generated/AircraftNew.py'), 'w') as f:
+        #    f.write(text)
+        #from test.generated.AircraftNew import AircraftNew as AircraftNew
+        #e = AircraftNew()
+        #e.linearize_symbolic()
+        #e.linearize()
+        # noinspection PyUnusedLocal
+        #res = e.simulate()
+        self.flush()
+
+    def test_bouncing_ball(self):
+        with open(os.path.join(TEST_DIR, 'BouncingBall.mo'), 'r') as f:
+            txt = f.read()
+        # noinspection PyUnusedLocal
+        ast_tree = parser.parse(txt)
+        dae = gen_sympy.generate(ast_tree, 'BouncingBall')
+        print(dae)
+        #with open(os.path.join(TEST_DIR, 'generated/AircraftNew.py'), 'w') as f:
+        #    f.write(text)
+        #from test.generated.AircraftNew import AircraftNew as AircraftNew
+        #e = AircraftNew()
+        #e.linearize_symbolic()
+        #e.linearize()
+        # noinspection PyUnusedLocal
+        #res = e.simulate()
         self.flush()
 
 

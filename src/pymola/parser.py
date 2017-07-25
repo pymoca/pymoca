@@ -149,18 +149,11 @@ class ASTListener(ModelicaListener):
                 else:
                     self.class_node.statements += alglist.statements
 
-        if ctx.comp_annotation is not None:
-            self.class_node.annotation = self.ast[ctx.comp_annotation]
-
-    def exitArgument(self, ctx):
-        argument = ast.ClassModificationArgument()
+    def exitArgument(self, ctx: ModelicaParser.ArgumentContext):
         if ctx.element_modification_or_replaceable() is not None:
-            argument.value = self.ast[ctx.element_modification_or_replaceable()]
-            argument.redeclare = False
+            self.ast[ctx] = self.ast[ctx.element_modification_or_replaceable()]
         else:
-            argument.value = self.ast[ctx.element_redeclaration()]
-            argument.redeclare = True
-        self.ast[ctx] = argument
+            self.ast[ctx] = self.ast[ctx.element_redeclaration()]
 
     def exitArgument_list(self, ctx):
         self.ast[ctx] = [self.ast[a] for a in ctx.argument()]
@@ -171,65 +164,105 @@ class ASTListener(ModelicaListener):
             arguments = self.ast[ctx.argument_list()]
         self.ast[ctx] = ast.ClassModification(arguments=arguments)
 
-    def enterEquation_section(self, ctx):
+    def enterEquation_section(self, ctx: ModelicaParser.Equation_sectionContext):
         eq_sect = ast.EquationSection(
             initial=ctx.INITIAL() is not None
         )
         self.ast[ctx] = eq_sect
         self.eq_sect = eq_sect
 
-    def exitEquation_section(self, ctx):
+    def exitEquation_section(self, ctx: ModelicaParser.Equation_sectionContext):
         eq_sect = self.ast[ctx]
         if eq_sect.initial:
-            eq_sect.equations += [self.ast[e] for e in ctx.equation()]
+            eq_sect.equations.extend(self.ast[ctx.equation_block()])
         else:
-            eq_sect.equations += [self.ast[e] for e in ctx.equation()]
+            eq_sect.equations.extend(self.ast[ctx.equation_block()])
 
-    def enterAlgorithm_section(self, ctx):
+    def exitEquation_block(self, ctx: ModelicaParser.Equation_blockContext):
+        self.ast[ctx] = [self.ast[e] for e in ctx.equation()]
+
+    def exitStatement_block(self, ctx: ModelicaParser.Statement_blockContext):
+        self.ast[ctx] = [self.ast[e] for e in ctx.statement()]
+
+    def enterAlgorithm_section(self, ctx: ModelicaParser.Algorithm_sectionContext):
         alg_sect = ast.AlgorithmSection(
             initial=ctx.INITIAL() is not None
         )
         self.ast[ctx] = alg_sect
         self.alg_sect = alg_sect
 
-    def exitAlgorithm_section(self, ctx):
+    def exitAlgorithm_section(self, ctx: ModelicaParser.Algorithm_sectionContext):
         alg_sect = self.ast[ctx]
         if alg_sect.initial:
-            alg_sect.statements += [self.ast[e] for e in ctx.statement()]
+            alg_sect.statements.extend(self.ast[ctx.statement_block()])
         else:
-            alg_sect.statements += [self.ast[e] for e in ctx.statement()]
+            alg_sect.statements.extend(self.ast[ctx.statement_block()])
 
     # EQUATION ===========================================================
 
-    def enterEquation(self, ctx):
+    def enterEquation(self, ctx: ModelicaParser.EquationContext):
         pass
 
-    def exitEquation(self, ctx):
+    def exitEquation(self, ctx: ModelicaParser.EquationContext):
         self.ast[ctx] = self.ast[ctx.equation_options()]
         try:
             self.ast[ctx].comment = self.ast[ctx.comment()]
         except AttributeError:
             pass
 
-    def exitEquation_simple(self, ctx):
+    def exitEquation_simple(self, ctx: ModelicaParser.Equation_simpleContext):
         self.ast[ctx] = ast.Equation(
             left=self.ast[ctx.simple_expression()],
             right=self.ast[ctx.expression()])
 
-    def exitEquation_if(self, ctx):
-        self.ast[ctx] = ast.IfEquation(
-            conditions=[self.ast[s] for s in ctx.if_equation().expression()],
-            equations=[self.ast[s] for s in ctx.if_equation().equation()])
+    def exitEquation_if(self, ctx: ModelicaParser.Equation_ifContext):
+        self.ast[ctx] = self.ast[ctx.if_equation()]
 
-    def exitEquation_for(self, ctx):
-        self.ast[ctx] = ast.ForEquation(
-            indices=[self.ast[s] for s in ctx.for_equation().for_indices().for_index()],
-            equations=[self.ast[s] for s in ctx.for_equation().equation()])
+    def exitEquation_for(self, ctx: ModelicaParser.Equation_forContext):
+        self.ast[ctx] = self.ast[ctx.for_equation()]
 
-    def exitEquation_connect_clause(self, ctx):
+    def exitEquation_connect_clause(self, ctx: ModelicaParser.Equation_connect_clauseContext):
         self.ast[ctx] = self.ast[ctx.connect_clause()]
 
-    def exitConnect_clause(self, ctx):
+    def exitEquation_when(self, ctx: ModelicaParser.Equation_whenContext):
+        self.ast[ctx] = self.ast[ctx.when_equation()]
+
+    def exitFunction_call_args(self, ctx:ModelicaParser.Function_call_argsContext):
+        self.ast[ctx] = self.ast[ctx.function_arguments()]
+
+    def exitFunction_arguments(self, ctx:ModelicaParser.Function_argumentsContext):
+        self.ast[ctx] = [self.ast[e] for e in ctx.function_argument()]
+
+    def exitArgument_expression(self, ctx:ModelicaParser.Argument_expressionContext):
+        self.ast[ctx] = self.ast[ctx.expression()]
+
+    def exitEquation_function(self, ctx: ModelicaParser.Equation_functionContext):
+
+        self.ast[ctx] = ast.Function(
+            name=ctx.name().getText(),
+            args=self.ast[ctx.args])
+
+    def exitIf_equation(self, ctx:ModelicaParser.If_equationContext):
+        blocks = [self.ast[b] for b in ctx.blocks]
+        conditions = [self.ast[c] for c in ctx.conditions]
+        # add condition for else
+        if len(conditions) == len(blocks) - 1:
+            conditions.append(True)
+        self.ast[ctx] = ast.IfEquation(
+            conditions=conditions,
+            blocks=blocks)
+
+    def exitWhen_equation(self, ctx:ModelicaParser.When_equationContext):
+        self.ast[ctx] = ast.WhenEquation(
+            conditions=[self.ast[c] for c in ctx.conditions],
+            blocks=[self.ast[b] for b in ctx.blocks])
+
+    def exitFor_equation(self, ctx:ModelicaParser.For_equationContext):
+        self.ast[ctx] = ast.ForEquation(
+            indices=self.ast[ctx.for_indices()],
+            equations =self.ast[ctx.equation_block()])
+
+    def exitConnect_clause(self, ctx: ModelicaParser.Connect_clauseContext):
         self.ast[ctx] = ast.ConnectClause(
             left=self.ast[ctx.component_reference()[0]],
             right=self.ast[ctx.component_reference()[1]])
@@ -244,22 +277,22 @@ class ASTListener(ModelicaListener):
     #   + While
     #   + When? (also in equation missing)
 
-    def enterStatement(self, ctx):
+    def enterStatement(self, ctx: ModelicaParser.StatementContext):
         pass
 
-    def exitStatement(self, ctx):
+    def exitStatement(self, ctx: ModelicaParser.StatementContext):
         self.ast[ctx] = self.ast[ctx.statement_options()]
         try:
             self.ast[ctx].comment = self.ast[ctx.comment()]
         except AttributeError:
             pass
 
-    def exitStatement_component_reference(self, ctx):
+    def exitStatement_component_reference(self, ctx: ModelicaParser.Statement_component_referenceContext):
         self.ast[ctx] = ast.AssignmentStatement(
             left=[self.ast[ctx.component_reference()]],
             right=self.ast[ctx.expression()])
 
-    def exitStatement_component_function(self, ctx):
+    def exitStatement_component_function(self, ctx: ModelicaParser.Statement_component_functionContext):
         all_comp_refs = [self.ast[x] for x in ctx.component_reference()]
 
         right = ast.Expression(
@@ -272,15 +305,51 @@ class ASTListener(ModelicaListener):
             left=all_comp_refs[:-1],
             right=right)
 
-    def exitStatement_if(self, ctx):
-        self.ast[ctx] = ast.IfStatement(
-            conditions=[self.ast[s] for s in ctx.if_statement().expression()],
-            statements=[self.ast[s] for s in ctx.if_statement().statement()])
+    def exitStatement_break(self, ctx:ModelicaParser.Statement_breakContext):
+        # TODO
+        pass
 
-    def exitStatement_for(self, ctx):
+    def exitStatement_return(self, ctx:ModelicaParser.Statement_returnContext):
+        # TODO
+        pass
+
+    def exitStatement_if(self, ctx: ModelicaParser.Statement_ifContext):
+        self.ast[ctx] = self.ast[ctx.if_statement()]
+
+    def exitStatement_for(self, ctx: ModelicaParser.Statement_forContext):
+        self.ast[ctx] = self.ast[ctx.for_statement()]
+
+    def exitStatement_while(self, ctx:ModelicaParser.Statement_whileContext):
+        # TODO
+        pass
+
+    def exitStatement_when(self, ctx: ModelicaParser.Statement_whenContext):
+        self.ast[ctx] = self.ast[ctx.when_statement()]
+
+    def exitIf_statement(self, ctx: ModelicaParser.If_statementContext):
+        blocks = [self.ast[b] for b in ctx.blocks]
+        conditions = [self.ast[c] for c in ctx.conditions]
+        # add condition for else
+        if len(conditions) == len(blocks) - 1:
+            conditions.append(True)
+        self.ast[ctx] = ast.IfStatement(
+            conditions=conditions,
+            blocks=blocks)
+
+    def exitFor_statement(self, ctx:ModelicaParser.For_statementContext):
         self.ast[ctx] = ast.ForStatement(
-            indices=[self.ast[s] for s in ctx.for_statement().for_indices().for_index()],
-            statements=[self.ast[s] for s in ctx.for_statement().statement()])
+            indices=self.ast[ctx.for_indices()],
+            statements=self.ast[ctx.statement_block()])
+
+    def exitWhile_statement(self, ctx:ModelicaParser.While_statementContext):
+        # TODO
+        pass
+
+    def exitWhen_statement(self, ctx: ModelicaParser.When_statementContext):
+        self.ast[ctx] = ast.WhenStatement(
+            conditions=[self.ast[c] for c in ctx.conditions],
+            blocks=[self.ast[b] for b in ctx.blocks])
+
 
     # EXPRESSIONS ===========================================================
 

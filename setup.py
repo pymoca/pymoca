@@ -80,13 +80,13 @@ def call_antlr4(arg):
     #pylint: disable=unused-argument, unused-variable
     antlr_path = os.path.join(ROOT_DIR, "java", "antlr-4.7-complete.jar")
     classpath = ".:{:s}:$CLASSPATH".format(antlr_path)
-    generated = os.path.join(ROOT_DIR, 'pymola', 'generated')
+    generated = os.path.join(ROOT_DIR, 'src', 'pymola', 'generated')
     cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
             " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
     print(cmd)
-    proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'pymola'))
+    proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'src', 'pymola'))
     proc.communicate()
-    with open(os.path.join(ROOT_DIR, 'pymola', 'generated', '__init__.py'), 'w') as fid:
+    with open(os.path.join(generated, '__init__.py'), 'w') as fid:
         fid.write('')
 
 def setup_package():

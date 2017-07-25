@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# C extensions
+*.so
+
 # Distribution / packaging
 .Python
 env/
@@ -65,3 +68,5 @@ pymola/version.py
 # virtual environments
 venv/
 venv3/
+
+Untitled.ipynb
