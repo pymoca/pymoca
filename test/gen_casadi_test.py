@@ -651,8 +651,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp, cst]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, []))
@@ -688,8 +694,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp, cst]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, [c]))
@@ -726,8 +738,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp, cst]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, [c]))
@@ -763,8 +781,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp, cst]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, [c]))
@@ -804,8 +828,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, [c, cst]))
@@ -842,8 +872,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, cst]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, [c]))
@@ -880,6 +916,9 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 1
+        ref_model.states[0].max = 2
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [y, _tmp, cst]))
         ref_model.inputs = list(map(Variable, []))
@@ -897,6 +936,32 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEquals(casadi_model.states[0].aliases, ['alias'])
+
+    def test_simplify_detect_negative_alias(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'detect_aliases': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'NegativeAlias', compiler_options)
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 1
+        ref_model.states[0].max = 2
+        ref_model.states[0].nominal = 10
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, []))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.equations = [der_x - x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+        self.assertEquals(casadi_model.states[0].aliases, ['-alias'])
 
     def test_simplify_reduce_affine_expression(self):
         # Create model, cache it, and load the cache
@@ -920,8 +985,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp, cst]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, [c]))
@@ -977,6 +1048,9 @@ class GenCasadiTest(unittest.TestCase):
         y = ca.MX.sym('y')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 1
+        ref_model.states[0].max = 2
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [y]))
         ref_model.inputs = list(map(Variable, []))
@@ -1026,8 +1100,14 @@ class GenCasadiTest(unittest.TestCase):
         cst = ca.MX.sym('cst')
 
         ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 0
+        ref_model.states[0].max = 3
+        ref_model.states[0].nominal = 10
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [alias, y, _tmp, cst]))
+        ref_model.alg_states[0].min = 1
+        ref_model.alg_states[0].max = 2
+        ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
         ref_model.constants = list(map(Variable, [c]))
