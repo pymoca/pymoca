@@ -267,6 +267,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             extended_orig_class.initial_equations += flat_parent_class.initial_equations
             extended_orig_class.statements += flat_parent_class.statements
             extended_orig_class.initial_statements += flat_parent_class.initial_statements
+            extended_orig_class.functions.update(flat_parent_class.functions)
 
             # carry out modifications
             extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification, orig_class.within)
@@ -277,6 +278,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     extended_orig_class.initial_equations += orig_class.initial_equations
     extended_orig_class.statements += orig_class.statements
     extended_orig_class.initial_statements += orig_class.initial_statements
+    extended_orig_class.functions.update(orig_class.functions)
 
     # Modify the main class with any class modifications
     if class_modification is not None:
@@ -340,6 +342,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             flat_class.initial_equations += flat_sub_class.initial_equations
             flat_class.statements += flat_sub_class.statements
             flat_class.initial_statements += flat_sub_class.initial_statements
+            flat_class.functions.update(flat_sub_class.functions)
 
             # we keep connectors in the class hierarchy, as we may refer to them further
             # up using connect() clauses
@@ -352,9 +355,16 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
         flat_sym = flatten_component_refs(root, flat_class, sym, instance_prefix)
         flat_class.symbols[sym_name] = flat_sym
 
+    # A set of component refs to functions
+    pulled_functions = OrderedDict()
+
     # for all equations in original class
     for equation in extended_orig_class.equations:
-        flat_equation = flatten_component_refs(root, flat_class, equation, instance_prefix)
+        # Equation returned has function calls replaced with their full scope
+        # equivalent, and it pulls out all references into the pulled_functions.
+        full_scope_equation = fully_scope_functions(root, orig_class.within, equation, pulled_functions)
+
+        flat_equation = flatten_component_refs(root, flat_class, full_scope_equation, instance_prefix)
         flat_class.equations.append(flat_equation)
         if isinstance(flat_equation, ast.ConnectClause):
             # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
@@ -370,14 +380,11 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     flat_class.initial_statements += \
         [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_statements]
 
-    # TODO: Also drag along any functions we need
-    # function_set = set()
-    # for eq in flat_class.equations + flat_class.statements:
-    #     function_set |= pull_functions(eq, instance_prefix)
+    # TODO: Make sure we also pull in any functions called in functions in function_set
+    # TODO: Also do functions in statements, initial_statements, and initial_equations
 
-    # for f in function_set:
-    #     if f not in flat_file.classes:
-    #         flat_file.classes.update(flatten(root, f, instance_name).classes)
+    flat_class.functions.update(pulled_functions)
+
     return flat_class
 
 
@@ -661,39 +668,55 @@ def annotate_states(root: ast.Collection, node: ast.Node) -> None:
     w.walk(StateAnnotator(root, node), node)
 
 
-class FunctionPuller(TreeListener):
+class FunctionExpander(TreeListener):
     """
     Listener to extract functions
     """
 
-    def __init__(self, instance_prefix: str, root, function_set):
-        self.instance_prefix = instance_prefix
+    def __init__(self, root: ast.Collection, within: list, function_set: set):
         self.root = root
+        self.within = within
         self.function_set = function_set
         super().__init__()
 
     def exitExpression(self, tree: ast.Expression):
-        if isinstance(tree.operator, ast.ComponentRef) and \
-                        tree.operator.name in self.root.classes:
-            self.function_set.add(tree.operator.name)
+        if isinstance(tree.operator, ast.ComponentRef):
+            try:
+                function_class = self.root.find_class(tree.operator, self.within)
+
+                if self.within:
+                    full_name = ast.merge_component_ref(self.within[0], ast.ComponentRef(name=function_class.name))
+                else:
+                    full_name = ast.ComponentRef(name=function_class.name)
+
+                full_name = ast.component_ref_to_tuple(full_name)
+                full_name = ".".join(full_name)
+
+                tree.operator = full_name
+                self.function_set[full_name] = function_class
+            except (KeyError, ast.ClassNotFoundError) as e:
+                # Assume built-in function
+                pass
 
 
 # noinspection PyUnusedLocal
-def pull_functions(root: ast.Collection, expression: ast.Expression, instance_prefix: str) -> set:
+def fully_scope_functions(root: ast.Collection, within: list, expression: ast.Expression, function_set: OrderedDict) -> ast.Expression:
     """
-    TODO: document
+    Turns the function references in this expression into fully scoped
+    references (e.g. relative to absolute). The component references of all
+    referenced functions are put into the functions set.
+
     :param root: collection for performing symbol lookup etc.
-    :param expression:
-    :param instance_prefix:
+    :param container: class
+    :param expression: original expression
+    :param function_set: output of function component references
     :return:
     """
-
     expression_copy = copy.deepcopy(expression)
 
     w = TreeWalker()
-    function_set = set()
-    w.walk(FunctionPuller(instance_prefix, root, function_set), expression_copy)
-    return function_set
+    w.walk(FunctionExpander(root, within, function_set), expression_copy)
+    return expression_copy
 
 
 def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:

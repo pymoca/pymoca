@@ -11,6 +11,10 @@ from typing import List, Union, Dict
 from collections import OrderedDict
 
 
+class ClassNotFoundError(Exception):
+    pass
+
+
 class Visibility(Enum):
     PRIVATE = 0, 'private'
     PROTECTED = 1, 'protected'
@@ -309,6 +313,7 @@ class Class(Node):
         self.comment = ''  # type: str
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
+        self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
         self.initial_statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
@@ -413,7 +418,7 @@ class Collection(Node):
                 # KeyError for what are likely to be elementary types
                 raise KeyError
             else:
-                raise Exception("Could not find class {}".format(component_ref))
+                raise ClassNotFoundError("Could not find class {}".format(component_ref))
 
         return c
 
