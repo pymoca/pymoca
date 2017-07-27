@@ -362,9 +362,9 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     for equation in extended_orig_class.equations:
         # Equation returned has function calls replaced with their full scope
         # equivalent, and it pulls out all references into the pulled_functions.
-        full_scope_equation = fully_scope_functions(root, orig_class.within, equation, pulled_functions)
+        fs_equation = fully_scope_function_calls(root, orig_class.within, equation, pulled_functions)
 
-        flat_equation = flatten_component_refs(root, flat_class, full_scope_equation, instance_prefix)
+        flat_equation = flatten_component_refs(root, flat_class, fs_equation, instance_prefix)
         flat_class.equations.append(flat_equation)
         if isinstance(flat_equation, ast.ConnectClause):
             # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
@@ -373,15 +373,29 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             if not hasattr(flat_equation, '__right_inner'):
                 flat_equation.__right_inner = len(equation.right.child) > 0
 
+    # Create fully scoped equivalents
+    fs_initial_equations = \
+        [fully_scope_function_calls(root, orig_class.within, e, pulled_functions) for e in extended_orig_class.initial_equations]
+    fs_statements = \
+        [fully_scope_function_calls(root, orig_class.within, e, pulled_functions) for e in extended_orig_class.statements]
+    fs_initial_statements = \
+        [fully_scope_function_calls(root, orig_class.within, e, pulled_functions) for e in extended_orig_class.initial_statements]
+
     flat_class.initial_equations += \
-        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_equations]
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in fs_initial_equations]
     flat_class.statements += \
-        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.statements]
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in fs_statements]
     flat_class.initial_statements += \
-        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_statements]
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in fs_initial_statements]
 
     # TODO: Make sure we also pull in any functions called in functions in function_set
     # TODO: Also do functions in statements, initial_statements, and initial_equations
+
+    for f, c in pulled_functions.items():
+        pulled_functions[f] = flatten_class(root, c, '')
+        c = pulled_functions[f]
+        flat_class.functions.update(c.functions)
+        c.functions = OrderedDict()
 
     flat_class.functions.update(pulled_functions)
 
@@ -700,7 +714,7 @@ class FunctionExpander(TreeListener):
 
 
 # noinspection PyUnusedLocal
-def fully_scope_functions(root: ast.Collection, within: list, expression: ast.Expression, function_set: OrderedDict) -> ast.Expression:
+def fully_scope_function_calls(root: ast.Collection, within: list, expression: ast.Expression, function_set: OrderedDict) -> ast.Expression:
     """
     Turns the function references in this expression into fully scoped
     references (e.g. relative to absolute). The component references of all
@@ -749,5 +763,9 @@ def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:
     # flat file
     flat_file = ast.File()
     flat_file.classes[flat_class.name] = flat_class
+
+    # pull functions to the top level
+    flat_file.classes.update(flat_class.functions)
+    flat_class.functions = OrderedDict()
 
     return flat_file
