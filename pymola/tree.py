@@ -696,14 +696,9 @@ class FunctionExpander(TreeListener):
     def exitExpression(self, tree: ast.Expression):
         if isinstance(tree.operator, ast.ComponentRef):
             try:
-                function_class = self.root.find_class(tree.operator, self.within)
+                function_class, comp_ref = self.root.find_class(tree.operator, self.within, return_ref=True)
 
-                if self.within:
-                    full_name = ast.merge_component_ref(self.within[0], ast.ComponentRef(name=function_class.name))
-                else:
-                    full_name = ast.ComponentRef(name=function_class.name)
-
-                full_name = ast.component_ref_to_tuple(full_name)
+                full_name = ast.component_ref_to_tuple(comp_ref)
                 full_name = ".".join(full_name)
 
                 tree.operator = full_name
