@@ -21,6 +21,13 @@ package TestPackage
 	algorithm
 	  y := x * x;
 	end square;
+
+	function not_called
+	  input Real x;
+	  output Real y;
+	algorithm
+	  y := x * x * x;
+	end square;
 end TestPackage;
 
 model Function5

@@ -152,5 +152,22 @@ class ParseTest(unittest.TestCase):
         self.assertIn('elem.tc.a', flat_tree.classes['Test'].symbols.keys())
         self.assertIn('b',         flat_tree.classes['Test'].symbols.keys())
 
+    def test_function_pull(self):
+        with open(os.path.join(TEST_DIR, 'FunctionPull.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'Level1.Level2.Level3.Function5'
+        comp_ref = ast.component_ref_from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        # Check if all referenced functions are pulled in
+        self.assertIn('Level1.Level2.Level3.f', flat_tree.classes)
+        self.assertIn('Level1.Level2.Level3.TestPackage.times2', flat_tree.classes)
+        self.assertIn('Level1.Level2.Level3.TestPackage.square', flat_tree.classes)
+        self.assertNotIn('Level1.Level2.Level3.TestPackage.not_called', flat_tree.classes)
+
+
 if __name__ == "__main__":
     unittest.main()
