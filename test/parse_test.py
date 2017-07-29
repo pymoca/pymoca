@@ -168,6 +168,24 @@ class ParseTest(unittest.TestCase):
         self.assertIn('Level1.Level2.Level3.TestPackage.square', flat_tree.classes)
         self.assertNotIn('Level1.Level2.Level3.TestPackage.not_called', flat_tree.classes)
 
+        # Check if the classes in the flattened tree have the right type
+        self.assertEqual(flat_tree.classes['Function5'].type, 'model')
+
+        self.assertEqual(flat_tree.classes['Level1.Level2.Level3.f'].type, 'function')
+        self.assertEqual(flat_tree.classes['Level1.Level2.Level3.TestPackage.times2'].type, 'function')
+        self.assertEqual(flat_tree.classes['Level1.Level2.Level3.TestPackage.square'].type, 'function')
+
+        # Check whether input/output information of functions comes along properly
+        func_t2 = flat_tree.classes['Level1.Level2.Level3.TestPackage.times2']
+        self.assertIn("input", func_t2.symbols['x'].prefixes)
+        self.assertIn("output", func_t2.symbols['y'].prefixes)
+
+        # Check if built-in function call statement comes along properly
+        func_f = flat_tree.classes['Level1.Level2.Level3.f']
+        self.assertEqual(func_f.statements[0].right.operator, '*')
+        # Check if user-specified function call statement comes along properly
+        self.assertEqual(func_f.statements[0].right.operands[0].operator,
+                         'Level1.Level2.Level3.TestPackage.times2')
 
 if __name__ == "__main__":
     unittest.main()
