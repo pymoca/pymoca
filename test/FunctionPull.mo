@@ -12,7 +12,7 @@ package TestPackage
 	  input Real x;
 	  output Real y;
 	algorithm
-	  y := x * 3.0;
+	  y := x * 2.0;
 	end times2;
 
 	function square
