@@ -493,6 +493,10 @@ def component_ref_to_tuple(c: ComponentRef) -> tuple:
         return (c.name, )
 
 
+def component_ref_to_string(c: ComponentRef) -> str:
+    return ".".join(component_ref_to_tuple(c))
+
+
 def component_ref_from_string(s: str) -> ComponentRef:
     """
     Convert the string pointing to a component using dot notation to
