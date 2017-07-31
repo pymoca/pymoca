@@ -260,7 +260,7 @@ class ASTListener(ModelicaListener):
 
     def exitStatement_if(self, ctx):
         self.ast[ctx] = ast.IfStatement(
-            expressions=[self.ast[s] for s in ctx.if_statement().expression()],
+            conditions=[self.ast[s] for s in ctx.if_statement().expression()],
             statements=[self.ast[s] for s in ctx.if_statement().statement()])
 
     def exitStatement_for(self, ctx):

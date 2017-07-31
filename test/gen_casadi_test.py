@@ -464,7 +464,8 @@ class GenCasadiTest(unittest.TestCase):
         a = ca.MX.sym("a")
         r = ca.MX.sym("r")
         ref_model.alg_states = list(map(Variable, [c, a, r]))
-        ref_model.equations = [vertcat(c, a) - circle_properties(r)]
+        ref_model.outputs = list(map(Variable, [c, a]))
+        ref_model.equations = [ca.vertcat(c, a) - ca.vertcat(*circle_properties.call([r]))]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

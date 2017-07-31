@@ -133,8 +133,8 @@ class IfExpression(Node):
 
 class Equation(Node):
     def __init__(self, **kwargs):
-        self.left = None  # type: Union[Expression, Primary, ComponentRef]
-        self.right = None  # type: Union[Expression, Primary, ComponentRef]
+        self.left = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.right = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
@@ -180,8 +180,8 @@ class AssignmentStatement(Node):
 
 class IfStatement(Node):
     def __init__(self, **kwargs):
-        self.expressions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
@@ -189,7 +189,7 @@ class IfStatement(Node):
 class ForStatement(Node):
     def __init__(self, **kwargs):
         self.indices = []  # type: List[ForIndex]
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
