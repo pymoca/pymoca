@@ -448,7 +448,6 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
-    @unittest.expectedFailure
     def test_function_call(self):
         with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
             txt = f.read()
@@ -457,11 +456,15 @@ class GenCasadiTest(unittest.TestCase):
         print("FunctionCall", casadi_model)
         ref_model = Model()
 
+        radius = ca.MX.sym('radius')
+        diameter = radius * 2
+        circle_properties = ca.Function('circle_properties', [radius], [3.14159*diameter, 3.14159*radius**2])
+
         c = ca.MX.sym("c")
         a = ca.MX.sym("a")
         r = ca.MX.sym("r")
         ref_model.alg_states = list(map(Variable, [c, a, r]))
-        ref_model.equations = [c - 3.14159*r*2, a - 3.14159*r**2]
+        ref_model.equations = [vertcat(c, a) - circle_properties(r)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

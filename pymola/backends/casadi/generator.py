@@ -76,6 +76,7 @@ class Generator(TreeListener):
         self.derivative = {}
         self.cls = cls
         self.for_loops = []
+        self.functions = {}
 
     def _ast_symbols_to_variables(self, ast_symbols, differentiate=False):
         variables = []
@@ -96,8 +97,61 @@ class Generator(TreeListener):
             variables.append(variable)
         return variables
 
+    def get_function(self, function_name):
+        if function_name in self.functions:
+            return self.functions[function_name]
+
+        try:
+            tree = self.cls.functions[function_name]
+        except KeyError:
+            import pprint
+            pprint.pprint(self.cls.functions)
+            raise Exception('Unknown function {}'.format(function_name))
+
+        inputs = []
+        outputs = []
+        tmp = []
+        for s in tree.symbols.values():
+            src = self.get_mx(s)
+            if 'input' in s.prefixes:
+                inputs.append(src)
+            elif 'output' in s.prefixes:
+                outputs.append(src)
+            else:
+                tmp.append(src)
+
+        # Store current variable values
+        values = {}
+        for variable in inputs:
+            values[variable] = variable
+
+        for statement in tree.statements:
+            if isinstance(statement, ast.AssignmentStatement):
+                assert isinstance(statement.left, ast.Symbol)
+                expr = self.get_mx(statement.right)
+                expr = substitute(expr, values.keys(), values.values())
+                values[statement.left] = expr
+            elif isinstance(statement, ast.IfStatement):
+                # TODO
+                raise NotImplementedError
+            elif isinstance(statement, ast.ForStatement):
+                # TODO
+                raise NotImplementedError
+            else:
+                raise Exception("Unknown statement type")
+
+        output_expr = [values[output.name()] for output in outputs]
+        function = ca.Function(tree.name, inputs, output_expr)
+        self.functions[tree.name] = function
+
+        return function
+
     def exitClass(self, tree):
         logger.debug('exitClass {}'.format(tree.name))
+
+        if tree.type == 'function':
+            # Already handled previously
+            return
 
         states = []
         inputs = []
@@ -139,6 +193,9 @@ class Generator(TreeListener):
 
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
+
+        if len(tree.statements) + len(tree.initial_statements) > 0:
+            raise NotImplementedError('Statements are currently supported inside functions only')
 
     def exitArray(self, tree):
         self.src[tree] = [self.src[e] for e in tree.values]
@@ -236,16 +293,21 @@ class Generator(TreeListener):
             lhs = self.get_mx(tree.operands[0])
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
-        elif n_operands == 1:
-            src = self.get_mx(tree.operands[0])
-            src = getattr(src, op)()
-        elif n_operands == 2:
-            lhs = self.get_mx(tree.operands[0])
-            rhs = self.get_mx(tree.operands[1])
-            lhs_op = getattr(lhs, op)
-            src = lhs_op(rhs)
         else:
-            raise Exception("Unknown operator {}({})".format(op, ','.join(n_operands * ['.'])))
+            src = self.get_mx(tree.operands[0])
+            if hasattr(src, op) and n_operands <= 2:
+                if n_operands == 1:
+                    src = self.get_mx(tree.operands[0])
+                    src = getattr(src, op)()
+                else:
+                    lhs = self.get_mx(tree.operands[0])
+                    rhs = self.get_mx(tree.operands[1])
+                    lhs_op = getattr(lhs, op)
+                    src = lhs_op(rhs)
+            else:
+                function = self.get_function(op)
+                src = function.call([self.get_mx(operand) for operand in tree.operands])
+
         self.src[tree] = src
 
     def exitIfExpression(self, tree):
