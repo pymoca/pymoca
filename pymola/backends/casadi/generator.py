@@ -346,10 +346,12 @@ class Generator(TreeListener):
 
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
-        if ca.MX(src_left).size1() < ca.MX(src_right).size1():
-            src_right = src_right[0:src_left.size1()]
-        elif ca.MX(src_left).size1() > ca.MX(src_right).size1():
-            src_left = src_left[0:src_right.size1()]
+        if isinstance(tree.right, ast.Expression) and tree.right.operator in self.cls.functions:
+            if ca.MX(src_left).size1() < ca.MX(src_right).size1():
+                src_right = src_right[0:src_left.size1()]
+        if isinstance(tree.left, ast.Expression) and tree.left.operator in self.cls.functions:
+            if ca.MX(src_left).size1() > ca.MX(src_right).size1():
+                src_left = src_left[0:src_right.size1()]
 
         self.src[tree] = src_left - src_right
 
