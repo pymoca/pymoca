@@ -344,6 +344,13 @@ class Generator(TreeListener):
         else:
             src_right = self.get_mx(tree.right)
 
+        # According to the Modelica spec,
+        # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
+        if ca.MX(src_left).size1() < ca.MX(src_right).size1():
+            src_right = src_right[0:src_left.size1()]
+        elif ca.MX(src_left).size1() > ca.MX(src_right).size1():
+            src_left = src_left[0:src_right.size1()]
+
         self.src[tree] = src_left - src_right
 
     def enterForEquation(self, tree):
@@ -407,9 +414,6 @@ class Generator(TreeListener):
 
         self.src[tree] = all_assignments
 
-    # TODO Expression left, right list weirdness
-    # TODO unit tests: for loop, if statement
-
     def exitIfStatement(self, tree):
         logger.debug('exitIfStatement')
 
@@ -424,20 +428,21 @@ class Generator(TreeListener):
         for statement_index in range(statements_per_condition):
             assignments = self.get_mx(tree.statements[-(statement_index + 1)])
             for assignment in assignments:
+                src = assignment.right
                 for cond_index in range(len(tree.conditions)):
                     cond = self.get_mx(tree.conditions[-(cond_index + 1)])
                     src1 = None
-                    for i in range(equations_per_condition):
-                        other_assignments = self.get_mx(tree.statements[-equations_per_condition * (
+                    for i in range(statements_per_condition):
+                        other_assignments = self.get_mx(tree.statements[-statements_per_condition * (
                             cond_index + 1) - (i + 1)])
-                        for j in range(len(other_assigments)):
-                            if assignment.left == other_assignments[j].left:
+                        for j in range(len(other_assignments)):
+                            if ca.is_equal(assignment.left, other_assignments[j].left):
                                 src1 = other_assignments[j].right
                                 break
                         if src1 is not None:
                             break
                     src = ca.if_else(cond, src1, src)
-                all_assignments.append(Statement(assignment.left, src))
+                all_assignments.append(Assignment(assignment.left, src))
 
         self.src[tree] = all_assignments
 
@@ -466,13 +471,14 @@ class Generator(TreeListener):
                                     indexed_symbols]
             Fmap = F.map("map", "serial", len(f.values), list(
                 range(len(args), len(all_args))), [])
-            [res] = Fmap.call([f.values] + indexed_symbols_full + free_vars)
+            res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
 
             # Split into a list of statements
-            variables = [assignment.left for assignment in self.get_mx(statement) for statement in tree.statements]
+            variables = [assignment.left for statement in tree.statements for assignment in self.get_mx(statement)]
             all_assignments = []
             for i in range(len(f.values)):
-                all_assignments.append(Assignment(variables[i % len(f.values)], res[i, :]))
+                for j, variable in enumerate(variables):
+                    all_assignments.append(Assignment(variable, res[0][j, i].T))
 
             self.src[tree] = all_assignments
         else:
