@@ -122,6 +122,24 @@ class TreeListener(object):
     def exitConnectClause(self, tree: ast.ConnectClause) -> None:
         pass
 
+    def enterAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
+        pass
+
+    def exitAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
+        pass
+
+    def enterIfStatement(self, tree: ast.IfStatement) -> None:
+        pass
+
+    def exitIfStatement(self, tree: ast.IfStatement) -> None:
+        pass
+
+    def enterForStatement(self, tree: ast.ForStatement) -> None:
+        pass
+
+    def exitForStatement(self, tree: ast.ForStatement) -> None:
+        pass
+
     def enterSymbol(self, tree: ast.Symbol) -> None:
         pass
 

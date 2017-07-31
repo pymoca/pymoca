@@ -237,14 +237,14 @@ class ComponentClause(Node):
 class EquationSection(Node):
     def __init__(self, **kwargs):
         self.initial = False  # type: bool
-        self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
+        self.equations = []  # type: List[Union[Equation, IfEquation, ForEquation, ConnectClause]]
         super().__init__(**kwargs)
 
 
 class AlgorithmSection(Node):
     def __init__(self, **kwargs):
         self.initial = False  # type: bool
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         super().__init__(**kwargs)
 
 
