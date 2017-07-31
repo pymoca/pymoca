@@ -11,6 +11,10 @@ from typing import List, Union, Dict
 from collections import OrderedDict
 
 
+class ClassNotFoundError(Exception):
+    pass
+
+
 class Visibility(Enum):
     PRIVATE = 0, 'private'
     PROTECTED = 1, 'protected'
@@ -309,6 +313,7 @@ class Class(Node):
         self.comment = ''  # type: str
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
+        self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
         self.initial_statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
@@ -368,16 +373,20 @@ class Collection(Node):
     def extend(self, other):
         self.files.extend(other.files)
 
-    def find_class(self, component_ref: ComponentRef, within: list = None, check_builtin_classes=False):
+    def find_class(self, component_ref: ComponentRef, within: list = None, check_builtin_classes=False, return_ref=False):
         if check_builtin_classes:
             if component_ref.name in ["Real", "Integer", "String", "Boolean"]:
                 c = Class(name=component_ref.name)
                 c.type = "__builtin"
 
-                s = Symbol(name="__value", type=ComponentRef(name=component_ref.name))
+                cref = ComponentRef(name=component_ref.name)
+                s = Symbol(name="__value", type=cref)
                 c.symbols[s.name] = s
 
-                return c
+                if return_ref:
+                    return c, cref
+                else:
+                    return c
 
         if self._class_lookup is None:
             self._build_class_lookup()
@@ -396,8 +405,12 @@ class Collection(Node):
 
         cref_tuple = component_ref_to_tuple(component_ref)
 
+        prev_tuple = None
+
         while c is None:
             c = self._class_lookup.get(within_tuple + cref_tuple, None)
+
+            prev_tuple = within_tuple + cref_tuple
 
             if within_tuple:
                 within_tuple = within_tuple[:-1]
@@ -413,9 +426,12 @@ class Collection(Node):
                 # KeyError for what are likely to be elementary types
                 raise KeyError
             else:
-                raise Exception("Could not find class {}".format(component_ref))
+                raise ClassNotFoundError("Could not find class {}".format(component_ref))
 
-        return c
+        if return_ref:
+            return c, component_ref_from_string(".".join(prev_tuple))
+        else:
+            return c
 
     def find_symbol(self, node, component_ref: ComponentRef) -> Symbol:
         sym = node.symbols[component_ref.name]
@@ -475,6 +491,10 @@ def component_ref_to_tuple(c: ComponentRef) -> tuple:
         return (c.name, ) + component_ref_to_tuple(c.child[0])
     else:
         return (c.name, )
+
+
+def component_ref_to_string(c: ComponentRef) -> str:
+    return ".".join(component_ref_to_tuple(c))
 
 
 def component_ref_from_string(s: str) -> ComponentRef:
