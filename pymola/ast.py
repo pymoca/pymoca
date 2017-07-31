@@ -316,8 +316,8 @@ class Class(Node):
         self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
-        self.initial_statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.within = []  # type: List[ComponentRef]
         super().__init__(**kwargs)
 
