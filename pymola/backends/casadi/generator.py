@@ -71,13 +71,14 @@ Assignment = namedtuple('Assignment', ['left', 'right'])
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
-    def __init__(self, cls: ast.Class):
+    def __init__(self, root: ast.Collection, class_name: str):
         super(Generator, self).__init__()
         self.src = {}
         self.model = Model()
-        self.nodes = {cls: {'time': self.model.time}}
+        self.root = root
+        c = self.root.classes[class_name]
+        self.nodes = {c: {'time': self.model.time}}
         self.derivative = {}
-        self.cls = cls
         self.for_loops = deque()
         self.functions = {}
         self.entered_classes = deque()
@@ -310,10 +311,10 @@ class Generator(TreeListener):
 
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
-        if isinstance(tree.right, ast.Expression) and tree.right.operator in self.cls.functions:
+        if isinstance(tree.right, ast.Expression) and tree.right.operator in self.root.classes:
             if ca.MX(src_left).size1() < ca.MX(src_right).size1():
                 src_right = src_right[0:src_left.size1()]
-        if isinstance(tree.left, ast.Expression) and tree.left.operator in self.cls.functions:
+        if isinstance(tree.left, ast.Expression) and tree.left.operator in self.root.classes:
             if ca.MX(src_left).size1() > ca.MX(src_right).size1():
                 src_left = src_left[0:src_right.size1()]
 
@@ -583,7 +584,7 @@ class Generator(TreeListener):
             return self.functions[function_name]
 
         try:
-            tree = self.cls.functions[function_name]
+            tree = self.root.classes[function_name]
         except KeyError:
             raise Exception('Unknown function {}'.format(function_name))
 
@@ -626,7 +627,7 @@ def generate(ast_tree: ast.Collection, model_name: str) -> Model:
     component_ref = ast.ComponentRef.from_string(model_name)
     ast_walker = TreeWalker()
     flat_tree = flatten(ast_tree, component_ref)
-    component_ref_tuple = component_ref.to_tuple()
-    casadi_gen = Generator(flat_tree.classes[component_ref_tuple[-1]])
+    component_ref_tuple = component_ref.to_tuple(component_ref)
+    casadi_gen = Generator(flat_tree, component_ref_tuple[-1])
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model

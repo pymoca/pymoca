@@ -787,4 +787,12 @@ def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:
     flat_file = ast.File()
     flat_file.classes[flat_class.name] = flat_class
 
+    # pull functions to the top level,
+    # putting them prior to the model class so that they are visited
+    # first by the tree walker.
+    functions_and_classes = flat_class.functions
+    functions_and_classes.update(flat_file.classes)
+    flat_file.classes = functions_and_classes
+    flat_class.functions = OrderedDict()
+
     return flat_file
