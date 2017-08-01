@@ -78,7 +78,7 @@ class Generator(TreeListener):
         self.nodes = {cls: {'time': self.model.time}}
         self.derivative = {}
         self.cls = cls
-        self.for_loops = []
+        self.for_loops = deque()
         self.functions = {}
         self.entered_classes = deque()
 
