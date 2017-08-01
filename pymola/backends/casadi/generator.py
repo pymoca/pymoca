@@ -105,44 +105,6 @@ class Generator(TreeListener):
             variables.append(variable)
         return variables
 
-    def get_function(self, function_name):
-        if function_name in self.functions:
-            return self.functions[function_name]
-
-        try:
-            tree = self.cls.functions[function_name]
-        except KeyError:
-            raise Exception('Unknown function {}'.format(function_name))
-
-        inputs = []
-        outputs = []
-        tmp = []
-        for s in tree.symbols.values():
-            src = self.get_mx(s)
-            if 'input' in s.prefixes:
-                inputs.append(src)
-            elif 'output' in s.prefixes:
-                outputs.append(src)
-            else:
-                tmp.append(src)
-
-        # Store current variable values
-        values = {}
-        for variable in inputs:
-            values[variable] = variable
-
-        # Process statements in order
-        for statement in tree.statements:
-            src = self.get_mx(statement)
-            for assignment in src:
-                [values[assignment.left]] = ca.substitute([assignment.right], list(values.keys()), list(values.values()))
-
-        output_expr = ca.substitute([values[output] for output in outputs], tmp, [values[t] for t in tmp])
-        function = ca.Function(tree.name, inputs, output_expr)
-        self.functions[tree.name] = function
-
-        return function
-
     def enterClass(self, tree):
         logger.debug('enterClass {}'.format(tree.name))
 
@@ -615,6 +577,44 @@ class Generator(TreeListener):
                 raise Exception('Tried to look up expression before it was reached by the tree walker')
             self.src[tree] = s
         return self.src[tree]
+
+    def get_function(self, function_name):
+        if function_name in self.functions:
+            return self.functions[function_name]
+
+        try:
+            tree = self.cls.functions[function_name]
+        except KeyError:
+            raise Exception('Unknown function {}'.format(function_name))
+
+        inputs = []
+        outputs = []
+        tmp = []
+        for s in tree.symbols.values():
+            src = self.get_mx(s)
+            if 'input' in s.prefixes:
+                inputs.append(src)
+            elif 'output' in s.prefixes:
+                outputs.append(src)
+            else:
+                tmp.append(src)
+
+        # Store current variable values
+        values = {}
+        for variable in inputs:
+            values[variable] = variable
+
+        # Process statements in order
+        for statement in tree.statements:
+            src = self.get_mx(statement)
+            for assignment in src:
+                [values[assignment.left]] = ca.substitute([assignment.right], list(values.keys()), list(values.values()))
+
+        output_expr = ca.substitute([values[output] for output in outputs], tmp, [values[t] for t in tmp])
+        function = ca.Function(tree.name, inputs, output_expr)
+        self.functions[tree.name] = function
+
+        return function
 
 
 def generate(ast_tree: ast.Collection, model_name: str) -> Model:
