@@ -416,7 +416,7 @@ class Collection(Node):
             full_name = ComponentRef(name=c.name)
 
         # FIXME: Do we have to convert to string?
-        self._class_lookup[ComponentRef.to_tuple(full_name)] = c
+        self._class_lookup[full_name.to_tuple()] = c
 
         if within:
             within = ComponentRef.concatenate(within, ComponentRef(name=c.name))
@@ -462,11 +462,11 @@ class Collection(Node):
         c = None
 
         if within:
-            within_tuple = ComponentRef.to_tuple(within[0])
+            within_tuple = within[0].to_tuple()
         else:
             within_tuple = tuple()
 
-        cref_tuple = ComponentRef.to_tuple(component_ref)
+        cref_tuple = component_ref.to_tuple()
 
         prev_tuple = None
 
