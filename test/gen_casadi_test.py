@@ -542,7 +542,7 @@ class GenCasadiTest(unittest.TestCase):
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
         ref_model.equations = [c - (a + b[0:3] * e), d - (ca.sin(a / b[1:4])), e - (d + scalar_f), g - ca.sum1(c),
-                               h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - ca.DM.zeros(3),
+                               h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - np.array([4, 5, 6]),
                                nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1],
                                arcw[0] + arcw[1], a - np.array([1, 2, 3]), scalar_f - 1.3]
 
