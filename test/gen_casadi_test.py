@@ -448,7 +448,6 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
-    @unittest.expectedFailure
     def test_function_call(self):
         with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
             txt = f.read()
@@ -457,11 +456,20 @@ class GenCasadiTest(unittest.TestCase):
         print("FunctionCall", casadi_model)
         ref_model = Model()
 
+        radius = ca.MX.sym('radius')
+        diameter = radius * 2
+        circle_properties = ca.Function('circle_properties', [radius], [3.14159*diameter, 3.14159*radius**2, ca.if_else(3.14159*radius**2 > 10, 1, 2), ca.if_else(3.14159*radius**2 > 10, 10, 3.14159*radius**2), 8, 3, 12])
+
         c = ca.MX.sym("c")
         a = ca.MX.sym("a")
+        d = ca.MX.sym("d")
+        e = ca.MX.sym("e")
+        S1 = ca.MX.sym("S1")
+        S2 = ca.MX.sym("S2")
         r = ca.MX.sym("r")
-        ref_model.alg_states = list(map(Variable, [c, a, r]))
-        ref_model.equations = [c - 3.14159*r*2, a - 3.14159*r**2]
+        ref_model.alg_states = list(map(Variable, [c, a, d, e, S1, S2, r]))
+        ref_model.outputs = list(map(Variable, [c, a, d, e, S1, S2]))
+        ref_model.equations = [ca.vertcat(c, a, d, e, S1, S2) - ca.vertcat(*circle_properties.call([r])[0:-1])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

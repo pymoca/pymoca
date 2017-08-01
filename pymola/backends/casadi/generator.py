@@ -1,7 +1,7 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
 
 import logging
-from collections import namedtuple
+from collections import namedtuple, deque
 
 import casadi as ca
 import numpy as np
@@ -66,16 +66,25 @@ class ForLoop:
         self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, indices)
 
 
+Assignment = namedtuple('Assignment', ['left', 'right'])
+
+
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
     def __init__(self, cls: ast.Class):
         super(Generator, self).__init__()
         self.src = {}
         self.model = Model()
-        self.nodes = {'time': self.model.time}
+        self.nodes = {cls: {'time': self.model.time}}
         self.derivative = {}
         self.cls = cls
         self.for_loops = []
+        self.functions = {}
+        self.entered_classes = deque()
+
+    @property
+    def current_class(self):
+        return self.entered_classes[-1]
 
     def _ast_symbols_to_variables(self, ast_symbols, differentiate=False):
         variables = []
@@ -96,8 +105,19 @@ class Generator(TreeListener):
             variables.append(variable)
         return variables
 
+    def enterClass(self, tree):
+        logger.debug('enterClass {}'.format(tree.name))
+
+        self.entered_classes.append(tree)
+        self.nodes.setdefault(tree, {})
+
     def exitClass(self, tree):
         logger.debug('exitClass {}'.format(tree.name))
+
+        if tree.type == 'function':
+            # Already handled previously
+            self.entered_classes.pop()
+            return
 
         states = []
         inputs = []
@@ -140,6 +160,11 @@ class Generator(TreeListener):
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
 
+        if len(tree.statements) + len(tree.initial_statements) > 0:
+            raise NotImplementedError('Statements are currently supported inside functions only')
+
+        self.entered_classes.pop()
+
     def exitArray(self, tree):
         self.src[tree] = [self.src[e] for e in tree.values]
 
@@ -167,11 +192,12 @@ class Generator(TreeListener):
             else:
                 s = ca.MX.sym("der({})".format(orig.name()), orig.sparsity())
                 self.derivative[orig] = s
-                self.nodes[s] = s
+                self.nodes[self.current_class][s] = s
                 src = s
         elif op == '-' and n_operands == 1:
             src = -self.get_mx(tree.operands[0])
         elif op == 'mtimes':
+            assert n_operands >= 2
             src = self.get_mx(tree.operands[0])
             for i in tree.operands[1:]:
                 src = ca.mtimes(src, self.get_mx(i))
@@ -236,16 +262,23 @@ class Generator(TreeListener):
             lhs = self.get_mx(tree.operands[0])
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
-        elif n_operands == 1:
-            src = self.get_mx(tree.operands[0])
-            src = getattr(src, op)()
-        elif n_operands == 2:
-            lhs = self.get_mx(tree.operands[0])
-            rhs = self.get_mx(tree.operands[1])
-            lhs_op = getattr(lhs, op)
-            src = lhs_op(rhs)
         else:
-            raise Exception("Unknown operator {}({})".format(op, ','.join(n_operands * ['.'])))
+            src = self.get_mx(tree.operands[0])
+            # Check for built-in operations, such as the
+            # elementary functions, first.
+            if hasattr(src, op) and n_operands <= 2:
+                if n_operands == 1:
+                    src = self.get_mx(tree.operands[0])
+                    src = getattr(src, op)()
+                else:
+                    lhs = self.get_mx(tree.operands[0])
+                    rhs = self.get_mx(tree.operands[1])
+                    lhs_op = getattr(lhs, op)
+                    src = lhs_op(rhs)
+            else:
+                function = self.get_function(op)
+                src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands]))
+
         self.src[tree] = src
 
     def exitIfExpression(self, tree):
@@ -265,7 +298,26 @@ class Generator(TreeListener):
     def exitEquation(self, tree):
         logger.debug('exitEquation')
 
-        self.src[tree] = self.get_mx(tree.left) - self.get_mx(tree.right)
+        if isinstance(tree.left, list):
+            src_left = ca.vertcat(*[self.get_mx(c) for c in tree.left])
+        else:
+            src_left = self.get_mx(tree.left)
+
+        if isinstance(tree.right, list):
+            src_right = ca.vertcat(*[self.get_mx(c) for c in tree.right])
+        else:
+            src_right = self.get_mx(tree.right)
+
+        # According to the Modelica spec,
+        # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
+        if isinstance(tree.right, ast.Expression) and tree.right.operator in self.cls.functions:
+            if ca.MX(src_left).size1() < ca.MX(src_right).size1():
+                src_right = src_right[0:src_left.size1()]
+        if isinstance(tree.left, ast.Expression) and tree.left.operator in self.cls.functions:
+            if ca.MX(src_left).size1() > ca.MX(src_right).size1():
+                src_left = src_left[0:src_right.size1()]
+
+        self.src[tree] = src_left - src_right
 
     def enterForEquation(self, tree):
         logger.debug('enterForEquation')
@@ -287,7 +339,7 @@ class Generator(TreeListener):
             all_args = args + free_vars
             F = ca.Function('loop_body_' + f.name, all_args, [expr])
 
-            indexed_symbols_full = [self.nodes[
+            indexed_symbols_full = [self.nodes[self.current_class][
                                         f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in
                                     indexed_symbols]
             Fmap = F.map("map", "serial", len(f.values), list(
@@ -317,13 +369,94 @@ class Generator(TreeListener):
 
         self.src[tree] = src
 
+    def exitAssignmentStatement(self, tree):
+        logger.debug('exitAssignmentStatement')
+
+        all_assignments = []
+
+        expr = self.get_mx(tree.right)
+        for component_ref in tree.left:
+            all_assignments.append(Assignment(self.get_mx(component_ref), expr))
+
+        self.src[tree] = all_assignments
+
+    def exitIfStatement(self, tree):
+        logger.debug('exitIfStatement')
+
+        # We assume an equal number of statements per branch.
+        # Furthermore, we assume that every branch assigns to the same variables.
+        assert (len(tree.statements) % (len(tree.conditions) + 1) == 0)
+
+        statements_per_condition = int(
+            len(tree.statements) / (len(tree.conditions) + 1))
+
+        all_assignments = []
+        for statement_index in range(statements_per_condition):
+            assignments = self.get_mx(tree.statements[-(statement_index + 1)])
+            for assignment in assignments:
+                src = assignment.right
+                for cond_index in range(len(tree.conditions)):
+                    cond = self.get_mx(tree.conditions[-(cond_index + 1)])
+                    src1 = None
+                    for i in range(statements_per_condition):
+                        other_assignments = self.get_mx(tree.statements[-statements_per_condition * (
+                            cond_index + 1) - (i + 1)])
+                        for j in range(len(other_assignments)):
+                            if ca.is_equal(assignment.left, other_assignments[j].left):
+                                src1 = other_assignments[j].right
+                                break
+                        if src1 is not None:
+                            break
+                    src = ca.if_else(cond, src1, src)
+                all_assignments.append(Assignment(assignment.left, src))
+
+        self.src[tree] = all_assignments
+
+    def enterForStatement(self, tree):
+        logger.debug('enterForStatement')
+
+        self.for_loops.append(ForLoop(self, tree))
+
+    def exitForStatement(self, tree):
+        logger.debug('exitForStatement')
+
+        f = self.for_loops.pop()
+        if len(f.values) > 0:
+            indexed_symbols = list(f.indexed_symbols.keys())
+            args = [f.index_variable] + indexed_symbols
+            expr = ca.vcat([ca.vec(self.get_mx(e.right)) for e in tree.statements])
+            free_vars = ca.symvar(expr)
+
+            arg_names = [arg.name() for arg in args]
+            free_vars = [e for e in free_vars if e.name() not in arg_names]
+            all_args = args + free_vars
+            F = ca.Function('loop_body_' + f.name, all_args, [expr])
+
+            indexed_symbols_full = [self.nodes[self.current_class][
+                                        f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in
+                                    indexed_symbols]
+            Fmap = F.map("map", "serial", len(f.values), list(
+                range(len(args), len(all_args))), [])
+            res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
+
+            # Split into a list of statements
+            variables = [assignment.left for statement in tree.statements for assignment in self.get_mx(statement)]
+            all_assignments = []
+            for i in range(len(f.values)):
+                for j, variable in enumerate(variables):
+                    all_assignments.append(Assignment(variable, res[0][j, i].T))
+
+            self.src[tree] = all_assignments
+        else:
+            self.src[tree] = []
+
     def get_integer(self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]):
         # CasADi needs to know the dimensions of symbols at instantiation.
         # We therefore need a mechanism to evaluate expressions that define dimensions of symbols.
         if isinstance(tree, ast.Primary):
             return int(tree.value)
         if isinstance(tree, ast.ComponentRef):
-            s = self.cls.symbols[tree.name]
+            s = self.current_class.symbols[tree.name]
             assert (s.type.name == 'Integer')
             return self.get_integer(s.value)
         if isinstance(tree, ast.Expression):
@@ -346,7 +479,7 @@ class Generator(TreeListener):
                     if (len(self.for_loops) > 0) and (dep.name() == self.for_loops[-1].name):
                         vals.append(self.for_loops[-1].index_variable)
                     else:
-                        vals.append(self.get_integer(self.cls.symbols[dep.name()].value))
+                        vals.append(self.get_integer(self.current_class.symbols[dep.name()].value))
 
             # Evaluate the expression
             F = ca.Function('get_integer_{}'.format('_'.join([dep.name().replace('.', '_') for dep in deps])), deps,
@@ -380,7 +513,7 @@ class Generator(TreeListener):
         shape = self.get_shape(tree)
         assert(len(shape) <= 2)
         s = ca.MX.sym(tree.name, *shape)
-        self.nodes[tree.name] = s
+        self.nodes[self.current_class][tree.name] = s
         return s
 
     def get_indexed_symbol(self, tree, s):
@@ -421,7 +554,7 @@ class Generator(TreeListener):
                     return f.index_variable
 
         # Check ordinary symbols
-        symbol = self.cls.symbols[tree.name]
+        symbol = self.current_class.symbols[tree.name]
         s = self.get_mx(symbol)
         if len(tree.indices) > 0:
             s = self.get_indexed_symbol(tree, s)
@@ -444,6 +577,44 @@ class Generator(TreeListener):
                 raise Exception('Tried to look up expression before it was reached by the tree walker')
             self.src[tree] = s
         return self.src[tree]
+
+    def get_function(self, function_name):
+        if function_name in self.functions:
+            return self.functions[function_name]
+
+        try:
+            tree = self.cls.functions[function_name]
+        except KeyError:
+            raise Exception('Unknown function {}'.format(function_name))
+
+        inputs = []
+        outputs = []
+        tmp = []
+        for s in tree.symbols.values():
+            src = self.get_mx(s)
+            if 'input' in s.prefixes:
+                inputs.append(src)
+            elif 'output' in s.prefixes:
+                outputs.append(src)
+            else:
+                tmp.append(src)
+
+        # Store current variable values
+        values = {}
+        for variable in inputs:
+            values[variable] = variable
+
+        # Process statements in order
+        for statement in tree.statements:
+            src = self.get_mx(statement)
+            for assignment in src:
+                [values[assignment.left]] = ca.substitute([assignment.right], list(values.keys()), list(values.values()))
+
+        output_expr = ca.substitute([values[output] for output in outputs], tmp, [values[t] for t in tmp])
+        function = ca.Function(tree.name, inputs, output_expr)
+        self.functions[tree.name] = function
+
+        return function
 
 
 def generate(ast_tree: ast.Collection, model_name: str) -> Model:

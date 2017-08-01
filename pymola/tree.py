@@ -656,7 +656,7 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
             del node.symbols[i]
 
 
-def add_state_value_equations(root: ast.Collection, node: ast.Node) -> None:
+def add_state_value_equations(node: ast.Node) -> None:
     # we do this here, instead of in flatten_class, because symbol values
     # inside flattened classes may be modified later by modify_class().
     non_state_prefixes = set(['constant', 'parameter'])
@@ -665,6 +665,15 @@ def add_state_value_equations(root: ast.Collection, node: ast.Node) -> None:
             if len(non_state_prefixes & set(sym.prefixes)) == 0:
                 node.equations.append(ast.Equation(left=sym, right=sym.value))
                 sym.value = ast.Primary(value=None)
+
+
+def add_variable_value_statements(node: ast.Node) -> None:
+    # we do this here, instead of in flatten_class, because symbol values
+    # inside flattened classes may be modified later by modify_class().
+    for sym in node.symbols.values():
+        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
+            node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
+            sym.value = ast.Primary(value=None)
 
 
 class StateAnnotator(TreeListener):
@@ -767,7 +776,9 @@ def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:
     expand_connectors(root, flat_class)
 
     # add equations for state symbol values
-    add_state_value_equations(root, flat_class)
+    add_state_value_equations(flat_class)
+    for function in flat_class.functions.values():
+        add_variable_value_statements(function)
 
     # annotate states
     annotate_states(root, flat_class)
@@ -775,9 +786,5 @@ def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:
     # flat file
     flat_file = ast.File()
     flat_file.classes[flat_class.name] = flat_class
-
-    # pull functions to the top level
-    flat_file.classes.update(flat_class.functions)
-    flat_class.functions = OrderedDict()
 
     return flat_file
