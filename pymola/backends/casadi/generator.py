@@ -302,6 +302,8 @@ class Generator(TreeListener):
             src = lhs_op()
         else:
             src = self.get_mx(tree.operands[0])
+            # Check for built-in operations, such as the
+            # elementary functions, first.
             if hasattr(src, op) and n_operands <= 2:
                 if n_operands == 1:
                     src = self.get_mx(tree.operands[0])
