@@ -147,7 +147,7 @@ class Model:
         if options.get('eliminate_constant_assignments', False):
             logger.info("Elimating constant variable assignments")
 
-            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
+            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
 
             reduced_equations = []
             for eq in self.equations:
@@ -233,7 +233,7 @@ class Model:
 
             p = re.compile(options['eliminable_variable_expression'])
 
-            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
+            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
 
             variables = []
             values = []
@@ -278,11 +278,11 @@ class Model:
         if options.get('detect_aliases', False):
             logger.info("Detecting aliases")
 
-            states = OrderedDict({s.symbol.name() : s for s in self.states})
-            der_states = OrderedDict({s.symbol.name() : s for s in self.der_states})
-            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
-            inputs = OrderedDict({s.symbol.name() : s for s in self.inputs})
-            outputs = OrderedDict({s.symbol.name() : s for s in self.outputs})
+            states = OrderedDict([(s.symbol.name(), s) for s in self.states])
+            der_states = OrderedDict([(s.symbol.name(), s) for s in self.der_states])
+            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
+            inputs = OrderedDict([(s.symbol.name(), s) for s in self.inputs])
+            outputs = OrderedDict([(s.symbol.name(), s) for s in self.outputs])
 
             all_states = OrderedDict()
             all_states.update(states)
