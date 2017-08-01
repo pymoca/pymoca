@@ -206,7 +206,7 @@ def generate(ast_tree: ast.Collection, model_name: str):
     :param model_name: class to generate
     :return: sympy source code for model
     """
-    component_ref = ast.component_ref_from_string(model_name)
+    component_ref = ast.ComponentRef.from_string(model_name)
     ast_tree_new = copy.deepcopy(ast_tree)
     ast_walker = TreeWalker()
     flat_tree = flatten(ast_tree_new, component_ref)

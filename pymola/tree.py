@@ -725,7 +725,7 @@ class FunctionExpander(TreeListener):
             try:
                 function_class, comp_ref = self.root.find_class(tree.operator, self.within, return_ref=True)
 
-                full_name = ast.component_ref_to_string(comp_ref)
+                full_name = str(comp_ref)
 
                 tree.operator = full_name
                 self.function_set[full_name] = function_class

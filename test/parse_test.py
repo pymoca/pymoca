@@ -142,7 +142,7 @@ class ParseTest(unittest.TestCase):
         # The class we want to flatten. We first have to turn it into a
         # full-fledged ComponentRef.
         class_name = 'Level1.Level2.Level3.Test'
-        comp_ref = ast.component_ref_from_string(class_name)
+        comp_ref = ast.ComponentRef.from_string(class_name)
 
         flat_tree = tree.flatten(ast_tree, comp_ref)
 
@@ -158,7 +158,7 @@ class ParseTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
 
         class_name = 'Level1.Level2.Level3.Function5'
-        comp_ref = ast.component_ref_from_string(class_name)
+        comp_ref = ast.ComponentRef.from_string(class_name)
 
         flat_tree = tree.flatten(ast_tree, comp_ref)
 

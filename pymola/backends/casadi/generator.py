@@ -623,10 +623,10 @@ def generate(ast_tree: ast.Collection, model_name: str) -> Model:
     :param model_name: class to generate
     :return: casadi model
     """
-    component_ref = ast.component_ref_from_string(model_name)
+    component_ref = ast.ComponentRef.from_string(model_name)
     ast_walker = TreeWalker()
     flat_tree = flatten(ast_tree, component_ref)
-    component_ref_tuple = ast.component_ref_to_tuple(component_ref)
+    component_ref_tuple = component_ref.to_tuple()
     casadi_gen = Generator(flat_tree.classes[component_ref_tuple[-1]])
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model

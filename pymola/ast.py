@@ -116,6 +116,69 @@ class ComponentRef(Node):
         self.child = []  # type: List[ComponentRef]
         super().__init__(**kwargs)
 
+    def __str__(self) -> str:
+        return ".".join(self.to_tuple())
+
+    def to_tuple(self) -> tuple:
+        """
+        Convert the nested component reference to flat tuple of names, which is
+        hashable and can therefore be used as dictionary key. Note that this
+        function ignores any array indices in the component reference.
+        :return: flattened tuple of c's names
+        """
+
+        if self.child:
+            return (self.name, ) + self.child[0].to_tuple()
+        else:
+            return (self.name, )
+
+    @classmethod
+    def from_tuple(cls, components: tuple) -> 'ComponentRef':
+        """
+        Convert the tuple pointing to a component to
+        a component reference.
+        :param components: tuple of components name
+        :return: ComponentRef
+        """
+
+        component_ref = ComponentRef(name=components[0], child=[])
+        c = component_ref
+        for component in components[1:]:
+            c.child.append(ComponentRef(name=component, child=[]))
+            c = c.child[0]
+        return component_ref
+
+    @classmethod
+    def from_string(cls, s: str) -> 'ComponentRef':
+        """
+        Convert the string pointing to a component using dot notation to
+        a component reference.
+        :param s: string pointing to component using dot notation
+        :return: ComponentRef
+        """
+
+        components = s.split('.')
+        return cls.from_tuple(components)
+
+    @classmethod
+    def concatenate(cls, *args: List['ComponentRef']) -> 'ComponentRef':
+        """
+        Helper function to append two component references to eachother, e.g.
+        a "within" component ref and an "object type" component ref.
+        :param a:
+        :param b:
+        :return: New component reference, with other appended to self.
+        """
+
+        a = copy.deepcopy(args[0])
+        n = a
+        for b in args[1:]:
+            while n.child:
+                n = n.child[0]
+            b = copy.deepcopy(b)  # Not strictly necessary
+            n.child = [b]
+        return a
+
 
 class Expression(Node):
     def __init__(self, **kwargs):
@@ -348,15 +411,15 @@ class Collection(Node):
 
     def _build_class_lookup_for_class(self, c, within):
         if within:
-            full_name = merge_component_ref(within, ComponentRef(name=c.name))
+            full_name = ComponentRef.concatenate(within, ComponentRef(name=c.name))
         else:
             full_name = ComponentRef(name=c.name)
 
         # FIXME: Do we have to convert to string?
-        self._class_lookup[component_ref_to_tuple(full_name)] = c
+        self._class_lookup[full_name.to_tuple()] = c
 
         if within:
-            within = merge_component_ref(within, ComponentRef(name=c.name))
+            within = ComponentRef.concatenate(within, ComponentRef(name=c.name))
         else:
             within = ComponentRef(name=c.name)
         for nested_c in c.classes.values():
@@ -399,11 +462,11 @@ class Collection(Node):
         c = None
 
         if within:
-            within_tuple = component_ref_to_tuple(within[0])
+            within_tuple = within[0].to_tuple()
         else:
             within_tuple = tuple()
 
-        cref_tuple = component_ref_to_tuple(component_ref)
+        cref_tuple = component_ref.to_tuple()
 
         prev_tuple = None
 
@@ -429,7 +492,7 @@ class Collection(Node):
                 raise ClassNotFoundError("Could not find class {}".format(component_ref))
 
         if return_ref:
-            return c, component_ref_from_string(".".join(prev_tuple))
+            return c, ComponentRef.from_tuple(prev_tuple)
         else:
             return c
 
@@ -440,75 +503,3 @@ class Collection(Node):
             return self.find_symbol(node, component_ref.child[0])
         else:
             return sym
-
-
-def compare_component_ref(this: ComponentRef, other: ComponentRef) -> bool:
-    """
-    Helper function to compare component references to each other without converting to JSON
-    :param this:
-    :param other:
-    :return: boolean, true if match
-    """
-    if len(this.child) != len(other.child):
-        return False
-
-    if this.child and other.child:
-        return compare_component_ref(this.child[0], other.child[0])
-
-    return this.__dict__ == other.__dict__
-
-
-def merge_component_ref(a: ComponentRef, b: ComponentRef) -> ComponentRef:
-    """
-    Helper function to append two component references to eachother, e.g.
-    a "within" component ref and an "object type" component ref.
-    :param a:
-    :param b:
-    :return: component reference, with b appended to a.
-    """
-
-    a = copy.deepcopy(a)
-    b = copy.deepcopy(b)  # Not strictly necessary
-
-    n = a
-    while n.child:
-        n = n.child[0]
-    n.child = [b]
-
-    return a
-
-
-def component_ref_to_tuple(c: ComponentRef) -> tuple:
-    """
-    Convert the nested component reference to flat tuple of names, which is
-    hashable and can therefore be used as dictionary key. Note that this
-    function ignores any array indices in the component reference.
-    :param c:
-    :return: flattened tuple of c's names
-    """
-
-    if c.child:
-        return (c.name, ) + component_ref_to_tuple(c.child[0])
-    else:
-        return (c.name, )
-
-
-def component_ref_to_string(c: ComponentRef) -> str:
-    return ".".join(component_ref_to_tuple(c))
-
-
-def component_ref_from_string(s: str) -> ComponentRef:
-    """
-    Convert the string pointing to a component using dot notation to
-    a component reference.
-    :param s: string pointing to component using dot notation
-    :return: ComponentRef
-    """
-
-    components = s.split('.')
-    component_ref = ComponentRef(name=components[0], child=[])
-    c = component_ref
-    for component in components[1:]:
-        c.child.append(ComponentRef(name=component, child=[]))
-        c = c.child[0]
-    return component_ref
