@@ -122,6 +122,24 @@ class TreeListener(object):
     def exitConnectClause(self, tree: ast.ConnectClause) -> None:
         pass
 
+    def enterAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
+        pass
+
+    def exitAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
+        pass
+
+    def enterIfStatement(self, tree: ast.IfStatement) -> None:
+        pass
+
+    def exitIfStatement(self, tree: ast.IfStatement) -> None:
+        pass
+
+    def enterForStatement(self, tree: ast.ForStatement) -> None:
+        pass
+
+    def exitForStatement(self, tree: ast.ForStatement) -> None:
+        pass
+
     def enterSymbol(self, tree: ast.Symbol) -> None:
         pass
 
@@ -267,9 +285,10 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             extended_orig_class.initial_equations += flat_parent_class.initial_equations
             extended_orig_class.statements += flat_parent_class.statements
             extended_orig_class.initial_statements += flat_parent_class.initial_statements
+            extended_orig_class.functions.update(flat_parent_class.functions)
 
             # carry out modifications
-            extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification)
+            extended_orig_class = modify_class(root, extended_orig_class, extends.class_modification, orig_class.within)
 
     extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
@@ -277,6 +296,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
     extended_orig_class.initial_equations += orig_class.initial_equations
     extended_orig_class.statements += orig_class.statements
     extended_orig_class.initial_statements += orig_class.initial_statements
+    extended_orig_class.functions.update(orig_class.functions)
 
     # Modify the main class with any class modifications
     if class_modification is not None:
@@ -305,7 +325,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
 
             # If not found, do a lookup in the class tree
             if c is None:
-                c = root.find_class(sym.type)
+                c = root.find_class(sym.type, orig_class.within)
 
             if c.type == "__builtin":
                 flat_class.symbols[flat_sym.name] = flat_sym
@@ -340,6 +360,7 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             flat_class.initial_equations += flat_sub_class.initial_equations
             flat_class.statements += flat_sub_class.statements
             flat_class.initial_statements += flat_sub_class.initial_statements
+            flat_class.functions.update(flat_sub_class.functions)
 
             # we keep connectors in the class hierarchy, as we may refer to them further
             # up using connect() clauses
@@ -352,9 +373,16 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
         flat_sym = flatten_component_refs(root, flat_class, sym, instance_prefix)
         flat_class.symbols[sym_name] = flat_sym
 
+    # A set of component refs to functions
+    pulled_functions = OrderedDict()
+
     # for all equations in original class
     for equation in extended_orig_class.equations:
-        flat_equation = flatten_component_refs(root, flat_class, equation, instance_prefix)
+        # Equation returned has function calls replaced with their full scope
+        # equivalent, and it pulls out all references into the pulled_functions.
+        fs_equation = fully_scope_function_calls(root, orig_class.within, equation, pulled_functions)
+
+        flat_equation = flatten_component_refs(root, flat_class, fs_equation, instance_prefix)
         flat_class.equations.append(flat_equation)
         if isinstance(flat_equation, ast.ConnectClause):
             # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
@@ -363,25 +391,36 @@ def flatten_class(root: ast.Collection, orig_class: ast.Class, instance_name: st
             if not hasattr(flat_equation, '__right_inner'):
                 flat_equation.__right_inner = len(equation.right.child) > 0
 
+    # Create fully scoped equivalents
+    fs_initial_equations = \
+        [fully_scope_function_calls(root, orig_class.within, e, pulled_functions) for e in extended_orig_class.initial_equations]
+    fs_statements = \
+        [fully_scope_function_calls(root, orig_class.within, e, pulled_functions) for e in extended_orig_class.statements]
+    fs_initial_statements = \
+        [fully_scope_function_calls(root, orig_class.within, e, pulled_functions) for e in extended_orig_class.initial_statements]
+
     flat_class.initial_equations += \
-        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_equations]
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in fs_initial_equations]
     flat_class.statements += \
-        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.statements]
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in fs_statements]
     flat_class.initial_statements += \
-        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in extended_orig_class.initial_statements]
+        [flatten_component_refs(root, flat_class, e, instance_prefix) for e in fs_initial_statements]
 
-    # TODO: Also drag along any functions we need
-    # function_set = set()
-    # for eq in flat_class.equations + flat_class.statements:
-    #     function_set |= pull_functions(eq, instance_prefix)
+    # TODO: Make sure we also pull in any functions called in functions in function_set
+    # TODO: Also do functions in statements, initial_statements, and initial_equations
 
-    # for f in function_set:
-    #     if f not in flat_file.classes:
-    #         flat_file.classes.update(flatten(root, f, instance_name).classes)
+    for f, c in pulled_functions.items():
+        pulled_functions[f] = flatten_class(root, c, '')
+        c = pulled_functions[f]
+        flat_class.functions.update(c.functions)
+        c.functions = OrderedDict()
+
+    flat_class.functions.update(pulled_functions)
+
     return flat_class
 
 
-def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification):
+def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol], modification, within=[]):
     """
     Apply a modification to a class or symbol.
     :param root: root tree for looking up symbols
@@ -416,7 +455,7 @@ def modify_class(root: ast.Collection, class_or_sym: Union[ast.Class, ast.Symbol
                 orig_sym = class_or_sym.symbols[new_sym.name]
                 orig_sym.__dict__.update(new_sym.__dict__)
         elif isinstance(argument, ast.ShortClassDefinition):
-            class_or_sym.classes[argument.name] = root.find_class(argument.component)
+            class_or_sym.classes[argument.name] = root.find_class(argument.component, within)
         else:
             raise Exception('Unsupported class modification argument {}'.format(argument))
     return class_or_sym
@@ -617,7 +656,7 @@ def expand_connectors(root: ast.Collection, node: ast.Node) -> None:
             del node.symbols[i]
 
 
-def add_state_value_equations(root: ast.Collection, node: ast.Node) -> None:
+def add_state_value_equations(node: ast.Node) -> None:
     # we do this here, instead of in flatten_class, because symbol values
     # inside flattened classes may be modified later by modify_class().
     non_state_prefixes = set(['constant', 'parameter'])
@@ -626,6 +665,15 @@ def add_state_value_equations(root: ast.Collection, node: ast.Node) -> None:
             if len(non_state_prefixes & set(sym.prefixes)) == 0:
                 node.equations.append(ast.Equation(left=sym, right=sym.value))
                 sym.value = ast.Primary(value=None)
+
+
+def add_variable_value_statements(node: ast.Node) -> None:
+    # we do this here, instead of in flatten_class, because symbol values
+    # inside flattened classes may be modified later by modify_class().
+    for sym in node.symbols.values():
+        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
+            node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
+            sym.value = ast.Primary(value=None)
 
 
 class StateAnnotator(TreeListener):
@@ -661,42 +709,52 @@ def annotate_states(root: ast.Collection, node: ast.Node) -> None:
     w.walk(StateAnnotator(root, node), node)
 
 
-class FunctionPuller(TreeListener):
+class FunctionExpander(TreeListener):
     """
     Listener to extract functions
     """
 
-    def __init__(self, instance_prefix: str, root, function_set):
-        self.instance_prefix = instance_prefix
+    def __init__(self, root: ast.Collection, within: list, function_set: set):
         self.root = root
+        self.within = within
         self.function_set = function_set
         super().__init__()
 
     def exitExpression(self, tree: ast.Expression):
-        if isinstance(tree.operator, ast.ComponentRef) and \
-                        tree.operator.name in self.root.classes:
-            self.function_set.add(tree.operator.name)
+        if isinstance(tree.operator, ast.ComponentRef):
+            try:
+                function_class, comp_ref = self.root.find_class(tree.operator, self.within, return_ref=True)
+
+                full_name = str(comp_ref)
+
+                tree.operator = full_name
+                self.function_set[full_name] = function_class
+            except (KeyError, ast.ClassNotFoundError) as e:
+                # Assume built-in function
+                pass
 
 
 # noinspection PyUnusedLocal
-def pull_functions(root: ast.Collection, expression: ast.Expression, instance_prefix: str) -> set:
+def fully_scope_function_calls(root: ast.Collection, within: list, expression: ast.Expression, function_set: OrderedDict) -> ast.Expression:
     """
-    TODO: document
+    Turns the function references in this expression into fully scoped
+    references (e.g. relative to absolute). The component references of all
+    referenced functions are put into the functions set.
+
     :param root: collection for performing symbol lookup etc.
-    :param expression:
-    :param instance_prefix:
+    :param container: class
+    :param expression: original expression
+    :param function_set: output of function component references
     :return:
     """
-
     expression_copy = copy.deepcopy(expression)
 
     w = TreeWalker()
-    function_set = set()
-    w.walk(FunctionPuller(instance_prefix, root, function_set), expression_copy)
-    return function_set
+    w.walk(FunctionExpander(root, within, function_set), expression_copy)
+    return expression_copy
 
 
-def flatten(root: ast.Collection, class_name: str) -> ast.File:
+def flatten(root: ast.Collection, component_ref: ast.ComponentRef) -> ast.File:
     """
     This function takes a Collection and flattens it so that all subclasses instances
     are replaced by the their equations and symbols with name mangling
@@ -712,19 +770,29 @@ def flatten(root: ast.Collection, class_name: str) -> ast.File:
             c.within = f.within
 
     # flatten class
-    flat_class = flatten_class(root, root.find_class(class_name), '')
+    flat_class = flatten_class(root, root.find_class(component_ref), '')
 
     # expand connectors
     expand_connectors(root, flat_class)
 
     # add equations for state symbol values
-    add_state_value_equations(root, flat_class)
+    add_state_value_equations(flat_class)
+    for function in flat_class.functions.values():
+        add_variable_value_statements(function)
 
     # annotate states
     annotate_states(root, flat_class)
 
     # flat file
     flat_file = ast.File()
-    flat_file.classes[class_name] = flat_class
+    flat_file.classes[flat_class.name] = flat_class
+
+    # pull functions to the top level,
+    # putting them prior to the model class so that they are visited
+    # first by the tree walker.
+    functions_and_classes = flat_class.functions
+    functions_and_classes.update(flat_file.classes)
+    flat_file.classes = functions_and_classes
+    flat_class.functions = OrderedDict()
 
     return flat_file

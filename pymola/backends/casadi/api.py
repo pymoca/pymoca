@@ -1,4 +1,5 @@
 from collections import namedtuple
+from typing import Dict
 import distutils.ccompiler
 import casadi as ca
 import numpy as np
@@ -79,7 +80,7 @@ class ObjectData:
         self.library = library
 
 
-def _compile_model(model_folder, model_name, compiler_options):
+def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]):
     # Load folders
     tree = None
     for folder in [model_folder] + compiler_options.get('library_folders', []):
@@ -107,7 +108,7 @@ def _compile_model(model_folder, model_name, compiler_options):
 
     return model
 
-def _save_model(model_folder, model_name, model):
+def _save_model(model_folder: str, model_name: str, model: Model):
     # Compile shared libraries
     if os.name == 'posix':
         compiler_flags = ['-O2', '-fPIC']
@@ -173,7 +174,7 @@ def _save_model(model_folder, model_name, model):
 
         pickle.dump(db, f)
 
-def _load_model(model_folder, model_name, compiler_options):
+def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]) -> CachedModel:
     db_file = os.path.join(model_folder, model_name)
 
     if compiler_options.get('mtime_check', True):
@@ -260,7 +261,7 @@ def _load_model(model_folder, model_name, compiler_options):
     # Done
     return model
 
-def transfer_model(model_folder, model_name, compiler_options={}):
+def transfer_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]={}):
     if compiler_options.get('cache', False):
         try:
             return _load_model(model_folder, model_name, compiler_options)

@@ -147,7 +147,7 @@ class Model:
         if options.get('eliminate_constant_assignments', False):
             logger.info("Elimating constant variable assignments")
 
-            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
+            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
 
             reduced_equations = []
             for eq in self.equations:
@@ -233,7 +233,7 @@ class Model:
 
             p = re.compile(options['eliminable_variable_expression'])
 
-            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
+            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
 
             variables = []
             values = []
@@ -275,14 +275,74 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
+        if options.get('expand_vectors', False):
+            logger.info("Expanding vectors")
+
+            symbols = []
+            values = []
+
+            for l in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
+                old_vars = getattr(self, l)
+                new_vars = []
+                for old_var in old_vars:
+                    if old_var.symbol.numel() > 1:
+                        rows = []
+                        for i in range(old_var.symbol.size1()):
+                            cols = []
+                            for j in range(old_var.symbol.size2()):
+                                if old_var.symbol.size1() > 1 and old_var.symbol.size2() > 1:
+                                    component_symbol = ca.MX.sym('{}[{},{}]'.format(old_var.symbol.name(), i, j))
+                                elif old_var.symbol.size1() > 1:
+                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), i))
+                                elif old_var.symbol.size2() > 1:
+                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), j))
+                                else:
+                                    raise AssertionError
+                                component_var = Variable(component_symbol, old_var.python_type)
+                                for attribute in ast.Symbol.ATTRIBUTES:
+                                    value = ca.MX(getattr(old_var, attribute))
+                                    if value.size1() == old_var.symbol.size1() and value.size2() == old_var.symbol.size2():
+                                        setattr(component_var, attribute, value[i, j])
+                                    elif value.size1() == old_var.symbol.size1():
+                                        setattr(component_var, attribute, value[i])
+                                    elif value.size2() == old_var.symbol.size2():
+                                        setattr(component_var, attribute, value[j])
+                                    else:
+                                        assert value.size1() == 1
+                                        assert value.size2() == 1
+                                        setattr(component_var, attribute, value)
+                                cols.append(component_var)
+                            rows.append(cols)
+                        symbols.append(old_var.symbol)
+                        values.append(ca.vertcat(*[ca.horzcat(*[v.symbol for v in row]) for row in rows]))
+                        new_vars.extend(itertools.chain.from_iterable(rows))
+                    else:
+                        new_vars.append(old_var)
+                setattr(self, l, new_vars)
+
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, symbols, values)
+                self.equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.equations))
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
+
+            # Replace values in metadata
+            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                for attribute in ast.Symbol.ATTRIBUTES:
+                    value = getattr(variable, attribute)
+                    if isinstance(value, ca.MX):
+                        [value] = ca.substitute([value], symbols, values)
+                        setattr(variable, attribute, value)
+
         if options.get('detect_aliases', False):
             logger.info("Detecting aliases")
 
-            states = OrderedDict({s.symbol.name() : s for s in self.states})
-            der_states = OrderedDict({s.symbol.name() : s for s in self.der_states})
-            alg_states = OrderedDict({s.symbol.name() : s for s in self.alg_states})
-            inputs = OrderedDict({s.symbol.name() : s for s in self.inputs})
-            outputs = OrderedDict({s.symbol.name() : s for s in self.outputs})
+            states = OrderedDict([(s.symbol.name(), s) for s in self.states])
+            der_states = OrderedDict([(s.symbol.name(), s) for s in self.der_states])
+            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
+            inputs = OrderedDict([(s.symbol.name(), s) for s in self.inputs])
+            outputs = OrderedDict([(s.symbol.name(), s) for s in self.outputs])
 
             all_states = OrderedDict()
             all_states.update(states)
@@ -349,7 +409,8 @@ class Model:
 
                     # If any of the aliases has a nondefault start value, apply it to
                     # the canonical state as well
-                    if np.isfinite(alias_state.start) and alias_state.start != 0:
+                    alias_state_start = ca.MX(alias_state.start)
+                    if alias_state_start.is_regular() and not alias_state_start.is_zero():
                         start = sign * alias_state.start
 
                     # The intersection of all bound ranges applies
@@ -407,7 +468,7 @@ class Model:
                     equations = [ca.reshape(ca.mtimes(A, states), equations.shape) + b]
                     setattr(self, equation_list, equations)
 
-        if options.get('expand', False):
+        if options.get('expand_mx', False):
             logger.info("Expanding MX graph")
             
             if len(self.equations) > 0:

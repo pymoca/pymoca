@@ -11,6 +11,10 @@ from typing import List, Union, Dict
 from collections import OrderedDict
 
 
+class ClassNotFoundError(Exception):
+    pass
+
+
 class Visibility(Enum):
     PRIVATE = 0, 'private'
     PROTECTED = 1, 'protected'
@@ -112,6 +116,69 @@ class ComponentRef(Node):
         self.child = []  # type: List[ComponentRef]
         super().__init__(**kwargs)
 
+    def __str__(self) -> str:
+        return ".".join(self.to_tuple())
+
+    def to_tuple(self) -> tuple:
+        """
+        Convert the nested component reference to flat tuple of names, which is
+        hashable and can therefore be used as dictionary key. Note that this
+        function ignores any array indices in the component reference.
+        :return: flattened tuple of c's names
+        """
+
+        if self.child:
+            return (self.name, ) + self.child[0].to_tuple()
+        else:
+            return (self.name, )
+
+    @classmethod
+    def from_tuple(cls, components: tuple) -> 'ComponentRef':
+        """
+        Convert the tuple pointing to a component to
+        a component reference.
+        :param components: tuple of components name
+        :return: ComponentRef
+        """
+
+        component_ref = ComponentRef(name=components[0], child=[])
+        c = component_ref
+        for component in components[1:]:
+            c.child.append(ComponentRef(name=component, child=[]))
+            c = c.child[0]
+        return component_ref
+
+    @classmethod
+    def from_string(cls, s: str) -> 'ComponentRef':
+        """
+        Convert the string pointing to a component using dot notation to
+        a component reference.
+        :param s: string pointing to component using dot notation
+        :return: ComponentRef
+        """
+
+        components = s.split('.')
+        return cls.from_tuple(components)
+
+    @classmethod
+    def concatenate(cls, *args: List['ComponentRef']) -> 'ComponentRef':
+        """
+        Helper function to append two component references to eachother, e.g.
+        a "within" component ref and an "object type" component ref.
+        :param a:
+        :param b:
+        :return: New component reference, with other appended to self.
+        """
+
+        a = copy.deepcopy(args[0])
+        n = a
+        for b in args[1:]:
+            while n.child:
+                n = n.child[0]
+            b = copy.deepcopy(b)  # Not strictly necessary
+            n.child = [b]
+        return a
+
 
 class Expression(Node):
     def __init__(self, **kwargs):
@@ -129,8 +196,8 @@ class IfExpression(Node):
 
 class Equation(Node):
     def __init__(self, **kwargs):
-        self.left = None  # type: Union[Expression, Primary, ComponentRef]
-        self.right = None  # type: Union[Expression, Primary, ComponentRef]
+        self.left = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.right = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
@@ -176,8 +243,8 @@ class AssignmentStatement(Node):
 
 class IfStatement(Node):
     def __init__(self, **kwargs):
-        self.expressions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
@@ -185,7 +252,7 @@ class IfStatement(Node):
 class ForStatement(Node):
     def __init__(self, **kwargs):
         self.indices = []  # type: List[ForIndex]
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
@@ -233,14 +300,14 @@ class ComponentClause(Node):
 class EquationSection(Node):
     def __init__(self, **kwargs):
         self.initial = False  # type: bool
-        self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
+        self.equations = []  # type: List[Union[Equation, IfEquation, ForEquation, ConnectClause]]
         super().__init__(**kwargs)
 
 
 class AlgorithmSection(Node):
     def __init__(self, **kwargs):
         self.initial = False  # type: bool
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         super().__init__(**kwargs)
 
 
@@ -309,10 +376,11 @@ class Class(Node):
         self.comment = ''  # type: str
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
+        self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
-        self.initial_statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
-        self.statements = []  # type: List[Union[AssignmentStatement, ForStatement]]
+        self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
+        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.within = []  # type: List[ComponentRef]
         super().__init__(**kwargs)
 
@@ -326,33 +394,6 @@ class File(Node):
         self.within = []  # type: List[ComponentRef]
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         super().__init__(**kwargs)
-
-    def find_class(self, component_ref: ComponentRef) -> Class:
-        """
-        Find the class that a component is defined in
-        :param component_ref: component reference
-        :return: the class that contains the ref
-        """
-        name = component_ref.name
-        for c_name in self.classes.keys():
-            c = self.classes[c_name]
-            if component_ref.name in c.symbols.keys():
-                return c
-        raise KeyError('symbol {:s} not found'.format(name))
-
-    def find_symbol(self, c: Class, component_ref: ComponentRef) -> Symbol:
-        """
-        Given a component ref, lookup the symbol in the given class
-        :param c: class to look in
-        :param component_ref: component reference
-        :return: the symbol
-        """
-        sym = c.symbols[component_ref.name]
-        if len(component_ref.child) > 0:
-            c = self.find_class(sym.type)
-            return self.find_symbol(c, component_ref.child[0])
-        else:
-            return sym
 
 
 class Collection(Node):
@@ -370,15 +411,15 @@ class Collection(Node):
 
     def _build_class_lookup_for_class(self, c, within):
         if within:
-            full_name = merge_component_ref(within, ComponentRef(name=c.name))
+            full_name = ComponentRef.concatenate(within, ComponentRef(name=c.name))
         else:
             full_name = ComponentRef(name=c.name)
 
         # FIXME: Do we have to convert to string?
-        self._class_lookup[component_ref_to_tuple(full_name)] = c
+        self._class_lookup[full_name.to_tuple()] = c
 
         if within:
-            within = merge_component_ref(within, ComponentRef(name=c.name))
+            within = ComponentRef.concatenate(within, ComponentRef(name=c.name))
         else:
             within = ComponentRef(name=c.name)
         for nested_c in c.classes.values():
@@ -395,40 +436,51 @@ class Collection(Node):
     def extend(self, other):
         self.files.extend(other.files)
 
-    def find_class(self, component_ref: Union[ComponentRef, str], within: list = None, check_builtin_classes=False):
+    def find_class(self, component_ref: ComponentRef, within: list = None, check_builtin_classes=False, return_ref=False):
         if check_builtin_classes:
             if component_ref.name in ["Real", "Integer", "String", "Boolean"]:
                 c = Class(name=component_ref.name)
                 c.type = "__builtin"
 
-                s = Symbol(name="__value", type=ComponentRef(name=component_ref.name))
+                cref = ComponentRef(name=component_ref.name)
+                s = Symbol(name="__value", type=cref)
                 c.symbols[s.name] = s
 
-                return c
+                if return_ref:
+                    return c, cref
+                else:
+                    return c
 
         if self._class_lookup is None:
             self._build_class_lookup()
 
-        if isinstance(component_ref, str):
-            assert component_ref.find('.') == -1
-            component_ref = ComponentRef(name=component_ref)
+        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
+        # Odds are that these types of lookups are not parsed yet. We would expet an empty first name, with a non-empty child.
 
-        if within:
-            full_name = merge_component_ref(within[0], component_ref)
-        else:
-            full_name = component_ref
-
+        # Lookup the referenced class, walking up the tree from the current
+        # node until the root node.
         c = None
 
-        # Try relative lookup
-        c = self._class_lookup.get(component_ref_to_tuple(full_name), None)
+        if within:
+            within_tuple = within[0].to_tuple()
+        else:
+            within_tuple = tuple()
 
-        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
-        # TODO: Should we traverse up the tree, or just try twice (once relative to current class, once absolute = relative to root)
+        cref_tuple = component_ref.to_tuple()
 
-        # Try absolute lookup
-        if c is None:
-            c = self._class_lookup.get(component_ref_to_tuple(component_ref), None)
+        prev_tuple = None
+
+        while c is None:
+            c = self._class_lookup.get(within_tuple + cref_tuple, None)
+
+            prev_tuple = within_tuple + cref_tuple
+
+            if within_tuple:
+                within_tuple = within_tuple[:-1]
+            else:
+                # Finished traversing up the tree all the way to the root. No
+                # more lookups possible.
+                break
 
         if c is None:
             # Class not found
@@ -437,9 +489,12 @@ class Collection(Node):
                 # KeyError for what are likely to be elementary types
                 raise KeyError
             else:
-                raise Exception("Could not find class {}".format(component_ref))
+                raise ClassNotFoundError("Could not find class {}".format(component_ref))
 
-        return c
+        if return_ref:
+            return c, ComponentRef.from_tuple(prev_tuple)
+        else:
+            return c
 
     def find_symbol(self, node, component_ref: ComponentRef) -> Symbol:
         sym = node.symbols[component_ref.name]
@@ -448,54 +503,3 @@ class Collection(Node):
             return self.find_symbol(node, component_ref.child[0])
         else:
             return sym
-
-
-def compare_component_ref(this: ComponentRef, other: ComponentRef) -> bool:
-    """
-    Helper function to compare component references to each other without converting to JSON
-    :param this:
-    :param other:
-    :return: boolean, true if match
-    """
-    if len(this.child) != len(other.child):
-        return False
-
-    if this.child and other.child:
-        return compare_component_ref(this.child[0], other.child[0])
-
-    return this.__dict__ == other.__dict__
-
-
-def merge_component_ref(a: ComponentRef, b: ComponentRef) -> ComponentRef:
-    """
-    Helper function to append two component references to eachother, e.g.
-    a "within" component ref and an "object type" component ref.
-    :param a:
-    :param b:
-    :return: component reference, with b appended to a.
-    """
-
-    a = copy.deepcopy(a)
-    b = copy.deepcopy(b)  # Not strictly necessary
-
-    n = a
-    while n.child:
-        n = n.child[0]
-    n.child = [b]
-
-    return a
-
-
-def component_ref_to_tuple(c: ComponentRef) -> tuple:
-    """
-    Convert the nested component reference to flat tuple of names, which is
-    hashable and can therefore be used as dictionary key. Note that this
-    function ignores any array indices in the component reference.
-    :param c:
-    :return: flattened tuple of c's names
-    """
-
-    if c.child:
-        return (c.name, ) + component_ref_to_tuple(c.child[0])
-    else:
-        return (c.name, )
