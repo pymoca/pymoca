@@ -15,7 +15,7 @@ import numpy as np
 import pymola.backends.casadi.generator as gen_casadi
 from pymola.backends.casadi.model import Model, Variable
 from pymola.backends.casadi.api import transfer_model, CachedModel
-from pymola import parser
+from pymola import parser, ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -284,6 +284,27 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_tree_lookup(self):
+        with open(os.path.join(TEST_DIR, 'TreeLookup.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        casadi_model = gen_casadi.generate(ast_tree, 'Level1.Level2.Level3.Test')
+        ref_model = Model()
+        print(casadi_model)
+
+        elem__tc__i = ca.MX.sym("elem.tc.i")
+        elem__tc__a = ca.MX.sym("elem.tc.a")
+        b = ca.MX.sym("b")
+
+        ref_model.alg_states = map(Variable, [elem__tc__i, elem__tc__a, b])
+
+        ref_model.equations = [elem__tc__i - 1,
+                               elem__tc__a - b]
+
+        print(ref_model)
+        self.assert_model_equivalent(ref_model, casadi_model)
+
     def test_duplicate(self):
         with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
             txt = f.read()
@@ -427,7 +448,6 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
-    @unittest.expectedFailure
     def test_function_call(self):
         with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
             txt = f.read()
@@ -436,11 +456,20 @@ class GenCasadiTest(unittest.TestCase):
         print("FunctionCall", casadi_model)
         ref_model = Model()
 
+        radius = ca.MX.sym('radius')
+        diameter = radius * 2
+        circle_properties = ca.Function('circle_properties', [radius], [3.14159*diameter, 3.14159*radius**2, ca.if_else(3.14159*radius**2 > 10, 1, 2), ca.if_else(3.14159*radius**2 > 10, 10, 3.14159*radius**2), 8, 3, 12])
+
         c = ca.MX.sym("c")
         a = ca.MX.sym("a")
+        d = ca.MX.sym("d")
+        e = ca.MX.sym("e")
+        S1 = ca.MX.sym("S1")
+        S2 = ca.MX.sym("S2")
         r = ca.MX.sym("r")
-        ref_model.alg_states = list(map(Variable, [c, a, r]))
-        ref_model.equations = [c - 3.14159*r*2, a - 3.14159*r**2]
+        ref_model.alg_states = list(map(Variable, [c, a, d, e, S1, S2, r]))
+        ref_model.outputs = list(map(Variable, [c, a, d, e, S1, S2]))
+        ref_model.equations = [ca.vertcat(c, a, d, e, S1, S2) - ca.vertcat(*circle_properties.call([r])[0:-1])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -513,7 +542,7 @@ class GenCasadiTest(unittest.TestCase):
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
         ref_model.equations = [c - (a + b[0:3] * e), d - (ca.sin(a / b[1:4])), e - (d + scalar_f), g - ca.sum1(c),
-                               h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - ca.DM.zeros(3),
+                               h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - np.array([4, 5, 6]),
                                nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1],
                                arcw[0] + arcw[1], a - np.array([1, 2, 3]), scalar_f - 1.3]
 
@@ -963,6 +992,30 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEquals(casadi_model.states[0].aliases, ['-alias'])
 
+    def test_simplify_expand_vectors(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'expand_vectors': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'SimplifyVector', compiler_options)
+
+        ref_model = Model()
+
+        x0 = ca.MX.sym('x[0]')
+        x1 = ca.MX.sym('x[1]')
+        der_x0 = ca.MX.sym('der(x)[0]')
+        der_x1 = ca.MX.sym('der(x)[1]')
+
+        ref_model.states = list(map(Variable, [x0, x1]))
+        ref_model.der_states = list(map(Variable, [der_x0, der_x1]))
+        ref_model.alg_states = list(map(Variable, []))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        ref_model.equations = [der_x0 - x0, der_x1 - x1]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
     def test_simplify_reduce_affine_expression(self):
         # Create model, cache it, and load the cache
         compiler_options = \
@@ -1029,7 +1082,8 @@ class GenCasadiTest(unittest.TestCase):
     def test_simplify_all(self):
         # Create model, cache it, and load the cache
         compiler_options = \
-            {'replace_constant_values': True,
+            {'expand_vectors': True,
+             'replace_constant_values': True,
              'replace_constant_expressions': True,
              'replace_parameter_values': True,
              'replace_parameter_expressions': True,
@@ -1078,10 +1132,10 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
-    def test_simplify_expand(self):
+    def test_simplify_expand_mx(self):
         # Create model, cache it, and load the cache
         compiler_options = \
-            {'expand': True}
+            {'expand_mx': True}
 
         casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
 
