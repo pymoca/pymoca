@@ -586,11 +586,8 @@ class ASTListener(ModelicaListener):
             modifications = self.ast[ctx.modification()]
         else:
             modifications = []
-        self.ast[ctx] = ast.ElementModification(component=component, modifications=modifications)
 
-        sym = self.symbol_node
-        if component.name in ast.Symbol.ATTRIBUTES:
-            setattr(sym, component.name, self.ast[ctx.modification().expression()])
+        self.ast[ctx] = ast.ElementModification(component=component, modifications=modifications)
 
     def exitModification_class(self, ctx):
         self.ast[ctx] = [self.ast[ctx.class_modification()]]
