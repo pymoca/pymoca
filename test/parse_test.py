@@ -108,6 +108,8 @@ class ParseTest(unittest.TestCase):
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='C2'))
 
         self.assertEqual(flat_tree.classes['C2'].symbols['bcomp1.b'].value.value, 3.0)
+        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp3.a'].value.value, 1.0)
+        self.assertEqual(flat_tree.classes['C2'].symbols['bcomp3.b'].value.value, 2.0)
 
     def test_nested_classes(self):
         with open(os.path.join(TEST_DIR, 'NestedClasses.mo'), 'r') as f:
@@ -186,6 +188,75 @@ class ParseTest(unittest.TestCase):
         # Check if user-specified function call statement comes along properly
         self.assertEqual(func_f.statements[0].right.operands[0].operator,
                          'Level1.Level2.Level3.TestPackage.times2')
+
+    def test_nested_symbol_modification(self):
+        with open(os.path.join(TEST_DIR, 'NestedSymbolModification.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'E'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertEqual(flat_tree.classes['E'].symbols['c.x'].nominal.value, 2.0)
+
+    def test_redeclare_in_extends(self):
+        with open(os.path.join(TEST_DIR, 'RedeclareInExtends.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'ChannelZ'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertIn('down.Z', flat_tree.classes['ChannelZ'].symbols)
+
+    def test_redeclaration_scope(self):
+        with open(os.path.join(TEST_DIR, 'RedeclarationScope.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'ChannelZ'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertIn('down.A', flat_tree.classes['ChannelZ'].symbols)
+
+    def test_extends_redeclareable(self):
+        with open(os.path.join(TEST_DIR, 'ExtendsRedeclareable.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'E'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertIn('z.y', flat_tree.classes['E'].symbols)
+        self.assertEqual(flat_tree.classes['E'].symbols['z.y'].nominal.value, 2.0)
+
+    def test_redeclare_nested(self):
+        with open(os.path.join(TEST_DIR, 'RedeclareNestedClass.mo.fail_parse'), 'r') as f:
+            txt = f.read()
+
+        with self.assertRaises(Exception):
+            ast_tree = parser.parse(txt)
+
+    def test_extends_order(self):
+        with open(os.path.join(TEST_DIR, 'ExtendsOrder.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'P.M'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertEqual(flat_tree.classes['M'].symbols['at.m'].value.value, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
