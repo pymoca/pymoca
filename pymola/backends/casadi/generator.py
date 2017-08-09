@@ -71,7 +71,7 @@ Assignment = namedtuple('Assignment', ['left', 'right'])
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
-    def __init__(self, root: ast.Collection, class_name: str):
+    def __init__(self, root: ast.Tree, class_name: str):
         super(Generator, self).__init__()
         self.src = {}
         self.model = Model()
@@ -619,7 +619,7 @@ class Generator(TreeListener):
         return function
 
 
-def generate(ast_tree: ast.Collection, model_name: str) -> Model:
+def generate(ast_tree: ast.Tree, model_name: str) -> Model:
     """
     :param ast_tree: AST to generate from
     :param model_name: class to generate

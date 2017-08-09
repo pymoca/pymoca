@@ -7,7 +7,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 import antlr4
 import antlr4.Parser
 from typing import Dict
-from collections import deque
+from collections import deque, OrderedDict
 import copy
 
 from . import ast
@@ -23,13 +23,19 @@ from .generated.ModelicaParser import ModelicaParser
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
+class ModelicaFile:
+    def __init__(self, **kwargs):
+        self.within = []  # type: List[ComponentRef]
+        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
+        super().__init__(**kwargs)
+
 
 # noinspection PyPep8Naming
 class ASTListener(ModelicaListener):
     def __init__(self):
+        self.file_node = None  # type: ModelicaFile
         self.ast = {}  # type: Dict[ast.Node]
         self.ast_result = None  # type: ast.Node
-        self.file_node = None  # type: ast.File
         self.class_nodes = deque([ast.Class()])  # type: deque[ast.Class]
         self.comp_clause = None  # type: ast.ComponentClause
         self.eq_sect = None  # type: ast.EquationSection
@@ -47,7 +53,7 @@ class ASTListener(ModelicaListener):
 
     def enterStored_definition(self, ctx):
 
-        file_node = ast.File()
+        file_node = ModelicaFile()
         self.ast[ctx] = file_node
         self.file_node = file_node
 
@@ -144,10 +150,14 @@ class ASTListener(ModelicaListener):
                     self.class_node.statements += alglist.statements
 
     def exitArgument(self, ctx):
+        argument = ast.ClassModificationArgument()
         if ctx.element_modification_or_replaceable() is not None:
-            self.ast[ctx] = self.ast[ctx.element_modification_or_replaceable()]
+            argument.value = self.ast[ctx.element_modification_or_replaceable()]
+            argument.redeclare = False
         else:
-            self.ast[ctx] = self.ast[ctx.element_redeclaration()]
+            argument.value = self.ast[ctx.element_redeclaration()]
+            argument.redeclare = True
+        self.ast[ctx] = argument
 
     def exitArgument_list(self, ctx):
         self.ast[ctx] = [self.ast[a] for a in ctx.argument()]
@@ -439,6 +449,9 @@ class ASTListener(ModelicaListener):
     def enterExtends_clause(self, ctx):
         self.in_extends_clause = True
 
+    def enterExtends_clause(self, ctx):
+        self.in_extends_clause = True
+
     def exitExtends_clause(self, ctx):
         if ctx.class_modification() is not None:
             class_modification = self.ast[ctx.class_modification()]
@@ -447,6 +460,8 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
                                           class_modification=class_modification)
         self.class_node.extends += [self.ast[ctx]]
+
+        self.in_extends_clause = False
 
         self.in_extends_clause = False
 
@@ -629,6 +644,24 @@ class ASTListener(ModelicaListener):
 
 
 # UTILITY FUNCTIONS ========================================================
+def file_to_tree(f: ModelicaFile) -> ast.Tree:
+    # TODO: We can only insert where classes exist. For example, if we have a
+    # within statement, we have to check if the nodes of the within statement
+    # are actually in the tree, and if not raise an exception.
+    root = ast.Tree()
+    insert_node = root
+    if f.within:
+        for p in f.within[0].to_tuple():
+            package = ast.Class(name=p, type="package")
+            insert_node.classes[p] = package
+            insert_node = package
+
+    insert_node.classes.update(f.classes)
+
+    root.update_parent_refs()
+
+    return root
+
 def parse(text):
     input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
@@ -639,8 +672,5 @@ def parse(text):
     ast_listener = ASTListener()
     parse_walker = antlr4.ParseTreeWalker()
     parse_walker.walk(ast_listener, parse_tree)
-    ast_tree = ast_listener.ast_result
-    # TODO: This is not the prettiest way, but avoid having to instantiate a
-    # Collection every time we want to parse+flatten a single file.
-    ast_tree = ast.Collection(files=[ast_tree])
-    return ast_tree
+    modelica_file = ast_listener.ast_result
+    return file_to_tree(modelica_file)
