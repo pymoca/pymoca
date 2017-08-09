@@ -264,6 +264,16 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     if modification_environment is not None:
         extended_orig_class.modification_environment.arguments.extend(modification_environment.arguments)
 
+    # If the current class is inheriting an elementary type, we shift modifications from the class to its __value symbol
+    if extended_orig_class.type == "__builtin":
+        if extended_orig_class.symbols['__value'].class_modification is not None:
+            extended_orig_class.symbols['__value'].class_modification.arguments.extend(
+                extended_orig_class.modification_environment.arguments)
+        else:
+            extended_orig_class.symbols['__value'].class_modification = extended_orig_class.modification_environment
+
+        extended_orig_class.modification_environment = ast.ClassModification()
+
     return extended_orig_class
 
 
@@ -293,6 +303,10 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
     # ShortClassDefinitions (which are both redeclares). There are still
     # possible redeclares in symbols though.
 
+    # TODO: Remove redundancy in code below. Filtering of arguments and
+    # shifting of modifications is fairly similar for both classes, elementary
+    # symbols, and non-elementary symbols.
+
     # Merge/pass along modifications for classes
     for class_name, c in extended_orig_class.classes.items():
         sub_class_modification = ast.ClassModification()
@@ -321,7 +335,48 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
             else:
                 c = sym.type
         except ast.FoundElementaryClassError:
-            pass  # Do nothing
+            # Symbol is elementary type. Check if we need to move any modifications to the symbol.
+            sym_arguments = [x for x in extended_orig_class.modification_environment.arguments
+                             if isinstance(x.value, ast.ElementModification) and x.value.component.name == sym_name]
+
+            # Remove from current class's modification environment
+            extended_orig_class.modification_environment.arguments = [
+                x for x in extended_orig_class.modification_environment.arguments if x not in sym_arguments]
+
+            sym_mod = ast.ClassModification()
+
+            for arg in sym_arguments:
+                if arg.value.component.indices:
+                    raise Exception("Subscripting modifiers is not allowed.")
+                for el_arg in arg.value.modifications:
+                    # Behavior is different depending on whether the value is
+                    # being set (which is an unnamed field not explicitly
+                    # referred to), or a named attribute (e.g. nominal, min,
+                    # etc).
+
+                    if not isinstance(el_arg, ast.ClassModification):
+                        # If the value is being set, we make a new class
+                        # modification with attribute name "value" that we
+                        # pick up later in modify_symbol()
+
+                        # TODO: Is it also possible for users to say
+                        # x(nominal=1.0, value=3.0), and that x = 3.0 is
+                        # just a shorthand for x(value=3.0)
+
+                        # TODO: Figure out if it's easier to directly do this
+                        # in the parser.
+                        vmod_arg = ast.ClassModificationArgument()
+                        vmod_arg.value = ast.ElementModification()
+                        vmod_arg.value.component = ast.ComponentRef(name="value")
+                        vmod_arg.value.modifications = [el_arg]
+                        sym_mod.arguments.append(vmod_arg)
+                    else:
+                        sym_mod.arguments.extend(el_arg.arguments)
+
+            if sym.class_modification:
+                sym.class_modification.arguments.extend(sym_mod.arguments)
+            else:
+                sym.class_modification = sym_mod
         else:
             # Symbol is not elementary type. Check if we need to move any modifications along.
             sym_arguments = [x for x in extended_orig_class.modification_environment.arguments
@@ -331,7 +386,7 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
             extended_orig_class.modification_environment.arguments = [
                 x for x in extended_orig_class.modification_environment.arguments if x not in sym_arguments]
 
-            # Fix component references and set correct scope for possible lookup
+            # Fix component references
             for arg in sym_arguments:
                 if arg.value.component.indices:
                     raise Exception("Subscripting modifiers is not allowed.")
@@ -365,8 +420,6 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
     else:
         instance_prefix = instance_name
 
-    modify_class(class_, class_.modification_environment)
-
     # for all symbols in the original class
     for sym_name, sym in class_.symbols.items():
 
@@ -386,7 +439,7 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
             # Elementary type
             flat_class.symbols[flat_sym.name] = flat_sym
         elif sym.type.type == "__builtin":
-            modify_class(sym.type, sym.type.modification_environment)
+            # Built-in type. No flattening to be done, just copying over all attributes.
             flat_class.symbols[flat_sym.name] = flat_sym
             for att in flat_sym.ATTRIBUTES + ["type"]:
                 setattr(flat_class.symbols[flat_sym.name], att, getattr(sym.type.symbols['__value'], att))
@@ -478,52 +531,45 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
 def flatten_class(orig_class: ast.Class) -> ast.Class:
     # First we build a tree of the to-be-flattened class, with all symbol
     # types expanded to classes as well. Modifications are shifted/passed
-    # along to child classes. No symbol flattening is performed.
+    # along to child classes.
+    # Note that no element modifications are applied (e.g of values, nominals,
+    # etc), and no symbol flattening is performed.
     instance_tree = build_instance_tree(orig_class, parent=orig_class.parent)
 
-    # Apply remaining symbol modifications, i.e. those on elementary types,
-    # because we do not handle those as classes.
-    apply_elementary_symbol_modifications(instance_tree)
+    # At this point:
+    # 1. All redeclarations have been handled.
+    # 2. InstanceClasses have no modifications anymore, nor do non-elementary
+    #    symbols. All modifications have been shifted to Symbols that are of
+    #    one of the elementary types (Real, Integer, ...).
 
-    # At this point there are:
-    # 1. No symbol modifiers left (everything is shifted to the
-    #    InstanceClass's modification environment, or has been applied to
-    #    elementary symbols)
-    # 2. No redeclarations left, only ElementModifications
+    # Now we apply those symbol modifications on the instance tree.
+    apply_symbol_modifications(instance_tree)
 
-    # And finally we flatten all symbols.
+    # At this point there are no modifications left, on classes or symbols of whatever kind.
+
+    # Finally we flatten all symbols.
     flat_class = flatten_symbols(instance_tree)
 
     return flat_class
 
 
-def modify_class(class_or_sym: Union[ast.Class, ast.Symbol], modification=None):
+def modify_symbol(sym: ast.Symbol) -> None:
     """
-    Apply a modification to a class or symbol.
-    :param class_or_sym: class or symbol to modify
-    :param modification: modification to apply
-    :return:
+    Apply a modification to a symbol.
+    :param sym: symbol to apply modifications for
     """
-    for class_mod_argument in modification.arguments:
+    for class_mod_argument in sym.class_modification.arguments:
         argument = class_mod_argument.value
-        if not isinstance(argument, ast.ElementModification):
-            raise Exception('Unsupported class modification argument {}'.format(argument))
 
-        if argument.component.name in ast.Symbol.ATTRIBUTES:
-            if isinstance(class_or_sym, ast.Class):
-                assert class_or_sym.type == "__builtin"
-                setattr(class_or_sym.symbols['__value'], argument.component.name, argument.modifications[0])
-            else:
-                setattr(class_or_sym, argument.component.name, argument.modifications[0])
-        else:
-            s = class_or_sym.symbols[argument.component.name]
+        assert isinstance(argument, ast.ElementModification), \
+            "Found redeclaration modification which should already have been handled."
 
-            for modification in argument.modifications:
-                if isinstance(modification, ast.ClassModification):
-                    s.__dict__.update(modify_class(s, modification).__dict__)
-                else:
-                    s.value = modification
-    return class_or_sym
+        # TODO: Strip all non-symbol stuff.
+        if argument.component.name not in ast.Symbol.ATTRIBUTES:
+            raise Exception("Trying to set unknown symbol property {}".format(argument.component.name))
+
+        setattr(sym, argument.component.name, argument.modifications[0])
+
 
 
 class ComponentRefFlattener(TreeListener):
@@ -798,7 +844,7 @@ def fully_scope_function_calls(node: ast.Tree, expression: ast.Expression, funct
     return expression_copy
 
 
-class ElementarySymbolModificationApplier(TreeListener):
+class SymbolModificationApplier(TreeListener):
     """
     This walker applies all modifications on elementary types (e.g. Real,
     Integer, etc.). It also checks if there are any lingering modifications
@@ -812,19 +858,23 @@ class ElementarySymbolModificationApplier(TreeListener):
 
     def exitSymbol(self, tree: ast.Symbol):
         if not isinstance(tree.type, ast.ComponentRef):
-            assert tree.class_modification is None, "Found non-None symbol modification in instance tree."
+            assert tree.class_modification is None, \
+                "Found symbol modification on non-elementary type in instance tree."
         elif tree.class_modification is not None:
-            # Apply any elemen
-            modify_class(tree, tree.class_modification)
+            modify_symbol(tree)
             tree.class_modification = None
 
     def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
         assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
 
+    def exitInstanceClass(self, tree: ast.InstanceClass):
+        assert tree.modification_environment is None or not tree.modification_environment.arguments, \
+            "Found unhandled modification on instance class."
 
-def apply_elementary_symbol_modifications(node: ast.Node) -> None:
+
+def apply_symbol_modifications(node: ast.Node) -> None:
     w = TreeWalker()
-    w.walk(ElementarySymbolModificationApplier(node), node)
+    w.walk(SymbolModificationApplier(node), node)
 
 
 def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
