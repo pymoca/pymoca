@@ -19,7 +19,7 @@ class SympyGenerator(TreeListener):
         super(SympyGenerator, self).__init__()
         self.src = {}
 
-    def exitFile(self, tree: ast.File):
+    def exitTree(self, tree: ast.Tree):
         d = {'classes': []}
         for key in sorted(tree.classes.keys()):
             d['classes'] += [self.src[tree.classes[key]]]
@@ -200,7 +200,7 @@ class {{tree.name}}(OdeModel):
             right=self.src[tree.right])
 
 
-def generate(ast_tree: ast.Collection, model_name: str):
+def generate(ast_tree: ast.Tree, model_name: str):
     """
     :param ast_tree: AST to generate from
     :param model_name: class to generate
