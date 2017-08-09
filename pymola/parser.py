@@ -37,6 +37,7 @@ class ASTListener(ModelicaListener):
         self.symbol_node = None  # type: ast.Symbol
         self.eq_comment = None  # type: str
         self.sym_count = 0  # type: int
+        self.in_extends_clause = False
 
     @property
     def class_node(self):
@@ -435,6 +436,9 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] = ast.ImportFromClause(component=component, symbols=symbols)
         self.class_node.imports += [self.ast[ctx]]
 
+    def enterExtends_clause(self, ctx):
+        self.in_extends_clause = True
+
     def exitExtends_clause(self, ctx):
         if ctx.class_modification() is not None:
             class_modification = self.ast[ctx.class_modification()]
@@ -443,6 +447,8 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
                                           class_modification=class_modification)
         self.class_node.extends += [self.ast[ctx]]
+
+        self.in_extends_clause = False
 
     def exitRegular_element(self, ctx):
         if ctx.comp_elem is not None:
@@ -548,9 +554,12 @@ class ASTListener(ModelicaListener):
         sym.dimensions = dimensions
         sym.prefixes = self.comp_clause.prefixes
         sym.type = self.comp_clause.type
-        if sym.name in self.class_node.symbols:
-            raise IOError(sym.name, 'already defined')
-        self.class_node.symbols[sym.name] = sym
+
+        # Declarations can also occur in extends clauses, in which case we do not have to add it to the class's symbols.
+        if not self.in_extends_clause:
+            if sym.name in self.class_node.symbols:
+                raise IOError(sym.name, 'already defined')
+            self.class_node.symbols[sym.name] = sym
 
     def exitDeclaration(self, ctx):
         sym = self.symbol_node
