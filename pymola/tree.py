@@ -909,8 +909,8 @@ def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
     # putting them prior to the model class so that they are visited
     # first by the tree walker.
     functions_and_classes = flat_class.functions
+    flat_class.functions = OrderedDict()
     functions_and_classes.update(root.classes)
     root.classes = functions_and_classes
-    flat_class.functions = OrderedDict()
 
     return root
