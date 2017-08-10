@@ -285,11 +285,13 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
     for class_mod_argument in extended_orig_class.modification_environment.arguments:
         if not class_mod_argument.redeclare:
             continue
+        scope_class = class_mod_argument.scope if class_mod_argument.scope is not None else extended_orig_class
         argument = class_mod_argument.value
         if isinstance(argument, ast.ShortClassDefinition):
-            extended_orig_class.classes[argument.name] = extended_orig_class.find_class(argument.component)
+            extended_orig_class.classes[argument.name] = scope_class.find_class(argument.component)
         elif isinstance(argument, ast.ComponentClause):
             # Redeclaration of symbols
+            # TODO: Do we need to handle scoping of redeclarations of symbols?
             for s in argument.symbol_list:
                 extended_orig_class.symbols[s.name].type = s.type
         else:
@@ -399,6 +401,11 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
                 sym_modification = ast.ClassModification()
                 sym_modification.arguments = sym_arguments
                 sym.class_modification = sym_modification
+
+            # Set the correct scope, e.g. for redeclaration modifications
+            for arg in sym.class_modification.arguments:
+                if arg.scope is None:
+                    arg.scope = extended_orig_class
 
             sym.type = build_instance_tree(c, sym.class_modification, c.parent)
             sym.class_modification = None
