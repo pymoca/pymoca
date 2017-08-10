@@ -26,7 +26,5 @@ equation
 end Channel;
 
 model ChannelZ
-    extends Channel(redeclare connector port = HQZ);
+    Channel c(redeclare connector port = HQZ);
 end ChannelZ;
-
-// We get .A, and not .Z

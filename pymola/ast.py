@@ -83,7 +83,7 @@ class Node(object):
             res = {key: cls.to_json(var[key]) for key in var.keys()}
         elif isinstance(var, Node):
             res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()
-                   if key not in ('root', 'parent')}
+                   if key not in ('root', 'parent', 'scope')}
         elif isinstance(var, Visibility):
             res = str(var)
         else:
@@ -360,6 +360,7 @@ class ClassModification(Node):
 class ClassModificationArgument(Node):
     def __init__(self, **kwargs):
         self.value = []  # type: Union[ElementModification, ComponentClause, ShortClassDefinition]
+        self.scope = None  # type: InstanceClass
         self.redeclare = False
         super().__init__(**kwargs)
 

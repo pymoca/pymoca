@@ -223,7 +223,8 @@ class ParseTest(unittest.TestCase):
 
         flat_tree = tree.flatten(ast_tree, comp_ref)
 
-        self.assertIn('down.A', flat_tree.classes['ChannelZ'].symbols)
+        self.assertIn('c.up.Z', flat_tree.classes['ChannelZ'].symbols)
+        self.assertIn('c.down.A', flat_tree.classes['ChannelZ'].symbols)
 
     def test_extends_redeclareable(self):
         with open(os.path.join(TEST_DIR, 'ExtendsRedeclareable.mo'), 'r') as f:
