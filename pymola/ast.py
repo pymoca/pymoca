@@ -440,6 +440,17 @@ class Class(Node):
 
         return c
 
+    def find_symbol(self, component_ref: ComponentRef) -> Symbol:
+        if component_ref.child:
+            t = component_ref.to_tuple()
+            class_cref, sym_name = t[:-1], t[-1]
+            node = self.find_class(ComponentRef.from_tuple(class_cref))
+        else:
+            sym_name = component_ref.name
+            node = self
+        return node.symbols[sym_name]
+
+
     def full_reference(self):
         names = []
 

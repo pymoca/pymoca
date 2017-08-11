@@ -704,6 +704,51 @@ def apply_symbol_modifications(node: ast.Node) -> None:
     w.walk(SymbolModificationApplier(node), node)
 
 
+class ConstantReferenceApplier(TreeListener):
+    """
+    This walker applies all references to constants. For each referenced
+    constant it makes a symbol in the passed in InstanceClass class_, with the
+    flattened component reference to the constant as the symbol's name.
+    """
+
+    def __init__(self, class_: ast.InstanceClass):
+        self.classes = []
+
+        # We cannot directly mutate the dictionary while we are looping over
+        # it, so instead we store symbol updates here.
+        self.extra_symbols = OrderedDict()
+
+        super().__init__()
+
+    def enterComponentRef(self, tree: ast.ComponentRef):
+        # If it is not a nested comonent reference, we do not have to do
+        # anyhing as the symbol we look for would already be in the current
+        # class
+        if tree.child:
+            try:
+                s = self.classes[-1].find_symbol(tree)
+                if 'constant' in s.prefixes:
+                    self.extra_symbols[str(tree)] = s
+            except (KeyError, ast.ClassNotFoundError, ast.FoundElementaryClassError):
+                pass
+
+    def enterInstanceClass(self, tree: ast.InstanceClass):
+        self.classes.append(tree)
+
+    def exitInstanceClass(self, tree: ast.InstanceClass):
+        c = self.classes.pop()
+        c.symbols.update(self.extra_symbols)
+        self.extra_symbols = OrderedDict()
+
+    def enterClass(self, tree: ast.InstanceClass):
+        assert False, "All classes should have been replaced by instance classes."
+
+
+def apply_constant_references(class_: ast.InstanceClass) -> None:
+    w = TreeWalker()
+    w.walk(ConstantReferenceApplier(class_), class_)
+
+
 def flatten_class(orig_class: ast.Class) -> ast.Class:
     # First we build a tree of the to-be-flattened class, with all symbol
     # types expanded to classes as well. Modifications are shifted/passed
@@ -722,6 +767,9 @@ def flatten_class(orig_class: ast.Class) -> ast.Class:
     apply_symbol_modifications(instance_tree)
 
     # At this point there are no modifications left, on classes or symbols of whatever kind.
+
+    # Pull references to constants
+    apply_constant_references(instance_tree)
 
     # Finally we flatten all symbols.
     flat_class = flatten_symbols(instance_tree)

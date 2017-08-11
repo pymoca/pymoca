@@ -258,6 +258,17 @@ class ParseTest(unittest.TestCase):
 
         self.assertEqual(flat_tree.classes['M'].symbols['at.m'].value.value, 0.0)
 
+    def test_constant_references(self):
+        with open(os.path.join(TEST_DIR, 'ConstantReferences.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'b'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertEqual(flat_tree.classes['b'].symbols['m.p'].value.value, 2.0)
 
 if __name__ == "__main__":
     unittest.main()
