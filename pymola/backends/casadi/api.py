@@ -125,10 +125,16 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         library_name = '{}_{}'.format(model_name, o)
 
         cg = ca.CodeGenerator(library_name)
+
+        # Create temporary variables to keep the functions in scope
+        # cfr casadi bug #2059
+        fr = f.reverse(1)
+        ff = f.forward(1)
+        frf = fr.forward(1)
         cg.add(f)
-        cg.add(f.forward(1))
-        cg.add(f.reverse(1))
-        cg.add(f.reverse(1).forward(1))
+        cg.add(ff)
+        cg.add(fr)
+        cg.add(frf)
         cg.generate(model_folder + '/')
 
         compiler = distutils.ccompiler.new_compiler()
