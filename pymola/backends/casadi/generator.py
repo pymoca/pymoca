@@ -489,6 +489,7 @@ class Generator(TreeListener):
             if ret[0].is_constant():
                 return int(ret[0])
             else:
+                logger.warning('Failed to determine integer value of expression {}'.format(expr))
                 return ret[0]
         if isinstance(tree, ast.Slice):
             start = self.get_integer(tree.start)
@@ -499,9 +500,9 @@ class Generator(TreeListener):
             raise Exception('Unexpected node type {}'.format(tree.__class__.__name__))
 
     def get_python_type(self, tree):
-        if tree.type == 'Boolean':
+        if tree.type.name == 'Boolean':
             return bool
-        elif tree.type == 'Integer':
+        elif tree.type.name == 'Integer':
             return int
         else:
             return float
