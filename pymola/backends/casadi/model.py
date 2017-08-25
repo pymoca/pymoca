@@ -459,8 +459,8 @@ class Model:
 
                     equations = ca.veccat(*equations)
 
-                    Af = ca.Function('Af', [constants, parameters], [ca.jacobian(equations, states)])
-                    A = Af(constants, parameters)
+                    Af = ca.Function('Af', [states, constants, parameters], [ca.jacobian(equations, states)])
+                    A = Af(0, constants, parameters)
 
                     bf = ca.Function('bf', [states, constants, parameters], [equations])
                     b = bf(0, constants, parameters)
