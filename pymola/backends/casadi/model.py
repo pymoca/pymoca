@@ -460,9 +460,15 @@ class Model:
                     equations = ca.veccat(*equations)
 
                     Af = ca.Function('Af', [states, constants, parameters], [ca.jacobian(equations, states)])
-                    A = Af(0, constants, parameters)
-
                     bf = ca.Function('bf', [states, constants, parameters], [equations])
+
+                    # Work around CasADi issue #172
+                    if len(self.constants) == 0:
+                        constants = 0
+                    if len(self.parameters) == 0:
+                        parameters = 0
+
+                    A = Af(0, constants, parameters)
                     b = bf(0, constants, parameters)
 
                     equations = [ca.reshape(ca.mtimes(A, states), equations.shape) + b]
