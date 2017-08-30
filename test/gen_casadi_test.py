@@ -1020,7 +1020,12 @@ class GenCasadiTest(unittest.TestCase):
         # Create model, cache it, and load the cache
         compiler_options = \
             {'expand_vectors': True,
-             'reduce_affine_expression': True}
+             'detect_aliases': True,
+             'reduce_affine_expression': True,
+             'replace_constant_expressions': True,
+             'replace_constant_values': True,
+             'replace_parameter_expressions': True,
+             'replace_parameter_values': True}
 
         casadi_model = transfer_model(TEST_DIR, 'SimplifyLoop', compiler_options)
 
