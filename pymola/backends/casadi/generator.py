@@ -255,12 +255,12 @@ class Generator(TreeListener):
             self.model.delayed_states.append(delayed_state)
             self.model.inputs.append(Variable(src))
         elif op in OP_MAP and n_operands == 2:
-            lhs = self.get_mx(tree.operands[0])
-            rhs = self.get_mx(tree.operands[1])
+            lhs = ca.MX(self.get_mx(tree.operands[0]))
+            rhs = ca.MX(self.get_mx(tree.operands[1]))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
-            lhs = self.get_mx(tree.operands[0])
+            lhs = ca.MX(self.get_mx(tree.operands[0]))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         else:
@@ -269,11 +269,11 @@ class Generator(TreeListener):
             # elementary functions, first.
             if hasattr(src, op) and n_operands <= 2:
                 if n_operands == 1:
-                    src = self.get_mx(tree.operands[0])
+                    src = ca.MX(self.get_mx(tree.operands[0]))
                     src = getattr(src, op)()
                 else:
-                    lhs = self.get_mx(tree.operands[0])
-                    rhs = self.get_mx(tree.operands[1])
+                    lhs = ca.MX(self.get_mx(tree.operands[0]))
+                    rhs = ca.MX(self.get_mx(tree.operands[1]))
                     lhs_op = getattr(lhs, op)
                     src = lhs_op(rhs)
             else:
