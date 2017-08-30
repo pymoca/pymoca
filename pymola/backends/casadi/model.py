@@ -10,6 +10,8 @@ from .alias_relation import AliasRelation
 
 logger = logging.getLogger("pymola")
 
+CASADI_COMPARISON_DEPTH = 100
+
 
 class Variable:
     def __init__(self, symbol, python_type=float, aliases=[]):
@@ -99,50 +101,72 @@ class Model:
 
             simple_parameters, symbols, values = [], [], []
             for p in self.parameters:
-                if ca.MX(p.value).is_constant():
+                value = ca.MX(p.value)
+                if value.is_constant():
                     simple_parameters.append(p)
                 else:
                     symbols.append(p.symbol)
-                    values.append(p.value)   
+                    values.append(value)
 
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, symbols, values)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.parameters = simple_parameters
 
-            # Replace parameter expressions in metadata
-            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in ast.Symbol.ATTRIBUTES:
-                    value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX):
-                        [value] = ca.substitute([value], symbols, values)
-                        setattr(variable, attribute, value)
+            if len(values) > 0:
+                # Resolve expressions that include other, non-simple parameter
+                # expressions.
+                converged = False
+                while not converged:
+                    new_values = ca.substitute(values, symbols, values)
+                    converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
+                    values = new_values
+
+                if len(self.equations) > 0:
+                    self.equations = ca.substitute(self.equations, symbols, values)
+                if len(self.initial_equations) > 0:
+                    self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+
+                # Replace parameter expressions in metadata
+                for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                    for attribute in ast.Symbol.ATTRIBUTES:
+                        value = getattr(variable, attribute)
+                        if isinstance(value, ca.MX):
+                            [value] = ca.substitute([value], symbols, values)
+                            setattr(variable, attribute, value)
 
         if options.get('replace_constant_expressions', False):
             logger.info("Replacing constant expressions")
 
             simple_constants, symbols, values = [], [], []
             for c in self.constants:
-                if ca.MX(c.value).is_constant():
+                value = ca.MX(c.value)
+                if value.is_constant():
                     simple_constants.append(c)
                 else:
                     symbols.append(c.symbol)
-                    values.append(c.value)
+                    values.append(value)
 
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, symbols, values)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             self.constants = simple_constants
 
-            # Replace constant expressions in metadata
-            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in ast.Symbol.ATTRIBUTES:
-                    value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX):
-                        [value] = ca.substitute([value], symbols, values)
-                        setattr(variable, attribute, value)
+            if len(values) > 0:
+                # Resolve expressions that include other, non-simple parameter
+                # expressions.
+                converged = False
+                while not converged:
+                    new_values = ca.substitute(values, symbols, values)
+                    converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
+                    values = new_values
+
+                if len(self.equations) > 0:
+                    self.equations = ca.substitute(self.equations, symbols, values)
+                if len(self.initial_equations) > 0:
+                    self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+
+                # Replace constant expressions in metadata
+                for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                    for attribute in ast.Symbol.ATTRIBUTES:
+                        value = getattr(variable, attribute)
+                        if isinstance(value, ca.MX):
+                            [value] = ca.substitute([value], symbols, values)
+                            setattr(variable, attribute, value)
 
         if options.get('eliminate_constant_assignments', False):
             logger.info("Elimating constant variable assignments")
