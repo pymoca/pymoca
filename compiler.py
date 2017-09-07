@@ -31,26 +31,26 @@ model_name = args[1]
 logging.basicConfig(level=logging.DEBUG if options.verbose else logging.INFO)
 
 # Import rest of pymola
-from pymola import parser, tree    
+from pymola import parser, tree, ast
 
 # Compile
 if options.flatten_only:
     # Load folder
-    ast = None
+    _ast = None
     for root, dir, files in os.walk(model_folder, followlinks=True):
         for item in fnmatch.filter(files, "*.mo"):
             logger.info("Parsing {}".format(item))
 
             with open(os.path.join(root, item), 'r') as f:
-                if ast is None:
-                    ast = parser.parse(f.read())
+                if _ast is None:
+                    _ast = parser.parse(f.read())
                 else:
-                    ast.extend(parser.parse(f.read()))
+                    _ast.extend(parser.parse(f.read()))
 
     logger.info("Flattening")
 
-    ast = tree.flatten(ast, model_name)
-    print(ast)
+    _ast = tree.flatten(_ast, ast.ComponentRef(name=model_name))
+    print(_ast)
 else:
     # Set CasADi installation folder
     if options.casadi_folder is not None:
