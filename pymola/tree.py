@@ -899,7 +899,7 @@ def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
     :param class_name: The class that we want to create a flat model for
     :return: flat_class, a Class containing the flattened class
     """
-    orig_class = root.find_class(class_name, return_reference=True)
+    orig_class = root.find_class(class_name, copy=False)
 
     flat_class = flatten_class(orig_class)
 

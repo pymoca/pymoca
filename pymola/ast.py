@@ -412,7 +412,7 @@ class Class(Node):
             else:
                 raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
 
-    def find_class(self, component_ref: ComponentRef, return_reference=False, check_builtin_classes=False) -> 'Class':
+    def find_class(self, component_ref: ComponentRef, copy=True, check_builtin_classes=False) -> 'Class':
         # TODO: Remove workaround for Modelica / Modelica.SIUnits
         if component_ref.name in ["Real", "Integer", "String", "Boolean", "Modelica", "SI"]:
             if check_builtin_classes:
@@ -435,13 +435,8 @@ class Class(Node):
 
         c = self._find_class(component_ref)
 
-        if not return_reference:
-            _parent, _root = c.parent, c.root
-            _orig = c
-            c.parent, c.root = None, None
-            c = copy.deepcopy(c)
-            c.parent, c.root = _parent, _root
-            _orig.parent, _orig.root = _parent, _root
+        if copy:
+            c = c.copy_including_children()
 
         return c
 
@@ -465,6 +460,14 @@ class Class(Node):
                 self.classes[class_name]._extend(other.classes[class_name])
             else:
                 self.classes[class_name] = other.classes[class_name]
+
+    def copy_including_children(self):
+        _parent, _root = self.parent, self.root
+        self.parent, self.root = None, None
+        new = copy.deepcopy(self)
+        self.parent, self.root = _parent, _root
+        new.parent, new.root = _parent, _root
+        return new
 
 
 class InstanceClass(Class):
