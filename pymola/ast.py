@@ -82,6 +82,8 @@ class Node(object):
         elif isinstance(var, dict):
             res = {key: cls.to_json(var[key]) for key in var.keys()}
         elif isinstance(var, Node):
+            # Avoid infinite recursion by not handling attributes that may go
+            # back up in the tree again.
             res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()
                    if key not in ('root', 'parent', 'scope')}
         elif isinstance(var, Visibility):
@@ -390,7 +392,11 @@ class Class(Node):
         self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.parent = None  # type: Class
+        # Some references are relative to root. Instead of traversing up the
+        # tree using parent to find the root node, we store a reference to it
+        # for faster and cleaner lookups.
         self.root = None  # type: Tree
+
         super().__init__(**kwargs)
 
     def _find_class(self, component_ref: ComponentRef, search_parent=True) -> 'Class':
