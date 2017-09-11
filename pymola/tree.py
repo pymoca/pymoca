@@ -246,6 +246,9 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
         extended_orig_class.statements += c.statements
         extended_orig_class.initial_statements += c.initial_statements
         extended_orig_class.functions.update(c.functions)
+
+        # Note that all extends clauses are handled before any modifications
+        # are applied.
         extended_orig_class.modification_environment.arguments.extend(c.modification_environment.arguments)
 
         # set visibility
@@ -388,7 +391,9 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
             extended_orig_class.modification_environment.arguments = [
                 x for x in extended_orig_class.modification_environment.arguments if x not in sym_arguments]
 
-            # Fix component references
+            # Fix component references to be one level deeper. E.g. applying a
+            # modification "a.x = 3.0" on a symbol "a", will mean we pass
+            # along a modification "x = 3.0" to the symbol's class instance.
             for arg in sym_arguments:
                 if arg.value.component.indices:
                     raise Exception("Subscripting modifiers is not allowed.")
@@ -446,7 +451,9 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
             # Elementary type
             flat_class.symbols[flat_sym.name] = flat_sym
         elif sym.type.type == "__builtin":
-            # Built-in type. No flattening to be done, just copying over all attributes.
+            # Class inherited from elementary type (e.g. "type Voltage =
+            # Real"). No flattening to be done, just copying over all
+            # attributes to the class's "__value" symbol.
             flat_class.symbols[flat_sym.name] = flat_sym
             for att in flat_sym.ATTRIBUTES + ["type"]:
                 setattr(flat_class.symbols[flat_sym.name], att, getattr(sym.type.symbols['__value'], att))
@@ -576,7 +583,6 @@ def modify_symbol(sym: ast.Symbol) -> None:
             raise Exception("Trying to set unknown symbol property {}".format(argument.component.name))
 
         setattr(sym, argument.component.name, argument.modifications[0])
-
 
 
 class ComponentRefFlattener(TreeListener):
