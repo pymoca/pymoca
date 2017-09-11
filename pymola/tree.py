@@ -542,49 +542,6 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
     return flat_class
 
 
-def flatten_class(orig_class: ast.Class) -> ast.Class:
-    # First we build a tree of the to-be-flattened class, with all symbol
-    # types expanded to classes as well. Modifications are shifted/passed
-    # along to child classes.
-    # Note that no element modifications are applied (e.g of values, nominals,
-    # etc), and no symbol flattening is performed.
-    instance_tree = build_instance_tree(orig_class, parent=orig_class.parent)
-
-    # At this point:
-    # 1. All redeclarations have been handled.
-    # 2. InstanceClasses have no modifications anymore, nor do non-elementary
-    #    symbols. All modifications have been shifted to Symbols that are of
-    #    one of the elementary types (Real, Integer, ...).
-
-    # Now we apply those symbol modifications on the instance tree.
-    apply_symbol_modifications(instance_tree)
-
-    # At this point there are no modifications left, on classes or symbols of whatever kind.
-
-    # Finally we flatten all symbols.
-    flat_class = flatten_symbols(instance_tree)
-
-    return flat_class
-
-
-def modify_symbol(sym: ast.Symbol) -> None:
-    """
-    Apply a modification to a symbol.
-    :param sym: symbol to apply modifications for
-    """
-    for class_mod_argument in sym.class_modification.arguments:
-        argument = class_mod_argument.value
-
-        assert isinstance(argument, ast.ElementModification), \
-            "Found redeclaration modification which should already have been handled."
-
-        # TODO: Strip all non-symbol stuff.
-        if argument.component.name not in ast.Symbol.ATTRIBUTES:
-            raise Exception("Trying to set unknown symbol property {}".format(argument.component.name))
-
-        setattr(sym, argument.component.name, argument.modifications[0])
-
-
 class ComponentRefFlattener(TreeListener):
     """
     A listener that flattens references to components and performs name mangling,
@@ -650,6 +607,126 @@ def flatten_component_refs(
     w.walk(ComponentRefFlattener(container, instance_prefix), expression_copy)
 
     return expression_copy
+
+
+class FunctionExpander(TreeListener):
+    """
+    Listener to extract functions
+    """
+
+    def __init__(self, node: ast.Tree, function_set: set):
+        self.node = node
+        self.function_set = function_set
+        super().__init__()
+
+    def exitExpression(self, tree: ast.Expression):
+        if isinstance(tree.operator, ast.ComponentRef):
+            try:
+                function_class = self.node.find_class(tree.operator)
+
+                full_name = str(function_class.full_reference())
+
+                tree.operator = full_name
+                self.function_set[full_name] = function_class
+            except (KeyError, ast.ClassNotFoundError) as e:
+                # Assume built-in function
+                pass
+
+
+# noinspection PyUnusedLocal
+def fully_scope_function_calls(node: ast.Tree, expression: ast.Expression, function_set: OrderedDict) -> ast.Expression:
+    """
+    Turns the function references in this expression into fully scoped
+    references (e.g. relative to absolute). The component references of all
+    referenced functions are put into the functions set.
+
+    :param node: collection for performing symbol lookup etc.
+    :param container: class
+    :param expression: original expression
+    :param function_set: output of function component references
+    :return:
+    """
+    expression_copy = copy.deepcopy(expression)
+
+    w = TreeWalker()
+    w.walk(FunctionExpander(node, function_set), expression_copy)
+    return expression_copy
+
+
+def modify_symbol(sym: ast.Symbol) -> None:
+    """
+    Apply a modification to a symbol.
+    :param sym: symbol to apply modifications for
+    """
+    for class_mod_argument in sym.class_modification.arguments:
+        argument = class_mod_argument.value
+
+        assert isinstance(argument, ast.ElementModification), \
+            "Found redeclaration modification which should already have been handled."
+
+        # TODO: Strip all non-symbol stuff.
+        if argument.component.name not in ast.Symbol.ATTRIBUTES:
+            raise Exception("Trying to set unknown symbol property {}".format(argument.component.name))
+
+        setattr(sym, argument.component.name, argument.modifications[0])
+
+
+class SymbolModificationApplier(TreeListener):
+    """
+    This walker applies all modifications on elementary types (e.g. Real,
+    Integer, etc.). It also checks if there are any lingering modifications
+    that should not be present, e.g. redeclarations, or symbol modifications
+    on non-elementary types.
+    """
+
+    def __init__(self, node: ast.Node):
+        self.node = node
+        super().__init__()
+
+    def exitSymbol(self, tree: ast.Symbol):
+        if not isinstance(tree.type, ast.ComponentRef):
+            assert tree.class_modification is None, \
+                "Found symbol modification on non-elementary type in instance tree."
+        elif tree.class_modification is not None:
+            modify_symbol(tree)
+            tree.class_modification = None
+
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
+        assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
+
+    def exitInstanceClass(self, tree: ast.InstanceClass):
+        assert tree.modification_environment is None or not tree.modification_environment.arguments, \
+            "Found unhandled modification on instance class."
+
+
+def apply_symbol_modifications(node: ast.Node) -> None:
+    w = TreeWalker()
+    w.walk(SymbolModificationApplier(node), node)
+
+
+def flatten_class(orig_class: ast.Class) -> ast.Class:
+    # First we build a tree of the to-be-flattened class, with all symbol
+    # types expanded to classes as well. Modifications are shifted/passed
+    # along to child classes.
+    # Note that no element modifications are applied (e.g of values, nominals,
+    # etc), and no symbol flattening is performed.
+    instance_tree = build_instance_tree(orig_class, parent=orig_class.parent)
+
+    # At this point:
+    # 1. All redeclarations have been handled.
+    # 2. InstanceClasses have no modifications anymore, nor do non-elementary
+    #    symbols. All modifications have been shifted to Symbols that are of
+    #    one of the elementary types (Real, Integer, ...).
+
+    # Now we apply those symbol modifications on the instance tree.
+    apply_symbol_modifications(instance_tree)
+
+    # At this point there are no modifications left, on classes or symbols of whatever kind.
+
+    # Finally we flatten all symbols.
+    flat_class = flatten_symbols(instance_tree)
+
+    return flat_class
 
 
 def expand_connectors(node: ast.Node) -> None:
@@ -811,83 +888,6 @@ def annotate_states(node: ast.Node) -> None:
     """
     w = TreeWalker()
     w.walk(StateAnnotator(node), node)
-
-
-class FunctionExpander(TreeListener):
-    """
-    Listener to extract functions
-    """
-
-    def __init__(self, node: ast.Tree, function_set: set):
-        self.node = node
-        self.function_set = function_set
-        super().__init__()
-
-    def exitExpression(self, tree: ast.Expression):
-        if isinstance(tree.operator, ast.ComponentRef):
-            try:
-                function_class = self.node.find_class(tree.operator)
-
-                full_name = str(function_class.full_reference())
-
-                tree.operator = full_name
-                self.function_set[full_name] = function_class
-            except (KeyError, ast.ClassNotFoundError) as e:
-                # Assume built-in function
-                pass
-
-
-# noinspection PyUnusedLocal
-def fully_scope_function_calls(node: ast.Tree, expression: ast.Expression, function_set: OrderedDict) -> ast.Expression:
-    """
-    Turns the function references in this expression into fully scoped
-    references (e.g. relative to absolute). The component references of all
-    referenced functions are put into the functions set.
-
-    :param node: collection for performing symbol lookup etc.
-    :param container: class
-    :param expression: original expression
-    :param function_set: output of function component references
-    :return:
-    """
-    expression_copy = copy.deepcopy(expression)
-
-    w = TreeWalker()
-    w.walk(FunctionExpander(node, function_set), expression_copy)
-    return expression_copy
-
-
-class SymbolModificationApplier(TreeListener):
-    """
-    This walker applies all modifications on elementary types (e.g. Real,
-    Integer, etc.). It also checks if there are any lingering modifications
-    that should not be present, e.g. redeclarations, or symbol modifications
-    on non-elementary types.
-    """
-
-    def __init__(self, node: ast.Node):
-        self.node = node
-        super().__init__()
-
-    def exitSymbol(self, tree: ast.Symbol):
-        if not isinstance(tree.type, ast.ComponentRef):
-            assert tree.class_modification is None, \
-                "Found symbol modification on non-elementary type in instance tree."
-        elif tree.class_modification is not None:
-            modify_symbol(tree)
-            tree.class_modification = None
-
-    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
-        assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
-
-    def exitInstanceClass(self, tree: ast.InstanceClass):
-        assert tree.modification_environment is None or not tree.modification_environment.arguments, \
-            "Found unhandled modification on instance class."
-
-
-def apply_symbol_modifications(node: ast.Node) -> None:
-    w = TreeWalker()
-    w.walk(SymbolModificationApplier(node), node)
 
 
 def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
