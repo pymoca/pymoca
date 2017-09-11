@@ -449,9 +449,6 @@ class ASTListener(ModelicaListener):
     def enterExtends_clause(self, ctx):
         self.in_extends_clause = True
 
-    def enterExtends_clause(self, ctx):
-        self.in_extends_clause = True
-
     def exitExtends_clause(self, ctx):
         if ctx.class_modification() is not None:
             class_modification = self.ast[ctx.class_modification()]
@@ -460,8 +457,6 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
                                           class_modification=class_modification)
         self.class_node.extends += [self.ast[ctx]]
-
-        self.in_extends_clause = False
 
         self.in_extends_clause = False
 
