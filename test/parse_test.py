@@ -269,6 +269,7 @@ class ParseTest(unittest.TestCase):
         flat_tree = tree.flatten(ast_tree, comp_ref)
 
         self.assertEqual(flat_tree.classes['b'].symbols['m.p'].value.value, 2.0)
+        self.assertEqual(flat_tree.classes['b'].symbols['M2.m.f'].value.value, 3.0)
 
 if __name__ == "__main__":
     unittest.main()
