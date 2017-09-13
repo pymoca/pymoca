@@ -10,6 +10,14 @@ package P2
   constant Real p = 2;
 end P2;
 
+model M1
+  constant Real f = 3;
+end M1;
+
+model M2
+  constant M1 m;
+end M2;
+
 model a
   replaceable package m = P1;
 end a;
@@ -21,7 +29,9 @@ model b
   parameter Real y = m.p;
   parameter Real z = P0.p[0];
   Real w;
+  Real g;
 equation
+  g = M2.m.f;
   x = m.p;
   w = m.p * 2.0;
 end b;

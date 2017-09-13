@@ -14,6 +14,9 @@ from collections import OrderedDict
 class ClassNotFoundError(Exception):
     pass
 
+class ConstantSymbolNotFoundError(Exception):
+    pass
+
 class FoundElementaryClassError(Exception):
     pass
 
@@ -440,15 +443,40 @@ class Class(Node):
 
         return c
 
-    def find_symbol(self, component_ref: ComponentRef) -> Symbol:
+    def _find_constant_symbol(self, component_ref: ComponentRef, search_parent=True) -> Symbol:
+
         if component_ref.child:
+            # Try classes first, and constant symbols second
             t = component_ref.to_tuple()
-            class_cref, sym_name = t[:-1], t[-1]
-            node = self.find_class(ComponentRef.from_tuple(class_cref))
+
+            try:
+                node = self._find_class(ComponentRef(name=t[0]), search_parent)
+                return node._find_constant_symbol(ComponentRef.from_tuple(t[1:]), False)
+            except ClassNotFoundError:
+                try:
+                    s = self.symbols[t[0]]
+                except KeyError:
+                    raise ConstantSymbolNotFoundError()
+
+                if 'constant' not in s.prefixes:
+                    raise ConstantSymbolNotFoundError()
+
+                # Found a symbol. Continue lookup on type of this symbol.
+                if isinstance(s.type, InstanceClass):
+                    return s.type._find_constant_symbol(ComponentRef.from_tuple(t[1:]), False)
+                elif isinstance(s.type, ComponentRef):
+                    node = self._find_class(s.type)  # Parent lookups is OK here.
+                    return node._find_constant_symbol(ComponentRef.from_tuple(t[1:]), False)
+                else:
+                    raise Exception("Unknown object type of symbol type: {}".format(type(s.type)))
         else:
-            sym_name = component_ref.name
-            node = self
-        return node.symbols[sym_name]
+            try:
+                return self.symbols[component_ref.name]
+            except KeyError:
+                raise ConstantSymbolNotFoundError()
+
+    def find_constant_symbol(self, component_ref: ComponentRef) -> Symbol:
+        return self._find_constant_symbol(component_ref)
 
 
     def full_reference(self):

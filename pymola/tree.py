@@ -718,19 +718,28 @@ class ConstantReferenceApplier(TreeListener):
         # it, so instead we store symbol updates here.
         self.extra_symbols = OrderedDict()
 
+        self.depth = 0
+
         super().__init__()
 
     def enterComponentRef(self, tree: ast.ComponentRef):
         # If it is not a nested comonent reference, we do not have to do
         # anyhing as the symbol we look for would already be in the current
         # class
+        self.depth += 1
+
+        if self.depth > 1:
+            # Already inside a component reference. Do not perform lookups.
+            return
+
         if tree.child:
             try:
-                s = self.classes[-1].find_symbol(tree)
-                if 'constant' in s.prefixes:
-                    self.extra_symbols[str(tree)] = s
-            except (KeyError, ast.ClassNotFoundError, ast.FoundElementaryClassError):
+                self.extra_symbols[str(tree)] = self.classes[-1].find_constant_symbol(tree)
+            except (KeyError, ast.ClassNotFoundError, ast.FoundElementaryClassError, ast.ConstantSymbolNotFoundError):
                 pass
+
+    def exitComponentRef(self, tree: ast.ComponentRef):
+        self.depth -= 1
 
     def enterInstanceClass(self, tree: ast.InstanceClass):
         self.classes.append(tree)
