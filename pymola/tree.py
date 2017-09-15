@@ -972,9 +972,14 @@ class DerivativeExpander(TreeListener):
         if self.in_der > 0:
             assert len(tree.child) == 0
 
-            s = self.node.symbols[tree.name]
-            if 'state' not in s.prefixes:
-                s.prefixes.append('state')
+            try:
+                s = self.node.symbols[tree.name]
+            except KeyError:
+                # Ignore index variables, parameters, and so forth.
+                pass
+            else:
+                if 'state' not in s.prefixes:
+                    s.prefixes.append('state')
 
 
 def expand_derivatives(node: ast.Node) -> None:
