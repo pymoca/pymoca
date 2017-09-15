@@ -242,6 +242,15 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ModelicaParser#type_specifier_element.
+    def enterType_specifier_element(self, ctx:ModelicaParser.Type_specifier_elementContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#type_specifier_element.
+    def exitType_specifier_element(self, ctx:ModelicaParser.Type_specifier_elementContext):
+        pass
+
+
     # Enter a parse tree produced by ModelicaParser#type_specifier.
     def enterType_specifier(self, ctx:ModelicaParser.Type_specifierContext):
         pass
