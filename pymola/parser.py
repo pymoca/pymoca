@@ -386,6 +386,19 @@ class ASTListener(ModelicaListener):
         # if 'state' not in self.class_node.symbols[comp_name].prefixes:
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
+    def exitType_specifier_element(self, ctx):
+        self.ast[ctx] = ast.ComponentRef(
+            name=ctx.IDENT().getText(),
+            indices=[],
+            child=[]
+        )
+
+    def exitType_specifier(self, ctx):
+        for element in reversed([self.ast[ctx] for ctx in ctx.type_specifier_element()]):
+            if ctx in self.ast:
+                element.child = [self.ast[ctx]]
+            self.ast[ctx] = element
+
     def exitComponent_reference_element(self, ctx):
         if ctx.array_subscripts() is not None:
             indices = [self.ast[x] for x in ctx.array_subscripts().subscript()]
@@ -501,6 +514,9 @@ class ASTListener(ModelicaListener):
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
+            for sym in self.comp_clause.symbol_list:
+                s = self.class_node.symbols[sym.name]
+                s.dimensions = clause.dimensions
 
         # We make sure that all references to the objects are unique per
         # symbol making copies. Note that if there is only one symbol in the
@@ -543,9 +559,6 @@ class ASTListener(ModelicaListener):
             self.sym_count += 1
             self.ast[ctx] = sym
             self.symbol_node = sym
-
-    def exitType_specifier(self, ctx):
-        self.ast[ctx] = self.ast[ctx.component_reference()]
 
     def exitComponent_declaration(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]

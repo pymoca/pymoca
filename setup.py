@@ -112,7 +112,7 @@ def setup_package():
         # Disable compiler optimization.  We have to do this, as the default -O3 triggers a bug in clang causing an initialization failure.
         #os.environ['CFLAGS'] = '-O0'
         # Or alternatively, use gcc:
-        os.environ['CC'] = 'gcc-6'
+        os.environ['CC'] = 'gcc-7'
 
     # Without disabling this, it will reach a limit
     # on tracking and disable tracking and then recompile, which is slow
