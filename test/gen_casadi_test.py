@@ -1218,6 +1218,27 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_state_annotator(self):
+        with open(os.path.join(TEST_DIR, 'StateAnnotator.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'StateAnnotator')
+        print(casadi_model)
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        y = ca.MX.sym('y')
+        z = ca.MX.sym('z')
+        der_x = ca.MX.sym('der(x)')
+        der_y = ca.MX.sym('der(y)')
+        der_z = ca.MX.sym('der(z)')
+
+        ref_model.states = list(map(Variable, [x, y, z]))
+        ref_model.der_states = list(map(Variable, [der_x, der_y, der_z]))
+        ref_model.equations = [der_x + der_y - 1, der_x * y + x * der_y - 2, (der_x * y - x * der_y) / (y**2) - 3, 2 * x * der_x - 4, der_z - 5]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
 
 if __name__ == "__main__":
     unittest.main()
