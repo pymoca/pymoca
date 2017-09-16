@@ -530,6 +530,8 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.matrix_expand(self.initial_equations)
 
+        logger.info("Finished model simplification")
+
     @property
     def dae_residual_function(self):
         return ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
