@@ -128,7 +128,7 @@ class Model:
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
                     for attribute in ast.Symbol.ATTRIBUTES:
                         value = getattr(variable, attribute)
-                        if isinstance(value, ca.MX):
+                        if isinstance(value, ca.MX) and not value.is_constant():
                             [value] = ca.substitute([value], symbols, values)
                             setattr(variable, attribute, value)
 
@@ -164,7 +164,7 @@ class Model:
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
                     for attribute in ast.Symbol.ATTRIBUTES:
                         value = getattr(variable, attribute)
-                        if isinstance(value, ca.MX):
+                        if isinstance(value, ca.MX) and not value.is_constant():
                             [value] = ca.substitute([value], symbols, values)
                             setattr(variable, attribute, value)
 
@@ -228,7 +228,7 @@ class Model:
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
                 for attribute in ast.Symbol.ATTRIBUTES:
                     value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX):
+                    if isinstance(value, ca.MX) and not value.is_constant():
                         [value] = ca.substitute([value], symbols, values)
                         setattr(variable, attribute, value)
 
@@ -248,7 +248,7 @@ class Model:
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
                 for attribute in ast.Symbol.ATTRIBUTES:
                     value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX):
+                    if isinstance(value, ca.MX) and not value.is_constant():
                         [value] = ca.substitute([value], symbols, values)
                         setattr(variable, attribute, value)
 
@@ -355,7 +355,7 @@ class Model:
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
                 for attribute in ast.Symbol.ATTRIBUTES:
                     value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX):
+                    if isinstance(value, ca.MX) and not value.is_constant():
                         [value] = ca.substitute([value], symbols, values)
                         setattr(variable, attribute, value)
 
