@@ -36,7 +36,7 @@ OP_MAP = {'*': "__mul__",
           "max": "fmax",
           "abs": "fabs"}
 
-ForLoopIndexedSymbol = namedtuple('ForLoopSymbol', ['tree', 'indices'])
+ForLoopIndexedSymbol = namedtuple('ForLoopIndexedSymbol', ['tree', 'indices'])
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
@@ -513,10 +513,17 @@ class Generator(TreeListener):
             return 0
         elif s.is_symbolic():
             if s not in self.derivative:
-                der_s = ca.MX.sym("der({})".format(s.name()), s.size())
-                self.derivative[s] = der_s
-                self.nodes[self.current_class][der_s.name()] = der_s
-                return der_s
+                if len(self.for_loops) > 0 and s in self.for_loops[-1].indexed_symbols:
+                    # Create a new indexed symbol, referencing to the for loop index inside the vector derivative symbol.
+                    for_loop_symbol = self.for_loops[-1].indexed_symbols[s]
+                    s_without_index = self.get_mx(ast.ComponentRef(name=for_loop_symbol.tree.name))
+                    der_s_without_index = self.get_derivative(s_without_index)
+                    return self.get_indexed_symbol(ast.ComponentRef(name=der_s_without_index.name(), indices=for_loop_symbol.tree.indices), der_s_without_index)
+                else:
+                    der_s = ca.MX.sym("der({})".format(s.name()), s.size())
+                    self.derivative[s] = der_s
+                    self.nodes[self.current_class][der_s.name()] = der_s
+                    return der_s
             else:
                 return self.derivative[s]
         else:
