@@ -8,6 +8,7 @@ import os
 import fnmatch
 import logging
 import pickle
+import contextlib
 
 from pymola import parser, tree, ast, __version__
 from . import generator
@@ -134,7 +135,7 @@ def _save_model(model_folder: str, model_name: str, model: Model):
 
         compiler = distutils.ccompiler.new_compiler()
 
-        file_name = os.path.join(model_folder, library_name + '.c')
+        file_name = os.path.realpath(os.path.join(model_folder, library_name + '.c'))
         object_name = compiler.object_filenames([file_name])[0]
         d.library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
         try:
@@ -151,8 +152,9 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         except:
             raise
         finally:
-            os.remove(file_name)
-            os.remove(object_name)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(file_name)
+                os.remove(object_name)
 
     # Output metadata
     db_file = os.path.join(model_folder, model_name)
