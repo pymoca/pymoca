@@ -125,6 +125,8 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         # Generate C code
         library_name = '{}_{}'.format(model_name, o)
 
+        logger.debug("Generating {}".format(library_name))
+
         cg = ca.CodeGenerator(library_name)
         cg.add(f) # Nondifferentiated function
         cg.add(f.forward(1)) # Jacobian-times-vector product
