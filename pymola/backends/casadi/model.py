@@ -438,14 +438,14 @@ class Model:
                         start = sign * alias_state.start
 
                     # The intersection of all bound ranges applies
-                    m = max(m, alias_state.min if sign == 1 else -alias_state.max)
-                    M = min(M, alias_state.max if sign == 1 else -alias_state.min)
+                    m = ca.fmax(m, alias_state.min if sign == 1 else -alias_state.max)
+                    M = ca.fmin(M, alias_state.max if sign == 1 else -alias_state.min)
 
                     # Take the largest nominal of all aliases
-                    nominal = max(nominal, alias_state.nominal)
+                    nominal = ca.fmax(nominal, alias_state.nominal)
 
                     # If any of the aliases is fixed, the canonical state is as well
-                    fixed = max(fixed, alias_state.fixed)
+                    fixed = ca.fmax(fixed, alias_state.fixed)
 
                     del all_states[alias]
                     if alias in outputs:
