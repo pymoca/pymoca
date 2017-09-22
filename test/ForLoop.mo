@@ -5,6 +5,7 @@ model ForLoop
     Real z[n];
     Real w[2, n];
     Real b;
+    Real s[n];
 equation
 	for i in 1:n loop
     	x[i] = i+b;
@@ -23,5 +24,8 @@ equation
     end for;
     for l in 1:0 loop
         z[l] = 1e3;
+    end for;
+    for l in 1:n loop
+        der(s[l]) = 1.0;
     end for;
 end ForLoop;
