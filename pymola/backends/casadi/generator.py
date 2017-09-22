@@ -94,7 +94,7 @@ class Generator(TreeListener):
             if mx_symbol.is_empty():
                 continue
             if differentiate:
-                mx_symbol = self.derivative[mx_symbol]
+                mx_symbol = self.get_derivative(mx_symbol)
             python_type = self.get_python_type(ast_symbol)
             variable = Variable(mx_symbol, python_type)
             if not differentiate:
