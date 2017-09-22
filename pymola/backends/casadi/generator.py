@@ -120,7 +120,8 @@ class Generator(TreeListener):
             self.entered_classes.pop()
             return
 
-        states = []
+        ode_states = []
+        alg_states = []
         inputs = []
         constants = []
         parameters = []
@@ -132,14 +133,8 @@ class Generator(TreeListener):
                 parameters.append(s)
             elif 'input' in s.prefixes:
                 inputs.append(s)
-            else:
-                states.append(s)
-
-        ode_states = []
-        alg_states = []
-        for s in states:
-            if self.get_mx(s) in self.derivative:
-                ode_states.append(s) 
+            elif 'state' in s.prefixes:
+                ode_states.append(s)
             else:
                 alg_states.append(s)
 
@@ -156,7 +151,7 @@ class Generator(TreeListener):
         self.model.outputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
 
         def discard_empty(l):
-            return list(filter(lambda x: not x.is_empty(), l))
+            return list(filter(lambda x: not ca.MX(x).is_empty(), l))
 
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
@@ -187,14 +182,8 @@ class Generator(TreeListener):
 
         n_operands = len(tree.operands)
         if op == 'der':
-            orig = self.get_mx(tree.operands[0])
-            if orig in self.derivative:
-                src = self.derivative[orig]
-            else:
-                s = ca.MX.sym("der({})".format(orig.name()), orig.sparsity())
-                self.derivative[orig] = s
-                self.nodes[self.current_class][s] = s
-                src = s
+            v = self.get_mx(tree.operands[0])
+            src = self.get_derivative(v)
         elif op == '-' and n_operands == 1:
             src = -self.get_mx(tree.operands[0])
         elif op == 'mtimes':
@@ -518,6 +507,26 @@ class Generator(TreeListener):
         s = ca.MX.sym(tree.name, *shape)
         self.nodes[self.current_class][tree.name] = s
         return s
+
+    def get_derivative(self, s):
+        if ca.MX(s).is_constant():
+            return 0
+        elif s.is_symbolic():
+            if s not in self.derivative:
+                der_s = ca.MX.sym("der({})".format(s.name()), s.size())
+                self.derivative[s] = der_s
+                self.nodes[self.current_class][der_s.name()] = der_s
+                return der_s
+            else:
+                return self.derivative[s]
+        else:
+            # Differentiate expression using CasADi
+            orig_deps = list(self.nodes[self.current_class].values())
+            deps = ca.vertcat(*orig_deps)
+            J = ca.Function('J', [deps], [ca.jacobian(s, deps)])
+            J_sparsity = J.sparsity_out(0)
+            der_deps = [self.get_derivative(dep) if J_sparsity.has_nz(0, j) else 0 for j, dep in enumerate(orig_deps)]
+            return ca.mtimes(J(deps), ca.vertcat(*der_deps))
 
     def get_indexed_symbol(self, tree, s):
         # Check whether we loop over an index of this symbol

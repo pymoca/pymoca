@@ -1235,7 +1235,7 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = list(map(Variable, [x, y, z]))
         ref_model.der_states = list(map(Variable, [der_x, der_y, der_z]))
-        ref_model.equations = [der_x + der_y - 1, der_x * y + x * der_y - 2, (der_x * y - x * der_y) / (y**2) - 3, 2 * x * der_x - 4, der_z - 5]
+        ref_model.equations = [der_x + der_y - 1, der_x * y + x * der_y - 2, (der_x * y - x * der_y) / (y**2) - 3, 2 * x * der_x - 4, der_z - 5, der_x * z + x * der_z + der_y * z + y * der_z - 4, 0]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
