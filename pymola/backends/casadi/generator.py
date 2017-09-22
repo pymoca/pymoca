@@ -327,7 +327,7 @@ class Generator(TreeListener):
             arg_names = [arg.name() for arg in args]
             free_vars = [e for e in free_vars if e.name() not in arg_names]
             all_args = args + free_vars
-            F = ca.Function('loop_body_' + f.name, all_args, [expr])
+            F = ca.Function('loop_body', all_args, [expr])
 
             indexed_symbols_full = [self.nodes[self.current_class][
                                         f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in
@@ -420,7 +420,7 @@ class Generator(TreeListener):
             arg_names = [arg.name() for arg in args]
             free_vars = [e for e in free_vars if e.name() not in arg_names]
             all_args = args + free_vars
-            F = ca.Function('loop_body_' + f.name, all_args, [expr])
+            F = ca.Function('loop_body', all_args, [expr])
 
             indexed_symbols_full = [self.nodes[self.current_class][
                                         f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in
@@ -472,8 +472,7 @@ class Generator(TreeListener):
                         vals.append(self.get_integer(self.current_class.symbols[dep.name()].value))
 
             # Evaluate the expression
-            F = ca.Function('get_integer_{}'.format('_'.join([dep.name().replace('.', '_') for dep in deps])), deps,
-                            [expr])
+            F = ca.Function('get_integer', deps, [expr])
             ret = F.call(vals)
             if ret[0].is_constant():
                 # We managed to evaluate the expression.  Assume the result to be integer.
