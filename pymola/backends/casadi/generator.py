@@ -532,7 +532,7 @@ class Generator(TreeListener):
             deps = ca.vertcat(*orig_deps)
             J = ca.Function('J', [deps], [ca.jacobian(s, deps)])
             J_sparsity = J.sparsity_out(0)
-            der_deps = [self.get_derivative(dep) if J_sparsity.has_nz(0, j) else np.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
+            der_deps = [self.get_derivative(dep) if J_sparsity.has_nz(0, j) else ca.DM.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
             return ca.mtimes(J(deps), ca.vertcat(*der_deps))
 
     def get_indexed_symbol(self, tree, s):
