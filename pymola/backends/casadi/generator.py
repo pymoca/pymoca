@@ -451,7 +451,7 @@ class Generator(TreeListener):
         else:
             self.src[tree] = []
 
-    def get_integer(self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]):
+    def get_integer(self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]) -> Union[int, ca.MX, np.ndarray]:
         # CasADi needs to know the dimensions of symbols at instantiation.
         # We therefore need a mechanism to evaluate expressions that define dimensions of symbols.
         if isinstance(tree, ast.Primary):
@@ -487,9 +487,10 @@ class Generator(TreeListener):
                             [expr])
             ret = F.call(vals)
             if ret[0].is_constant():
+                # We managed to evaluate the expression.  Assume the result to be integer.
                 return int(ret[0])
             else:
-                logger.warning('Failed to determine integer value of expression {}'.format(expr))
+                # Expression depends on other symbols.  Could not extract integer value.
                 return ret[0]
         if isinstance(tree, ast.Slice):
             start = self.get_integer(tree.start)
