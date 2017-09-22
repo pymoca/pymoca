@@ -918,10 +918,9 @@ def add_variable_value_statements(node: ast.Node) -> None:
             sym.value = ast.Primary(value=None)
 
 
-class DerivativeExpander(TreeListener):
+class StateAnnotator(TreeListener):
     """
-    This expands all derivative expressions, and finds all variables that are differentiated and
-    annotates them with the state prefix
+    Finds all variables that are differentiated and annotates them with the state prefix
     """
 
     def __init__(self, node: ast.Node):
@@ -941,33 +940,6 @@ class DerivativeExpander(TreeListener):
         if tree.operator == 'der':
             self.in_der -= 1
 
-            if isinstance(tree.operands[0], ast.Expression):
-                # There is an expression under the der() operator.  Apply
-                # the rules of calculus to obtain an expression of derivatives
-                # of variables.
-                operator = tree.operands[0].operator
-                operands = tree.operands[0].operands
-                der_operands = [ast.Primary(value=0) if isinstance(op, ast.Primary) else ast.Expression(operator='der', operands=[op]) for op in operands]
-                if operator in ['-', '+']:
-                    tree.operator = operator
-                    tree.operands = der_operands
-                elif operator == '*':
-                    assert len(operands) == 2
-                    tree.operator = '+'
-                    tree.operands = [ast.Expression(operator='*', operands=[der_operands[0], operands[1]]), ast.Expression(operator='*', operands=[operands[0], der_operands[1]])]
-                elif operator == '/':
-                    assert len(operands) == 2
-                    numerator = ast.Expression(operator='-', operands=[ast.Expression(operator='*', operands=[der_operands[0], operands[1]]), ast.Expression(operator='*', operands=[operands[0], der_operands[1]])])
-                    denominator = ast.Expression(operator='^', operands=[operands[1], ast.Primary(value=2)])
-                    tree.operator = '/'
-                    tree.operands = [numerator, denominator]
-                elif operator == '^':
-                    assert len(operands) == 2
-                    tree.operator = '*'
-                    tree.operands = [operands[1], ast.Expression(operator='*', operands=[ast.Expression(operator='^', operands=[operands[0], ast.Primary(value=operands[1].value - 1)]), der_operands[0]])]
-                else:
-                    raise NotImplementedError("Unknown operator {} when expanding derivative expression.".format(tree.operator))
-
     def exitComponentRef(self, tree: ast.Expression):
         if self.in_der > 0:
             assert len(tree.child) == 0
@@ -982,7 +954,7 @@ class DerivativeExpander(TreeListener):
                     s.prefixes.append('state')
 
 
-def expand_derivatives(node: ast.Node) -> None:
+def annotate_states(node: ast.Node) -> None:
     """
     Finds all derivative expressions and annotates all differentiated
     symbols as states by adding state the prefix list
@@ -991,7 +963,7 @@ def expand_derivatives(node: ast.Node) -> None:
     :return:
     """
     w = TreeWalker()
-    w.walk(DerivativeExpander(node), node)
+    w.walk(StateAnnotator(node), node)
 
 
 def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
@@ -1015,8 +987,8 @@ def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
     for function in flat_class.functions.values():
         add_variable_value_statements(function)
 
-    # expand derivatives and annotate states
-    expand_derivatives(flat_class)
+    # annotate states
+    annotate_states(flat_class)
 
     # Put class in root
     root = ast.Tree()
