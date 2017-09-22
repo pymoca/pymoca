@@ -862,6 +862,9 @@ def expand_connectors(node: ast.Node) -> None:
                         # do not always know the length of vectors a priori.
                         disconnected_flow_variables.pop(left_name, None)
                         disconnected_flow_variables.pop(right_name, None)
+                    elif connector_variable.prefixes[0] in ['constant', 'parameter']:
+                        # Skip constants and parameters in connectors.
+                        pass
                     else:
                         raise Exception(
                             "Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
