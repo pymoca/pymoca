@@ -920,24 +920,38 @@ def add_variable_value_statements(node: ast.Node) -> None:
 
 class StateAnnotator(TreeListener):
     """
-    This finds all variables that are differentiated and annotates them with the state prefix
+    Finds all variables that are differentiated and annotates them with the state prefix
     """
 
     def __init__(self, node: ast.Node):
         self.node = node
+        self.in_der = 0
         super().__init__()
 
-    def exitExpression(self, tree: ast.Expression):
+    def enterExpression(self, tree: ast.Expression):
         """
-        When exiting an expression, check if it is a derivative, if it is
-        put state prefix on symbol
+        When entering an expression, check if it is a derivative, if it is
+        put state prefix on contained symbols
         """
         if tree.operator == 'der':
-            assert len(tree.operands[0].child) == 0
+            self.in_der += 1
 
-            s = self.node.symbols[tree.operands[0].name]
-            if 'state' not in s.prefixes:
-                s.prefixes.append('state')
+    def exitExpression(self, tree: ast.Expression):
+        if tree.operator == 'der':
+            self.in_der -= 1
+
+    def exitComponentRef(self, tree: ast.Expression):
+        if self.in_der > 0:
+            assert len(tree.child) == 0
+
+            try:
+                s = self.node.symbols[tree.name]
+            except KeyError:
+                # Ignore index variables, parameters, and so forth.
+                pass
+            else:
+                if 'state' not in s.prefixes:
+                    s.prefixes.append('state')
 
 
 def annotate_states(node: ast.Node) -> None:

@@ -487,14 +487,18 @@ class GenCasadiTest(unittest.TestCase):
         w = ca.MX.sym('w', 2, 10)
         b = ca.MX.sym("b")
         n = ca.MX.sym("n")
+        s = ca.MX.sym('s', 10)
+        der_s = ca.MX.sym('der(s)', 10)
 
+        ref_model.states = list(map(Variable, [s]))
+        ref_model.der_states = list(map(Variable, [der_s]))
         ref_model.alg_states = list(map(Variable, [x, y, z, w, b]))
         ref_model.parameters = list(map(Variable, [n]))
         ref_model.parameters[0].value = 10
         ref_model.equations = [
             ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2)),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
-            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1]))]
+            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -1217,6 +1221,27 @@ class GenCasadiTest(unittest.TestCase):
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_state_annotator(self):
+        with open(os.path.join(TEST_DIR, 'StateAnnotator.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'StateAnnotator')
+        print(casadi_model)
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        y = ca.MX.sym('y')
+        z = ca.MX.sym('z')
+        der_x = ca.MX.sym('der(x)')
+        der_y = ca.MX.sym('der(y)')
+        der_z = ca.MX.sym('der(z)')
+
+        ref_model.states = list(map(Variable, [x, y, z]))
+        ref_model.der_states = list(map(Variable, [der_x, der_y, der_z]))
+        ref_model.equations = [der_x + der_y - 1, der_x * y + x * der_y - 2, (der_x * y - x * der_y) / (y**2) - 3, 2 * x * der_x - 4, der_z - 5, der_x * z + x * der_z + der_y * z + y * der_z - 4, 0]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
 
 if __name__ == "__main__":
