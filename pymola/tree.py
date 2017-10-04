@@ -221,6 +221,7 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     extended_orig_class = ast.InstanceClass(
         name=orig_class.name,
         type=orig_class.type,
+        annotation=ast.ClassModification(),
         parent=parent,
         root=parent.root if parent is not None else None
     )
@@ -245,6 +246,8 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
         extended_orig_class.initial_equations += c.initial_equations
         extended_orig_class.statements += c.statements
         extended_orig_class.initial_statements += c.initial_statements
+        if isinstance(c.annotation, ast.ClassModification):
+            extended_orig_class.annotation.arguments += c.annotation.arguments
         extended_orig_class.functions.update(c.functions)
 
         # Note that all extends clauses are handled before any modifications
@@ -262,6 +265,8 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     extended_orig_class.initial_equations += orig_class.initial_equations
     extended_orig_class.statements += orig_class.statements
     extended_orig_class.initial_statements += orig_class.initial_statements
+    if isinstance(orig_class.annotation, ast.ClassModification):
+        extended_orig_class.annotation.arguments += orig_class.annotation.arguments
     extended_orig_class.functions.update(orig_class.functions)
 
     if modification_environment is not None:
@@ -424,6 +429,7 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
     flat_class = ast.Class(
         name=class_.name,
         type=class_.type,
+        annotation=class_.annotation,
     )
 
     # append period to non empty instance_name
@@ -693,8 +699,9 @@ class SymbolModificationApplier(TreeListener):
             modify_symbol(tree)
             tree.class_modification = None
 
-    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
-        assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
+    # Class modification arguments may exist within annotations.
+    #def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
+    #     assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
 
     def exitInstanceClass(self, tree: ast.InstanceClass):
         assert tree.modification_environment is None or not tree.modification_environment.arguments, \

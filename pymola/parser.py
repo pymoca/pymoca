@@ -149,6 +149,9 @@ class ASTListener(ModelicaListener):
                 else:
                     self.class_node.statements += alglist.statements
 
+        if ctx.comp_annotation is not None:
+            self.class_node.annotation = self.ast[ctx.comp_annotation]
+
     def exitArgument(self, ctx):
         argument = ast.ClassModificationArgument()
         if ctx.element_modification_or_replaceable() is not None:
@@ -644,11 +647,15 @@ class ASTListener(ModelicaListener):
     # COMMENTS ==============================================================
 
     def exitComment(self, ctx):
-        # TODO handle annotation
         self.ast[ctx] = self.ast[ctx.string_comment()]
 
     def exitString_comment(self, ctx):
         self.ast[ctx] = ctx.getText()[1:-1]
+
+    # ANNOTATIONS ==========================================================
+
+    def exitAnnotation(self, ctx):
+        self.ast[ctx] = self.ast[ctx.class_modification()]
 
 
 # UTILITY FUNCTIONS ========================================================
