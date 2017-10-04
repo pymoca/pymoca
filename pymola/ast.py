@@ -394,6 +394,7 @@ class Class(Node):
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
         self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
+        self.annotation = []  # type: Union[NoneType, ClassModification]
         self.parent = None  # type: Class
         # Some references are relative to root. Instead of traversing up the
         # tree using parent to find the root node, we store a reference to it

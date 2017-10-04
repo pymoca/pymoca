@@ -49,7 +49,7 @@ if options.flatten_only:
 
     logger.info("Flattening")
 
-    _ast = tree.flatten(_ast, ast.ComponentRef(name=model_name))
+    _ast = tree.flatten(_ast, ast.ComponentRef.from_string(model_name))
     print(_ast)
 else:
     # Set CasADi installation folder
