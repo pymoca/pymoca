@@ -459,20 +459,19 @@ class Generator(TreeListener):
             expr = self.get_mx(tree)
 
             # Obtain the symbols it depends on
-            deps = [expr.dep(i) for i in range(expr.n_dep())
-                    if expr.dep(i).is_symbolic()]
+            free_vars = ca.symvar(expr)
 
             # Find the values of the symbols
             vals = []
-            for dep in deps:
-                if dep.is_symbolic():
-                    if (len(self.for_loops) > 0) and (dep.name() == self.for_loops[-1].name):
+            for free_var in free_vars:
+                if free_var.is_symbolic():
+                    if (len(self.for_loops) > 0) and (free_var.name() == self.for_loops[-1].name):
                         vals.append(self.for_loops[-1].index_variable)
                     else:
-                        vals.append(self.get_integer(self.current_class.symbols[dep.name()].value))
+                        vals.append(self.get_integer(self.current_class.symbols[free_var.name()].value))
 
             # Evaluate the expression
-            F = ca.Function('get_integer', deps, [expr])
+            F = ca.Function('get_integer', free_vars, [expr])
             ret = F.call(vals)
             if ret[0].is_constant():
                 # We managed to evaluate the expression.  Assume the result to be integer.
@@ -527,7 +526,7 @@ class Generator(TreeListener):
                 return self.derivative[s]
         else:
             # Differentiate expression using CasADi
-            orig_deps = list(self.nodes[self.current_class].values())
+            orig_deps = ca.symvar(s)
             deps = ca.vertcat(*orig_deps)
             J = ca.Function('J', [deps], [ca.jacobian(s, deps)])
             J_sparsity = J.sparsity_out(0)
