@@ -393,11 +393,13 @@ class Model:
                             other_state = None
 
                         if alg_state is not None:
+                            # Get canonical name and sign of other state
+                            canonical_other_state, sign = alias_rel.canonical_signed(other_state.name())
                             # Add alias
-                            if eq.is_op(ca.OP_SUB):
-                                alias_rel.add(other_state.name(), alg_state.name())
+                            if eq.is_op(ca.OP_SUB) ^ (sign < 0):
+                                alias_rel.add(canonical_other_state, alg_state.name())
                             else:
-                                alias_rel.add(other_state.name(), '-' + alg_state.name())
+                                alias_rel.add(canonical_other_state, '-' + alg_state.name())
 
                             # Skip this equation
                             continue
