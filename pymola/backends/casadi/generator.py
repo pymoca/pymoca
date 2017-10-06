@@ -299,14 +299,23 @@ class Generator(TreeListener):
         else:
             src_right = self.get_mx(tree.right)
 
+        src_left = ca.MX(src_left)
+        src_right = ca.MX(src_right)
+
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
         if isinstance(tree.right, ast.Expression) and tree.right.operator in self.root.classes:
-            if ca.MX(src_left).size1() < ca.MX(src_right).size1():
+            if src_left.size1() < src_right.size1():
                 src_right = src_right[0:src_left.size1()]
         if isinstance(tree.left, ast.Expression) and tree.left.operator in self.root.classes:
-            if ca.MX(src_left).size1() > ca.MX(src_right).size1():
+            if src_left.size1() > src_right.size1():
                 src_left = src_left[0:src_right.size1()]
+
+        # If dimensions between the lhs and rhs do not match, but the dimensions of lhs
+        # and transposed rhs do match, transpose the rhs.
+        if ((src_left.size1() != src_right.size1()) or (src_left.size2() != src_right.size2())) and \
+           ((src_left.size1() == src_right.size2()) and (src_left.size2() == src_right.size1())):
+           src_right = ca.transpose(src_right)
 
         self.src[tree] = src_left - src_right
 
@@ -445,7 +454,7 @@ class Generator(TreeListener):
         # CasADi needs to know the dimensions of symbols at instantiation.
         # We therefore need a mechanism to evaluate expressions that define dimensions of symbols.
         if isinstance(tree, ast.Primary):
-            return int(tree.value)
+            return None if tree.value == None else int(tree.value)
         if isinstance(tree, ast.ComponentRef):
             s = self.current_class.symbols[tree.name]
             assert (s.type.name == 'Integer')
@@ -484,7 +493,7 @@ class Generator(TreeListener):
             start = self.get_integer(tree.start)
             step = self.get_integer(tree.step)
             stop = self.get_integer(tree.stop)
-            return np.arange(start, stop + step, step, dtype=np.int)
+            return slice(start, stop, step)
         else:
             raise Exception('Unexpected node type {}'.format(tree.__class__.__name__))
 
@@ -550,14 +559,19 @@ class Generator(TreeListener):
                         return s
 
             sl = self.get_integer(index)
-            if not isinstance(sl, int) and not isinstance(sl, np.ndarray):
+            if isinstance(sl, int):
+                # Modelica indexing starts from one;  Python from zero.
+                sl = sl - 1
+            elif isinstance(sl, slice):
+                # Modelica indexing starts from one;  Python from zero.
+                sl = slice(None if sl.start is None else sl.start - 1, sl.stop, sl.step)
+            else:
                 for_loop = self.for_loops[-1]
                 s = ca.MX.sym('{}[{}]'.format(tree.name, for_loop.name))
                 for_loop.register_indexed_symbol(s, tree, sl)
                 return s
 
-            # Modelica indexing starts from one;  Python from zero.
-            indices.append(sl - 1)
+            indices.append(sl)
         if len(indices) == 1:
             return s[indices[0]]
         elif len(indices) == 2:

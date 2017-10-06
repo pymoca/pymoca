@@ -112,8 +112,8 @@ class Array(Node):
 
 class Slice(Node):
     def __init__(self, **kwargs):
-        self.start = Primary(value=0)  # type: Union[Expression, Primary, ComponentRef]
-        self.stop = Primary(value=-1)  # type: Union[Expression, Primary, ComponentRef]
+        self.start = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef]
+        self.stop = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef]
         self.step = Primary(value=1)  # type: Union[Expression, Primary, ComponentRef]
         super().__init__(**kwargs)
 

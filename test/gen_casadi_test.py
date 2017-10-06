@@ -533,6 +533,7 @@ class GenCasadiTest(unittest.TestCase):
         e = ca.MX.sym("e", 3)
         g = ca.MX.sym("g", 1)
         h = ca.MX.sym("h", 1)
+        i = ca.MX.sym('i', 2, 3)
         B = ca.MX.sym("B", 3)
         C = ca.MX.sym("C", 2)
         D = ca.MX.sym("D", 3)
@@ -549,7 +550,7 @@ class GenCasadiTest(unittest.TestCase):
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]))
+        ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h, i]))
         ref_model.alg_states[6].min = [0, 0, 0]
         ref_model.parameters = list(map(Variable, [nested2n, nested1n, d_dim]))
         parameter_values = [np.array([3, 3]), 3, 3]
@@ -563,7 +564,7 @@ class GenCasadiTest(unittest.TestCase):
             const.value = val
         ref_model.equations = [c - (a + b[0:3] * e), d - (ca.sin(a / b[1:4])), e - (d + scalar_f), g - ca.sum1(c),
                                h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - np.array([4, 5, 6]),
-                               nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1],
+                               nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, i[0, :] - ca.transpose(ca.DM.ones(3)), i[1, :] - ca.transpose(ca.DM.ones(3)), arcy[0] - arcy[1],
                                arcw[0] + arcw[1], a - np.array([1, 2, 3]), scalar_f - 1.3]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
