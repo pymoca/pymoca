@@ -97,6 +97,23 @@ class AliasRelation:
             except KeyError:
                 pass
 
+    def flatten(self):
+        for v in self.canonical_variables:
+            vt = self.__toggle(v)
+            for al in self.aliases(v):
+                self.add(vt, self.__toggle(al))
+
+        for v in self.canonical_variables:
+            if v[0] == '-':
+                del self._aliases[v]
+                self._canonical_variables.remove(v)
+
+    def __toggle(self, v):
+        if v[0] == '-':
+            return v[1:]
+        else:
+            return '-' + v
+
     def aliases(self, a):
         return self._aliases.get(a, OrderedSet([a]))
 
