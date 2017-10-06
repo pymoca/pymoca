@@ -99,16 +99,15 @@ class AliasRelation:
 
     def flatten(self):
         for v in self.canonical_variables:
-            vt = self.__toggle(v)
-            for al in self.aliases(v):
-                self.add(vt, self.__toggle(al))
+            vt = self.__toggle_sign(v)
+            for a in self.aliases(v):
+                self.add(vt, self.__toggle_sign(a))
 
         for v in self.canonical_variables:
             if v[0] == '-':
-                del self._aliases[v]
                 self._canonical_variables.remove(v)
 
-    def __toggle(self, v):
+    def __toggle_sign(self, v):
         if v[0] == '-':
             return v[1:]
         else:
@@ -121,10 +120,7 @@ class AliasRelation:
         if a in self._aliases:
             return self.aliases(a)[0], 1
         else:
-            if a[0] == '-':
-                b = a[1:]
-            else:
-                b = '-' + a
+            b = self.__toggle_sign(a)
             if b in self._aliases:
                 return self.aliases(b)[0], -1
             else:
