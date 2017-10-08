@@ -414,9 +414,6 @@ class Model:
                 # Keep this equation
                 reduced_equations.append(eq)
 
-            # Flatten model
-            alias_rel.flatten()
-
             # Eliminate alias variables
             variables, values = [], []
             for canonical, aliases in alias_rel:
