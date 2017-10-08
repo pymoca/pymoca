@@ -85,27 +85,37 @@ class AliasRelation:
         self._canonical_variables = OrderedSet()
 
     def add(self, a, b):
-        aliases = self.aliases(a)
-        for v in self.aliases(b):
+        # Get the canonical names and signs
+        canonical_a, sign_a = self.canonical_signed(a)
+        canonical_b, sign_b = self.canonical_signed(b)
+
+        # Determine if signs need to be inverted when merging the aliased sets
+        opposite_signs = (sign_a + sign_b) == 0
+
+        # Construct aliases (a set of equivalent variables)
+        aliases = self.aliases(canonical_a)
+        for v in self.aliases(canonical_b):
+            if opposite_signs:
+                v = self.__toggle_sign(v)
             aliases.add(v)
+
+        # Update _aliases so that keys are always positive
+        inverted_aliases = OrderedSet([self.__toggle_sign(v) for v in aliases])
         for v in aliases:
-            self._aliases[v] = aliases
+            if v[0] == '-':
+                self._aliases[self.__toggle_sign(v)] = inverted_aliases
+            else:
+                self._aliases[v] = aliases
+
+        # Update _canonical_variables with new canonical var and remove old ones
         self._canonical_variables.add(aliases[0])
         for v in aliases[1:]:
+            if v[0] == '-':
+                v = self.__toggle_sign(v)
             try:
                 self._canonical_variables.remove(v)
             except KeyError:
                 pass
-
-    def flatten(self):
-        for v in self.canonical_variables:
-            vt = self.__toggle_sign(v)
-            for a in self.aliases(v):
-                self.add(vt, self.__toggle_sign(a))
-
-        for v in self.canonical_variables:
-            if v[0] == '-':
-                self._canonical_variables.remove(v)
 
     def __toggle_sign(self, v):
         if v[0] == '-':
@@ -117,14 +127,15 @@ class AliasRelation:
         return self._aliases.get(a, OrderedSet([a]))
 
     def canonical_signed(self, a):
-        if a in self._aliases:
-            return self.aliases(a)[0], 1
+        if a[0] == '-':
+            top_alias = self.aliases(self.__toggle_sign(a))[0]
         else:
-            b = self.__toggle_sign(a)
-            if b in self._aliases:
-                return self.aliases(b)[0], -1
-            else:
-                return self.aliases(a)[0], 1
+            top_alias = self.aliases(a)[0]
+
+        if top_alias[0] == '-':
+            return top_alias[1:], 1 if a[0] == '-' else -1
+        else:
+            return top_alias, -1 if a[0] == '-' else 1
 
     @property
     def canonical_variables(self):
