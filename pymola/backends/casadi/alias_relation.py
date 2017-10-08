@@ -124,7 +124,11 @@ class AliasRelation:
             return '-' + v
 
     def aliases(self, a):
-        return self._aliases.get(a, OrderedSet([a]))
+        if a[0] == '-':
+            a = self.__toggle_sign(a)
+            return OrderedSet([self.__toggle_sign(v) for v in self._aliases.get(a, OrderedSet([a]))])
+        else:
+            return self._aliases.get(a, OrderedSet([a]))
 
     def canonical_signed(self, a):
         if a[0] == '-':
