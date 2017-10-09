@@ -500,6 +500,8 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym("x", 10)
         y = ca.MX.sym("y", 10)
         z = ca.MX.sym("z", 10)
+        u = ca.MX.sym('u', 10, 2)
+        v = ca.MX.sym('v', 2, 10)
         w = ca.MX.sym('w', 2, 10)
         b = ca.MX.sym("b")
         n = ca.MX.sym("n")
@@ -508,11 +510,11 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = list(map(Variable, [s]))
         ref_model.der_states = list(map(Variable, [der_s]))
-        ref_model.alg_states = list(map(Variable, [x, y, z, w, b]))
+        ref_model.alg_states = list(map(Variable, [x, y, z, u, v, w, b]))
         ref_model.parameters = list(map(Variable, [n]))
         ref_model.parameters[0].value = 10
         ref_model.equations = [
-            ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2)),
+            ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2), u - np.ones((10, 2)), v.T - np.ones((10, 2))),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
             ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10)]
 
