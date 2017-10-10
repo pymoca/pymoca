@@ -13,9 +13,11 @@ import casadi as ca
 import numpy as np
 
 import pymola.backends.casadi.generator as gen_casadi
+from pymola.backends.casadi.alias_relation import AliasRelation
 from pymola.backends.casadi.model import Model, Variable
 from pymola.backends.casadi.api import transfer_model, CachedModel
 from pymola import parser, ast
+
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -1243,6 +1245,14 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+
+    def test_alias_relation(self):
+        a = AliasRelation()
+        self.assertEqual(a.canonical_signed('-a'), ('a', -1))
+        a.add('a', '-b')
+        a.add('b', 'c')
+        a.add('d', '-b')
+        self.assertEqual(list(a), [('d', ['a', '-b', '-c'])])
 
 if __name__ == "__main__":
     unittest.main()
