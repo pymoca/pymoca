@@ -516,7 +516,7 @@ class Generator(TreeListener):
                     for_loop_symbol = self.for_loops[-1].indexed_symbols[s]
                     s_without_index = self.get_mx(ast.ComponentRef(name=for_loop_symbol.tree.name))
                     der_s_without_index = self.get_derivative(s_without_index)
-                    if der_s_without_index.is_symbolic():
+                    if ca.MX(der_s_without_index).is_symbolic():
                         return self.get_indexed_symbol(ast.ComponentRef(name=der_s_without_index.name(), indices=for_loop_symbol.tree.indices), der_s_without_index)
                     else:
                         return 0
