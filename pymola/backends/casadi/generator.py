@@ -510,20 +510,23 @@ class Generator(TreeListener):
         if ca.MX(s).is_constant():
             return 0
         elif s.is_symbolic():
-            if s not in self.derivative:
+            if s.name() not in self.derivative:
                 if len(self.for_loops) > 0 and s in self.for_loops[-1].indexed_symbols:
                     # Create a new indexed symbol, referencing to the for loop index inside the vector derivative symbol.
                     for_loop_symbol = self.for_loops[-1].indexed_symbols[s]
                     s_without_index = self.get_mx(ast.ComponentRef(name=for_loop_symbol.tree.name))
                     der_s_without_index = self.get_derivative(s_without_index)
-                    return self.get_indexed_symbol(ast.ComponentRef(name=der_s_without_index.name(), indices=for_loop_symbol.tree.indices), der_s_without_index)
+                    if der_s_without_index.is_symbolic():
+                        return self.get_indexed_symbol(ast.ComponentRef(name=der_s_without_index.name(), indices=for_loop_symbol.tree.indices), der_s_without_index)
+                    else:
+                        return 0
                 else:
                     der_s = ca.MX.sym("der({})".format(s.name()), s.size())
-                    self.derivative[s] = der_s
+                    self.derivative[s.name()] = der_s
                     self.nodes[self.current_class][der_s.name()] = der_s
                     return der_s
             else:
-                return self.derivative[s]
+                return self.derivative[s.name()]
         else:
             # Differentiate expression using CasADi
             orig_deps = ca.symvar(s)
