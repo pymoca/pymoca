@@ -102,7 +102,8 @@ class AliasRelation:
         # Update _aliases so that keys are always positive
         inverted_aliases = OrderedSet([self.__toggle_sign(v) for v in aliases])
         for v in aliases:
-            if v[0] == '-':
+            if self.__is_negative(v):
+                # If v is negative, we make it positive and store the inverse alias set
                 self._aliases[self.__toggle_sign(v)] = inverted_aliases
             else:
                 self._aliases[v] = aliases
@@ -110,7 +111,7 @@ class AliasRelation:
         # Update _canonical_variables with new canonical var and remove old ones
         self._canonical_variables.add(aliases[0])
         for v in aliases[1:]:
-            if v[0] == '-':
+            if self.__is_negative(v):
                 v = self.__toggle_sign(v)
             try:
                 self._canonical_variables.remove(v)
@@ -118,28 +119,31 @@ class AliasRelation:
                 pass
 
     def __toggle_sign(self, v):
-        if v[0] == '-':
+        if self.__is_negative(v):
             return v[1:]
         else:
             return '-' + v
 
+    def __is_negative(self, v):
+        return True if v[0] == '-' else False
+
     def aliases(self, a):
-        if a[0] == '-':
+        if self.__is_negative(a):
             a = self.__toggle_sign(a)
             return OrderedSet([self.__toggle_sign(v) for v in self._aliases.get(a, OrderedSet([a]))])
         else:
             return self._aliases.get(a, OrderedSet([a]))
 
     def canonical_signed(self, a):
-        if a[0] == '-':
+        if self.__is_negative(a):
             top_alias = self.aliases(self.__toggle_sign(a))[0]
         else:
             top_alias = self.aliases(a)[0]
 
-        if top_alias[0] == '-':
-            return top_alias[1:], 1 if a[0] == '-' else -1
+        if self.__is_negative(top_alias):
+            return top_alias[1:], 1 if self.__is_negative(a) else -1
         else:
-            return top_alias, -1 if a[0] == '-' else 1
+            return top_alias, -1 if self.__is_negative(a) else 1
 
     @property
     def canonical_variables(self):
