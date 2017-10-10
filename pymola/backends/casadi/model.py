@@ -393,6 +393,10 @@ class Model:
                             other_state = None
 
                         if alg_state is not None:
+                            # We found an alg_state to alias
+                            # To keep equations balanced, we make sure that we don't drop
+                            # equations unless we are also eliminating a variable.
+
                             # Add alias
                             if eq.is_op(ca.OP_SUB):
                                 alias_rel.add(other_state.name(), alg_state.name())
