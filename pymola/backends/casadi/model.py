@@ -397,11 +397,6 @@ class Model:
                             # To keep equations balanced, we make sure that we don't drop
                             # equations unless we are also eliminating a variable.
 
-                            # For now, if alg_state is already aliased, we keep the equation.
-                            if alg_state.name() != alias_rel.canonical_signed(alg_state.name())[0]:
-                                reduced_equations.append(eq)
-                                continue
-
                             # Add alias
                             if eq.is_op(ca.OP_SUB):
                                 alias_rel.add(other_state.name(), alg_state.name())
