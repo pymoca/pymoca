@@ -379,7 +379,7 @@ class Model:
             alias_rel = AliasRelation()
 
             # For now, we only eliminate algebraic states.
-            do_not_eliminate = list(der_states) + list(states) + list(inputs)
+            do_not_eliminate = set(list(der_states) + list(states) + list(inputs))
 
             reduced_equations = []
             for eq in self.equations:
