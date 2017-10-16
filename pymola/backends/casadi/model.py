@@ -378,6 +378,9 @@ class Model:
 
             alias_rel = AliasRelation()
 
+            # For now, we only eliminate algebraic states.
+            do_not_eliminate = set(list(der_states) + list(states) + list(inputs))
+
             reduced_equations = []
             for eq in self.equations:
                 if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
@@ -391,6 +394,24 @@ class Model:
                         else:
                             alg_state = None
                             other_state = None
+
+                        # If both states are algebraic, we need to decide which to eliminate
+                        if eq.dep(0).name() in alg_states and eq.dep(1).name() in alg_states:
+                            # Most of the time it does not matter which one we eliminate.
+                            # The exception is if alg_state has already been aliased to a
+                            # variable in do_not_eliminate. If this is the case, setting the
+                            # states in the default order will cause the new canonical variable
+                            # to be other_state, unseating (and eliminating) the current
+                            # canonical variable (which is in do_not_eliminate).
+                            if alias_rel.canonical_signed(alg_state.name())[0] in do_not_eliminate:
+                                # swap the states
+                                other_state, alg_state = alg_state, other_state
+
+                        # To avoid eliminating states, we check to see if we are linking two states
+                        if alias_rel.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
+                           alias_rel.canonical_signed(other_state.name())[0] in do_not_eliminate:
+                           alg_state = None
+                           other_state = None
 
                         if alg_state is not None:
                             # We found an alg_state to alias
