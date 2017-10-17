@@ -189,7 +189,8 @@ class TreeWalker(object):
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.__dict__.keys():
-            if isinstance(tree, ast.Class) and child_name in ('parent'):
+            if isinstance(tree, ast.Class) and child_name in ('parent') or \
+                isinstance(tree, ast.ClassModificationArgument) and child_name == 'scope':
                 # Do not go up again.
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
@@ -375,6 +376,7 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
                         # TODO: Figure out if it's easier to directly do this
                         # in the parser.
                         vmod_arg = ast.ClassModificationArgument()
+                        vmod_arg.scope = arg.scope
                         vmod_arg.value = ast.ElementModification()
                         vmod_arg.value.component = ast.ComponentRef(name="value")
                         vmod_arg.value.modifications = [el_arg]
@@ -458,10 +460,17 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
         elif sym.type.type == "__builtin":
             # Class inherited from elementary type (e.g. "type Voltage =
             # Real"). No flattening to be done, just copying over all
-            # attributes to the class's "__value" symbol.
+            # attributes and modifications to the class's "__value" symbol.
             flat_class.symbols[flat_sym.name] = flat_sym
+
+            if flat_sym.class_modification is not None:
+                flat_sym.class_modification.arguments.extend(sym.type.symbols['__value'].class_modification.arguments)
+            else:
+                flat_sym.class_modification = sym.type.symbols['__value'].class_modification
+
             for att in flat_sym.ATTRIBUTES + ["type"]:
                 setattr(flat_class.symbols[flat_sym.name], att, getattr(sym.type.symbols['__value'], att))
+
             continue
         else:
             # recursively call flatten on the contained class
@@ -504,6 +513,9 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
     for sym_name, sym in flat_class.symbols.items():
         flat_sym = flatten_component_refs(flat_class, sym, instance_prefix)
         flat_class.symbols[sym_name] = flat_sym
+
+    # Apply any symbol modifications if the scope of said modification is equal to that of the current class
+    apply_symbol_modifications(flat_class, class_)
 
     # A set of component refs to functions
     pulled_functions = OrderedDict()
@@ -561,7 +573,14 @@ class ComponentRefFlattener(TreeListener):
         self.instance_prefix = instance_prefix
         self.depth = 0
         self.cutoff_depth = sys.maxsize
+        self.inside_modification = 0  # We do flatten component references in modifications
         super().__init__()
+
+    def enterElementModification(self, tree: ast.ElementModification):
+        self.inside_modification += 1
+
+    def exitElementModification(self, tree: ast.ElementModification):
+        self.inside_modification -= 1
 
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
@@ -577,7 +596,7 @@ class ComponentRefFlattener(TreeListener):
 
         # If the flattened name exists in the container, use it.
         # Otherwise, skip this reference.
-        if new_name in self.container.symbols:
+        if new_name in self.container.symbols and self.inside_modification == 0:
             tree.name = new_name
             c = tree
             while len(c.child) > 0:
@@ -660,12 +679,21 @@ def fully_scope_function_calls(node: ast.Tree, expression: ast.Expression, funct
     return expression_copy
 
 
-def modify_symbol(sym: ast.Symbol) -> None:
+def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
     """
-    Apply a modification to a symbol.
+    Apply a modification to a symbol if the scope matches (or is None)
     :param sym: symbol to apply modifications for
+    :param scope: scope of modification
     """
-    for class_mod_argument in sym.class_modification.arguments:
+
+    # We assume that we do not screw up the order of applying modifications
+    # when "moving up" with the scope.
+    apply_args = [x for x in sym.class_modification.arguments
+                  if x.scope is None or x.scope.full_reference().to_tuple() == scope.full_reference().to_tuple()]
+    skip_args = [x for x in sym.class_modification.arguments
+                 if x.scope is not None and x.scope.full_reference().to_tuple() != scope.full_reference().to_tuple()]
+
+    for class_mod_argument in apply_args:
         argument = class_mod_argument.value
 
         assert isinstance(argument, ast.ElementModification), \
@@ -677,6 +705,8 @@ def modify_symbol(sym: ast.Symbol) -> None:
 
         setattr(sym, argument.component.name, argument.modifications[0])
 
+    sym.class_modification.arguments = skip_args
+
 
 class SymbolModificationApplier(TreeListener):
     """
@@ -686,8 +716,9 @@ class SymbolModificationApplier(TreeListener):
     on non-elementary types.
     """
 
-    def __init__(self, node: ast.Node):
+    def __init__(self, node: ast.Node, scope: ast.InstanceClass):
         self.node = node
+        self.scope = scope
         super().__init__()
 
     def exitSymbol(self, tree: ast.Symbol):
@@ -695,8 +726,11 @@ class SymbolModificationApplier(TreeListener):
             assert tree.class_modification is None, \
                 "Found symbol modification on non-elementary type in instance tree."
         elif tree.class_modification is not None:
-            modify_symbol(tree)
-            tree.class_modification = None
+            if tree.class_modification.arguments:
+                modify_symbol(tree, self.scope)
+
+            if not tree.class_modification.arguments:
+                tree.class_modification = None
 
     # Class modification arguments may exist within annotations.
     #def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
@@ -707,9 +741,9 @@ class SymbolModificationApplier(TreeListener):
             "Found unhandled modification on instance class."
 
 
-def apply_symbol_modifications(node: ast.Node) -> None:
+def apply_symbol_modifications(node: ast.Node, scope: ast.InstanceClass) -> None:
     w = TreeWalker()
-    w.walk(SymbolModificationApplier(node), node)
+    w.walk(SymbolModificationApplier(node, scope), node)
 
 
 class ConstantReferenceApplier(TreeListener):
@@ -778,17 +812,14 @@ def flatten_class(orig_class: ast.Class) -> ast.Class:
     # 1. All redeclarations have been handled.
     # 2. InstanceClasses have no modifications anymore, nor do non-elementary
     #    symbols. All modifications have been shifted to Symbols that are of
-    #    one of the elementary types (Real, Integer, ...).
-
-    # Now we apply those symbol modifications on the instance tree.
-    apply_symbol_modifications(instance_tree)
-
-    # At this point there are no modifications left, on classes or symbols of whatever kind.
+    #    one of the elementary types (Real, Integer, ...). Scope of the
+    #    modification is retained, such that flattening of symbols can be done
+    #    correctly.
 
     # Pull references to constants
     apply_constant_references(instance_tree)
 
-    # Finally we flatten all symbols.
+    # Finally we flatten all symbols and apply modifications.
     flat_class = flatten_symbols(instance_tree)
 
     return flat_class

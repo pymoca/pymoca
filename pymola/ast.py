@@ -369,6 +369,7 @@ class ClassModificationArgument(Node):
         self.redeclare = False
         super().__init__(**kwargs)
 
+
 class ExtendsClause(Node):
     def __init__(self, **kwargs):
         self.component = None  # type: ComponentRef
