@@ -189,7 +189,7 @@ class TreeWalker(object):
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.__dict__.keys():
-            if isinstance(tree, ast.Class) and child_name in ('root', 'parent'):
+            if isinstance(tree, ast.Class) and child_name in ('parent'):
                 # Do not go up again.
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
@@ -222,8 +222,7 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
         name=orig_class.name,
         type=orig_class.type,
         annotation=ast.ClassModification(),
-        parent=parent,
-        root=parent.root if parent is not None else None
+        parent=parent
     )
 
     if isinstance(orig_class, ast.InstanceClass):

@@ -88,7 +88,7 @@ class Node(object):
             # Avoid infinite recursion by not handling attributes that may go
             # back up in the tree again.
             res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()
-                   if key not in ('root', 'parent', 'scope')}
+                   if key not in ('parent', 'scope')}
         elif isinstance(var, Visibility):
             res = str(var)
         else:
@@ -396,10 +396,6 @@ class Class(Node):
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.annotation = []  # type: Union[NoneType, ClassModification]
         self.parent = None  # type: Class
-        # Some references are relative to root. Instead of traversing up the
-        # tree using parent to find the root node, we store a reference to it
-        # for faster and cleaner lookups.
-        self.root = None  # type: Tree
 
         super().__init__(**kwargs)
 
@@ -427,7 +423,6 @@ class Class(Node):
                 c = Class(name=type_)
                 c.type = "__builtin"
                 c.parent = self.root
-                c.root = self.root
 
                 cref = ComponentRef(name=type_)
                 s = Symbol(name="__value", type=cref)
@@ -501,12 +496,19 @@ class Class(Node):
             else:
                 self.classes[class_name] = other.classes[class_name]
 
+    @property
+    def root(self):
+        if self.parent is None:
+            return self
+        else:
+            return self.parent.root
+
     def copy_including_children(self):
-        _parent, _root = self.parent, self.root
-        self.parent, self.root = None, None
+        _parent = self.parent
+        self.parent = None
         new = copy.deepcopy(self)
-        self.parent, self.root = _parent, _root
-        new.parent, new.root = _parent, _root
+        self.parent = _parent
+        new.parent = _parent
         return new
 
 
@@ -531,7 +533,6 @@ class Tree(Class):
 
     def _update_parent_refs(self, parent: Class) -> None:
         for c in parent.classes.values():
-            c.root = self
             c.parent = parent
             self._update_parent_refs(c)
 
