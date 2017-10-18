@@ -596,6 +596,11 @@ class ComponentRefFlattener(TreeListener):
 
         # If the flattened name exists in the container, use it.
         # Otherwise, skip this reference.
+        # We also do not want to modify any component references inside
+        # modifications (that still need to be applied), as those have an
+        # accompanying scope and will be handled by the modification applier.
+        # Only when modifications have been applied, will they be picked up
+        # below.
         if new_name in self.container.symbols and self.inside_modification == 0:
             tree.name = new_name
             c = tree
