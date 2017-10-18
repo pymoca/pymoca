@@ -475,6 +475,20 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_double_function_call(self):
+        with open(os.path.join(TEST_DIR, 'DoubleFunctionCall.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
+        print("FunctionCall", casadi_model)
+        ref_model = Model()
+
+        # Check that both instances of the function call refer to the same node in the tree
+        func_a = casadi_model.equations[0].dep(1).dep(0).dep(0).dep(0).getFunction().__hash__()
+        func_b = casadi_model.equations[1].dep(1).dep(0).dep(0).dep(0).getFunction().__hash__()
+
+        self.assertEqual(func_a, func_b)
+
     def test_forloop(self):
         with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
             txt = f.read()
