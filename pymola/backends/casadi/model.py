@@ -406,25 +406,22 @@ class Model:
                                 # swap the states
                                 other_state, alg_state = alg_state, other_state
 
-                        # To avoid eliminating states, we check to see if we are linking two states
-                        if alias_rel.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
-                           alias_rel.canonical_signed(other_state.name())[0] in do_not_eliminate:
-                           alg_state = None
-                           other_state = None
-
                         if alg_state is not None:
-                            # We found an alg_state to alias
-                            # To keep equations balanced, we make sure that we don't drop
-                            # equations unless we are also eliminating a variable.
+                            # Check to see if we are linking two entries in do_not_eliminate
+                            if alias_rel.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
+                               alias_rel.canonical_signed(other_state.name())[0] in do_not_eliminate:
+                                # Don't do anything for now, we only eliminate alg_states
+                                pass
 
-                            # Add alias
-                            if eq.is_op(ca.OP_SUB):
-                                alias_rel.add(other_state.name(), alg_state.name())
                             else:
-                                alias_rel.add(other_state.name(), '-' + alg_state.name())
+                                # Eliminate alg_state by aliasing it to other_state
+                                if eq.is_op(ca.OP_SUB):
+                                    alias_rel.add(other_state.name(), alg_state.name())
+                                else:
+                                    alias_rel.add(other_state.name(), '-' + alg_state.name())
 
-                            # Skip this equation
-                            continue
+                                # To keep equations balanced, drop this equation
+                                continue
 
                 # Keep this equation
                 reduced_equations.append(eq)
