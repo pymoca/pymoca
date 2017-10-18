@@ -172,8 +172,10 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         db['library_os'] = os.name
 
         # Describe variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters', 'constants']:
+        for key in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
             db[key] = [e.to_dict() for e in getattr(model, key)]
+
+        db['outputs'] = model.outputs
 
         db['delayed_states'] = model.delayed_states
 
@@ -225,7 +227,7 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
                 variable_dict[variable.symbol.name()] = variable
 
         model.der_states = [Variable.from_dict(d) for d in db['der_states']]
-        model.outputs = [variable_dict[v['name']] for v in db['outputs']]
+        model.outputs = db['outputs']
         model.delayed_states = db['delayed_states']
 
         # Evaluate variable metadata:

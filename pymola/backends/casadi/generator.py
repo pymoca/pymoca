@@ -147,8 +147,9 @@ class Generator(TreeListener):
         # We extend the input list, as it is already populated with delayed states.
         self.model.inputs.extend(self._ast_symbols_to_variables(inputs))
 
-        # The outputs are a subset of the states.
-        self.model.outputs = [v for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
+        # The outputs are a list of strings of state names. Specifying
+        # multiple aliases of the same state is allowed.
+        self.model.outputs = [v.symbol.name() for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
 
         def discard_empty(l):
             return list(filter(lambda x: not ca.MX(x).is_empty(), l))
