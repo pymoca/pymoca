@@ -576,11 +576,13 @@ class ComponentRefFlattener(TreeListener):
         self.inside_modification = 0  # We do flatten component references in modifications
         super().__init__()
 
-    def enterElementModification(self, tree: ast.ElementModification):
-        self.inside_modification += 1
+    def enterClassModificationArgument(self, tree: ast.ClassModificationArgument):
+        if tree.scope is not None:
+            self.inside_modification += 1
 
-    def exitElementModification(self, tree: ast.ElementModification):
-        self.inside_modification -= 1
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
+        if tree.scope is not None:
+            self.inside_modification -= 1
 
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
