@@ -8,6 +8,7 @@ model ForLoop
     Real w[2, n];
     Real b;
     Real s[n];
+    Real Arr[2, 2];
 equation
 	for i in 1:n loop
     	x[i] = i+b;
@@ -31,5 +32,11 @@ equation
     end for;
     for l in 1:n loop
         der(s[l]) = 1.0;
+    end for;
+    for m in 1:2 loop
+        // In this order, this test fails. 
+        // If the order is reversed, it passes.
+        Arr[m, 2] = 2.0;
+        Arr[m, 1] = 1.0;
     end for;
 end ForLoop;

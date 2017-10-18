@@ -506,17 +506,18 @@ class GenCasadiTest(unittest.TestCase):
         b = ca.MX.sym("b")
         n = ca.MX.sym("n")
         s = ca.MX.sym('s', 10)
+        Arr = ca.MX.sym('Arr', 2, 2)
         der_s = ca.MX.sym('der(s)', 10)
 
         ref_model.states = list(map(Variable, [s]))
         ref_model.der_states = list(map(Variable, [der_s]))
-        ref_model.alg_states = list(map(Variable, [x, y, z, u, v, w, b]))
+        ref_model.alg_states = list(map(Variable, [x, y, z, u, v, w, b, Arr]))
         ref_model.parameters = list(map(Variable, [n]))
         ref_model.parameters[0].value = 10
         ref_model.equations = [
             ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2), u - np.ones((10, 2)), v.T - np.ones((10, 2))),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
-            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10)]
+            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10), Arr - np.array([[1, 2], [1, 2]])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
