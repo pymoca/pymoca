@@ -34,8 +34,6 @@ equation
         der(s[l]) = 1.0;
     end for;
     for m in 1:2 loop
-        // In this order, this test fails. 
-        // If the order is reversed, it passes.
         Arr[m, 2] = 2.0;
         Arr[m, 1] = 1.0;
     end for;

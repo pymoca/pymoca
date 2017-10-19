@@ -517,7 +517,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [
             ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2), u - np.ones((10, 2)), v.T - np.ones((10, 2))),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
-            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10), Arr - np.array([[1, 2], [1, 2]])]
+            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10), ca.horzcat(Arr[:, 1], Arr[:, 0]) - np.array([[2, 1], [2, 1]])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
