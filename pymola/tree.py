@@ -369,10 +369,6 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
                         # modification with attribute name "value" that we
                         # pick up later in modify_symbol()
 
-                        # TODO: Is it also possible for users to say
-                        # x(nominal=1.0, value=3.0), and that x = 3.0 is
-                        # just a shorthand for x(value=3.0)
-
                         # TODO: Figure out if it's easier to directly do this
                         # in the parser.
                         vmod_arg = ast.ClassModificationArgument()
