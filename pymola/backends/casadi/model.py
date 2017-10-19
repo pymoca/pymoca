@@ -519,7 +519,14 @@ class Model:
                     A = Af(0, constants, parameters)
                     b = bf(0, constants, parameters)
 
-                    equations = [ca.reshape(ca.mtimes(A, states), equations.shape) + b]
+                    # Replace veccat'ed states with brand new state vectors so as to avoid the value copy operations induced by veccat.
+                    self._states_vector = ca.MX.sym('states_vector', sum([s.numel() for s in self._symbols(self.states)]))
+                    self._der_states_vector = ca.MX.sym('der_states_vector', sum([s.numel() for s in self._symbols(self.der_states)]))
+                    self._alg_states_vector = ca.MX.sym('alg_states_vector', sum([s.numel() for s in self._symbols(self.alg_states)]))
+                    self._inputs_vector = ca.MX.sym('inputs_vector', sum([s.numel() for s in self._symbols(self.inputs)]))
+
+                    states_vector = ca.vertcat(self._states_vector, self._der_states_vector, self._alg_states_vector, self._inputs_vector)
+                    equations = [ca.reshape(ca.mtimes(A, states_vector), equations.shape) + b]
                     setattr(self, equation_list, equations)
 
         if options.get('expand_mx', False):
@@ -534,16 +541,26 @@ class Model:
 
     @property
     def dae_residual_function(self):
-        return ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
-                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [])
+        if hasattr(self, '_states_vector'):
+            return ca.Function('dae_residual', [self.time, self._states_vector, self._der_states_vector,
+                                                self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [])
+        else:
+            return ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
+                                                ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [])
 
     # noinspection PyUnusedLocal
     @property
     def initial_residual_function(self):
-        return ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
-                                            ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                            ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
+        if hasattr(self, '_states_vector'):
+            return ca.Function('initial_residual', [self.time, self._states_vector, self._der_states_vector,
+                                                self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
+        else:
+            return ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
+                                                ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
 
     # noinspection PyPep8Naming
     @property
