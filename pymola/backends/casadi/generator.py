@@ -633,7 +633,7 @@ class Generator(TreeListener):
 
         output_expr = ca.substitute([values[output] for output in outputs], tmp, [values[t] for t in tmp])
         function = ca.Function(tree.name, inputs, output_expr)
-        self.functions[tree.name] = function
+        self.functions[function_name] = function
 
         return function
 
