@@ -36,7 +36,7 @@ OP_MAP = {'*': "__mul__",
           "max": "fmax",
           "abs": "fabs"}
 
-ForLoopIndexedSymbol = namedtuple('ForLoopIndexedSymbol', ['tree', 'indices'])
+ForLoopIndexedSymbol = namedtuple('ForLoopIndexedSymbol', ['tree', 'transpose', 'indices'])
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
@@ -54,8 +54,8 @@ class ForLoop:
         self.name = i.name
         self.indexed_symbols = {}
 
-    def register_indexed_symbol(self, e, tree, index_expr=None):
-        if isinstance(index_expr, ca.MX):
+    def register_indexed_symbol(self, e, index_function, transpose, tree, index_expr=None):
+        if isinstance(index_expr, ca.MX) and index_expr is not self.index_variable:
             F = ca.Function('index_expr', [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=np.int)
             Fmap = F.map("map", "serial", len(self.values), [], [])
@@ -63,7 +63,7 @@ class ForLoop:
             indices = np.array(res[0].T, dtype=np.int)
         else:
             indices = self.values
-        self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, indices)
+        self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, transpose, index_function(indices - 1))
 
 
 Assignment = namedtuple('Assignment', ['left', 'right'])
@@ -339,9 +339,15 @@ class Generator(TreeListener):
             all_args = args + free_vars
             F = ca.Function('loop_body', all_args, [expr])
 
-            indexed_symbols_full = [self.nodes[self.current_class][
-                                        f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in
-                                    indexed_symbols]
+            indexed_symbols_full = []
+            for k in indexed_symbols:
+                s = f.indexed_symbols[k]
+                orig_symbol = self.nodes[self.current_class][s.tree.name]
+                indexed_symbol = orig_symbol[s.indices]
+                if s.transpose:
+                    indexed_symbol = ca.transpose(indexed_symbol)
+                indexed_symbols_full.append(indexed_symbol)
+
             Fmap = F.map("map", "serial", len(f.values), list(
                 range(len(args), len(all_args))), [])
             res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
@@ -432,9 +438,15 @@ class Generator(TreeListener):
             all_args = args + free_vars
             F = ca.Function('loop_body', all_args, [expr])
 
-            indexed_symbols_full = [self.nodes[self.current_class][
-                                        f.indexed_symbols[k].tree.name][f.indexed_symbols[k].indices - 1] for k in
-                                    indexed_symbols]
+            indexed_symbols_full = []
+            for k in indexed_symbols:
+                s = f.indexed_symbols[k]
+                orig_symbol = self.nodes[self.current_class][s.tree.name]
+                indexed_symbol = orig_symbol[s.indices]
+                if s.transpose:
+                    indexed_symbol = ca.transpose(indexed_symbol)
+                indexed_symbols_full.append(indexed_symbol)
+
             Fmap = F.map("map", "serial", len(f.values), list(
                 range(len(args), len(all_args))), [])
             res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
@@ -549,35 +561,53 @@ class Generator(TreeListener):
     def get_indexed_symbol(self, tree, s):
         # Check whether we loop over an index of this symbol
         indices = []
+        for_loop = None
         for index in tree.indices:
-            if isinstance(index, ast.ComponentRef):
-                for for_loop in self.for_loops:
-                    if index.name == for_loop.name:
-                        # TODO support nested loops
-                        s = ca.MX.sym('{}[{}]'.format(tree.name, for_loop.name))
-                        for_loop.register_indexed_symbol(s, tree)
-                        return s
+            sl = None
 
-            sl = self.get_integer(index)
-            if isinstance(sl, int):
-                # Modelica indexing starts from one;  Python from zero.
-                sl = sl - 1
-            elif isinstance(sl, slice):
-                # Modelica indexing starts from one;  Python from zero.
-                sl = slice(None if sl.start is None else sl.start - 1, sl.stop, sl.step)
-            else:
-                for_loop = self.for_loops[-1]
-                s = ca.MX.sym('{}[{}]'.format(tree.name, for_loop.name))
-                for_loop.register_indexed_symbol(s, tree, sl)
-                return s
+            if isinstance(index, ast.ComponentRef):
+                for f in self.for_loops:
+                    if index.name == f.name:
+                        # TODO support nested loops
+                        for_loop = f
+                        sl = for_loop.index_variable
+
+            if sl is None:
+                sl = self.get_integer(index)
+                if isinstance(sl, int):
+                    # Modelica indexing starts from one;  Python from zero.
+                    sl = sl - 1
+                elif isinstance(sl, slice):
+                    # Modelica indexing starts from one;  Python from zero.
+                    sl = slice(None if sl.start is None else sl.start - 1, sl.stop, sl.step)
+                else:
+                    for_loop = self.for_loops[-1]
 
             indices.append(sl)
-        if len(indices) == 1:
-            return s[indices[0]]
-        elif len(indices) == 2:
-            return s[indices[0], indices[1]]
+
+        assert len(indices) <= 2, "Dimensions higher than two are not yet supported"
+
+        if for_loop is not None:
+            if isinstance(indices[0], ca.MX):
+                if len(indices) > 1:
+                    s = s[:, indices[1]]
+                    indexed_symbol = ca.MX.sym('{}[{},{}]'.format(tree.name, for_loop.name, indices[1]), s.size2())
+                    index_function = lambda i : (i, indices[1])
+                else:
+                    indexed_symbol = ca.MX.sym('{}[{}]'.format(tree.name, for_loop.name))
+                    index_function = lambda i : i
+                for_loop.register_indexed_symbol(indexed_symbol, index_function, True, tree, indices[0])
+            else:
+                s = ca.transpose(s[indices[0], :])
+                indexed_symbol = ca.MX.sym('{}[{},{}]'.format(tree.name, indices[0], for_loop.name), s.size2())
+                index_function = lambda i: (indices[0], i)
+                for_loop.register_indexed_symbol(indexed_symbol, index_function, False, tree, indices[1])
+            return indexed_symbol
         else:
-            raise Exception("Dimensions higher than two are not yet supported")
+            if len(indices) == 1:
+                return s[indices[0]]
+            else:
+                return s[indices[0], indices[1]]
 
     def get_component(self, tree):
         # Check special symbols
