@@ -88,7 +88,7 @@ class Node(object):
             # Avoid infinite recursion by not handling attributes that may go
             # back up in the tree again.
             res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()
-                   if key not in ('parent', 'scope')}
+                   if key not in ('parent', 'scope', '__deepcopy__')}
         elif isinstance(var, Visibility):
             res = str(var)
         else:
