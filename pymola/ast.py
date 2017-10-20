@@ -374,7 +374,7 @@ class ClassModificationArgument(Node):
     def __deepcopy__(self, memo):
         _scope, _deepcp = self.scope, self.__deepcopy__
         self.scope, self.__deepcopy__ = None, None
-        new = copy.deepcopy(self)
+        new = copy.deepcopy(self, memo)
         self.scope, self.__deepcopy__ = _scope, _deepcp
         new.scope, new.__deepcopy__ = _scope, _deepcp
         return new
