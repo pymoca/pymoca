@@ -190,7 +190,7 @@ class TreeWalker(object):
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.__dict__.keys():
             if isinstance(tree, ast.Class) and child_name in ('parent') or \
-                isinstance(tree, ast.ClassModificationArgument) and child_name == 'scope':
+                isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
                 # Do not go up again.
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
