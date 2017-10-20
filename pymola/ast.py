@@ -369,6 +369,16 @@ class ClassModificationArgument(Node):
         self.redeclare = False
         super().__init__(**kwargs)
 
+    # FIXME: This is not a pretty way of avoiding memory copies it. See #62
+    # for discussion.
+    def __deepcopy__(self, memo):
+        _scope, _deepcp = self.scope, self.__deepcopy__
+        self.scope, self.__deepcopy__ = None, None
+        new = copy.deepcopy(self)
+        self.scope, self.__deepcopy__ = _scope, _deepcp
+        new.scope, new.__deepcopy__ = _scope, _deepcp
+        return new
+
 
 class ExtendsClause(Node):
     def __init__(self, **kwargs):
