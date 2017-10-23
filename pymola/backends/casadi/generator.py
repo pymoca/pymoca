@@ -591,6 +591,7 @@ class Generator(TreeListener):
             if isinstance(indices[0], ca.MX):
                 if len(indices) > 1:
                     s = s[:, indices[1]]
+                    assert s.size2() > 0, "Second dimension of matrix is zero"
                     indexed_symbol = ca.MX.sym('{}[{},{}]'.format(tree.name, for_loop.name, indices[1]), s.size2())
                     index_function = lambda i : (i, indices[1])
                 else:
@@ -599,6 +600,7 @@ class Generator(TreeListener):
                 for_loop.register_indexed_symbol(indexed_symbol, index_function, True, tree, indices[0])
             else:
                 s = ca.transpose(s[indices[0], :])
+                assert s.size2() > 0, "Second dimension of matrix is zero"
                 indexed_symbol = ca.MX.sym('{}[{},{}]'.format(tree.name, indices[0], for_loop.name), s.size2())
                 index_function = lambda i: (indices[0], i)
                 for_loop.register_indexed_symbol(indexed_symbol, index_function, False, tree, indices[1])
