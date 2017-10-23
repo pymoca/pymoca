@@ -509,8 +509,12 @@ class Model:
                     # Work around CasADi issue #172
                     if len(self.constants) == 0:
                         constants = 0
+                    else:
+                        logger.warning('Not all constants have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
                     if len(self.parameters) == 0:
                         parameters = 0
+                    else:
+                        logger.warning('Not all parameters have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
 
                     A = Af(0, constants, parameters)
                     b = bf(0, constants, parameters)
