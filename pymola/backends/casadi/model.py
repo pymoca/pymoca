@@ -543,11 +543,16 @@ class Model:
     @property
     def variable_metadata_function(self):
         out = []
+        zero, one = ca.MX(0), ca.MX(1) # Recycle these common nodes as much as possible.
         for variable_list in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
             attribute_lists = [[] for i in range(len(ast.Symbol.ATTRIBUTES))]
             for variable in variable_list:
                 for attribute_list_index, attribute in enumerate(ast.Symbol.ATTRIBUTES):
                     value = ca.MX(getattr(variable, attribute))
+                    if value.is_zero():
+                        value = zero
+                    elif (value - 1).is_zero():
+                        value = one
                     value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
                     attribute_lists[attribute_list_index].append(value)
             out.append(ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists]))
