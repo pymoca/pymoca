@@ -579,7 +579,9 @@ class Model:
     # noinspection PyPep8Naming
     @property
     def variable_metadata_function(self):
+        in_var = ca.veccat(*self._symbols(self.parameters))
         out = []
+        is_affine = True
         zero, one = ca.MX(0), ca.MX(1) # Recycle these common nodes as much as possible.
         for variable_list in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
             attribute_lists = [[] for i in range(len(ast.Symbol.ATTRIBUTES))]
@@ -593,4 +595,26 @@ class Model:
                     value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
                     attribute_lists[attribute_list_index].append(value)
             out.append(ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists]))
-        return ca.Function('variable_metadata', [ca.veccat(*self._symbols(self.parameters))], out) 
+            if len(self.parameters) > 0 and not ca.jacobian(ca.jacobian(out[-1], in_var), in_var).is_zero():
+                is_affine = False
+        if len(self.parameters) > 0 and is_affine:
+            # Rebuild variable metadata as a single affine expression, if all
+            # subexpressions are affine.
+            # TODO if/else won't be picked up in this way
+            in_var_ = ca.MX.sym('in_var', in_var.shape)
+            out_ = []
+            for o in out:
+                Af = ca.Function('Af', [in_var], [ca.jacobian(o, in_var)])
+                bf = ca.Function('bf', [in_var], [o])
+
+                A = Af(0)
+                A = ca.sparsify(A)
+
+                b = bf(0)
+                b = ca.sparsify(b)
+
+                o_ = ca.reshape(ca.mtimes(A, in_var_), o.shape) + b
+                out_.append(o_)
+            out = out_
+            in_var = in_var_
+        return ca.Function('variable_metadata', [in_var], out) 
