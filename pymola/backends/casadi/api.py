@@ -98,7 +98,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     # Compile
     logger.info("Generating CasADi model")
 
-    model = generator.generate(tree, model_name)
+    model = generator.generate(tree, model_name, compiler_options)
     if compiler_options.get('check_balanced', True):
         model.check_balanced()
 
