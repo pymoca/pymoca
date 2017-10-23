@@ -6,7 +6,7 @@ from collections import namedtuple, deque
 import casadi as ca
 import numpy as np
 import itertools
-from typing import Union
+from typing import Union, Dict
 
 from pymola import ast
 from pymola.tree import TreeWalker, TreeListener, flatten
@@ -58,7 +58,7 @@ class ForLoop:
         if isinstance(index_expr, ca.MX) and index_expr is not self.index_variable:
             F = ca.Function('index_expr', [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=np.int)
-            Fmap = F.map("map", "serial", len(self.values), [], [])
+            Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
             res = Fmap.call([self.values])
             indices = np.array(res[0].T, dtype=np.int)
         else:
@@ -71,7 +71,7 @@ Assignment = namedtuple('Assignment', ['left', 'right'])
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
-    def __init__(self, root: ast.Tree, class_name: str):
+    def __init__(self, root: ast.Tree, class_name: str, options: Dict[str, bool]):
         super(Generator, self).__init__()
         self.src = {}
         self.model = Model()
@@ -82,6 +82,8 @@ class Generator(TreeListener):
         self.for_loops = deque()
         self.functions = {}
         self.entered_classes = deque()
+        self.map_mode = 'inline' if options.get('unroll_loops', True) else 'serial'
+        self.function_mode = (True, False) if options.get('inline_functions', True) else (False, True)
 
     @property
     def current_class(self):
@@ -268,7 +270,7 @@ class Generator(TreeListener):
                     src = lhs_op(rhs)
             else:
                 function = self.get_function(op)
-                src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands]))
+                src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
 
         self.src[tree] = src
 
@@ -348,7 +350,7 @@ class Generator(TreeListener):
                     indexed_symbol = ca.transpose(indexed_symbol)
                 indexed_symbols_full.append(indexed_symbol)
 
-            Fmap = F.map("map", "serial", len(f.values), list(
+            Fmap = F.map("map", self.map_mode, len(f.values), list(
                 range(len(args), len(all_args))), [])
             res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
 
@@ -447,7 +449,7 @@ class Generator(TreeListener):
                     indexed_symbol = ca.transpose(indexed_symbol)
                 indexed_symbols_full.append(indexed_symbol)
 
-            Fmap = F.map("map", "serial", len(f.values), list(
+            Fmap = F.map("map", self.map_mode, len(f.values), list(
                 range(len(args), len(all_args))), [])
             res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
 
@@ -494,7 +496,7 @@ class Generator(TreeListener):
 
             # Evaluate the expression
             F = ca.Function('get_integer', free_vars, [expr])
-            ret = F.call(vals)
+            ret = F.call(vals, *self.function_mode)
             if ret[0].is_constant():
                 # We managed to evaluate the expression.  Assume the result to be integer.
                 return int(ret[0])
@@ -684,16 +686,17 @@ class Generator(TreeListener):
         return function
 
 
-def generate(ast_tree: ast.Tree, model_name: str) -> Model:
+def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = {}) -> Model:
     """
     :param ast_tree: AST to generate from
     :param model_name: class to generate
+    :param options: dictionary of generator options
     :return: casadi model
     """
     component_ref = ast.ComponentRef.from_string(model_name)
     ast_walker = TreeWalker()
     flat_tree = flatten(ast_tree, component_ref)
     component_ref_tuple = component_ref.to_tuple()
-    casadi_gen = Generator(flat_tree, component_ref_tuple[-1])
+    casadi_gen = Generator(flat_tree, component_ref_tuple[-1], options)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model
