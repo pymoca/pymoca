@@ -594,13 +594,17 @@ class Model:
                         value = one
                     value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
                     attribute_lists[attribute_list_index].append(value)
-            out.append(ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists]))
-            if len(self.parameters) > 0 and not ca.jacobian(ca.jacobian(out[-1], in_var), in_var).is_zero():
-                is_affine = False
+            expr = ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists])
+            if len(self.parameters) > 0 and isinstance(expr, ca.MX):
+                f = ca.Function('f', [in_var], [expr])
+                contains_if_else = ca.OP_IF_ELSE_ZERO in [f.instruction_id(k) for k in range(f.n_instructions())]
+                zero_hessian = ca.jacobian(ca.jacobian(expr, in_var), in_var).is_zero()
+                if contains_if_else or not zero_hessian:
+                    is_affine = False
+            out.append(expr)
         if len(self.parameters) > 0 and is_affine:
             # Rebuild variable metadata as a single affine expression, if all
             # subexpressions are affine.
-            # TODO if/else won't be picked up in this way
             in_var_ = ca.MX.sym('in_var', in_var.shape)
             out_ = []
             for o in out:
@@ -617,4 +621,4 @@ class Model:
                 out_.append(o_)
             out = out_
             in_var = in_var_
-        return ca.Function('variable_metadata', [in_var], out) 
+        return ca.Function('variable_metadata', [in_var], out)
