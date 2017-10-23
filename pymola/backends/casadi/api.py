@@ -128,11 +128,12 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         logger.debug("Generating {}".format(library_name))
 
         cg = ca.CodeGenerator(library_name)
-        cg.add(f) # Nondifferentiated function
-        cg.add(f.forward(1)) # Jacobian-times-vector product
-        cg.add(f.reverse(1)) # vector-times-Jacobian product
-        cg.add(f.reverse(1).forward(1)) # Hessian-times-vector product
-        cg.add(f.jacobian()) # Jacobian
+        cg.add(f, True) # Nondifferentiated function
+        cg.add(f.forward(1), True) # Jacobian-times-vector product
+        cg.add(f.reverse(1), True) # vector-times-Jacobian product
+        cg.add(f.reverse(1).forward(1), True) # Hessian-times-vector product
+        cg.add(f.jacobian(), True) # Jacobian, including sparsity
+        cg.add(f.jacobian().jacobian(), True) # Hessian, including sparsity
         cg.generate(model_folder + '/')
 
         compiler = distutils.ccompiler.new_compiler()
