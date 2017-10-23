@@ -500,21 +500,24 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym("x", 10)
         y = ca.MX.sym("y", 10)
         z = ca.MX.sym("z", 10)
+        u = ca.MX.sym('u', 10, 2)
+        v = ca.MX.sym('v', 2, 10)
         w = ca.MX.sym('w', 2, 10)
         b = ca.MX.sym("b")
         n = ca.MX.sym("n")
         s = ca.MX.sym('s', 10)
+        Arr = ca.MX.sym('Arr', 2, 2)
         der_s = ca.MX.sym('der(s)', 10)
 
         ref_model.states = list(map(Variable, [s]))
         ref_model.der_states = list(map(Variable, [der_s]))
-        ref_model.alg_states = list(map(Variable, [x, y, z, w, b]))
+        ref_model.alg_states = list(map(Variable, [x, y, z, u, v, w, b, Arr]))
         ref_model.parameters = list(map(Variable, [n]))
         ref_model.parameters[0].value = 10
         ref_model.equations = [
-            ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2)),
+            ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2), u - np.ones((10, 2)), v.T - np.ones((10, 2))),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
-            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10)]
+            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10), ca.horzcat(Arr[:, 1], Arr[:, 0]) - np.array([[2, 1], [2, 1]])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -533,6 +536,7 @@ class GenCasadiTest(unittest.TestCase):
         e = ca.MX.sym("e", 3)
         g = ca.MX.sym("g", 1)
         h = ca.MX.sym("h", 1)
+        i = ca.MX.sym('i', 2, 3)
         B = ca.MX.sym("B", 3)
         C = ca.MX.sym("C", 2)
         D = ca.MX.sym("D", 3)
@@ -549,7 +553,7 @@ class GenCasadiTest(unittest.TestCase):
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]))
+        ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h, i]))
         ref_model.alg_states[6].min = [0, 0, 0]
         ref_model.parameters = list(map(Variable, [nested2n, nested1n, d_dim]))
         parameter_values = [np.array([3, 3]), 3, 3]
@@ -563,7 +567,7 @@ class GenCasadiTest(unittest.TestCase):
             const.value = val
         ref_model.equations = [c - (a + b[0:3] * e), d - (ca.sin(a / b[1:4])), e - (d + scalar_f), g - ca.sum1(c),
                                h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - np.array([4, 5, 6]),
-                               nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1],
+                               nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, i[0, :] - ca.transpose(ca.DM.ones(3)), i[1, :] - ca.transpose(ca.DM.ones(3)), arcy[0] - arcy[1],
                                arcw[0] + arcw[1], a - np.array([1, 2, 3]), scalar_f - 1.3]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
