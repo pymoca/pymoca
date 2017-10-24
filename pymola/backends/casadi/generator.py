@@ -236,7 +236,16 @@ class Generator(TreeListener):
             indices = list(range(n))
             src = ca.DM.triplet(indices, indices, diag, n, n)
         elif op == 'cat':
-            src = ca.vertcat(*[self.get_mx(op) for op in tree.operands])
+            entries = []
+            for sym in [self.get_mx(op) for op in tree.operands]:
+                if isinstance(sym, list):
+                    size = len(sym)
+                else:
+                    sym = ca.MX(sym)
+                    size = sym.numel()
+                for i in range(size):
+                    entries.append(sym[i])
+            src = ca.vertcat(*entries)
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
