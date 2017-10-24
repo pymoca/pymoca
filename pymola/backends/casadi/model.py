@@ -299,8 +299,6 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
 
-            # TODO update aliases
-
         if options.get('expand_vectors', False):
             logger.info("Expanding vectors")
 
