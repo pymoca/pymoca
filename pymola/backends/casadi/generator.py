@@ -293,7 +293,7 @@ class Generator(TreeListener):
             cond = self.get_mx(tree.conditions[-(cond_index + 1)])
             expr1 = self.get_mx(tree.expressions[-(cond_index + 2)])
 
-            src = ca.if_else(cond, expr1, src, False)
+            src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
 
@@ -382,7 +382,7 @@ class Generator(TreeListener):
             expr1 = ca.vertcat(*[self.get_mx(tree.equations[-equations_per_condition * (
                 cond_index + 1) - (i + 1)]) for i in range(equations_per_condition)])
 
-            src = ca.if_else(cond, expr1, src, False)
+            src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
 
@@ -424,7 +424,7 @@ class Generator(TreeListener):
                                 break
                         if src1 is not None:
                             break
-                    src = ca.if_else(cond, src1, src, False)
+                    src = ca.if_else(cond, src1, src, True)
                 all_assignments.append(Assignment(assignment.left, src))
 
         self.src[tree] = all_assignments
