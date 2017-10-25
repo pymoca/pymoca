@@ -1263,7 +1263,6 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
-
     def test_alias_relation(self):
         a = AliasRelation()
         self.assertEqual(a.canonical_signed('-a'), ('a', -1))
@@ -1277,7 +1276,6 @@ class GenCasadiTest(unittest.TestCase):
         c = [0, 1, 2, 2, 2, 0, 1]
         for i, e in enumerate(c):
             self.assertEqual(casadi_model.parameters[1].value[i], e)
-
 
 if __name__ == "__main__":
     unittest.main()
