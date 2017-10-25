@@ -235,6 +235,15 @@ class Generator(TreeListener):
             n = len(diag)
             indices = list(range(n))
             src = ca.DM.triplet(indices, indices, diag, n, n)
+        elif op == 'cat':
+            entries = []
+            for sym in [self.get_mx(op) for op in tree.operands]:
+                if isinstance(sym, list):
+                    for e in sym:
+                        entries.append(e)
+                else:
+                    entries.append(sym)
+            src = ca.vertcat(*entries)
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
@@ -284,7 +293,7 @@ class Generator(TreeListener):
             cond = self.get_mx(tree.conditions[-(cond_index + 1)])
             expr1 = self.get_mx(tree.expressions[-(cond_index + 2)])
 
-            src = ca.if_else(cond, expr1, src)
+            src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
 
@@ -373,7 +382,7 @@ class Generator(TreeListener):
             expr1 = ca.vertcat(*[self.get_mx(tree.equations[-equations_per_condition * (
                 cond_index + 1) - (i + 1)]) for i in range(equations_per_condition)])
 
-            src = ca.if_else(cond, expr1, src)
+            src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
 
@@ -415,7 +424,7 @@ class Generator(TreeListener):
                                 break
                         if src1 is not None:
                             break
-                    src = ca.if_else(cond, src1, src)
+                    src = ca.if_else(cond, src1, src, True)
                 all_assignments.append(Assignment(assignment.left, src))
 
         self.src[tree] = all_assignments
