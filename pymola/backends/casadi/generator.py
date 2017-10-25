@@ -239,12 +239,10 @@ class Generator(TreeListener):
             entries = []
             for sym in [self.get_mx(op) for op in tree.operands]:
                 if isinstance(sym, list):
-                    size = len(sym)
+                    for e in sym:
+                        entries.append(e)
                 else:
-                    sym = ca.MX(sym)
-                    size = sym.numel()
-                for i in range(size):
-                    entries.append(sym[i])
+                    entries.append(sym)
             src = ca.vertcat(*entries)
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])

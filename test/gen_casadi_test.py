@@ -1274,7 +1274,9 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_cat_params(self):
         casadi_model = transfer_model(TEST_DIR, 'Concat', {'replace_constant_values': True})
-        self.assertEqual(casadi_model.parameters[1].value.primitives(), [0, 1, 2, 2, 2, 0, 1])
+        c = [0, 1, 2, 2, 2, 0, 1]
+        for i, e in enumerate(c):
+            self.assertEqual(casadi_model.parameters[1].value[i], e)
 
 
 if __name__ == "__main__":
