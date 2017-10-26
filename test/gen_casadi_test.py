@@ -46,25 +46,6 @@ class GenCasadiTest(unittest.TestCase):
             this = getattr(A, f_name + '_function')
             that = getattr(B, f_name + '_function')
 
-            if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
-                # Since arguments are grouped, we first split them into their constituent parts.
-                # This is to render the test insensitive to the order in which variables are declared in the model.
-                this_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in this.mx_in()]
-                that_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in that.mx_in()]
-                this_in = [[repr(e) for e in l] for l in this_mx]
-                that_in = [[repr(e) for e in l] for l in that_mx]
-
-                that_from_this = []
-                this_mx_dict = dict(zip(itertools.chain(*this_in), itertools.chain(*this_mx)))
-                that_mx_dict = dict(zip(itertools.chain(*that_in), itertools.chain(*that_mx)))
-                for this_l, that_l in zip(this_in, that_in):
-                    self.assertEqual(set(this_l), set(that_l))
-                    for e in this_l:
-                        self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
-                        self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
-                    that_from_this.append(ca.vertcat(*[this_mx_dict[e] for e in that_l]))
-                that = ca.Function('f', [ca.vertcat(*l) for l in this_mx], that.call(that_from_this))
-
             np.random.seed(0)
 
             args_in = []
@@ -641,7 +622,7 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [1, 2 * nested_p1, 2]
         for c, v in zip(ref_model.parameters, parameter_values):
             c.value = v
-        ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0) * i),
+        ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0, True) * i),
                                protected_variable - (i1 + i2), nested_s - 3 * nested_p, test_state - r]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
