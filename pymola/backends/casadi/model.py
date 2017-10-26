@@ -175,6 +175,15 @@ class Model:
 
             reduced_equations = []
             for eq in self.equations:
+                if eq.is_symbolic() and eq.name() in alg_states:
+                    constant = alg_states.pop(eq.name())
+                    constant.value = 0.0
+
+                    self.constants.append(constant)
+
+                    # Skip this equation
+                    continue
+
                 if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
                     if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and eq.dep(1).is_constant():
                         variable = eq.dep(0)
@@ -270,6 +279,7 @@ class Model:
                     del alg_states[eq.name()]
                     # Skip this equation
                     continue
+
                 if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
                     if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and p.match(eq.dep(0).name()):
                         variable = eq.dep(0)
