@@ -264,6 +264,11 @@ class Model:
 
             reduced_equations = []
             for eq in self.equations:
+                if eq.is_symbolic() and eq.name() in alg_states and p.match(eq.name()):
+                    variables.append(eq)
+                    values.append(0.0)
+                    # Skip this equation
+                    continue
                 if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
                     if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and p.match(eq.dep(0).name()):
                         variable = eq.dep(0)
