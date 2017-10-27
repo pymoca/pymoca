@@ -1258,5 +1258,12 @@ class GenCasadiTest(unittest.TestCase):
         for i, e in enumerate(c):
             self.assertEqual(casadi_model.parameters[1].value[i], e)
 
+    def test_inline_input_assignment(self):
+        casadi_model = transfer_model(TEST_DIR, 'InlineAssignment')
+        self.assertTrue(casadi_model.inputs[0].fixed)
+        self.assertFalse(casadi_model.alg_states[0].fixed)
+        casadi_model = transfer_model(TEST_DIR, 'InlineAssignment', {'detect_aliases': True})
+        self.assertTrue(casadi_model.inputs[0].fixed)
+
 if __name__ == "__main__":
     unittest.main()

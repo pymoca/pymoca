@@ -597,13 +597,17 @@ class ASTListener(ModelicaListener):
                     sym.class_modification = mod
                 else:
                     # Assignment of value, which we turn into a modification here.
-                    sym_mod = ast.ClassModification()
                     vmod_arg = ast.ClassModificationArgument()
                     vmod_arg.value = ast.ElementModification()
                     vmod_arg.value.component = ast.ComponentRef(name="value")
                     vmod_arg.value.modifications = [mod]
-                    sym_mod.arguments.append(vmod_arg)
-                    sym.class_modification = sym_mod
+
+                    if sym.class_modification is None:
+                        sym_mod = ast.ClassModification()
+                        sym_mod.arguments.append(vmod_arg)
+                        sym.class_modification = sym_mod
+                    else:
+                        sym.class_modification.arguments.append(vmod_arg)
 
     def exitElement_modification(self, ctx):
         component = self.ast[ctx.component_reference()]
