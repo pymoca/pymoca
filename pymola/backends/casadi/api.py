@@ -253,15 +253,14 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
         # 3.  Fill in any irregular elements with expressions to be evaluated later.
         # Note that an expression is neccessary only if the function value actually depends on the inputs.
         # Otherwise, we would be dealing with a genuine NaN value.
+        parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else v.symbol for v in model.parameters]))))
         for k, key in enumerate(variables_with_metadata):
-            sparsity = model.variable_metadata_function.sparsity_jac(0, k)
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
                     if not getattr(variable, tmp).is_regular():
-                        depends_on_parameters = np.any([sparsity.has_nz(i * len(ast.Symbol.ATTRIBUTES) + j, l) for l in range(len(model.parameters))])
-                        if depends_on_parameters:
+                        if ca.depends_on(metadata[key][i, j], parameter_vector):
                             setattr(variable, tmp, metadata[key][i, j])
 
     # Done
