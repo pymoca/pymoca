@@ -588,7 +588,7 @@ class Model:
                     value = ca.MX(getattr(variable, attribute))
                     if value.is_zero():
                         value = zero
-                    elif (value - 1).is_zero():
+                    elif value.is_one():
                         value = one
                     value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
                     attribute_lists[attribute_list_index].append(value)
