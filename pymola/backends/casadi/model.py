@@ -521,11 +521,11 @@ class Model:
                     bf = ca.Function('bf', [states, constants, parameters], [equations])
 
                     # Work around CasADi issue #172
-                    if len(self.constants) == 0:
+                    if len(self.constants) == 0 or not ca.depends_on(equations, constants):
                         constants = 0
                     else:
                         logger.warning('Not all constants have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
-                    if len(self.parameters) == 0:
+                    if len(self.parameters) == 0 or not ca.depends_on(equations, parameters):
                         parameters = 0
                     else:
                         logger.warning('Not all parameters have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
