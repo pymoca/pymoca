@@ -136,7 +136,7 @@ def _save_model(model_folder: str, model_name: str, model: Model):
 
         compiler = distutils.ccompiler.new_compiler()
 
-        file_name = os.path.realpath(os.path.join(model_folder, library_name + '.c'))
+        file_name = os.path.relpath(os.path.join(model_folder, library_name + '.c'))
         object_name = compiler.object_filenames([file_name])[0]
         d.library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
         try:
