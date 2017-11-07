@@ -7,7 +7,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 import antlr4
 import antlr4.Parser
 from typing import Dict
-from collections import deque
+from collections import deque, OrderedDict
 import copy
 
 from . import ast
@@ -23,13 +23,19 @@ from .generated.ModelicaParser import ModelicaParser
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
+class ModelicaFile:
+    def __init__(self, **kwargs):
+        self.within = []  # type: List[ComponentRef]
+        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
+        super().__init__(**kwargs)
+
 
 # noinspection PyPep8Naming
 class ASTListener(ModelicaListener):
     def __init__(self):
+        self.file_node = None  # type: ModelicaFile
         self.ast = {}  # type: Dict[ast.Node]
         self.ast_result = None  # type: ast.Node
-        self.file_node = None  # type: ast.File
         self.class_nodes = deque([ast.Class()])  # type: deque[ast.Class]
         self.comp_clause = None  # type: ast.ComponentClause
         self.eq_sect = None  # type: ast.EquationSection
@@ -37,6 +43,7 @@ class ASTListener(ModelicaListener):
         self.symbol_node = None  # type: ast.Symbol
         self.eq_comment = None  # type: str
         self.sym_count = 0  # type: int
+        self.in_extends_clause = False
 
     @property
     def class_node(self):
@@ -46,7 +53,7 @@ class ASTListener(ModelicaListener):
 
     def enterStored_definition(self, ctx):
 
-        file_node = ast.File()
+        file_node = ModelicaFile()
         self.ast[ctx] = file_node
         self.file_node = file_node
 
@@ -142,11 +149,18 @@ class ASTListener(ModelicaListener):
                 else:
                     self.class_node.statements += alglist.statements
 
+        if ctx.comp_annotation is not None:
+            self.class_node.annotation = self.ast[ctx.comp_annotation]
+
     def exitArgument(self, ctx):
+        argument = ast.ClassModificationArgument()
         if ctx.element_modification_or_replaceable() is not None:
-            self.ast[ctx] = self.ast[ctx.element_modification_or_replaceable()]
+            argument.value = self.ast[ctx.element_modification_or_replaceable()]
+            argument.redeclare = False
         else:
-            self.ast[ctx] = self.ast[ctx.element_redeclaration()]
+            argument.value = self.ast[ctx.element_redeclaration()]
+            argument.redeclare = True
+        self.ast[ctx] = argument
 
     def exitArgument_list(self, ctx):
         self.ast[ctx] = [self.ast[a] for a in ctx.argument()]
@@ -375,6 +389,19 @@ class ASTListener(ModelicaListener):
         # if 'state' not in self.class_node.symbols[comp_name].prefixes:
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
+    def exitType_specifier_element(self, ctx):
+        self.ast[ctx] = ast.ComponentRef(
+            name=ctx.IDENT().getText(),
+            indices=[],
+            child=[]
+        )
+
+    def exitType_specifier(self, ctx):
+        for element in reversed([self.ast[ctx] for ctx in ctx.type_specifier_element()]):
+            if ctx in self.ast:
+                element.child = [self.ast[ctx]]
+            self.ast[ctx] = element
+
     def exitComponent_reference_element(self, ctx):
         if ctx.array_subscripts() is not None:
             indices = [self.ast[x] for x in ctx.array_subscripts().subscript()]
@@ -435,6 +462,9 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] = ast.ImportFromClause(component=component, symbols=symbols)
         self.class_node.imports += [self.ast[ctx]]
 
+    def enterExtends_clause(self, ctx):
+        self.in_extends_clause = True
+
     def exitExtends_clause(self, ctx):
         if ctx.class_modification() is not None:
             class_modification = self.ast[ctx.class_modification()]
@@ -443,6 +473,8 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
                                           class_modification=class_modification)
         self.class_node.extends += [self.ast[ctx]]
+
+        self.in_extends_clause = False
 
     def exitRegular_element(self, ctx):
         if ctx.comp_elem is not None:
@@ -485,6 +517,9 @@ class ASTListener(ModelicaListener):
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
         if ctx.array_subscripts() is not None:
             clause.dimensions = self.ast[ctx.array_subscripts()]
+            for sym in self.comp_clause.symbol_list:
+                s = self.class_node.symbols[sym.name]
+                s.dimensions = clause.dimensions
 
         # We make sure that all references to the objects are unique per
         # symbol making copies. Note that if there is only one symbol in the
@@ -528,9 +563,6 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] = sym
             self.symbol_node = sym
 
-    def exitType_specifier(self, ctx):
-        self.ast[ctx] = self.ast[ctx.component_reference()]
-
     def exitComponent_declaration(self, ctx):
         self.ast[ctx].comment = self.ast[ctx.comment()]
         self.symbol_node = None
@@ -548,9 +580,12 @@ class ASTListener(ModelicaListener):
         sym.dimensions = dimensions
         sym.prefixes = self.comp_clause.prefixes
         sym.type = self.comp_clause.type
-        if sym.name in self.class_node.symbols:
-            raise IOError(sym.name, 'already defined')
-        self.class_node.symbols[sym.name] = sym
+
+        # Declarations can also occur in extends clauses, in which case we do not have to add it to the class's symbols.
+        if not self.in_extends_clause:
+            if sym.name in self.class_node.symbols:
+                raise IOError(sym.name, 'already defined')
+            self.class_node.symbols[sym.name] = sym
 
     def exitDeclaration(self, ctx):
         sym = self.symbol_node
@@ -560,16 +595,19 @@ class ASTListener(ModelicaListener):
             for mod in self.ast[ctx.modification()]:
                 if isinstance(mod, ast.ClassModification):
                     sym.class_modification = mod
-                elif isinstance(mod, ast.Primary):
-                    sym.value = mod
-                elif isinstance(mod, ast.Array):
-                    sym.value = mod
-                elif isinstance(mod, ast.Expression):
-                    sym.value = mod
-                elif isinstance(mod, ast.ComponentRef):
-                    sym.value = mod
                 else:
-                    raise IOError('unhandled modification type', type(mod))
+                    # Assignment of value, which we turn into a modification here.
+                    vmod_arg = ast.ClassModificationArgument()
+                    vmod_arg.value = ast.ElementModification()
+                    vmod_arg.value.component = ast.ComponentRef(name="value")
+                    vmod_arg.value.modifications = [mod]
+
+                    if sym.class_modification is None:
+                        sym_mod = ast.ClassModification()
+                        sym_mod.arguments.append(vmod_arg)
+                        sym.class_modification = sym_mod
+                    else:
+                        sym.class_modification.arguments.append(vmod_arg)
 
     def exitElement_modification(self, ctx):
         component = self.ast[ctx.component_reference()]
@@ -577,11 +615,8 @@ class ASTListener(ModelicaListener):
             modifications = self.ast[ctx.modification()]
         else:
             modifications = []
-        self.ast[ctx] = ast.ElementModification(component=component, modifications=modifications)
 
-        sym = self.symbol_node
-        if component.name in ast.Symbol.ATTRIBUTES:
-            setattr(sym, component.name, self.ast[ctx.modification().expression()])
+        self.ast[ctx] = ast.ElementModification(component=component, modifications=modifications)
 
     def exitModification_class(self, ctx):
         self.ast[ctx] = [self.ast[ctx.class_modification()]]
@@ -615,14 +650,36 @@ class ASTListener(ModelicaListener):
     # COMMENTS ==============================================================
 
     def exitComment(self, ctx):
-        # TODO handle annotation
         self.ast[ctx] = self.ast[ctx.string_comment()]
 
     def exitString_comment(self, ctx):
         self.ast[ctx] = ctx.getText()[1:-1]
 
+    # ANNOTATIONS ==========================================================
+
+    def exitAnnotation(self, ctx):
+        self.ast[ctx] = self.ast[ctx.class_modification()]
+
 
 # UTILITY FUNCTIONS ========================================================
+def file_to_tree(f: ModelicaFile) -> ast.Tree:
+    # TODO: We can only insert where classes exist. For example, if we have a
+    # within statement, we have to check if the nodes of the within statement
+    # are actually in the tree, and if not raise an exception.
+    root = ast.Tree()
+    insert_node = root
+    if f.within:
+        for p in f.within[0].to_tuple():
+            package = ast.Class(name=p, type="package")
+            insert_node.classes[p] = package
+            insert_node = package
+
+    insert_node.classes.update(f.classes)
+
+    root.update_parent_refs()
+
+    return root
+
 def parse(text):
     input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
@@ -633,8 +690,5 @@ def parse(text):
     ast_listener = ASTListener()
     parse_walker = antlr4.ParseTreeWalker()
     parse_walker.walk(ast_listener, parse_tree)
-    ast_tree = ast_listener.ast_result
-    # TODO: This is not the prettiest way, but avoid having to instantiate a
-    # Collection every time we want to parse+flatten a single file.
-    ast_tree = ast.Collection(files=[ast_tree])
-    return ast_tree
+    modelica_file = ast_listener.ast_result
+    return file_to_tree(modelica_file)

@@ -14,6 +14,12 @@ from collections import OrderedDict
 class ClassNotFoundError(Exception):
     pass
 
+class ConstantSymbolNotFoundError(Exception):
+    pass
+
+class FoundElementaryClassError(Exception):
+    pass
+
 
 class Visibility(Enum):
     PRIVATE = 0, 'private'
@@ -79,7 +85,10 @@ class Node(object):
         elif isinstance(var, dict):
             res = {key: cls.to_json(var[key]) for key in var.keys()}
         elif isinstance(var, Node):
-            res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()}
+            # Avoid infinite recursion by not handling attributes that may go
+            # back up in the tree again.
+            res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()
+                   if key not in ('parent', 'scope', '__deepcopy__')}
         elif isinstance(var, Visibility):
             res = str(var)
         else:
@@ -103,8 +112,8 @@ class Array(Node):
 
 class Slice(Node):
     def __init__(self, **kwargs):
-        self.start = Primary(value=0)  # type: Union[Expression, Primary, ComponentRef]
-        self.stop = Primary(value=-1)  # type: Union[Expression, Primary, ComponentRef]
+        self.start = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef]
+        self.stop = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef]
         self.step = Primary(value=1)  # type: Union[Expression, Primary, ComponentRef]
         super().__init__(**kwargs)
 
@@ -326,9 +335,6 @@ class ImportFromClause(Node):
 
 
 class ElementModification(Node):
-    # TODO: Check if ComponentRef modifiers are handled correctly. For example,
-    # check HomotopicLinear which extends PartialHomotopic with the modifier
-    # "H(min = H_b)".
     def __init__(self, **kwargs):
         self.component = ComponentRef()  # type: Union[ComponentRef]
         self.modifications = []  # type: List[Union[Primary, Expression, ClassModification, Array, ComponentRef]]
@@ -352,8 +358,26 @@ class ElementReplaceable(Node):
 
 class ClassModification(Node):
     def __init__(self, **kwargs):
-        self.arguments = []  # type: List[Union[ElementModification, ComponentClause, ShortClassDefinition]]
+        self.arguments = []  # type: List[ClassModificationArgument]
         super().__init__(**kwargs)
+
+
+class ClassModificationArgument(Node):
+    def __init__(self, **kwargs):
+        self.value = []  # type: Union[ElementModification, ComponentClause, ShortClassDefinition]
+        self.scope = None  # type: InstanceClass
+        self.redeclare = False
+        super().__init__(**kwargs)
+
+    # FIXME: This is not a pretty way of avoiding memory copies it. See #62
+    # for discussion.
+    def __deepcopy__(self, memo):
+        _scope, _deepcp = self.scope, self.__deepcopy__
+        self.scope, self.__deepcopy__ = None, None
+        new = copy.deepcopy(self, memo)
+        self.scope, self.__deepcopy__ = _scope, _deepcp
+        new.scope, new.__deepcopy__ = _scope, _deepcp
+        return new
 
 
 class ExtendsClause(Node):
@@ -381,125 +405,147 @@ class Class(Node):
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
         self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
-        self.within = []  # type: List[ComponentRef]
+        self.annotation = []  # type: Union[NoneType, ClassModification]
+        self.parent = None  # type: Class
+
         super().__init__(**kwargs)
 
+    def _find_class(self, component_ref: ComponentRef, search_parent=True) -> 'Class':
+        try:
+            if not component_ref.child:
+                return self.classes[component_ref.name]
+            else:
+                # Avoid infinite recursion by passing search_parent = False
+                return self.classes[component_ref.name]._find_class(component_ref.child[0], False)
+        except (KeyError, ClassNotFoundError):
+            if search_parent and self.parent is not None:
+                return self.parent._find_class(component_ref)
+            else:
+                raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
 
-class File(Node):
-    """
-    Represents a .mo file for use in pre-processing before flattening to a single class.
-    """
+    def find_class(self, component_ref: ComponentRef, copy=True, check_builtin_classes=False) -> 'Class':
+        # TODO: Remove workaround for Modelica / Modelica.SIUnits
+        if component_ref.name in ["Real", "Integer", "String", "Boolean", "Modelica", "SI"]:
+            if check_builtin_classes:
+                type_ = component_ref.name
+                if component_ref.name in ["Modelica", "SI"]:
+                    type_ = "Real"
 
-    def __init__(self, **kwargs):
-        self.within = []  # type: List[ComponentRef]
-        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
-        super().__init__(**kwargs)
-
-
-class Collection(Node):
-    """
-    A list of modelica files, used in pre-processing packages etc. before flattening
-    to a single class.
-    """
-
-    def __init__(self, **kwargs):
-        self.files = []  # type: List[File]
-        super().__init__(**kwargs)
-
-        # TODO: Should be directly build the class_lookup, or wait until the first call to find_class?
-        self._class_lookup = None
-
-    def _build_class_lookup_for_class(self, c, within):
-        if within:
-            full_name = ComponentRef.concatenate(within, ComponentRef(name=c.name))
-        else:
-            full_name = ComponentRef(name=c.name)
-
-        # FIXME: Do we have to convert to string?
-        self._class_lookup[full_name.to_tuple()] = c
-
-        if within:
-            within = ComponentRef.concatenate(within, ComponentRef(name=c.name))
-        else:
-            within = ComponentRef(name=c.name)
-        for nested_c in c.classes.values():
-            self._build_class_lookup_for_class(nested_c, within)
-
-    def _build_class_lookup(self):
-        self._class_lookup = {}
-
-        for f in self.files:
-            within = f.within[0] if f.within else None
-            for c in f.classes.values():
-                self._build_class_lookup_for_class(c, within)
-
-    def extend(self, other):
-        self.files.extend(other.files)
-
-    def find_class(self, component_ref: ComponentRef, within: list = None, check_builtin_classes=False, return_ref=False):
-        if check_builtin_classes:
-            if component_ref.name in ["Real", "Integer", "String", "Boolean"]:
-                c = Class(name=component_ref.name)
+                c = Class(name=type_)
                 c.type = "__builtin"
+                c.parent = self.root
 
-                cref = ComponentRef(name=component_ref.name)
+                cref = ComponentRef(name=type_)
                 s = Symbol(name="__value", type=cref)
                 c.symbols[s.name] = s
 
-                if return_ref:
-                    return c, cref
+                return c
+            else:
+                raise FoundElementaryClassError()
+
+        c = self._find_class(component_ref)
+
+        if copy:
+            c = c.copy_including_children()
+
+        return c
+
+    def _find_constant_symbol(self, component_ref: ComponentRef, search_parent=True) -> Symbol:
+
+        if component_ref.child:
+            # Try classes first, and constant symbols second
+            t = component_ref.to_tuple()
+
+            try:
+                node = self._find_class(ComponentRef(name=t[0]), search_parent)
+                return node._find_constant_symbol(ComponentRef.from_tuple(t[1:]), False)
+            except ClassNotFoundError:
+                try:
+                    s = self.symbols[t[0]]
+                except KeyError:
+                    raise ConstantSymbolNotFoundError()
+
+                if 'constant' not in s.prefixes:
+                    raise ConstantSymbolNotFoundError()
+
+                # Found a symbol. Continue lookup on type of this symbol.
+                if isinstance(s.type, InstanceClass):
+                    return s.type._find_constant_symbol(ComponentRef.from_tuple(t[1:]), False)
+                elif isinstance(s.type, ComponentRef):
+                    node = self._find_class(s.type)  # Parent lookups is OK here.
+                    return node._find_constant_symbol(ComponentRef.from_tuple(t[1:]), False)
                 else:
-                    return c
-
-        if self._class_lookup is None:
-            self._build_class_lookup()
-
-        # TODO: Support lookups starting with a dot. These are lookups in the root node (i.e. within not used).
-        # Odds are that these types of lookups are not parsed yet. We would expet an empty first name, with a non-empty child.
-
-        # Lookup the referenced class, walking up the tree from the current
-        # node until the root node.
-        c = None
-
-        if within:
-            within_tuple = within[0].to_tuple()
+                    raise Exception("Unknown object type of symbol type: {}".format(type(s.type)))
         else:
-            within_tuple = tuple()
+            try:
+                return self.symbols[component_ref.name]
+            except KeyError:
+                raise ConstantSymbolNotFoundError()
 
-        cref_tuple = component_ref.to_tuple()
+    def find_constant_symbol(self, component_ref: ComponentRef) -> Symbol:
+        return self._find_constant_symbol(component_ref)
 
-        prev_tuple = None
 
-        while c is None:
-            c = self._class_lookup.get(within_tuple + cref_tuple, None)
+    def full_reference(self):
+        names = []
 
-            prev_tuple = within_tuple + cref_tuple
-
-            if within_tuple:
-                within_tuple = within_tuple[:-1]
-            else:
-                # Finished traversing up the tree all the way to the root. No
-                # more lookups possible.
+        c = self
+        while True:
+            names.append(c.name)
+            if c.parent is None:
                 break
-
-        if c is None:
-            # Class not found
-            if component_ref.name in ("Real", "Integer", "Boolean", "String", "Modelica", "SI"):
-                # FIXME: To support an "ignore" in the flattener, we raise a
-                # KeyError for what are likely to be elementary types
-                raise KeyError
             else:
-                raise ClassNotFoundError("Could not find class {}".format(component_ref))
+                c = c.parent
 
-        if return_ref:
-            return c, ComponentRef.from_tuple(prev_tuple)
-        else:
-            return c
+        # Exclude the root node's name
+        return ComponentRef.from_tuple(tuple(reversed(names[:-1])))
 
-    def find_symbol(self, node, component_ref: ComponentRef) -> Symbol:
-        sym = node.symbols[component_ref.name]
-        if len(component_ref.child) > 0:
-            node = self.find_class(sym.type)
-            return self.find_symbol(node, component_ref.child[0])
+    def _extend(self, other: 'Class') -> None:
+        for class_name in other.classes.keys():
+            if class_name in self.classes.keys():
+                self.classes[class_name]._extend(other.classes[class_name])
+            else:
+                self.classes[class_name] = other.classes[class_name]
+
+    @property
+    def root(self):
+        if self.parent is None:
+            return self
         else:
-            return sym
+            return self.parent.root
+
+    def copy_including_children(self):
+        _parent = self.parent
+        self.parent = None
+        new = copy.deepcopy(self)
+        self.parent = _parent
+        new.parent = _parent
+        return new
+
+
+class InstanceClass(Class):
+    """
+    Class used during instantiation/expansion of the model. Modififcations on
+    symbols and extends clauses are shifted to the modification environment of
+    this InstanceClass.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.modification_environment = ClassModification()
+
+
+class Tree(Class):
+    """
+    The root class.
+    """
+    def extend(self, other: 'Tree') -> None:
+        self._extend(other)
+        self.update_parent_refs()
+
+    def _update_parent_refs(self, parent: Class) -> None:
+        for c in parent.classes.values():
+            c.parent = parent
+            self._update_parent_refs(c)
+
+    def update_parent_refs(self) -> None:
+        self._update_parent_refs(self)

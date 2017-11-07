@@ -139,6 +139,11 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by ModelicaParser#type_specifier_element.
+    def visitType_specifier_element(self, ctx:ModelicaParser.Type_specifier_elementContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by ModelicaParser#type_specifier.
     def visitType_specifier(self, ctx:ModelicaParser.Type_specifierContext):
         return self.visitChildren(ctx)
