@@ -21,7 +21,6 @@ from setuptools.command.build_py import build_py
 from setuptools.command.build_ext import build_ext
 from setuptools import Command
 
-from Cython.Build import cythonize
 import versioneer
 
 MAJOR = 0
@@ -89,10 +88,6 @@ def call_antlr4(arg):
     proc.communicate()
     with open(os.path.join(ROOT_DIR, 'pymola', 'generated', '__init__.py'), 'w') as fid:
         fid.write('')
-    for root, dir, files in os.walk(generated):
-        for item in fnmatch.filter(files, "Modelica*.py"):
-            filename = os.path.join(root, item)
-            shutil.move(filename, filename.replace('.py', '.pyx'))
 
 def setup_package():
     """
@@ -142,11 +137,8 @@ def setup_package():
         ),
         cmdclass={
             'antlr': AntlrBuildCommand,
-            'versioneer': versioneer.get_cmdclass(),  
-        },
-        ext_modules=cythonize('pymola/generated/*.pyx',
-            compiler_directives={'boundscheck': False,
-                'initializedcheck': False, 'language_level': 3})
+            'versioneer': versioneer.get_cmdclass(),
+        }
     )
 
     try:
