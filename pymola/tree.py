@@ -761,7 +761,7 @@ class ConstantReferenceApplier(TreeListener):
 
         # We cannot directly mutate the dictionary while we are looping over
         # it, so instead we store symbol updates here.
-        self.extra_symbols = OrderedDict()
+        self.extra_symbols = []
 
         self.depth = 0
 
@@ -779,7 +779,7 @@ class ConstantReferenceApplier(TreeListener):
 
         if tree.child:
             try:
-                self.extra_symbols[str(tree)] = self.classes[-1].find_constant_symbol(tree)
+                self.extra_symbols[-1][str(tree)] = self.classes[-1].find_constant_symbol(tree)
             except (KeyError, ast.ClassNotFoundError, ast.FoundElementaryClassError, ast.ConstantSymbolNotFoundError):
                 pass
 
@@ -788,11 +788,12 @@ class ConstantReferenceApplier(TreeListener):
 
     def enterInstanceClass(self, tree: ast.InstanceClass):
         self.classes.append(tree)
+        self.extra_symbols.append(OrderedDict())
 
     def exitInstanceClass(self, tree: ast.InstanceClass):
         c = self.classes.pop()
-        c.symbols.update(self.extra_symbols)
-        self.extra_symbols = OrderedDict()
+        syms = self.extra_symbols.pop()
+        c.symbols.update(syms)
 
     def enterClass(self, tree: ast.InstanceClass):
         assert False, "All classes should have been replaced by instance classes."
