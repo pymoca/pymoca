@@ -1,3 +1,7 @@
 _temp.png
 f.c
 source.dot
+Aircraft
+Aircraft_dae_residual.*
+Aircraft_initial_residual.*
+Aircraft_variable_metadata.*
