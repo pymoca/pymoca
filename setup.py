@@ -131,10 +131,8 @@ def setup_package():
         tests_require=['coverage >= 3.7.1', 'nose >= 1.3.1'],
         test_suite='nose.collector',
         python_requires='>=3.5',
-        packages=find_packages(
-            # choosing to distribute tests
-            # exclude=['*.test']
-        ),
+        packages=find_packages("src"),
+        package_dir={"": "src"},
         cmdclass={
             'antlr': AntlrBuildCommand,
             'versioneer': versioneer.get_cmdclass(),
