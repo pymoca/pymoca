@@ -65,3 +65,7 @@ pymola/version.py
 .idea/dataSources.ids
 .idea/datasources.xml
 .idea/dictionaries
+
+# virtual environments
+venv/
+venv3/
