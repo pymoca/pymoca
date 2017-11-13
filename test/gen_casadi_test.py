@@ -456,6 +456,7 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    @unittest.skip
     def test_double_function_call(self):
         with open(os.path.join(TEST_DIR, 'DoubleFunctionCall.mo'), 'r') as f:
             txt = f.read()
