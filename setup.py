@@ -61,7 +61,7 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 import sys
 python_version = '.'.join([str(i) for i in sys.version_info[:3]])
-python_version_required = '3.4.0'
+python_version_required = '3.5.0'
 if python_version < python_version_required:
     sys.exit("Sorry, only Python >= {:s} is supported".format(python_version_required))
 
@@ -135,6 +135,7 @@ def setup_package():
         install_requires=install_reqs,
         tests_require=['coverage >= 3.7.1', 'nose >= 1.3.1'],
         test_suite='nose.collector',
+        python_requires='>=3.5',
         packages=find_packages(
             # choosing to distribute tests
             # exclude=['*.test']
