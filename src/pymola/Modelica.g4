@@ -160,8 +160,12 @@ type_prefix :
     ;
 
 // B.2.4.3 ------------------------------------------------
-type_specifier:
-    component_reference
+type_specifier_element :
+    IDENT
+    ;
+
+type_specifier :
+    type_specifier_element ('.' type_specifier_element)*
     ;
 
 // B.2.4.4 ------------------------------------------------

@@ -8,6 +8,7 @@ import os
 import fnmatch
 import logging
 import pickle
+import contextlib
 
 from pymola import parser, tree, ast, __version__
 from . import generator
@@ -97,7 +98,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     # Compile
     logger.info("Generating CasADi model")
 
-    model = generator.generate(tree, model_name)
+    model = generator.generate(tree, model_name, compiler_options)
     if compiler_options.get('check_balanced', True):
         model.check_balanced()
 
@@ -124,16 +125,18 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         # Generate C code
         library_name = '{}_{}'.format(model_name, o)
 
+        logger.debug("Generating {}".format(library_name))
+
         cg = ca.CodeGenerator(library_name)
-        cg.add(f)
-        cg.add(f.forward(1))
-        cg.add(f.reverse(1))
-        cg.add(f.reverse(1).forward(1))
+        cg.add(f, True) # Nondifferentiated function
+        cg.add(f.forward(1), True) # Jacobian-times-vector product
+        cg.add(f.reverse(1), True) # vector-times-Jacobian product
+        cg.add(f.reverse(1).forward(1), True) # Hessian-times-vector product
         cg.generate(model_folder + '/')
 
         compiler = distutils.ccompiler.new_compiler()
 
-        file_name = os.path.join(model_folder, library_name + '.c')
+        file_name = os.path.relpath(os.path.join(model_folder, library_name + '.c'))
         object_name = compiler.object_filenames([file_name])[0]
         d.library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
         try:
@@ -150,8 +153,9 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         except:
             raise
         finally:
-            os.remove(file_name)
-            os.remove(object_name)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(file_name)
+                os.remove(object_name)
 
     # Output metadata
     db_file = os.path.join(model_folder, model_name)
@@ -167,8 +171,10 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         db['library_os'] = os.name
 
         # Describe variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'outputs', 'parameters', 'constants']:
+        for key in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
             db[key] = [e.to_dict() for e in getattr(model, key)]
+
+        db['outputs'] = model.outputs
 
         db['delayed_states'] = model.delayed_states
 
@@ -220,7 +226,7 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
                 variable_dict[variable.symbol.name()] = variable
 
         model.der_states = [Variable.from_dict(d) for d in db['der_states']]
-        model.outputs = [variable_dict[v['name']] for v in db['outputs']]
+        model.outputs = db['outputs']
         model.delayed_states = db['delayed_states']
 
         # Evaluate variable metadata:
@@ -247,15 +253,14 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
         # 3.  Fill in any irregular elements with expressions to be evaluated later.
         # Note that an expression is neccessary only if the function value actually depends on the inputs.
         # Otherwise, we would be dealing with a genuine NaN value.
+        parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else v.symbol for v in model.parameters]))))
         for k, key in enumerate(variables_with_metadata):
-            sparsity = model.variable_metadata_function.sparsity_jac(0, k)
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
                     if not getattr(variable, tmp).is_regular():
-                        depends_on_parameters = np.any([sparsity.has_nz(i * len(ast.Symbol.ATTRIBUTES) + j, l) for l in range(len(model.parameters))])
-                        if depends_on_parameters:
+                        if ca.depends_on(metadata[key][i, j], parameter_vector):
                             setattr(variable, tmp, metadata[key][i, j])
 
     # Done

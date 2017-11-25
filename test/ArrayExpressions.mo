@@ -17,11 +17,12 @@ model ArrayExpressions
     Real a[3] = {1.0, 2.0, 3.0};
     constant Real b[4] = {2.7, 3.7, 4.7, 5.7}; // Can also be done with 2.7:5.7
     Real c[3](each min = 0.0);
-    Real d[3];
+    Real[3] d;
     Real e[3];
     Real scalar_f = 1.3;
     Real g;
     output Real h;
+    Real i[2, 3];
     constant Integer c_dim = 2;
     parameter Integer d_dim = 3;
     constant Real B[d_dim] = linspace(1, 2, 3);
@@ -55,6 +56,10 @@ equation
     nested2[2].z[1] = 3;
     nested2[2].z[2] = 2;
     nested2[2].z[3] = 1;
+
+    // Implicit transpose
+    i[1, :] = ones(3);
+    i[2, :] = transpose(ones(3));
 
     // Connecting
     connect(arc[1], arc[2]);

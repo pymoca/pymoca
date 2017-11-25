@@ -21,7 +21,6 @@ from setuptools.command.build_py import build_py
 from setuptools.command.build_ext import build_ext
 from setuptools import Command
 
-from Cython.Build import cythonize
 import versioneer
 
 MAJOR = 0
@@ -61,7 +60,7 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 import sys
 python_version = '.'.join([str(i) for i in sys.version_info[:3]])
-python_version_required = '3.4.0'
+python_version_required = '3.5.0'
 if python_version < python_version_required:
     sys.exit("Sorry, only Python >= {:s} is supported".format(python_version_required))
 
@@ -89,10 +88,6 @@ def call_antlr4(arg):
     proc.communicate()
     with open(os.path.join(ROOT_DIR, 'pymola', 'generated', '__init__.py'), 'w') as fid:
         fid.write('')
-    for root, dir, files in os.walk(generated):
-        for item in fnmatch.filter(files, "Modelica*.py"):
-            filename = os.path.join(root, item)
-            shutil.move(filename, filename.replace('.py', '.pyx'))
 
 def setup_package():
     """
@@ -112,7 +107,7 @@ def setup_package():
         # Disable compiler optimization.  We have to do this, as the default -O3 triggers a bug in clang causing an initialization failure.
         #os.environ['CFLAGS'] = '-O0'
         # Or alternatively, use gcc:
-        os.environ['CC'] = 'gcc-6'
+        os.environ['CC'] = 'gcc-7'
 
     # Without disabling this, it will reach a limit
     # on tracking and disable tracking and then recompile, which is slow
@@ -135,17 +130,13 @@ def setup_package():
         install_requires=install_reqs,
         tests_require=['coverage >= 3.7.1', 'nose >= 1.3.1'],
         test_suite='nose.collector',
-        packages=find_packages(
-            # choosing to distribute tests
-            # exclude=['*.test']
-        ),
+        python_requires='>=3.5',
+        packages=find_packages("src"),
+        package_dir={"": "src"},
         cmdclass={
             'antlr': AntlrBuildCommand,
-            'versioneer': versioneer.get_cmdclass(),  
-        },
-        ext_modules=cythonize('pymola/generated/*.pyx',
-            compiler_directives={'boundscheck': False,
-                'initializedcheck': False, 'language_level': 3})
+            'versioneer': versioneer.get_cmdclass(),
+        }
     )
 
     try:

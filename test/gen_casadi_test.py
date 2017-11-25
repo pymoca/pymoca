@@ -13,9 +13,11 @@ import casadi as ca
 import numpy as np
 
 import pymola.backends.casadi.generator as gen_casadi
+from pymola.backends.casadi.alias_relation import AliasRelation
 from pymola.backends.casadi.model import Model, Variable
 from pymola.backends.casadi.api import transfer_model, CachedModel
 from pymola import parser, ast
+
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -43,25 +45,6 @@ class GenCasadiTest(unittest.TestCase):
         for f_name in ['dae_residual', 'initial_residual', 'variable_metadata']:
             this = getattr(A, f_name + '_function')
             that = getattr(B, f_name + '_function')
-
-            if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
-                # Since arguments are grouped, we first split them into their constituent parts.
-                # This is to render the test insensitive to the order in which variables are declared in the model.
-                this_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in this.mx_in()]
-                that_mx = [[e.dep(i) for i in range(e.n_dep())] if e.is_op(ca.OP_VERTCAT) else [e] for e in that.mx_in()]
-                this_in = [[repr(e) for e in l] for l in this_mx]
-                that_in = [[repr(e) for e in l] for l in that_mx]
-
-                that_from_this = []
-                this_mx_dict = dict(zip(itertools.chain(*this_in), itertools.chain(*this_mx)))
-                that_mx_dict = dict(zip(itertools.chain(*that_in), itertools.chain(*that_mx)))
-                for this_l, that_l in zip(this_in, that_in):
-                    self.assertEqual(set(this_l), set(that_l))
-                    for e in this_l:
-                        self.assertEqual(this_mx_dict[e].size1(), that_mx_dict[e].size1())
-                        self.assertEqual(this_mx_dict[e].size2(), that_mx_dict[e].size2())
-                    that_from_this.append(ca.vertcat(*[this_mx_dict[e] for e in that_l]))
-                that = ca.Function('f', [ca.vertcat(*l) for l in this_mx], that.call(that_from_this))
 
             np.random.seed(0)
 
@@ -473,6 +456,21 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    @unittest.skip
+    def test_double_function_call(self):
+        with open(os.path.join(TEST_DIR, 'DoubleFunctionCall.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
+        print("FunctionCall", casadi_model)
+        ref_model = Model()
+
+        # Check that both instances of the function call refer to the same node in the tree
+        func_a = casadi_model.equations[0].dep(1).dep(0).dep(0).dep(0).getFunction().__hash__()
+        func_b = casadi_model.equations[1].dep(1).dep(0).dep(0).dep(0).getFunction().__hash__()
+
+        self.assertEqual(func_a, func_b)
+
     def test_forloop(self):
         with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
             txt = f.read()
@@ -484,17 +482,24 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym("x", 10)
         y = ca.MX.sym("y", 10)
         z = ca.MX.sym("z", 10)
+        u = ca.MX.sym('u', 10, 2)
+        v = ca.MX.sym('v', 2, 10)
         w = ca.MX.sym('w', 2, 10)
         b = ca.MX.sym("b")
         n = ca.MX.sym("n")
+        s = ca.MX.sym('s', 10)
+        Arr = ca.MX.sym('Arr', 2, 2)
+        der_s = ca.MX.sym('der(s)', 10)
 
-        ref_model.alg_states = list(map(Variable, [x, y, z, w, b]))
+        ref_model.states = list(map(Variable, [s]))
+        ref_model.der_states = list(map(Variable, [der_s]))
+        ref_model.alg_states = list(map(Variable, [x, y, z, u, v, w, b, Arr]))
         ref_model.parameters = list(map(Variable, [n]))
         ref_model.parameters[0].value = 10
         ref_model.equations = [
-            ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2)),
+            ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2), u - np.ones((10, 2)), v.T - np.ones((10, 2))),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
-            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1]))]
+            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10), ca.horzcat(Arr[:, 1], Arr[:, 0]) - np.array([[2, 1], [2, 1]])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -513,6 +518,7 @@ class GenCasadiTest(unittest.TestCase):
         e = ca.MX.sym("e", 3)
         g = ca.MX.sym("g", 1)
         h = ca.MX.sym("h", 1)
+        i = ca.MX.sym('i', 2, 3)
         B = ca.MX.sym("B", 3)
         C = ca.MX.sym("C", 2)
         D = ca.MX.sym("D", 3)
@@ -529,7 +535,7 @@ class GenCasadiTest(unittest.TestCase):
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h]))
+        ref_model.alg_states = list(map(Variable, [arx, arcy, arcw, nested1z, nested2z, a, c, d, e, scalar_f, g, h, i]))
         ref_model.alg_states[6].min = [0, 0, 0]
         ref_model.parameters = list(map(Variable, [nested2n, nested1n, d_dim]))
         parameter_values = [np.array([3, 3]), 3, 3]
@@ -543,7 +549,7 @@ class GenCasadiTest(unittest.TestCase):
             const.value = val
         ref_model.equations = [c - (a + b[0:3] * e), d - (ca.sin(a / b[1:4])), e - (d + scalar_f), g - ca.sum1(c),
                                h - B[1], arx[1] - scalar_f, nested1z - ca.DM.ones(3), nested2z[0, :].T - np.array([4, 5, 6]),
-                               nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, arcy[0] - arcy[1],
+                               nested2z[1, 0] - 3, nested2z[1, 1] - 2, nested2z[1, 2] - 1, i[0, :] - ca.transpose(ca.DM.ones(3)), i[1, :] - ca.transpose(ca.DM.ones(3)), arcy[0] - arcy[1],
                                arcw[0] + arcw[1], a - np.array([1, 2, 3]), scalar_f - 1.3]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -617,7 +623,7 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [1, 2 * nested_p1, 2]
         for c, v in zip(ref_model.parameters, parameter_values):
             c.value = v
-        ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0) * i),
+        ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0, True) * i),
                                protected_variable - (i1 + i2), nested_s - 3 * nested_p, test_state - r]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
@@ -1016,6 +1022,47 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_simplify_reduce_affine_expression_loop(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'expand_vectors': True,
+             'detect_aliases': True,
+             'reduce_affine_expression': True,
+             'replace_constant_expressions': True,
+             'replace_constant_values': True,
+             'replace_parameter_expressions': True,
+             'replace_parameter_values': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'SimplifyLoop', compiler_options)
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        y0 = ca.MX.sym('y[0]')
+        y1 = ca.MX.sym('y[1]')
+
+        A = ca.MX(2, 3)
+        A[0, 0] = -1
+        A[0, 1] = 1
+        A[0, 2] = 0
+        A[1, 0] = -2
+        A[1, 1] = 0
+        A[1, 2] = 1
+        b = ca.MX(2, 1)
+        b[0, 0] = 0
+        b[1, 0] = 0
+
+        ref_model.states = list(map(Variable, []))
+        ref_model.der_states = list(map(Variable, []))
+        ref_model.alg_states = list(map(Variable, [x, y0, y1]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        x = ca.vertcat(x, y0, y1)
+        ref_model.equations = [ca.mtimes(A, x) + b]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
     def test_simplify_reduce_affine_expression(self):
         # Create model, cache it, and load the cache
         compiler_options = \
@@ -1177,6 +1224,47 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_state_annotator(self):
+        with open(os.path.join(TEST_DIR, 'StateAnnotator.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'StateAnnotator')
+        print(casadi_model)
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        y = ca.MX.sym('y')
+        z = ca.MX.sym('z')
+        der_x = ca.MX.sym('der(x)')
+        der_y = ca.MX.sym('der(y)')
+        der_z = ca.MX.sym('der(z)')
+
+        ref_model.states = list(map(Variable, [x, y, z]))
+        ref_model.der_states = list(map(Variable, [der_x, der_y, der_z]))
+        ref_model.equations = [der_x + der_y - 1, der_x * y + x * der_y - 2, (der_x * y - x * der_y) / (y**2) - 3, 2 * x * der_x - 4, der_z - 5, der_x * z + x * der_z + der_y * z + y * der_z - 4, 0]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_alias_relation(self):
+        a = AliasRelation()
+        self.assertEqual(a.canonical_signed('-a'), ('a', -1))
+        a.add('a', '-b')
+        a.add('b', 'c')
+        a.add('d', '-b')
+        self.assertEqual(list(a), [('d', ['a', '-b', '-c'])])
+
+    def test_cat_params(self):
+        casadi_model = transfer_model(TEST_DIR, 'Concat', {'replace_constant_values': True})
+        c = [0, 1, 2, 2, 2, 0, 1]
+        for i, e in enumerate(c):
+            self.assertEqual(casadi_model.parameters[1].value[i], e)
+
+    def test_inline_input_assignment(self):
+        casadi_model = transfer_model(TEST_DIR, 'InlineAssignment')
+        self.assertTrue(casadi_model.inputs[0].fixed)
+        self.assertFalse(casadi_model.alg_states[0].fixed)
+        casadi_model = transfer_model(TEST_DIR, 'InlineAssignment', {'detect_aliases': True})
+        self.assertTrue(casadi_model.inputs[0].fixed)
 
 if __name__ == "__main__":
     unittest.main()
