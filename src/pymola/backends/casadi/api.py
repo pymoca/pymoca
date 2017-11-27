@@ -260,7 +260,8 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
                     if not getattr(variable, tmp).is_regular():
-                        if ca.depends_on(metadata[key][i, j], parameter_vector):
+                        if (not isinstance(metadata[key][i, j], ca.DM)
+                            and ca.depends_on(metadata[key][i, j], parameter_vector)):
                             setattr(variable, tmp, metadata[key][i, j])
 
     # Done
