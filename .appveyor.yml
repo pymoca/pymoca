@@ -1,0 +1,28 @@
+# Adapted from https://packaging.python.org/en/latest/appveyor/
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python35"
+      TOX_ENV: "py35"
+    - PYTHON: "C:\\Python35-x64"
+      TOX_ENV: "py35"
+    - PYTHON: "C:\\Python36"
+      TOX_ENV: "py36"
+    - PYTHON: "C:\\Python36-x64"
+      TOX_ENV: "py36"
+
+install:
+  - "%PYTHON%\\python.exe -m pip install tox"
+
+build: off
+
+test_script:
+  - "%PYTHON%\\python.exe -m tox -vv -e %TOX_ENV%"
+
+notifications:
+  - provider: Email
+    to:
+      - '{{commitAuthorEmail}}'
+    on_build_status_changed: true
+    on_build_failure: true
+    on_build_success: false
