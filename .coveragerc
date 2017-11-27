@@ -1,3 +1,15 @@
 [run]
+branch = True
 source = pymola
-omit = pymola/_version.py
+omit = src/pymola/_version.py
+
+[report]
+show_missing = true
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+
+[paths]
+source =
+    src/pymola
+    .tox/*/lib/python*/site-packages/pymola
