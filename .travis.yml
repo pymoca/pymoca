@@ -34,3 +34,14 @@ cache: pip
 
 before_cache:
   - rm -f $HOME/.cache/pip/log/debug.log
+
+deploy:
+  skip_cleanup: true
+  provider: pypi
+  user: pymola.wheelbuilder
+  password:
+    secure: "GZaxb109ZfDBjhFfpWnPxsfNeRMjq226MyNUB7K3ferXpR3+MBx2pOfzuYf+VF8ypOeZ9DsCwVn2x+33eJEOoXUAS4HaCz1EYEgHvEsAGf6nZI9MlGP9AWgKTqvQBj6m/VrizuaXU9gs4sAWm6udH+nqzstmrp6XVZknNfADRRA="
+  distributions: "sdist bdist_wheel"
+  server: https://test.pypi.org/legacy/
+  on:
+    tags: true
