@@ -113,6 +113,9 @@ def setup_package():
     # on tracking and disable tracking and then recompile, which is slow
     os.environ['CFLAGS'] = '-fno-var-tracking-assignments'
 
+    cmdclass_ = {'antlr': AntlrBuildCommand}
+    cmdclass_.update(versioneer.get_cmdclass())
+
     metadata = dict(
         version=versioneer.get_version(),
         name='pymola',
@@ -133,10 +136,7 @@ def setup_package():
         python_requires='>=3.5',
         packages=find_packages("src"),
         package_dir={"": "src"},
-        cmdclass={
-            'antlr': AntlrBuildCommand,
-            'versioneer': versioneer.get_cmdclass(),
-        }
+        cmdclass=cmdclass_
     )
 
     try:
