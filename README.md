@@ -2,9 +2,10 @@
 
 A python/modelica based simulation environment.
 
-[![Build Status](https://travis-ci.org/pymola/pymola.svg)](https://travis-ci.org/pymola/pymola)
-[![Build status](https://ci.appveyor.com/api/projects/status/vqoax3jkqsv578u7?svg=true)](https://ci.appveyor.com/project/pymola/pymola)
-[![Coverage Status](https://img.shields.io/coveralls/pymola/pymola.svg)](https://coveralls.io/r/pymola/pymola)
+[![Travis](https://img.shields.io/travis/pymola/pymola/master.svg?label=Travis%20CI)](https://travis-ci.org/pymola/pymola)
+[![AppVeyor](https://img.shields.io/appveyor/ci/pymola/pymola/master.svg?label=AppVeyor)](https://ci.appveyor.com/project/pymola/pymola)
+[![Coverage Status](https://img.shields.io/coveralls/pymola/pymola/master.svg)](https://coveralls.io/r/pymola/pymola)
+
 
 ## Install
 
