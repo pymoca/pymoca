@@ -59,12 +59,8 @@ pymola/version.py
 
 .ipynb_checkpoints
 
-# pycharm
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/dataSources.ids
-.idea/datasources.xml
-.idea/dictionaries
+# IDE
+.idea/
 
 # virtual environments
 venv/
