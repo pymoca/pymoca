@@ -382,17 +382,19 @@ class Model:
             der_states = OrderedDict([(s.symbol.name(), s) for s in self.der_states])
             alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
             inputs = OrderedDict([(s.symbol.name(), s) for s in self.inputs])
+            parameters = OrderedDict([(s.symbol.name(), s) for s in self.parameters])
 
             all_states = OrderedDict()
             all_states.update(states)
             all_states.update(der_states)
             all_states.update(alg_states)
             all_states.update(inputs)
+            all_states.update(parameters)
 
             alias_rel = AliasRelation()
 
             # For now, we only eliminate algebraic states.
-            do_not_eliminate = set(list(der_states) + list(states) + list(inputs))
+            do_not_eliminate = set(list(der_states) + list(states) + list(inputs) + list(parameters))
 
             reduced_equations = []
             for eq in self.equations:
@@ -498,6 +500,7 @@ class Model:
             self.der_states = [v for k, v in all_states.items() if k in der_states]
             self.alg_states = [v for k, v in all_states.items() if k in alg_states]
             self.inputs = [v for k, v in all_states.items() if k in inputs]
+            self.parameters = [v for k, v in all_states.items() if k in parameters]
             self.equations = reduced_equations
 
             if len(self.equations) > 0:
