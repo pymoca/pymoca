@@ -1,4 +1,4 @@
-# pymola
+# <img alt="Pymola" src="branding/icons/pymolalogo.svg" height="60">
 
 A python/modelica based simulation environment.
 
