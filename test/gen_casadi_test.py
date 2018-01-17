@@ -503,6 +503,31 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+
+    def test_simple_array(self):
+        with open(os.path.join(TEST_DIR, 'SimpleArray.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'SimpleArray')
+        print(casadi_model)
+        ref_model = Model()
+
+        a = ca.MX.sym("a", 3)
+        b = ca.MX.sym("b", 4)
+        c = ca.MX.sym("c", 3)
+
+        ref_model.alg_states = list(map(Variable, [a, c]))
+        ref_model.alg_states[1].min = [0, 0, 0]
+        # No parameters
+        ref_model.constants = list(map(Variable, [b]))
+        constant_values = [np.array([2.7, 3.7, 4.7, 5.7])]
+        for const, val in zip(ref_model.constants, constant_values):
+            const.value = val
+
+        ref_model.equations = [c - (a + b[0:3]), a - np.array([1, 2, 3])]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_arrayexpressions(self):
         with open(os.path.join(TEST_DIR, 'ArrayExpressions.mo'), 'r') as f:
             txt = f.read()
