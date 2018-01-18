@@ -85,12 +85,18 @@ class GenCasadiTest(unittest.TestCase):
         c_2 = ca.MX.sym("c_2")
         c_3 = ca.MX.sym("c_3")
 
+        d_dim = ca.MX.sym("d_dim")
+
         ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3]))
 
         for i in range(3, 6):
             ref_model.alg_states[i].min = 0.0
 
-        # No parameters
+        ref_model.parameters = list(map(Variable, [d_dim]))
+        parameter_values = [3]
+        for const, val in zip(ref_model.parameters, parameter_values):
+            const.value = val
+
         ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4]))
         constant_values = [2.7, 3.7, 4.7, 5.7]
         for const, val in zip(ref_model.constants, constant_values):
