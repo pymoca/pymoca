@@ -74,23 +74,37 @@ class GenCasadiTest(unittest.TestCase):
         print(casadi_model)
         ref_model = Model()
 
-        a = ca.MX.sym("a", 3)
-        b = ca.MX.sym("b", 4)
-        c = ca.MX.sym("c", 3)
+        a_1 = ca.MX.sym("a_1")
+        a_2 = ca.MX.sym("a_2")
+        a_3 = ca.MX.sym("a_3")
+        b_1 = ca.MX.sym("b_1")
+        b_2 = ca.MX.sym("b_2")
+        b_3 = ca.MX.sym("b_3")
+        b_4 = ca.MX.sym("b_4")
+        c_1 = ca.MX.sym("c_1")
+        c_2 = ca.MX.sym("c_2")
+        c_3 = ca.MX.sym("c_3")
 
-        ref_model.alg_states = list(map(Variable, [a, c]))
-        ref_model.alg_states[1].min = [0, 0, 0]
+        ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3]))
+
+        for i in range(3, 6):
+            ref_model.alg_states[i].min = 0.0
+
         # No parameters
-        ref_model.constants = list(map(Variable, [b]))
-        constant_values = [np.array([2.7, 3.7, 4.7, 5.7])]
+        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4]))
+        constant_values = [2.7, 3.7, 4.7, 5.7]
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
 
-        ref_model.equations = [c - (a + b[0:3]), a - np.array([1, 2, 3])]
+        ref_model.equations = [c_1 - (a_1 + b_1),
+                               c_2 - (a_2 + b_2),
+                               c_3 - (a_3 + b_3),
+                               a_1 - 1,
+                               a_2 - 2,
+                               a_3 - 3]
 
         if not self.assert_model_equivalent_numeric(ref_model, casadi_model):
             raise Exception("Failed test")
-
 
 
 c = GenCasadiTest()

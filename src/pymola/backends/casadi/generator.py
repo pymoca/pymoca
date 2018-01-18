@@ -92,20 +92,29 @@ class Generator(TreeListener):
     def _ast_symbols_to_variables(self, ast_symbols, differentiate=False):
         variables = []
         for ast_symbol in ast_symbols:
-            mx_symbol = self.get_mx(ast_symbol)
-            if mx_symbol.is_empty():
-                continue
-            if differentiate:
-                mx_symbol = self.get_derivative(mx_symbol)
-            python_type = self.get_python_type(ast_symbol)
-            variable = Variable(mx_symbol, python_type)
-            if not differentiate:
-                for a in ast.Symbol.ATTRIBUTES:
-                    v = self.get_mx(getattr(ast_symbol, a))
-                    if v is not None:
-                        setattr(variable, a, v)
-                variable.prefixes = ast_symbol.prefixes
-            variables.append(variable)
+            mx_symbols = self.get_mx(ast_symbol)
+
+            if isinstance(mx_symbols, np.ndarray):
+                mx_symbols = list(mx_symbols)  # TODO: support for higher dimensions
+            else:
+                mx_symbols = [mx_symbols]
+
+            for i, mx_symbol in enumerate(mx_symbols):
+                if mx_symbol.is_empty():
+                    continue
+                if differentiate:
+                    mx_symbol = self.get_derivative(mx_symbol)
+                python_type = self.get_python_type(ast_symbol)
+                variable = Variable(mx_symbol, python_type)
+                if not differentiate:
+                    for a in ast.Symbol.ATTRIBUTES:
+                        v = self.get_mx(getattr(ast_symbol, a))
+                        if v is not None:
+                            if isinstance(v, list):
+                                v = v[i]
+                            setattr(variable, a, v)
+                    variable.prefixes = ast_symbol.prefixes
+                variables.append(variable)
         return variables
 
     def enterClass(self, tree):
@@ -153,11 +162,27 @@ class Generator(TreeListener):
         # multiple aliases of the same state is allowed.
         self.model.outputs = [v.symbol.name() for v in itertools.chain(self.model.states, self.model.alg_states) if 'output' in v.prefixes]
 
+        def expand_ndarray(l):
+            new_l = []
+            for e in l:
+                if isinstance(e, np.ndarray):
+                    for e_sub in e:
+                        new_l.append(e_sub)
+                else:
+                    new_l.append(e)
+            return new_l
+
         def discard_empty(l):
             return list(filter(lambda x: not ca.MX(x).is_empty(), l))
 
-        self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
-        self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
+        self.model.equations = [self.get_mx(e) for e in tree.equations]
+        self.model.initial_equations = [self.get_mx(e) for e in tree.initial_equations]
+
+        self.model.equations = expand_ndarray(self.model.equations)
+        self.model.initial_equations = expand_ndarray(self.model.initial_equations)
+
+        self.model.equations = discard_empty(self.model.equations)
+        self.model.initial_equations = discard_empty(self.model.initial_equations)
 
         if len(tree.statements) + len(tree.initial_statements) > 0:
             raise NotImplementedError('Statements are currently supported inside functions only')
@@ -259,8 +284,10 @@ class Generator(TreeListener):
             self.model.delayed_states.append(delayed_state)
             self.model.inputs.append(Variable(src))
         elif op in OP_MAP and n_operands == 2:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
-            rhs = ca.MX(self.get_mx(tree.operands[1]))
+            lhs = self.get_mx(tree.operands[0])
+            # lhs = ca.MX(lhs)
+            rhs = self.get_mx(tree.operands[1])
+            # rhs = ca.MX(rhs)
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
@@ -313,8 +340,10 @@ class Generator(TreeListener):
         else:
             src_right = self.get_mx(tree.right)
 
-        src_left = ca.MX(src_left)
-        src_right = ca.MX(src_right)
+        if isinstance(src_left, list):
+            src_left = np.array(src_left)
+        if isinstance(src_right, list):
+            src_right = np.array(src_right)
 
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
@@ -540,10 +569,19 @@ class Generator(TreeListener):
     def get_symbol(self, tree):
         # Create symbol
         shape = self.get_shape(tree)
-        assert(len(shape) <= 2)
-        s = ca.MX.sym(tree.name, *shape)
-        self.nodes[self.current_class][tree.name] = s
-        return s
+        assert(len(shape) <= 1)
+
+        s_all = np.ndarray(shape, dtype=object)
+
+        for i in range(shape[0]):
+            name = tree.name + "[{}]".format(i+1)
+            s = ca.MX.sym(name)
+            # self.nodes[self.current_class][name] = s
+            s_all[i] = s
+
+        self.nodes[self.current_class][tree.name] = s_all
+
+        return s_all
 
     def get_derivative(self, s):
         if ca.MX(s).is_constant():
