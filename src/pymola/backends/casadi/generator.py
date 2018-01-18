@@ -298,18 +298,26 @@ class Generator(TreeListener):
             src = self.get_mx(tree.operands[0])
             # Check for built-in operations, such as the
             # elementary functions, first.
-            if hasattr(src, op) and n_operands <= 2:
+
+            if hasattr(ca.MX, op) and n_operands <= 2:
+                f = getattr(ca.MX, op)
+
                 if n_operands == 1:
-                    src = ca.MX(self.get_mx(tree.operands[0]))
-                    src = getattr(src, op)()
+                    src = np.array([f(x) for x in src])
                 else:
-                    lhs = ca.MX(self.get_mx(tree.operands[0]))
-                    rhs = ca.MX(self.get_mx(tree.operands[1]))
-                    lhs_op = getattr(lhs, op)
-                    src = lhs_op(rhs)
+                    # TODO:
+                    # lhs = ca.MX(lhs)
+                    # rhs = ca.MX(rhs)
+                    lhs = self.get_mx(tree.operands[0])
+                    rhs = self.get_mx(tree.operands[1])
+
+                    src = np.array([f(a, b) for a, b in zip(lhs, rhs)])
             else:
                 function = self.get_function(op)
                 src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
+
+            #if src.shape == (1, ):
+            #    src = src[0]
 
         self.src[tree] = src
 
@@ -356,8 +364,11 @@ class Generator(TreeListener):
 
         # If dimensions between the lhs and rhs do not match, but the dimensions of lhs
         # and transposed rhs do match, transpose the rhs.
-        if src_left.shape != src_right.shape and src_left.shape == src_right.shape[::-1]:
-            src_right = ca.transpose(src_right)
+        try:
+            if src_left.shape != src_right.shape and src_left.shape == src_right.shape[::-1]:
+               src_right = ca.transpose(src_right)
+        except:
+            pass
 
         self.src[tree] = src_left - src_right
 
@@ -684,11 +695,11 @@ class Generator(TreeListener):
 
     def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef, ast.Expression]) -> ca.MX:
         """
-        We pull components and symbols from the AST on demand.  
+        We pull components and symbols from the AST on demand.
         This is to ensure that parametrized vector dimensions can be resolved.  Vector
         dimensions need to be known at CasADi MX creation time.
-        :param tree: 
-        :return: 
+        :param tree:
+        :return:
         """
         if tree not in self.src:
             if isinstance(tree, ast.Symbol):

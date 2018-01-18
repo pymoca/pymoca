@@ -84,10 +84,18 @@ class GenCasadiTest(unittest.TestCase):
         c_1 = ca.MX.sym("c_1")
         c_2 = ca.MX.sym("c_2")
         c_3 = ca.MX.sym("c_3")
+        d_1 = ca.MX.sym("d_1")
+        d_2 = ca.MX.sym("d_2")
+        d_3 = ca.MX.sym("d_3")
+        e_1 = ca.MX.sym("e_1")
+        e_2 = ca.MX.sym("e_2")
+        e_3 = ca.MX.sym("e_3")
 
+        scalar_f = ca.MX.sym("scalar_f")
+        c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3]))
+        ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f]))
 
         for i in range(3, 6):
             ref_model.alg_states[i].min = 0.0
@@ -97,17 +105,28 @@ class GenCasadiTest(unittest.TestCase):
         for const, val in zip(ref_model.parameters, parameter_values):
             const.value = val
 
-        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4]))
-        constant_values = [2.7, 3.7, 4.7, 5.7]
+        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4, c_dim]))
+        constant_values = [2.7, 3.7, 4.7, 5.7, 2]
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
 
-        ref_model.equations = [c_1 - (a_1 + b_1),
-                               c_2 - (a_2 + b_2),
-                               c_3 - (a_3 + b_3),
+        ref_model.equations = [c_1 - (a_1 + b_1 * e_1),
+                               c_2 - (a_2 + b_2 * e_2),
+                               c_3 - (a_3 + b_3 * e_3),
+
+                               d_1 - (ca.sin(a_1 / b_2)),
+                               d_2 - (ca.sin(a_2 / b_3)),
+                               d_3 - (ca.sin(a_3 / b_4)),
+
+                               e_1 - (d_1 + scalar_f),
+                               e_2 - (d_2 + scalar_f),
+                               e_3 - (d_3 + scalar_f),
+
                                a_1 - 1,
                                a_2 - 2,
-                               a_3 - 3]
+                               a_3 - 3,
+
+                               scalar_f - 1.3]
 
         if not self.assert_model_equivalent_numeric(ref_model, casadi_model):
             raise Exception("Failed test")
