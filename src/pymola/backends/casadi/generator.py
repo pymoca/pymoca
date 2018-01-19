@@ -69,6 +69,16 @@ class ForLoop:
 Assignment = namedtuple('Assignment', ['left', 'right'])
 
 
+def _safe_ndarray(x):
+    if isinstance(x, ca.MX):
+        # We want the single MX symbol in an array. If we try to do
+        # np.array(x) directly in this case, we get an AttributeError:
+        # "'MX' object has no attribute 'full'"
+        return np.array([x])
+    else:
+        return np.array(x)
+
+
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
     def __init__(self, root: ast.Tree, class_name: str, options: Dict[str, bool]):
@@ -281,8 +291,8 @@ class Generator(TreeListener):
             self.model.delayed_states.append(delayed_state)
             self.model.inputs.append(Variable(src))
         elif op in OP_MAP and n_operands == 2:
-            lhs = self.get_mx(tree.operands[0])
-            rhs = self.get_mx(tree.operands[1])
+            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
+            rhs = _safe_ndarray(self.get_mx(tree.operands[1]))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
@@ -337,10 +347,8 @@ class Generator(TreeListener):
         else:
             src_right = self.get_mx(tree.right)
 
-        if isinstance(src_left, list):
-            src_left = np.array(src_left)
-        if isinstance(src_right, list):
-            src_right = np.array(src_right)
+        src_left = _safe_ndarray(src_left)
+        src_right = _safe_ndarray(src_right)
 
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
@@ -353,14 +361,8 @@ class Generator(TreeListener):
 
         # If dimensions between the lhs and rhs do not match, but the dimensions of lhs
         # and transposed rhs do match, transpose the rhs.
-        try:
-            if src_left.shape != src_right.shape and src_left.shape == src_right.shape[::-1]:
-               src_right = ca.transpose(src_right)
-        except:
-            pass
-
-        if isinstance(src_left, np.ndarray) and np.prod(src_left.shape) == 1:
-            src_left = src_left[0]
+        if src_left.shape != src_right.shape and src_left.shape == src_right.shape[::-1]:
+            src_right = ca.transpose(src_right)
 
         self.src[tree] = src_left - src_right
 
