@@ -223,7 +223,7 @@ class Generator(TreeListener):
             src = self.get_mx(tree.operands[0]).T
         elif op == 'sum' and n_operands == 1:
             v = self.get_mx(tree.operands[0])
-            src = ca.sum1(v)
+            src = sum(v)
         elif op == 'linspace' and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
@@ -369,6 +369,9 @@ class Generator(TreeListener):
                src_right = ca.transpose(src_right)
         except:
             pass
+
+        if isinstance(src_left, np.ndarray) and np.prod(src_left.shape) == 1:
+            src_left = src_left[0]
 
         self.src[tree] = src_left - src_right
 

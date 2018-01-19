@@ -5,6 +5,7 @@ model SimpleArray
     Real[3] d;
     Real e[3];
     Real scalar_f = 1.3;
+    Real g;
     constant Integer c_dim = 2;
     parameter Integer d_dim = 3;
 equation
@@ -16,4 +17,8 @@ equation
 
     // Difference between .+ and +
     e = d .+ scalar_f; // Different shapes, so + is not allowed, only .+ is.
+
+    // Sum.
+    g = sum(c);
+
 end ArrayExpressions;

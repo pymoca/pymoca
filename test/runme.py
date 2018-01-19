@@ -90,12 +90,13 @@ class GenCasadiTest(unittest.TestCase):
         e_1 = ca.MX.sym("e_1")
         e_2 = ca.MX.sym("e_2")
         e_3 = ca.MX.sym("e_3")
+        g = ca.MX.sym("g")
 
         scalar_f = ca.MX.sym("scalar_f")
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f]))
+        ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f, g]))
 
         for i in range(3, 6):
             ref_model.alg_states[i].min = 0.0
@@ -121,6 +122,8 @@ class GenCasadiTest(unittest.TestCase):
                                e_1 - (d_1 + scalar_f),
                                e_2 - (d_2 + scalar_f),
                                e_3 - (d_3 + scalar_f),
+
+                               g - (c_1 + c_2 + c_3),
 
                                a_1 - 1,
                                a_2 - 2,
