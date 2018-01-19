@@ -6,8 +6,11 @@ model SimpleArray
     Real e[3];
     Real scalar_f = 1.3;
     Real g;
+    output Real h;
+
     constant Integer c_dim = 2;
     parameter Integer d_dim = 3;
+    constant Real B[d_dim] = linspace(1, 2, 3);
 equation
     // Array operators.
     c = a .+ b[1:d_dim].*e; // .+ is equal to + in this case
@@ -21,4 +24,6 @@ equation
     // Sum.
     g = sum(c);
 
-end ArrayExpressions;
+    // Indexing
+    h = B[d_dim - 1];
+end SimpleArray;

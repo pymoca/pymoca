@@ -110,7 +110,7 @@ class Generator(TreeListener):
                     for a in ast.Symbol.ATTRIBUTES:
                         v = self.get_mx(getattr(ast_symbol, a))
                         if v is not None:
-                            if isinstance(v, list):
+                            if not np.isscalar(v):
                                 v = v[i]
                             setattr(variable, a, v)
                     variable.prefixes = ast_symbol.prefixes
@@ -228,7 +228,7 @@ class Generator(TreeListener):
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
             n_steps = self.get_integer(tree.operands[2])
-            src = ca.linspace(a, b, n_steps)
+            src = np.linspace(a, b, n_steps)
         elif op == 'fill' and n_operands == 2:
             val = self.get_mx(tree.operands[0])
             n_row = self.get_integer(tree.operands[1])
@@ -531,6 +531,9 @@ class Generator(TreeListener):
 
             # Obtain expression
             expr = self.get_mx(tree)
+
+            assert expr.shape == (1,)
+            expr = expr[0]
 
             # Obtain the symbols it depends on
             free_vars = ca.symvar(expr)

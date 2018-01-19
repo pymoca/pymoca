@@ -91,12 +91,16 @@ class GenCasadiTest(unittest.TestCase):
         e_2 = ca.MX.sym("e_2")
         e_3 = ca.MX.sym("e_3")
         g = ca.MX.sym("g")
+        h = ca.MX.sym("h")
+        B_1 = ca.MX.sym("B_1")
+        B_2 = ca.MX.sym("B_2")
+        B_3 = ca.MX.sym("B_3")
 
         scalar_f = ca.MX.sym("scalar_f")
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f, g]))
+        ref_model.alg_states = list(map(Variable, [a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f, g, h]))
 
         for i in range(3, 6):
             ref_model.alg_states[i].min = 0.0
@@ -105,9 +109,9 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [3]
         for const, val in zip(ref_model.parameters, parameter_values):
             const.value = val
-
-        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4, c_dim]))
-        constant_values = [2.7, 3.7, 4.7, 5.7, 2]
+        ref_model.outputs = list(map(Variable, [h]))
+        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4, c_dim, B_1, B_2, B_3]))
+        constant_values = [2.7, 3.7, 4.7, 5.7, 2, 1.0, 1.5, 2.0]
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
 
@@ -124,6 +128,8 @@ class GenCasadiTest(unittest.TestCase):
                                e_3 - (d_3 + scalar_f),
 
                                g - (c_1 + c_2 + c_3),
+
+                               h - B_2,
 
                                a_1 - 1,
                                a_2 - 2,
