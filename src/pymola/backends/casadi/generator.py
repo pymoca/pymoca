@@ -285,9 +285,7 @@ class Generator(TreeListener):
             self.model.inputs.append(Variable(src))
         elif op in OP_MAP and n_operands == 2:
             lhs = self.get_mx(tree.operands[0])
-            # lhs = ca.MX(lhs)
             rhs = self.get_mx(tree.operands[1])
-            # rhs = ca.MX(rhs)
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
@@ -305,9 +303,6 @@ class Generator(TreeListener):
                 if n_operands == 1:
                     src = np.array([f(x) for x in src])
                 else:
-                    # TODO:
-                    # lhs = ca.MX(lhs)
-                    # rhs = ca.MX(rhs)
                     lhs = self.get_mx(tree.operands[0])
                     rhs = self.get_mx(tree.operands[1])
 
@@ -315,9 +310,6 @@ class Generator(TreeListener):
             else:
                 function = self.get_function(op)
                 src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
-
-            #if src.shape == (1, ):
-            #    src = src[0]
 
         self.src[tree] = src
 
@@ -583,19 +575,26 @@ class Generator(TreeListener):
     def get_symbol(self, tree):
         # Create symbol
         shape = self.get_shape(tree)
-        assert(len(shape) <= 1)
 
-        s_all = np.ndarray(shape, dtype=object)
+        # FIXME: Even scalars have dimensions. We cannot distinct between 1-D array of length 1, and scalars this way.
+        # Real a;
+        # Real a[1];
+        # are therefore indistinguishable. But do we choose a symbol a, or a[1]?
+        # We currently assume "a", and not "a[1]".
 
-        for i in range(shape[0]):
-            name = tree.name + "[{}]".format(i+1)
-            s = ca.MX.sym(name)
-            # self.nodes[self.current_class][name] = s
-            s_all[i] = s
+        if np.prod(shape) == 1:
+            s = np.array([ca.MX.sym(tree.name)])
+        else:
+            s = np.ndarray(shape, dtype=object)
 
-        self.nodes[self.current_class][tree.name] = s_all
+            for ind in np.ndindex(s.shape):
+                ind_str = ",".join((str(x+1) for x in ind))
+                name = "{}[{}]".format(tree.name, ind_str)
+                s[ind] = ca.MX.sym(name)
 
-        return s_all
+        self.nodes[self.current_class][tree.name] = s
+
+        return s
 
     def get_derivative(self, s):
         if ca.MX(s).is_constant():
