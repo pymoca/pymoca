@@ -94,12 +94,7 @@ class Generator(TreeListener):
         for ast_symbol in ast_symbols:
             mx_symbols = self.get_mx(ast_symbol)
 
-            if isinstance(mx_symbols, np.ndarray):
-                mx_symbols = list(mx_symbols)  # TODO: support for higher dimensions
-            else:
-                mx_symbols = [mx_symbols]
-
-            for i, mx_symbol in enumerate(mx_symbols):
+            for ind, mx_symbol in np.ndenumerate(mx_symbols):
                 if mx_symbol.is_empty():
                     continue
                 if differentiate:
@@ -111,7 +106,9 @@ class Generator(TreeListener):
                         v = self.get_mx(getattr(ast_symbol, a))
                         if v is not None:
                             if not np.isscalar(v):
-                                v = v[i]
+                                # TODO: Why are some values still lists?
+                                v = np.array(v)
+                                v = v[ind]
                             setattr(variable, a, v)
                     variable.prefixes = ast_symbol.prefixes
                 variables.append(variable)
