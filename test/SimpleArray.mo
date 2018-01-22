@@ -7,7 +7,7 @@ model SimpleArray
     Real scalar_f = 1.3;
     Real g;
     output Real h;
-
+    Real i[2, 3];
     constant Integer c_dim = 2;
     parameter Integer d_dim = 3;
     constant Real B[d_dim] = linspace(1, 2, 3);
@@ -26,4 +26,8 @@ equation
 
     // Indexing
     h = B[d_dim - 1];
+
+    // Implicit transpose
+    i[1, :] = ones(3);
+    i[2, :] = transpose(ones(3));
 end SimpleArray;

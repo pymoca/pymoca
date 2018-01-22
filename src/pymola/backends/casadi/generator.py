@@ -222,12 +222,15 @@ class Generator(TreeListener):
         elif op == '-' and n_operands == 1:
             src = -self.get_mx(tree.operands[0])
         elif op == 'mtimes':
+            # TODO: Probably does not work right for higher order (3D+) matrices.
+            # See book.xogeny.com/behavior/arrays/functions/ under "Multiplication (* and .*)"
             assert n_operands >= 2
             src = self.get_mx(tree.operands[0])
             for i in tree.operands[1:]:
-                src = ca.mtimes(src, self.get_mx(i))
+                rhs = self.get_mx(tree.operands[i])
+                src = np.dot(src, rhs)
         elif op == 'transpose' and n_operands == 1:
-            src = self.get_mx(tree.operands[0]).T
+            src = np.transpose(self.get_mx(tree.operands[0]))
         elif op == 'sum' and n_operands == 1:
             v = self.get_mx(tree.operands[0])
             src = sum(v)
@@ -236,37 +239,22 @@ class Generator(TreeListener):
             b = self.get_mx(tree.operands[1])
             n_steps = self.get_integer(tree.operands[2])
             src = np.linspace(a, b, n_steps)
-        elif op == 'fill' and n_operands == 2:
+        elif op == 'fill' and n_operands >= 2:
             val = self.get_mx(tree.operands[0])
-            n_row = self.get_integer(tree.operands[1])
-            src = val * ca.DM.ones(n_row)
-        elif op == 'fill' and n_operands == 3:
-            val = self.get_mx(tree.operands[0])
-            n_row = self.get_integer(tree.operands[1])
-            n_col = self.get_integer(tree.operands[2])
-            src = val * ca.DM.ones(n_row, n_col)
-        elif op == 'zeros' and n_operands == 1:
-            n_row = self.get_integer(tree.operands[0])
-            src = ca.DM.zeros(n_row)
-        elif op == 'zeros' and n_operands == 2:
-            n_row = self.get_integer(tree.operands[0])
-            n_col = self.get_integer(tree.operands[1])
-            src = ca.DM.zeros(n_row, n_col)
-        elif op == 'ones' and n_operands == 1:
-            n_row = self.get_integer(tree.operands[0])
-            src = ca.DM.ones(n_row)
-        elif op == 'ones' and n_operands == 2:
-            n_row = self.get_integer(tree.operands[0])
-            n_col = self.get_integer(tree.operands[1])
-            src = ca.DM.ones(n_row, n_col)
+            inds = tuple((self.get_integer(x) for x in tree.operands[1:]))
+            src = np.full(val, inds)
+        elif op == 'zeros':
+            inds = tuple((self.get_integer(x) for x in tree.operands))
+            src = np.zeros(inds)
+        elif op == 'ones':
+            inds = tuple((self.get_integer(x) for x in tree.operands))
+            src = np.ones(inds)
         elif op == 'identity' and n_operands == 1:
             n = self.get_integer(tree.operands[0])
-            src = ca.DM.eye(n)
+            src = np.eye(n)
         elif op == 'diagonal' and n_operands == 1:
             diag = self.get_mx(tree.operands[0])
-            n = len(diag)
-            indices = list(range(n))
-            src = ca.DM.triplet(indices, indices, diag, n, n)
+            src = np.diag(diag)
         elif op == 'cat':
             axis = self.get_integer(tree.operands[0])
             assert axis == 1, "Currently only concatenation on first axis is supported"
@@ -296,7 +284,7 @@ class Generator(TreeListener):
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
+            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         else:
@@ -315,6 +303,7 @@ class Generator(TreeListener):
 
                     src = np.array([f(a, b) for a, b in zip(lhs, rhs)])
             else:
+                # TODO(Array)
                 function = self.get_function(op)
                 src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
 
