@@ -242,7 +242,7 @@ class Generator(TreeListener):
         elif op == 'fill' and n_operands >= 2:
             val = self.get_mx(tree.operands[0])
             inds = tuple((self.get_integer(x) for x in tree.operands[1:]))
-            src = np.full(val, inds)
+            src = np.full(inds, val)
         elif op == 'zeros':
             inds = tuple((self.get_integer(x) for x in tree.operands))
             src = np.zeros(inds)

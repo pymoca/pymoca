@@ -102,6 +102,14 @@ class GenCasadiTest(unittest.TestCase):
         B_1 = ca.MX.sym("B_1")
         B_2 = ca.MX.sym("B_2")
         B_3 = ca.MX.sym("B_3")
+        C_1 = ca.MX.sym("C_1")
+        C_2 = ca.MX.sym("C_2")
+        D_1 = ca.MX.sym("D_1")
+        D_2 = ca.MX.sym("D_2")
+        D_3 = ca.MX.sym("D_3")
+        E_1 = ca.MX.sym("E_1")
+        E_2 = ca.MX.sym("E_2")
+
 
         scalar_f = ca.MX.sym("scalar_f")
         c_dim = ca.MX.sym("c_dim")
@@ -117,8 +125,8 @@ class GenCasadiTest(unittest.TestCase):
         for const, val in zip(ref_model.parameters, parameter_values):
             const.value = val
         ref_model.outputs = list(map(Variable, [h]))
-        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4, c_dim, B_1, B_2, B_3]))
-        constant_values = [2.7, 3.7, 4.7, 5.7, 2, 1.0, 1.5, 2.0]
+        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4, c_dim, B_1, B_2, B_3, C_1, C_2, D_1, D_2, D_3, E_1, E_2]))
+        constant_values = [2.7, 3.7, 4.7, 5.7, 2, 1.0, 1.5, 2.0, 1.7, 1.7, 0.0, 0.0, 0.0, 1.0, 1.0]
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
 
