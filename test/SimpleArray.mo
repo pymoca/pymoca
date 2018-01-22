@@ -1,3 +1,8 @@
+// Also see the Modelica specification, section 10.6
+model ArrayElement
+    Real x;
+end ArrayElement;
+
 model SimpleArray
     Real a[3] = {1.0, 2.0, 3.0};
     constant Real b[4] = {2.7, 3.7, 4.7, 5.7};
@@ -14,6 +19,7 @@ model SimpleArray
     constant Real C[c_dim] = fill(1.7, c_dim);
     constant Real D[c_dim + 1] = zeros(d_dim);
     constant Real E[2] = ones(d_dim - 1);
+    ArrayElement ar[c_dim + 1];
 equation
     // Array operators.
     c = a .+ b[1:d_dim].*e; // .+ is equal to + in this case
@@ -29,6 +35,7 @@ equation
 
     // Indexing
     h = B[d_dim - 1];
+    ar[2].x = scalar_f;
 
     // Implicit transpose
     i[1, :] = ones(3);
