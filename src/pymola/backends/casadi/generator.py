@@ -6,6 +6,7 @@ from collections import namedtuple, deque, OrderedDict
 import casadi as ca
 import numpy as np
 import itertools
+import functools
 from typing import Union, Dict
 
 from pymola import ast
@@ -31,10 +32,7 @@ OP_MAP = {'*': "__mul__",
           '<=': '__le__',
           '>=': '__ge__',
           '!=': '__ne__',
-          '==': '__eq__',
-          "min": "fmin",
-          "max": "fmax",
-          "abs": "fabs"}
+          '==': '__eq__'}
 
 ForLoopIndexedSymbol = namedtuple('ForLoopIndexedSymbol', ['tree', 'transpose', 'indices'])
 
@@ -257,6 +255,20 @@ class Generator(TreeListener):
         elif op == 'diagonal' and n_operands == 1:
             diag = self.get_mx(tree.operands[0])
             src = np.diag(diag)
+        elif op in ("min", "max", "abs") and n_operands == 1:
+            ca_op = getattr(ca.MX, "f" + op)
+            src = _safe_ndarray(self.get_mx(tree.operands[0]))
+            src = functools.reduce(ca_op, src.flat)
+        elif op in ("min", "max", "abs") and n_operands == 2:
+            ca_op = getattr(ca.MX, "f" + op)
+
+            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
+            rhs = _safe_ndarray(self.get_mx(tree.operands[1]))
+
+            # Modelica Spec: Operation only allowed on scalars
+            assert np.prod(lhs.shape) == 1 and np.prod(rhs.shape)
+
+            src = ca_op(lhs[0], rhs[0])
         elif op == 'cat':
             axis = self.get_integer(tree.operands[0])
             assert axis == 1, "Currently only concatenation on first axis is supported"
@@ -686,7 +698,7 @@ class Generator(TreeListener):
     def get_component(self, tree):
         # Check special symbols
         if tree.name == 'time':
-            return self.model.time
+            return np.array([self.model.time], dtype=object)
         else:
             for f in reversed(self.for_loops):
                 if f.name == tree.name:
