@@ -654,23 +654,122 @@ class GenCasadiTest(unittest.TestCase):
         print(casadi_model)
         ref_model = Model()
 
-        A = ca.MX.sym("A", 3, 3)
-        b = ca.MX.sym("b", 3)
-        c = ca.MX.sym("c", 3)
-        d = ca.MX.sym("d", 3)
-        C = ca.MX.sym("C", 2, 3)
-        D = ca.MX.sym("D", 3, 2)
-        E = ca.MX.sym("E", 2, 3)
-        I = ca.MX.sym("I", 5, 5)
-        F = ca.MX.sym("F", 3, 3)
+        A_1_1 = ca.MX.sym("A[1,1]")
+        A_1_2 = ca.MX.sym("A[1,2]")
+        A_1_3 = ca.MX.sym("A[1,3]")
+        A_2_1 = ca.MX.sym("A[2,1]")
+        A_2_2 = ca.MX.sym("A[2,2]")
+        A_2_3 = ca.MX.sym("A[2,3]")
+        A_3_1 = ca.MX.sym("A[3,1]")
+        A_3_2 = ca.MX.sym("A[3,2]")
+        A_3_3 = ca.MX.sym("A[3,3]")
+        b_1 = ca.MX.sym("b[1]")
+        b_2 = ca.MX.sym("b[2]")
+        b_3 = ca.MX.sym("b[3]")
+        c_1 = ca.MX.sym("c[1]")
+        c_2 = ca.MX.sym("c[2]")
+        c_3 = ca.MX.sym("c[3]")
+        d_1 = ca.MX.sym("d[1]")
+        d_2 = ca.MX.sym("d[2]")
+        d_3 = ca.MX.sym("d[3]")
+        C_1_1 = ca.MX.sym("C[1,1]")
+        C_1_2 = ca.MX.sym("C[1,2]")
+        C_1_3 = ca.MX.sym("C[1,3]")
+        C_2_1 = ca.MX.sym("C[2,1]")
+        C_2_2 = ca.MX.sym("C[2,2]")
+        C_2_3 = ca.MX.sym("C[2,3]")
+        D_1_1 = ca.MX.sym("D[1,1]")
+        D_1_2 = ca.MX.sym("D[1,2]")
+        D_2_1 = ca.MX.sym("D[2,1]")
+        D_2_2 = ca.MX.sym("D[2,2]")
+        D_3_1 = ca.MX.sym("D[3,1]")
+        D_3_2 = ca.MX.sym("D[3,2]")
+        E_1_1 = ca.MX.sym("E[1,1]")
+        E_1_2 = ca.MX.sym("E[1,2]")
+        E_1_3 = ca.MX.sym("E[1,3]")
+        E_2_1 = ca.MX.sym("E[2,1]")
+        E_2_2 = ca.MX.sym("E[2,2]")
+        E_2_3 = ca.MX.sym("E[2,3]")
+        I_1_1 = ca.MX.sym("I[1,1]")
+        I_1_2 = ca.MX.sym("I[1,2]")
+        I_1_3 = ca.MX.sym("I[1,3]")
+        I_1_4 = ca.MX.sym("I[1,4]")
+        I_1_5 = ca.MX.sym("I[1,5]")
+        I_2_1 = ca.MX.sym("I[2,1]")
+        I_2_2 = ca.MX.sym("I[2,2]")
+        I_2_3 = ca.MX.sym("I[2,3]")
+        I_2_4 = ca.MX.sym("I[2,4]")
+        I_2_5 = ca.MX.sym("I[2,5]")
+        I_3_1 = ca.MX.sym("I[3,1]")
+        I_3_2 = ca.MX.sym("I[3,2]")
+        I_3_3 = ca.MX.sym("I[3,3]")
+        I_3_4 = ca.MX.sym("I[3,4]")
+        I_3_5 = ca.MX.sym("I[3,5]")
+        I_4_1 = ca.MX.sym("I[4,1]")
+        I_4_2 = ca.MX.sym("I[4,2]")
+        I_4_3 = ca.MX.sym("I[4,3]")
+        I_4_4 = ca.MX.sym("I[4,4]")
+        I_4_5 = ca.MX.sym("I[4,5]")
+        I_5_1 = ca.MX.sym("I[5,1]")
+        I_5_2 = ca.MX.sym("I[5,2]")
+        I_5_3 = ca.MX.sym("I[5,3]")
+        I_5_4 = ca.MX.sym("I[5,4]")
+        I_5_5 = ca.MX.sym("I[5,5]")
+        F_1_1 = ca.MX.sym("F[1,1]")
+        F_1_2 = ca.MX.sym("F[1,2]")
+        F_1_3 = ca.MX.sym("F[1,3]")
+        F_2_1 = ca.MX.sym("F[2,1]")
+        F_2_2 = ca.MX.sym("F[2,2]")
+        F_2_3 = ca.MX.sym("F[2,3]")
+        F_3_1 = ca.MX.sym("F[3,1]")
+        F_3_2 = ca.MX.sym("F[3,2]")
+        F_3_3 = ca.MX.sym("F[3,3]")
 
-        ref_model.alg_states = list(map(Variable, [A, b, c, d]))
-        ref_model.constants = list(map(Variable, [C, D, E, I, F]))
-        constant_values = [1.7 * ca.DM.ones(2, 3), ca.DM.zeros(3, 2), ca.DM.ones(2, 3), ca.DM.eye(5),
-                                     ca.DM.triplet([0, 1, 2], [0, 1, 2], [1, 2, 3], 3, 3)]
+        ref_model.alg_states = list(map(Variable, [
+            A_1_1, A_1_2, A_1_3, A_2_1, A_2_2, A_2_3, A_3_1, A_3_2, A_3_3,
+            b_1, b_2, b_3,
+            c_1, c_2, c_3,
+            d_1, d_2, d_3]))
+
+        ref_model.constants = list(map(Variable, [
+            C_1_1, C_1_2, C_1_3, C_2_1, C_2_2, C_2_3,
+            D_1_1, D_1_2, D_2_1, D_2_2, D_3_1, D_3_2,
+            E_1_1, E_1_2, E_1_3, E_2_1, E_2_2, E_2_3,
+            I_1_1, I_1_2, I_1_3, I_1_4, I_1_5,
+            I_2_1, I_2_2, I_2_3, I_2_4, I_2_5,
+            I_3_1, I_3_2, I_3_3, I_3_4, I_3_5,
+            I_4_1, I_4_2, I_4_3, I_4_4, I_4_5,
+            I_5_1, I_5_2, I_5_3, I_5_4, I_5_5,
+            F_1_1, F_1_2, F_1_3, F_2_1, F_2_2, F_2_3, F_3_1, F_3_2, F_3_3]))
+
+        constant_values = [1.7, 1.7, 1.7, 1.7, 1.7, 1.7,
+                           0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                           1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+
+                           1.0, 0.0, 0.0, 0.0, 0.0,
+                           0.0, 1.0, 0.0, 0.0, 0.0,
+                           0.0, 0.0, 1.0, 0.0, 0.0,
+                           0.0, 0.0, 0.0, 1.0, 0.0,
+                           0.0, 0.0, 0.0, 0.0, 1.0,
+
+                           1.0, 0.0, 0.0,
+                           0.0, 2.0, 0.0,
+                           0.0, 0.0, 3.0]
+
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
-        ref_model.equations = [ca.mtimes(A, b) - c, ca.mtimes(A.T, b) - d, F[1, 2]]
+        ref_model.equations = [
+            # A * b - c
+            A_1_1 * b_1 + A_1_2 * b_2 + A_1_3 * b_3 - c_1,
+            A_2_1 * b_1 + A_2_2 * b_2 + A_2_3 * b_3 - c_2,
+            A_3_1 * b_1 + A_3_2 * b_2 + A_3_3 * b_3 - c_3,
+
+            # A.T * b - d
+            A_1_1 * b_1 + A_2_1 * b_2 + A_3_1 * b_3 - d_1,
+            A_1_2 * b_1 + A_2_2 * b_2 + A_3_2 * b_3 - d_2,
+            A_1_3 * b_1 + A_2_3 * b_2 + A_3_3 * b_3 - d_3,
+
+            F_2_3]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
