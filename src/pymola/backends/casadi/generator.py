@@ -26,13 +26,14 @@ OP_MAP = {'*': "__mul__",
           '+': "__add__",
           "-": "__sub__",
           "/": "__truediv__",
-          '^': "__pow__",
-          '>': '__gt__',
-          '<': '__lt__',
-          '<=': '__le__',
-          '>=': '__ge__',
-          '!=': '__ne__',
-          '==': '__eq__'}
+          '^': "__pow__"}
+
+COMPARE_OP_MAP = {'>': '__gt__',
+                  '<': '__lt__',
+                  '<=': '__le__',
+                  '>=': '__ge__',
+                  '!=': '__ne__',
+                  '==': '__eq__'}
 
 ForLoopIndexedSymbol = namedtuple('ForLoopIndexedSymbol', ['tree', 'transpose', 'indices'])
 
@@ -301,6 +302,15 @@ class Generator(TreeListener):
             lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
+        elif op in COMPARE_OP_MAP and n_operands == 2:
+            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
+            rhs = _safe_ndarray(self.get_mx(tree.operands[1]))
+
+            # Only allowed for scalar expressions
+            assert lhs.shape == (1,) and rhs.shape == (1,)
+
+            lhs_op = getattr(lhs[0], COMPARE_OP_MAP[op])
+            src = _safe_ndarray(lhs_op(rhs[0]))
         else:
             src = self.get_mx(tree.operands[0])
             # Check for built-in operations, such as the
@@ -421,12 +431,17 @@ class Generator(TreeListener):
         # is not strictly necessary, see the Modelica Spec on if equations.
         assert tree.conditions[-1] == True
 
-        src = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[-1]])
+        src = np.concatenate([self.get_mx(e) for e in tree.blocks[-1]])
 
         for cond_index in range(1, len(tree.conditions)):
             cond = self.get_mx(tree.conditions[-(cond_index + 1)])
-            expr1 = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[-(cond_index + 1)]])
-            src = ca.if_else(cond, expr1, src, True)
+
+            assert cond.shape == (1,), "The expression of an if or elseif-clause must be a scalar Boolean expression"
+
+            expr1 = np.concatenate([self.get_mx(e) for e in tree.blocks[-(cond_index + 1)]])
+
+            for ind, s_i in np.ndenumerate(src):
+                src[ind] = ca.if_else(cond[0], expr1[ind], src[ind], True)
 
         self.src[tree] = src
 

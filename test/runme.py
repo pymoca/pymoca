@@ -82,9 +82,17 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters[0].value = 10
         ref_model.equations = [
             y1 - ca.if_else(x > 0, 1, 0) * y_max,
-            ca.if_else(x > 1, ca.vertcat(y3 - 100, y2 - y_max),
-                       ca.if_else(x > 2, ca.vertcat(y3 - 1000, y2 - y_max - 1),
-                                  ca.vertcat(y3 - 10000, y2)))]
+            ca.if_else(x > 1,
+                           y2 - y_max,
+                           ca.if_else(x > 2,
+                               y2 - y_max - 1,
+                               y2)),
+            ca.if_else(x > 1,
+                           y3 - 100,
+                           ca.if_else(x > 2,
+                               y3 - 1000,
+                               y3 - 10000))
+            ]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

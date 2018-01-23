@@ -180,7 +180,7 @@ class GenCasadiTest(unittest.TestCase):
                                c__up__Q + c__down__Q,
                                qa__down__Q + a__up__Q,
                                -p__Q + c__up__Q,
-                               a__down__Q + (b__up__Q + c__down__Q),   
+                               a__down__Q + (b__up__Q + c__down__Q),
                                b__down__Q + hb__up__Q,
                                zerotest__Q]
 
@@ -327,9 +327,17 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters[0].value = 10
         ref_model.equations = [
             y1 - ca.if_else(x > 0, 1, 0) * y_max,
-            ca.if_else(x > 1, ca.vertcat(y2 - y_max, y3 - 100),
-                       ca.if_else(x > 2, ca.vertcat(y2 - y_max - 1, y3 - 1000),
-                                  ca.vertcat(y2, y3 - 10000)))]
+            ca.if_else(x > 1,
+                           y2 - y_max,
+                           ca.if_else(x > 2,
+                               y2 - y_max - 1,
+                               y2)),
+            ca.if_else(x > 1,
+                           y3 - 100,
+                           ca.if_else(x > 2,
+                               y3 - 1000,
+                               y3 - 10000))
+            ]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -1313,7 +1321,7 @@ class GenCasadiTest(unittest.TestCase):
         b[4] = -4
         x = ca.vertcat(x, der_x, alias, y, _tmp, cst)
         ref_model.equations = [ca.mtimes(A, x) + b]
-            
+
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
@@ -1366,7 +1374,7 @@ class GenCasadiTest(unittest.TestCase):
         b[1] = -7
         x = ca.vertcat(x, der_x, y)
         ref_model.equations = [ca.mtimes(A, x) + b]
-            
+
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
