@@ -62,140 +62,53 @@ class GenCasadiTest(unittest.TestCase):
 
         return True
 
-
-    def test_simple_array(self):
-        with open(os.path.join(TEST_DIR, 'SimpleArray.mo'), 'r') as f:
+    def test_attributes(self):
+        with open(os.path.join(TEST_DIR, 'Attributes.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'SimpleArray')
-
-        casadi_model.simplify({})
-
+        casadi_model = gen_casadi.generate(ast_tree, 'Attributes')
         print(casadi_model)
         ref_model = Model()
 
-        a_1 = ca.MX.sym("a[1]")
-        a_2 = ca.MX.sym("a[2]")
-        a_3 = ca.MX.sym("a[3]")
-        b_1 = ca.MX.sym("b[1]")
-        b_2 = ca.MX.sym("b[2]")
-        b_3 = ca.MX.sym("b[3]")
-        b_4 = ca.MX.sym("b[4]")
-        c_1 = ca.MX.sym("c[1]")
-        c_2 = ca.MX.sym("c[2]")
-        c_3 = ca.MX.sym("c[3]")
-        d_1 = ca.MX.sym("d[1]")
-        d_2 = ca.MX.sym("d[2]")
-        d_3 = ca.MX.sym("d[3]")
-        e_1 = ca.MX.sym("e[1]")
-        e_2 = ca.MX.sym("e[2]")
-        e_3 = ca.MX.sym("e[3]")
-        g = ca.MX.sym("g")
-        h = ca.MX.sym("h")
-        i_1_1 = ca.MX.sym('i[1,1]')
-        i_1_2 = ca.MX.sym('i[1,2]')
-        i_1_3 = ca.MX.sym('i[1,3]')
-        i_2_1 = ca.MX.sym('i[2,1]')
-        i_2_2 = ca.MX.sym('i[2,2]')
-        i_2_3 = ca.MX.sym('i[2,3]')
+        nested_p1 = ca.MX.sym('nested.p1')
+        nested_p = ca.MX.sym('nested.p')
+        nested_s = ca.MX.sym('nested.s')
+        i = ca.MX.sym("int")
+        b = ca.MX.sym("bool")
+        r = ca.MX.sym("real")
+        der_r = ca.MX.sym("der(real)")
+        test_state = ca.MX.sym("test_state")
+        i1 = ca.MX.sym("i1")
+        i2 = ca.MX.sym("i2")
+        i3 = ca.MX.sym("i3")
+        i4 = ca.MX.sym("i4")
+        cst = ca.MX.sym("cst")
+        prm = ca.MX.sym("prm")
+        protected_variable = ca.MX.sym("protected_variable")
 
-        B_1 = ca.MX.sym("B[1]")
-        B_2 = ca.MX.sym("B[2]")
-        B_3 = ca.MX.sym("B[3]")
-        C_1 = ca.MX.sym("C[1]")
-        C_2 = ca.MX.sym("C[2]")
-        D_1 = ca.MX.sym("D[1]")
-        D_2 = ca.MX.sym("D[2]")
-        D_3 = ca.MX.sym("D[3]")
-        E_1 = ca.MX.sym("E[1]")
-        E_2 = ca.MX.sym("E[2]")
-
-        ar_x_1 = ca.MX.sym("ar.x[1]")
-        ar_x_2 = ca.MX.sym("ar.x[2]")
-        ar_x_3 = ca.MX.sym("ar.x[3]")
-        arcy_1 = ca.MX.sym("arc.y[1]")
-        arcy_2 = ca.MX.sym("arc.y[2]")
-        arcw_1 = ca.MX.sym("arc.w[1]")
-        arcw_2 = ca.MX.sym("arc.w[2]")
-        nested1z_1 = ca.MX.sym('nested1.z[1]')
-        nested1z_2 = ca.MX.sym('nested1.z[2]')
-        nested1z_3 = ca.MX.sym('nested1.z[3]')
-        nested2z_1_1 = ca.MX.sym('nested2.z[1,1]')
-        nested2z_1_2 = ca.MX.sym('nested2.z[1,2]')
-        nested2z_1_3 = ca.MX.sym('nested2.z[1,3]')
-        nested2z_2_1 = ca.MX.sym('nested2.z[2,1]')
-        nested2z_2_2 = ca.MX.sym('nested2.z[2,2]')
-        nested2z_2_3 = ca.MX.sym('nested2.z[2,3]')
-        nested1n = ca.MX.sym('nested1.n')
-        nested2n_1 = ca.MX.sym('nested2.n[1]')
-        nested2n_2 = ca.MX.sym('nested2.n[2]')
-
-        scalar_f = ca.MX.sym("scalar_f")
-        c_dim = ca.MX.sym("c_dim")
-        d_dim = ca.MX.sym("d_dim")
-
-        ref_model.alg_states = list(map(Variable, [ar_x_1, ar_x_2, ar_x_3, arcy_1, arcy_2, arcw_1, arcw_2, nested1z_1, nested1z_2, nested1z_3, nested2z_1_1, nested2z_1_2, nested2z_1_3, nested2z_2_1, nested2z_2_2, nested2z_2_3, a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f, g, h, i_1_1, i_1_2, i_1_3, i_2_1, i_2_2, i_2_3]))
-
-        for i in range(19, 22):
-            ref_model.alg_states[i].min = 0.0
-
-        ref_model.parameters = list(map(Variable, [nested2n_1, nested2n_2, nested1n, d_dim]))
-        parameter_values = [3, 3, 3, 3]
-        for const, val in zip(ref_model.parameters, parameter_values):
-            const.value = val
-        ref_model.outputs = list(map(Variable, [h]))
-        ref_model.constants = list(map(Variable, [b_1, b_2, b_3, b_4, c_dim, B_1, B_2, B_3, C_1, C_2, D_1, D_2, D_3, E_1, E_2]))
-        constant_values = [2.7, 3.7, 4.7, 5.7, 2, 1.0, 1.5, 2.0, 1.7, 1.7, 0.0, 0.0, 0.0, 1.0, 1.0]
-        for const, val in zip(ref_model.constants, constant_values):
-            const.value = val
-
-        ref_model.equations = [c_1 - (a_1 + b_1 * e_1),
-                               c_2 - (a_2 + b_2 * e_2),
-                               c_3 - (a_3 + b_3 * e_3),
-
-                               d_1 - (ca.sin(a_1 / b_2)),
-                               d_2 - (ca.sin(a_2 / b_3)),
-                               d_3 - (ca.sin(a_3 / b_4)),
-
-                               e_1 - (d_1 + scalar_f),
-                               e_2 - (d_2 + scalar_f),
-                               e_3 - (d_3 + scalar_f),
-
-                               g - (c_1 + c_2 + c_3),
-
-                               h - B_2,
-
-                               ar_x_2 - scalar_f,
-
-                               nested1z_1 - 1,
-                               nested1z_2 - 1,
-                               nested1z_3 - 1,
-                               nested2z_1_1 - 4,
-                               nested2z_1_2 - 5,
-                               nested2z_1_3 - 6,
-                               nested2z_2_1 - 3,
-                               nested2z_2_2 - 2,
-                               nested2z_2_3 - 1,
-
-                               i_1_1 - 1,
-                               i_1_2 - 1,
-                               i_1_3 - 1,
-                               i_2_1 - 1,
-                               i_2_2 - 1,
-                               i_2_3 - 1,
-
-                               arcy_1 - arcy_2,
-                               arcw_1 + arcw_2,
-
-                               a_1 - 1,
-                               a_2 - 2,
-                               a_3 - 3,
-
-                               scalar_f - 1.3]
+        ref_model.states = list(map(Variable, [r]))
+        ref_model.states[0].start = 20
+        ref_model.der_states = list(map(Variable, [der_r]))
+        ref_model.alg_states = list(map(Variable, [nested_s, i, b, i4, test_state, protected_variable]))
+        ref_model.alg_states[1].min = -5
+        ref_model.alg_states[1].max = 10
+        ref_model.inputs = list(map(Variable, [i1, i2, i3]))
+        ref_model.inputs[0].fixed = True
+        ref_model.outputs = list(map(Variable, [i4, protected_variable]))
+        ref_model.constants = list(map(Variable, [cst]))
+        constant_values = [1]
+        for c, v in zip(ref_model.constants, constant_values):
+            c.value = v
+        ref_model.parameters = list(map(Variable, [nested_p1, nested_p, prm]))
+        parameter_values = [1, 2 * nested_p1, 2]
+        for c, v in zip(ref_model.parameters, parameter_values):
+            c.value = v
+        ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0, True) * i),
+                               protected_variable - (i1 + i2), nested_s - 3 * nested_p, test_state - r]
 
         if not self.assert_model_equivalent_numeric(ref_model, casadi_model):
             raise Exception("Failed test")
 
 
 c = GenCasadiTest()
-c.test_simple_array()
+c.test_attributes()

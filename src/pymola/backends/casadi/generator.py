@@ -74,9 +74,11 @@ def _safe_ndarray(x):
         # We want the single MX symbol in an array. If we try to do
         # np.array(x) directly in this case, we get an AttributeError:
         # "'MX' object has no attribute 'full'"
-        return np.array([x])
+        return np.array([x], dtype=object)
+    elif np.isscalar(x):
+        return np.array([x], dtype=object)
     else:
-        return np.array(x)
+        return np.array(x, dtype=object)
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
@@ -108,7 +110,7 @@ class Generator(TreeListener):
                 if mx_symbol.is_empty():
                     continue
                 if differentiate:
-                    mx_symbol = self.get_derivative(mx_symbol)
+                    mx_symbol = self.get_derivative(_safe_ndarray(mx_symbol))[0]
                 python_type = self.get_python_type(ast_symbol)
                 variable = Variable(mx_symbol, python_type)
                 if not differentiate:
@@ -314,12 +316,16 @@ class Generator(TreeListener):
 
         assert (len(tree.conditions) + 1 == len(tree.expressions))
 
-        src = self.get_mx(tree.expressions[-1])
+        src = _safe_ndarray(self.get_mx(tree.expressions[-1]))
+
         for cond_index in range(len(tree.conditions)):
             cond = self.get_mx(tree.conditions[-(cond_index + 1)])
-            expr1 = self.get_mx(tree.expressions[-(cond_index + 2)])
+            assert cond.shape == (1,), "The expression of an if or elseif-clause must be a scalar Boolean expression"
 
-            src = ca.if_else(cond, expr1, src, True)
+            expr1 = _safe_ndarray(self.get_mx(tree.expressions[-(cond_index + 2)]))
+
+            for ind, s_i in np.ndenumerate(src):
+                src[ind] = ca.if_else(cond[0], expr1[ind], src[ind], True)
 
         self.src[tree] = src
 
@@ -588,34 +594,41 @@ class Generator(TreeListener):
         return s
 
     def get_derivative(self, s):
-        if ca.MX(s).is_constant():
-            return 0
-        elif s.is_symbolic():
-            if s.name() not in self.derivative:
-                if len(self.for_loops) > 0 and s in self.for_loops[-1].indexed_symbols:
-                    # Create a new indexed symbol, referencing to the for loop index inside the vector derivative symbol.
-                    for_loop_symbol = self.for_loops[-1].indexed_symbols[s]
-                    s_without_index = self.get_mx(ast.ComponentRef(name=for_loop_symbol.tree.name))
-                    der_s_without_index = self.get_derivative(s_without_index)
-                    if ca.MX(der_s_without_index).is_symbolic():
-                        return self.get_indexed_symbol(ast.ComponentRef(name=der_s_without_index.name(), indices=for_loop_symbol.tree.indices), der_s_without_index)
+        o = np.ndarray(s.shape, dtype=object)
+
+        for ind, s_i in np.ndenumerate(s):
+            if ca.MX.is_constant(s_i):
+                o[ind] = 0
+            elif s_i.is_symbolic():
+                if s_i.name() not in self.derivative:
+                    if len(self.for_loops) > 0 and s_i in self.for_loops[-1].indexed_symbols:
+                        # Create a new indexed symbol, referencing to the for loop index inside the vector derivative symbol.
+                        for_loop_symbol = self.for_loops[-1].indexed_symbols[s_i]
+                        s_without_index = self.get_mx(ast.ComponentRef(name=for_loop_symbol.tree.name))
+                        der_s_without_index = self.get_derivative(s_without_index)
+                        if ca.MX(der_s_without_index).is_symbolic():
+                            o[ind] = self.get_indexed_symbol(ast.ComponentRef(name=der_s_without_index.name(), indices=for_loop_symbol.tree.indices), der_s_without_index)
+                        else:
+                            o[ind] = 0
                     else:
-                        return 0
+                        assert s_i.size() == (1, 1)
+
+                        der_s = ca.MX.sym("der({})".format(s_i.name()))
+                        self.derivative[s_i.name()] = der_s
+                        self.nodes[self.current_class][der_s.name()] = der_s
+                        o[ind] = der_s
                 else:
-                    der_s = ca.MX.sym("der({})".format(s.name()), s.size())
-                    self.derivative[s.name()] = der_s
-                    self.nodes[self.current_class][der_s.name()] = der_s
-                    return der_s
+                    o[ind] = self.derivative[s_i.name()]
             else:
-                return self.derivative[s.name()]
-        else:
-            # Differentiate expression using CasADi
-            orig_deps = ca.symvar(s)
-            deps = ca.vertcat(*orig_deps)
-            J = ca.Function('J', [deps], [ca.jacobian(s, deps)])
-            J_sparsity = J.sparsity_out(0)
-            der_deps = [self.get_derivative(dep) if J_sparsity.has_nz(0, j) else ca.DM.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
-            return ca.mtimes(J(deps), ca.vertcat(*der_deps))
+                # Differentiate expression using CasADi
+                orig_deps = ca.symvar(s_i)
+                deps = ca.vertcat(*orig_deps)
+                J = ca.Function('J', [deps], [ca.jacobian(s_i, deps)])
+                J_sparsity = J.sparsity_out(0)
+                der_deps = [self.get_derivative(dep) if J_sparsity.has_nz(0, j) else ca.DM.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
+                o[ind] = ca.mtimes(J(deps), ca.vertcat(*der_deps))
+
+            return o
 
     def get_indexed_symbol(self, tree, s):
         # Check whether we loop over an index of this symbol
