@@ -227,7 +227,7 @@ class Generator(TreeListener):
             assert n_operands >= 2
             src = self.get_mx(tree.operands[0])
             for i in tree.operands[1:]:
-                rhs = self.get_mx(tree.operands[i])
+                rhs = self.get_mx(i)
                 src = np.dot(src, rhs)
         elif op == 'transpose' and n_operands == 1:
             src = np.transpose(self.get_mx(tree.operands[0]))
