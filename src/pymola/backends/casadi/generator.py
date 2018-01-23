@@ -324,9 +324,8 @@ class Generator(TreeListener):
 
         # If dimensions between the lhs and rhs do not match, but the dimensions of lhs
         # and transposed rhs do match, transpose the rhs.
-        if ((src_left.size1() != src_right.size1()) or (src_left.size2() != src_right.size2())) and \
-           ((src_left.size1() == src_right.size2()) and (src_left.size2() == src_right.size1())):
-           src_right = ca.transpose(src_right)
+        if src_left.shape != src_right.shape and src_left.shape == src_right.shape[::-1]:
+            src_right = ca.transpose(src_right)
 
         self.src[tree] = src_left - src_right
 
