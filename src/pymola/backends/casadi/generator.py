@@ -236,8 +236,11 @@ class Generator(TreeListener):
             indices = list(range(n))
             src = ca.DM.triplet(indices, indices, diag, n, n)
         elif op == 'cat':
+            axis = self.get_integer(tree.operands[0])
+            assert axis == 1, "Currently only concatenation on first axis is supported"
+
             entries = []
-            for sym in [self.get_mx(op) for op in tree.operands]:
+            for sym in [self.get_mx(op) for op in tree.operands[1:]]:
                 if isinstance(sym, list):
                     for e in sym:
                         entries.append(e)
