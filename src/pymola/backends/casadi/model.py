@@ -375,6 +375,41 @@ class Model:
                         [value] = ca.substitute([value], symbols, values)
                         setattr(variable, attribute, value)
 
+        if options.get('factor_and_simplify_equations', False):
+            # Operations that preserve the equivalence of an equation
+            # TODO: There may be more, but this is the most frequent set
+            unary_ops = ca.OP_NEG, ca.OP_FABS, ca.OP_SQRT
+            binary_ops = ca.OP_MUL, ca.OP_DIV
+
+            # Recursive factor and simplify function
+            def factor_and_simplify(eq):
+                # These are ops that can simply be dropped
+                if eq.n_dep() == 1 and eq.op() in unary_ops:
+                    return factor_and_simplify(eq.dep())
+
+                # These are binary ops and can get a little tricky
+                # For now, we just drop constant divisors or multipliers
+                elif eq.n_dep() == 2 and eq.op() in binary_ops:
+                    if eq.dep(1).is_constant():
+                        return factor_and_simplify(eq.dep(0))
+                    elif eq.dep(0).is_constant() and eq.op() == ca.OP_MUL:
+                        return factor_and_simplify(eq.dep(1))
+
+                # If no hits, return unmodified
+                return eq
+
+            # Do the simplifications
+            simplified_equations = [factor_and_simplify(eq) for eq in self.equations]
+
+            # Debugging output
+            if logger.getEffectiveLevel() == logging.DEBUG:
+                changed_equations = [(o,s) for o, s in zip(self.equations, simplified_equations) if o is not s]
+                for orig, simp in changed_equations:
+                    logger.debug('Equation {} simplified to {}'.format(orig, simp))
+
+            # Store changes
+            self.equations = simplified_equations
+
         if options.get('detect_aliases', False):
             logger.info("Detecting aliases")
 
