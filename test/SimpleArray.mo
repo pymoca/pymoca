@@ -8,6 +8,11 @@ connector ArrayConnector
     flow Real w;
 end ArrayConnector;
 
+model NestedArrayExpressions
+    parameter Integer n = 3;
+    Real z[n];
+end NestedArrayExpressions;
+
 model SimpleArray
     Real a[3] = {1.0, 2.0, 3.0};
     constant Real b[4] = {2.7, 3.7, 4.7, 5.7};
@@ -26,6 +31,8 @@ model SimpleArray
     constant Real E[2] = ones(d_dim - 1);
     ArrayElement ar[c_dim + 1];
     ArrayConnector arc[c_dim];
+    NestedArrayExpressions nested1;
+    NestedArrayExpressions nested2[2];
 equation
     // Array operators.
     c = a .+ b[1:d_dim].*e; // .+ is equal to + in this case
@@ -42,6 +49,13 @@ equation
     // Indexing
     h = B[d_dim - 1];
     ar[2].x = scalar_f;
+
+    // Nesting
+    nested1.z = ones(3);
+    nested2[1].z = {4, 5, 6};
+    nested2[2].z[1] = 3;
+    nested2[2].z[2] = 2;
+    nested2[2].z[3] = 1;
 
     // Implicit transpose
     i[1, :] = ones(3);
