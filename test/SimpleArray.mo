@@ -3,6 +3,11 @@ model ArrayElement
     Real x;
 end ArrayElement;
 
+connector ArrayConnector
+    Real y;
+    flow Real w;
+end ArrayConnector;
+
 model SimpleArray
     Real a[3] = {1.0, 2.0, 3.0};
     constant Real b[4] = {2.7, 3.7, 4.7, 5.7};
@@ -20,6 +25,7 @@ model SimpleArray
     constant Real D[c_dim + 1] = zeros(d_dim);
     constant Real E[2] = ones(d_dim - 1);
     ArrayElement ar[c_dim + 1];
+    ArrayConnector arc[c_dim];
 equation
     // Array operators.
     c = a .+ b[1:d_dim].*e; // .+ is equal to + in this case
@@ -40,4 +46,7 @@ equation
     // Implicit transpose
     i[1, :] = ones(3);
     i[2, :] = transpose(ones(3));
+
+    // Connecting
+    connect(arc[1], arc[2]);
 end SimpleArray;

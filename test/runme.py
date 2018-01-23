@@ -113,14 +113,18 @@ class GenCasadiTest(unittest.TestCase):
         ar_x_1 = ca.MX.sym("ar.x[1]")
         ar_x_2 = ca.MX.sym("ar.x[2]")
         ar_x_3 = ca.MX.sym("ar.x[3]")
+        arcy_1 = ca.MX.sym("arc.y[1]")
+        arcy_2 = ca.MX.sym("arc.y[2]")
+        arcw_1 = ca.MX.sym("arc.w[1]")
+        arcw_2 = ca.MX.sym("arc.w[2]")
 
         scalar_f = ca.MX.sym("scalar_f")
         c_dim = ca.MX.sym("c_dim")
         d_dim = ca.MX.sym("d_dim")
 
-        ref_model.alg_states = list(map(Variable, [ar_x_1, ar_x_2, ar_x_3, a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f, g, h, i_1_1, i_1_2, i_1_3, i_2_1, i_2_2, i_2_3]))
+        ref_model.alg_states = list(map(Variable, [ar_x_1, ar_x_2, ar_x_3, arcy_1, arcy_2, arcw_1, arcw_2, a_1, a_2, a_3, c_1, c_2, c_3, d_1, d_2, d_3, e_1, e_2, e_3, scalar_f, g, h, i_1_1, i_1_2, i_1_3, i_2_1, i_2_2, i_2_3]))
 
-        for i in range(6, 9):
+        for i in range(10, 13):
             ref_model.alg_states[i].min = 0.0
 
         ref_model.parameters = list(map(Variable, [d_dim]))
@@ -157,6 +161,9 @@ class GenCasadiTest(unittest.TestCase):
                                i_2_1 - 1,
                                i_2_2 - 1,
                                i_2_3 - 1,
+
+                               arcy_1 - arcy_2,
+                               arcw_1 + arcw_2,
 
                                a_1 - 1,
                                a_2 - 2,
