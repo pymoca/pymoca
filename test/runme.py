@@ -62,53 +62,34 @@ class GenCasadiTest(unittest.TestCase):
 
         return True
 
-    def test_attributes(self):
-        with open(os.path.join(TEST_DIR, 'Attributes.mo'), 'r') as f:
+    def test_matrixexpressions(self):
+        with open(os.path.join(TEST_DIR, 'MatrixExpressions.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'Attributes')
+        casadi_model = gen_casadi.generate(ast_tree, 'MatrixExpressions')
         print(casadi_model)
         ref_model = Model()
 
-        nested_p1 = ca.MX.sym('nested.p1')
-        nested_p = ca.MX.sym('nested.p')
-        nested_s = ca.MX.sym('nested.s')
-        i = ca.MX.sym("int")
-        b = ca.MX.sym("bool")
-        r = ca.MX.sym("real")
-        der_r = ca.MX.sym("der(real)")
-        test_state = ca.MX.sym("test_state")
-        i1 = ca.MX.sym("i1")
-        i2 = ca.MX.sym("i2")
-        i3 = ca.MX.sym("i3")
-        i4 = ca.MX.sym("i4")
-        cst = ca.MX.sym("cst")
-        prm = ca.MX.sym("prm")
-        protected_variable = ca.MX.sym("protected_variable")
+        A = ca.MX.sym("A", 3, 3)
+        b = ca.MX.sym("b", 3)
+        c = ca.MX.sym("c", 3)
+        d = ca.MX.sym("d", 3)
+        C = ca.MX.sym("C", 2, 3)
+        D = ca.MX.sym("D", 3, 2)
+        E = ca.MX.sym("E", 2, 3)
+        I = ca.MX.sym("I", 5, 5)
+        F = ca.MX.sym("F", 3, 3)
 
-        ref_model.states = list(map(Variable, [r]))
-        ref_model.states[0].start = 20
-        ref_model.der_states = list(map(Variable, [der_r]))
-        ref_model.alg_states = list(map(Variable, [nested_s, i, b, i4, test_state, protected_variable]))
-        ref_model.alg_states[1].min = -5
-        ref_model.alg_states[1].max = 10
-        ref_model.inputs = list(map(Variable, [i1, i2, i3]))
-        ref_model.inputs[0].fixed = True
-        ref_model.outputs = list(map(Variable, [i4, protected_variable]))
-        ref_model.constants = list(map(Variable, [cst]))
-        constant_values = [1]
-        for c, v in zip(ref_model.constants, constant_values):
-            c.value = v
-        ref_model.parameters = list(map(Variable, [nested_p1, nested_p, prm]))
-        parameter_values = [1, 2 * nested_p1, 2]
-        for c, v in zip(ref_model.parameters, parameter_values):
-            c.value = v
-        ref_model.equations = [i4 - ((i1 + i2) + i3), der_r - (i1 + ca.if_else(b, 1, 0, True) * i),
-                               protected_variable - (i1 + i2), nested_s - 3 * nested_p, test_state - r]
+        ref_model.alg_states = list(map(Variable, [A, b, c, d]))
+        ref_model.constants = list(map(Variable, [C, D, E, I, F]))
+        constant_values = [1.7 * ca.DM.ones(2, 3), ca.DM.zeros(3, 2), ca.DM.ones(2, 3), ca.DM.eye(5),
+                                     ca.DM.triplet([0, 1, 2], [0, 1, 2], [1, 2, 3], 3, 3)]
+        for const, val in zip(ref_model.constants, constant_values):
+            const.value = val
+        ref_model.equations = [ca.mtimes(A, b) - c, ca.mtimes(A.T, b) - d, F[1, 2]]
 
         if not self.assert_model_equivalent_numeric(ref_model, casadi_model):
             raise Exception("Failed test")
 
-
 c = GenCasadiTest()
-c.test_attributes()
+c.test_matrixexpressions()
