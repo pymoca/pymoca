@@ -62,29 +62,15 @@ class GenCasadiTest(unittest.TestCase):
 
         return True
 
-    def test_builtin(self):
-        with open(os.path.join(TEST_DIR, 'BuiltinFunctions.mo'), 'r') as f:
-            txt = f.read()
-        ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'BuiltinFunctions')
-        print("BuiltinFunctions", casadi_model)
-        ref_model = Model()
+    def test_cat_params(self):
+        casadi_model = transfer_model(TEST_DIR, 'Concat', {'replace_constant_values': True})
 
-        x = ca.MX.sym("x")
-        y = ca.MX.sym("y")
-        z = ca.MX.sym("z")
-        w = ca.MX.sym("w")
-        u = ca.MX.sym("u")
+        c = [0, 1, 2, 2, 2, 0, 1]
 
-        ref_model.inputs = list(map(Variable, [x]))
-        ref_model.outputs = list(map(Variable, [y, z, w, u]))
-        ref_model.alg_states = list(map(Variable, [y, z, w, u]))
-        ref_model.equations = [y - ca.sin(ref_model.time), z - ca.cos(x), w - ca.fmin(y, z), u - ca.fabs(w)]
+        self.assertEqual(len(c), len(casadi_model.parameters) - 1)
 
-
-
-        if not self.assert_model_equivalent_numeric(ref_model, casadi_model):
-            raise Exception("Failed test")
+        for v, e in zip(c, casadi_model.parameters[1:]):
+            self.assertEqual(v, e.value)
 
 c = GenCasadiTest()
-c.test_builtin()
+c.test_cat_params()

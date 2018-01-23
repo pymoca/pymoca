@@ -1447,8 +1447,10 @@ class GenCasadiTest(unittest.TestCase):
     def test_cat_params(self):
         casadi_model = transfer_model(TEST_DIR, 'Concat', {'replace_constant_values': True})
         c = [0, 1, 2, 2, 2, 0, 1]
-        for i, e in enumerate(c):
-            self.assertEqual(casadi_model.parameters[1].value[i], e)
+        self.assertEqual(len(c), len(casadi_model.parameters) - 1)
+
+        for v, e in zip(c, casadi_model.parameters[1:]):
+            self.assertEqual(v, e.value)
 
     def test_inline_input_assignment(self):
         casadi_model = transfer_model(TEST_DIR, 'InlineAssignment')

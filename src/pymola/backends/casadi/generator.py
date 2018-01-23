@@ -270,17 +270,17 @@ class Generator(TreeListener):
 
             src = ca_op(lhs[0], rhs[0])
         elif op == 'cat':
-            axis = self.get_integer(tree.operands[0])
-            assert axis == 1, "Currently only concatenation on first axis is supported"
+            axis = self.get_integer(tree.operands[0]) - 1
+            entries  = []
 
-            entries = []
             for sym in [self.get_mx(op) for op in tree.operands[1:]]:
                 if isinstance(sym, list):
                     for e in sym:
-                        entries.append(e)
+                        entries.append(_safe_ndarray(e))
                 else:
-                    entries.append(sym)
-            src = ca.vertcat(*entries)
+                    entries.append(_safe_ndarray(sym))
+
+            src = np.concatenate(entries, axis)
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
