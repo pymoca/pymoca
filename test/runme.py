@@ -62,39 +62,30 @@ class GenCasadiTest(unittest.TestCase):
 
         return True
 
-    def test_if_else(self):
-        with open(os.path.join(TEST_DIR, 'IfElse.mo'), 'r') as f:
+    def test_function_call(self):
+        with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'IfElse')
+        casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
+        print("FunctionCall", casadi_model)
         ref_model = Model()
 
-        x = ca.MX.sym("x")
-        y1 = ca.MX.sym("y1")
-        y2 = ca.MX.sym("y2")
-        y3 = ca.MX.sym("y3")
-        y_max = ca.MX.sym("y_max")
+        radius = ca.MX.sym('radius')
+        diameter = radius * 2
+        circle_properties = ca.Function('circle_properties', [radius], [3.14159*diameter, 3.14159*radius**2, ca.if_else(3.14159*radius**2 > 10, 1, 2), ca.if_else(3.14159*radius**2 > 10, 10, 3.14159*radius**2), 8, 3, 12])
 
-        ref_model.inputs = list(map(Variable, [x]))
-        ref_model.outputs = list(map(Variable, [y1, y2, y3]))
-        ref_model.alg_states = list(map(Variable, [y1, y2, y3]))
-        ref_model.parameters = list(map(Variable, [y_max]))
-        ref_model.parameters[0].value = 10
-        ref_model.equations = [
-            y1 - ca.if_else(x > 0, 1, 0) * y_max,
-            ca.if_else(x > 1,
-                           y2 - y_max,
-                           ca.if_else(x > 2,
-                               y2 - y_max - 1,
-                               y2)),
-            ca.if_else(x > 1,
-                           y3 - 100,
-                           ca.if_else(x > 2,
-                               y3 - 1000,
-                               y3 - 10000))
-            ]
+        c = ca.MX.sym("c")
+        a = ca.MX.sym("a")
+        d = ca.MX.sym("d")
+        e = ca.MX.sym("e")
+        S1 = ca.MX.sym("S1")
+        S2 = ca.MX.sym("S2")
+        r = ca.MX.sym("r")
+        ref_model.alg_states = list(map(Variable, [c, a, d, e, S1, S2, r]))
+        ref_model.outputs = list(map(Variable, [c, a, d, e, S1, S2]))
+        ref_model.equations = [ca.vertcat(c, a, d, e, S1, S2) - ca.vertcat(*circle_properties.call([r])[0:-1])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
 c = GenCasadiTest()
-c.test_if_else()
+c.test_function_call()
