@@ -64,11 +64,13 @@ class GenCasadiTest(unittest.TestCase):
                         if a[j, k].is_regular() or b[j, k].is_regular():
                             test = float(ca.norm_2(ca.vec(a[j, k] - b[j, k]))) <= tol
                             if not test:
-                                print(j)
-                                print(k)
-                                print(a[j,k])
-                                print(b[j,k])
-                                print(f_name)
+                                print('model A', A)
+                                print('model B', B)
+                                print('j', j)
+                                print('k', k)
+                                print('a', a[j,k])
+                                print('b', b[j,k])
+                                print('f_name', f_name)
                             self.assertTrue(test)
 
         return True
@@ -327,9 +329,10 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters[0].value = 10
         ref_model.equations = [
             y1 - ca.if_else(x > 0, 1, 0) * y_max,
-            ca.if_else(x > 1, ca.vertcat(y3 - 100, y2 - y_max),
-                       ca.if_else(x > 2, ca.vertcat(y3 - 1000, y2 - y_max - 1),
-                                  ca.vertcat(y3 - 10000, y2)))]
+            ca.if_else(x > 1, ca.vertcat(y2 - y_max, y3 - 100),
+                       ca.if_else(x > 2, ca.vertcat(y2 - y_max - 1, y3 - 1000),
+                                  ca.vertcat(y2, y3 - 10000)))
+        ]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

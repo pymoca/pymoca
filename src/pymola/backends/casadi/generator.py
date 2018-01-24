@@ -369,22 +369,19 @@ class Generator(TreeListener):
         else:
             self.src[tree] = ca.MX()
 
-    def exitIfEquation(self, tree):
+    def exitIfEquation(self, tree: ast.IfEquation):
         logger.debug('exitIfEquation')
+        assert len(tree.blocks) == len(tree.conditions)
 
-        assert (len(tree.equations) % (len(tree.conditions) + 1) == 0)
+        # get the else condition
+        assert tree.conditions[-1].value == True
+        src = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[-1]])
 
-        equations_per_condition = int(
-            len(tree.equations) / (len(tree.conditions) + 1))
-
-        src = ca.vertcat(*[self.get_mx(tree.equations[-(i + 1)])
-                           for i in range(equations_per_condition)])
-        for cond_index in range(len(tree.conditions)):
-            cond = self.get_mx(tree.conditions[-(cond_index + 1)])
-            expr1 = ca.vertcat(*[self.get_mx(tree.equations[-equations_per_condition * (
-                cond_index + 1) - (i + 1)]) for i in range(equations_per_condition)])
-
-            src = ca.if_else(cond, expr1, src, True)
+        # work from the inside out to fill the if else block structure
+        for i in range(-2, -1, -1):
+            cond = self.get_mx(tree.conditions[i])
+            expr1 = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[i]])
+            src = ca.if_else(cond, expr1, src, False)
 
         self.src[tree] = src
 
