@@ -214,7 +214,7 @@ class Equation(Node):
 class IfEquation(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.equations = []  # type: List[Union[Expression, ForEquation, ConnectClause, IfEquation]]
+        self.blocks = []  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
@@ -253,7 +253,7 @@ class AssignmentStatement(Node):
 class IfStatement(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
+        self.blocks = []  # type: List[List[Union[AssignmentStatement, IfStatement, ForStatement]]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
