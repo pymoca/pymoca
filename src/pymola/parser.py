@@ -185,6 +185,9 @@ class ASTListener(ModelicaListener):
         else:
             eq_sect.equations += [self.ast[e] for e in ctx.equation()]
 
+    def exitEquation_block(self, ctx: ModelicaParser.Equation_blockContext):
+        self.ast[ctx] = [self.ast[e] for e in ctx.equation()]
+
     def enterAlgorithm_section(self, ctx):
         alg_sect = ast.AlgorithmSection(
             initial=ctx.INITIAL() is not None
@@ -216,10 +219,18 @@ class ASTListener(ModelicaListener):
             left=self.ast[ctx.simple_expression()],
             right=self.ast[ctx.expression()])
 
-    def exitEquation_if(self, ctx):
+    def exitEquation_if(self, ctx: ModelicaParser.Equation_ifContext):
+        self.ast[ctx] = self.ast[ctx.if_equation()]
+
+    def exitIf_equation(self, ctx: ModelicaParser.If_equationContext):
+        blocks = [self.ast[b] for b in ctx.blocks]
+        conditions = [self.ast[c] for c in ctx.conditions]
+        # add condition for else
+        if len(conditions) == len(blocks) - 1:
+            conditions.append(ast.Primary(value=True))
         self.ast[ctx] = ast.IfEquation(
-            conditions=[self.ast[s] for s in ctx.if_equation().expression()],
-            equations=[self.ast[s] for s in ctx.if_equation().equation()])
+            conditions=conditions,
+            blocks=blocks)
 
     def exitEquation_for(self, ctx):
         self.ast[ctx] = ast.ForEquation(

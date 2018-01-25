@@ -263,6 +263,10 @@ short_class_definition :
 //=========================================================
 
 // B.2.6.1 ------------------------------------------------
+equation_block :
+    (equation ';')*
+    ;
+
 equation_section :
     INITIAL? 'equation' (equation ';')*
     ;
@@ -309,13 +313,13 @@ statement :
 
 // B.2.6.7 ------------------------------------------------
 if_equation :
-    'if' expression 'then'
-        (equation ';')*
-    ('elseif' expression 'then'
-        (equation ';')*
+    'if' conditions+=expression 'then'
+        blocks+=equation_block
+    ('elseif' conditions+=expression 'then'
+        blocks+=equation_block
     )*
     ('else'
-        (equation ';')*
+        blocks+=equation_block
     )?
     'end' 'if'
     ;
@@ -539,8 +543,8 @@ WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
 //=========================================================
 fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+;
 fragment NONDIGIT : [_a-zA-Z];
-fragment S_CHAR : [A-Za-z\u0000-\u00FF];
-fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}|! ];
+fragment S_CHAR : [\u0000-\u00FF];
+fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}| ];
 fragment S_ESCAPE : ('\\\'' | '\\"' | '\\\\' | '\\?' | '\\b' |
     '\\f' | '\\n' | '\\r' | '\\t' | '\\v' | '\\a');
 fragment DIGIT :  [0-9];

@@ -234,6 +234,11 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by ModelicaParser#equation_block.
+    def visitEquation_block(self, ctx:ModelicaParser.Equation_blockContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by ModelicaParser#equation_section.
     def visitEquation_section(self, ctx:ModelicaParser.Equation_sectionContext):
         return self.visitChildren(ctx)
