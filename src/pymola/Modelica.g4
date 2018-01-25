@@ -539,8 +539,8 @@ WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
 //=========================================================
 fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+;
 fragment NONDIGIT : [_a-zA-Z];
-fragment S_CHAR : [A-Za-z\u0000-\u00FF];
-fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}|! ];
+fragment S_CHAR : [\u0000-\u00FF];
+fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}| ];
 fragment S_ESCAPE : ('\\\'' | '\\"' | '\\\\' | '\\?' | '\\b' |
     '\\f' | '\\n' | '\\r' | '\\t' | '\\v' | '\\a');
 fragment DIGIT :  [0-9];
