@@ -24,21 +24,29 @@ class OdeModel(object):
         self.p0 = {}
         self.c0 = {}
         self.eqs = []
+        self.stmts = []
         self.f = None
         self.g = None
 
-    def compute_fg(self):
+    def compute_fgh(self):
         n_states = len(self.x)
         n_vars = len(self.v)
         n_eqs = len(self.eqs)
-        if n_states + n_vars != n_eqs:
-            raise RuntimeError('# states: {:d} + # variables: {:d} != # equations {:d}'.format(
-                n_states, n_vars, n_eqs))
+        n_stmts = len(self.stmts)
+        n_unknowns = n_states + n_vars
+        if n_unknowns != n_eqs:
+            print('x', self.x)
+            print('v', self.v)
+            raise RuntimeError('states({:d}) + variables({:d}) = {:d} != equations({:d})'.format(
+                n_states, n_vars, n_unknowns, n_eqs))
         fg_sol = sympy.solve(self.eqs, list(self.x.diff(self.t)) + list(self.v) + list(self.y))
         self.f = self.x.diff(self.t).subs(fg_sol)
         assert len(self.x) == len(self.f)
         self.g = self.y.subs(fg_sol)
         assert len(self.y) == len(self.g)
+
+        self.h = self.v.subs(fg_sol)
+        assert len(self.v) == len(self.h)
 
     def linearize_symbolic(self) -> List[sympy.MutableDenseMatrix]:
         A = sympy.Matrix([])

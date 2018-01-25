@@ -8,7 +8,9 @@ else
     exit 1
 fi
 
-conda update -q conda
+
+export PATH=$HOME/anaconda3/bin:$PATH
+#conda update -q conda
 # Useful for debugging any issues with conda
 conda info -a
 conda config --add channels conda-forge
@@ -22,6 +24,6 @@ pip install antlr4-python3-runtime casadi
 if [ "$config" == "testing" ]; then
     conda install -n pymola coverage coveralls
 elif [ "$config" == "eneduser" ]; then
-    conda install -n pymola jupyter lapack pydotplus
+    conda install -n pymola jupyter lapack pydotplus jupyter_contrib_nbextensions nb_conda_kernels nb_conda jupyter_nbextensions_configurator nb_config_manager
     pip install control slycot
 fi

@@ -4,4 +4,4 @@ model Estimator "a position estimator"
 equation
 	der(x) = -x "the deriv of position is velocity";
 	y = x;
-end BouncingBall;
+end Estimator;
