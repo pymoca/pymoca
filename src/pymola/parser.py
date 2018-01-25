@@ -181,9 +181,15 @@ class ASTListener(ModelicaListener):
     def exitEquation_section(self, ctx):
         eq_sect = self.ast[ctx]
         if eq_sect.initial:
-            eq_sect.equations += [self.ast[e] for e in ctx.equation()]
+            eq_sect.equations.extend(self.ast[ctx.equation_block()])
         else:
-            eq_sect.equations += [self.ast[e] for e in ctx.equation()]
+            eq_sect.equations.extend(self.ast[ctx.equation_block()])
+
+    def exitEquation_block(self, ctx):
+        self.ast[ctx] = [self.ast[e] for e in ctx.equation()]
+
+    def exitStatement_block(self, ctx):
+        self.ast[ctx] = [self.ast[e] for e in ctx.statement()]
 
     def enterAlgorithm_section(self, ctx):
         alg_sect = ast.AlgorithmSection(
@@ -195,9 +201,9 @@ class ASTListener(ModelicaListener):
     def exitAlgorithm_section(self, ctx):
         alg_sect = self.ast[ctx]
         if alg_sect.initial:
-            alg_sect.statements += [self.ast[e] for e in ctx.statement()]
+            alg_sect.statements.extend(self.ast[ctx.statement_block()])
         else:
-            alg_sect.statements += [self.ast[e] for e in ctx.statement()]
+            alg_sect.statements.extend(self.ast[ctx.statement_block()])
 
     # EQUATION ===========================================================
 
@@ -217,17 +223,30 @@ class ASTListener(ModelicaListener):
             right=self.ast[ctx.expression()])
 
     def exitEquation_if(self, ctx):
-        self.ast[ctx] = ast.IfEquation(
-            conditions=[self.ast[s] for s in ctx.if_equation().expression()],
-            equations=[self.ast[s] for s in ctx.if_equation().equation()])
+        self.ast[ctx] = self.ast[ctx.if_equation()]
 
     def exitEquation_for(self, ctx):
-        self.ast[ctx] = ast.ForEquation(
-            indices=[self.ast[s] for s in ctx.for_equation().for_indices().for_index()],
-            equations=[self.ast[s] for s in ctx.for_equation().equation()])
+        self.ast[ctx] = self.ast[ctx.for_equation()]
 
     def exitEquation_connect_clause(self, ctx):
         self.ast[ctx] = self.ast[ctx.connect_clause()]
+
+    def exitArgument_expression(self, ctx):
+        self.ast[ctx] = self.ast[ctx.expression()]
+
+    def exitIf_equation(self, ctx):
+        blocks = [self.ast[b] for b in ctx.blocks]
+        conditions = [self.ast[c] for c in ctx.conditions]
+        if len(conditions) == len(blocks) - 1:
+            conditions.append(True)
+        self.ast[ctx] = ast.IfEquation(
+            conditions=conditions,
+            blocks=blocks)
+
+    def exitFor_equation(self, ctx):
+        self.ast[ctx] = ast.ForEquation(
+            indices=self.ast[ctx.for_indices()],
+            equations =self.ast[ctx.equation_block()])
 
     def exitConnect_clause(self, ctx):
         self.ast[ctx] = ast.ConnectClause(
@@ -273,14 +292,24 @@ class ASTListener(ModelicaListener):
             right=right)
 
     def exitStatement_if(self, ctx):
-        self.ast[ctx] = ast.IfStatement(
-            conditions=[self.ast[s] for s in ctx.if_statement().expression()],
-            statements=[self.ast[s] for s in ctx.if_statement().statement()])
+        self.ast[ctx] = self.ast[ctx.if_statement()]
 
     def exitStatement_for(self, ctx):
+        self.ast[ctx] = self.ast[ctx.for_statement()]
+
+    def exitIf_statement(self, ctx):
+        blocks = [self.ast[b] for b in ctx.blocks]
+        conditions = [self.ast[c] for c in ctx.conditions]
+        if len(conditions) == len(blocks) - 1:
+            conditions.append(True)
+        self.ast[ctx] = ast.IfStatement(
+            conditions=conditions,
+            blocks=blocks)
+
+    def exitFor_statement(self, ctx):
         self.ast[ctx] = ast.ForStatement(
-            indices=[self.ast[s] for s in ctx.for_statement().for_indices().for_index()],
-            statements=[self.ast[s] for s in ctx.for_statement().statement()])
+            indices=self.ast[ctx.for_indices()],
+            statements=self.ast[ctx.statement_block()])
 
     # EXPRESSIONS ===========================================================
 

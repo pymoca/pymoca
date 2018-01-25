@@ -263,13 +263,21 @@ short_class_definition :
 //=========================================================
 
 // B.2.6.1 ------------------------------------------------
+equation_block :
+    (equation ';')*
+    ;
+
 equation_section :
-    INITIAL? 'equation' (equation ';')*
+    INITIAL? 'equation' equation_block
     ;
 
 // B.2.6.2 ------------------------------------------------
+statement_block :
+    (statement ';')*
+    ;
+
 algorithm_section :
-    INITIAL? 'algorithm' (statement ';')*
+    INITIAL? 'algorithm' statement_block
     ;
 
 // B.2.6.3 ------------------------------------------------
@@ -309,41 +317,41 @@ statement :
 
 // B.2.6.7 ------------------------------------------------
 if_equation :
-    'if' expression 'then'
-        (equation ';')*
-    ('elseif' expression 'then'
-        (equation ';')*
+    'if' conditions+=expression 'then'
+        blocks+=equation_block
+    ('elseif' conditions+=expression 'then'
+        blocks+=equation_block
     )*
     ('else'
-        (equation ';')*
+        blocks+=equation_block
     )?
     'end' 'if'
     ;
 
 // B.2.6.8 ------------------------------------------------
 if_statement :
-    'if' expression 'then'
-        (statement ';')*
-    ('elseif' expression 'then'
-        (statement ';')*
+    'if' conditions+=expression 'then'
+        blocks+=statement_block
+    ('elseif' conditions+=expression 'then'
+        blocks+=statement_block
     )*
     ('else'
-        (statement ';')*
+        blocks+=statement_block
     )?
     'end' 'if'
     ;
 
 // B.2.6.9 ------------------------------------------------
 for_equation :
-    'for' for_indices 'loop'
-        (equation ';')*
+    'for' indices=for_indices 'loop'
+        block=equation_block
     'end' 'for'
     ;
 
 // B.2.6.10 ------------------------------------------------
 for_statement :
-    'for' for_indices 'loop'
-        (statement ';')*
+    'for' indices=for_indices 'loop'
+        block=statement_block
     'end' 'for'
     ;
 
@@ -359,27 +367,27 @@ for_index :
 
 // B.2.6.13 ------------------------------------------------
 while_statement:
-    'while' expression 'loop'
-        (statement ';')*
+    'while' condition=expression 'loop'
+        block=statement_block
     'end' 'while'
     ;
 
 // B.2.6.14 ------------------------------------------------
 when_equation:
-    'when' expression 'then'
-        (equation ';')*
-    ('elsewhen' expression 'then'
-        (equation ';')*
+    'when' conditions+=expression 'then'
+        blocks+=equation_block
+    ('elsewhen' conditions+=expression 'then'
+        blocks+=equation_block
     )*
     'end' 'when'
     ;
 
 // B.2.6.15 ------------------------------------------------
 when_statement:
-    'when' expression 'then'
-        (statement ';')*
-    ('elsewhen' expression 'then'
-        (statement ';')*
+    'when' conditions+=expression 'then'
+        blocks+=statement_block
+    ('elsewhen' conditions+=expression 'then'
+        blocks+=statement_block
     )*
     'end' 'when'
     ;
@@ -397,10 +405,10 @@ connect_clause :
 // TODO: What is the difference between expression and simple_expression?
 //       Can't we get rid of one of them?
 expression :
-    simple_expression                           # expression_simple
-    | 'if' expression 'then' expression
-    ( 'elseif' expression 'then' expression)*
-    'else' expression                           # expression_if
+    simple_expression                                       # expression_simple
+    | 'if' conditions+=expression 'then' blocks+=expression
+    ( 'elseif' conditions+=expression 'then' blocks+=expression)*
+    'else' blocks+=expression                               # expression_if
     ;
 
 // B.2.7.2 ------------------------------------------------

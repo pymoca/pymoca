@@ -1,7 +1,7 @@
 from __future__ import print_function, absolute_import, division, unicode_literals
 
 import logging
-from collections import namedtuple, deque
+from collections import namedtuple, deque, OrderedDict
 
 import casadi as ca
 import numpy as np
@@ -372,18 +372,19 @@ class Generator(TreeListener):
     def exitIfEquation(self, tree):
         logger.debug('exitIfEquation')
 
-        assert (len(tree.equations) % (len(tree.conditions) + 1) == 0)
+        # Check if every equation block contains the same number of equations
+        if len(set((len(x) for x in tree.blocks))) != 1:
+            raise Exception("Every branch in an if-equation needs the same number of equations.")
 
-        equations_per_condition = int(
-            len(tree.equations) / (len(tree.conditions) + 1))
+        # NOTE: We currently assume that we always have an else-clause. This
+        # is not strictly necessary, see the Modelica Spec on if equations.
+        assert tree.conditions[-1] == True
 
-        src = ca.vertcat(*[self.get_mx(tree.equations[-(i + 1)])
-                           for i in range(equations_per_condition)])
-        for cond_index in range(len(tree.conditions)):
+        src = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[-1]])
+
+        for cond_index in range(1, len(tree.conditions)):
             cond = self.get_mx(tree.conditions[-(cond_index + 1)])
-            expr1 = ca.vertcat(*[self.get_mx(tree.equations[-equations_per_condition * (
-                cond_index + 1) - (i + 1)]) for i in range(equations_per_condition)])
-
+            expr1 = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[-(cond_index + 1)]])
             src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
@@ -404,30 +405,33 @@ class Generator(TreeListener):
 
         # We assume an equal number of statements per branch.
         # Furthermore, we assume that every branch assigns to the same variables.
-        assert (len(tree.statements) % (len(tree.conditions) + 1) == 0)
+        assert len(set((len(x) for x in tree.blocks))) == 1
 
-        statements_per_condition = int(
-            len(tree.statements) / (len(tree.conditions) + 1))
+        # NOTE: We currently assume that we always have an else-clause. This
+        # is not strictly necessary, see the Modelica Spec on if statements.
+        assert tree.conditions[-1] == True
+
+        expanded_blocks = OrderedDict()
+
+        for b in tree.blocks:
+            block_assignments = []
+            for s in b:
+                assignments = self.get_mx(s)
+                for assignment in assignments:
+                    expanded_blocks.setdefault(assignment.left, []).append(assignment.right)
+
+        assert len(set((len(x) for x in expanded_blocks.values()))) == 1
 
         all_assignments = []
-        for statement_index in range(statements_per_condition):
-            assignments = self.get_mx(tree.statements[-(statement_index + 1)])
-            for assignment in assignments:
-                src = assignment.right
-                for cond_index in range(len(tree.conditions)):
-                    cond = self.get_mx(tree.conditions[-(cond_index + 1)])
-                    src1 = None
-                    for i in range(statements_per_condition):
-                        other_assignments = self.get_mx(tree.statements[-statements_per_condition * (
-                            cond_index + 1) - (i + 1)])
-                        for j in range(len(other_assignments)):
-                            if ca.is_equal(assignment.left, other_assignments[j].left):
-                                src1 = other_assignments[j].right
-                                break
-                        if src1 is not None:
-                            break
-                    src = ca.if_else(cond, src1, src, True)
-                all_assignments.append(Assignment(assignment.left, src))
+
+        for lhs, values in expanded_blocks.items():
+            # Set default value to else block, and then loop in reverse over all branches
+            src = values[-1]
+            for cond, rhs in zip(tree.conditions[-2::-1], values[-2::-1]):
+                cond = self.get_mx(cond)
+                src = ca.if_else(cond, rhs, src, True)
+
+            all_assignments.append(Assignment(lhs, src))
 
         self.src[tree] = all_assignments
 

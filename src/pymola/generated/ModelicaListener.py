@@ -413,12 +413,30 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ModelicaParser#equation_block.
+    def enterEquation_block(self, ctx:ModelicaParser.Equation_blockContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#equation_block.
+    def exitEquation_block(self, ctx:ModelicaParser.Equation_blockContext):
+        pass
+
+
     # Enter a parse tree produced by ModelicaParser#equation_section.
     def enterEquation_section(self, ctx:ModelicaParser.Equation_sectionContext):
         pass
 
     # Exit a parse tree produced by ModelicaParser#equation_section.
     def exitEquation_section(self, ctx:ModelicaParser.Equation_sectionContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#statement_block.
+    def enterStatement_block(self, ctx:ModelicaParser.Statement_blockContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#statement_block.
+    def exitStatement_block(self, ctx:ModelicaParser.Statement_blockContext):
         pass
 
 
