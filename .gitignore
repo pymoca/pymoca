@@ -2,6 +2,11 @@
 __pycache__/
 *.py[cod]
 
+# C extensions
+*.so
+*.dll
+*.dylib
+
 # Distribution / packaging
 .Python
 env/
