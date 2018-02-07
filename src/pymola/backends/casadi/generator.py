@@ -392,11 +392,9 @@ class Generator(TreeListener):
                 ast_walker.walk(self, tree)
 
                 # Reset the parsed tree to a previous state. We want to throw
-                # away all equations inside the current for block. The only
-                # thing we want to keep is any ast.Symbol's we encountered, to
-                # avoid redefining them.
+                # away all equations inside the current for block.
                 for x in list(self.src.keys()):
-                    if x not in f.orig_keys and not isinstance(x, ast.Symbol):
+                    if x not in f.orig_keys:
                         f.tmp_src.setdefault(x, []).append(self.src[x])
                         del self.src[x]
             if len(f.values) > 0:
@@ -592,6 +590,11 @@ class Generator(TreeListener):
         return [self.get_integer(d) for d in tree.dimensions]
 
     def get_symbol(self, tree):
+        try:
+            return self.nodes[self.current_class][tree.name]
+        except KeyError:
+            pass
+
         # Create symbol
         shape = self.get_shape(tree)
 
