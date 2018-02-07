@@ -674,14 +674,9 @@ class Generator(TreeListener):
                 else:
                     o[ind] = self.derivative[s_i.name()]
             else:
-                # TODO(Tjerk): Test case that ends up here?
                 # Differentiate expression using CasADi
                 orig_deps = ca.symvar(s_i)
-                deps = ca.vertcat(*orig_deps)
-                J = ca.Function('J', [deps], [ca.jacobian(s_i, deps)])
-                J_sparsity = J.sparsity_out(0)
-                der_deps = [self.get_derivative(dep) if J_sparsity.has_nz(0, j) else ca.DM.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
-                o[ind] = ca.mtimes(J(deps), ca.vertcat(*der_deps))
+                o[ind] = sum(ca.jacobian(s_i, dep) * self.get_derivative(_safe_ndarray(dep))[0] for dep in orig_deps)
 
             return o
 
