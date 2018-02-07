@@ -73,75 +73,79 @@ class GenCasadiTest(unittest.TestCase):
 
         return True
 
-    # def test_function_call(self):
-    #     with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
+    def test_function_call(self):
+        with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
+        print("FunctionCall", casadi_model)
+        ref_model = Model()
+
+        c = ca.MX.sym("c")
+        a = ca.MX.sym("a")
+        d = ca.MX.sym("d")
+        e = ca.MX.sym("e")
+        S1 = ca.MX.sym("S1")
+        S2 = ca.MX.sym("S2")
+        r = ca.MX.sym("r")
+        ref_model.alg_states = list(map(Variable, [c, a, d, e, S1, S2, r]))
+        ref_model.outputs = list(map(Variable, [c, a, d, e, S1, S2]))
+        ref_model.equations = [
+            c - 3.14159*2*r,
+            a - 3.14159*r**2,
+            d - ca.if_else(3.14159*r**2 > 10,
+                           1,
+                           2),
+            e - ca.if_else(3.14159*r**2 > 10,
+                           10,
+                           3.14159*r**2),
+            S1 - 8,
+            S2 - 3]
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+
+    # def test_forloop(self):
+    #     with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
     #         txt = f.read()
     #     ast_tree = parser.parse(txt)
-    #     casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
-    #     print("FunctionCall", casadi_model)
+    #     casadi_model = gen_casadi.generate(ast_tree, 'ForLoop')
+    #     print(casadi_model)
     #     ref_model = Model()
 
-    #     radius = ca.MX.sym('radius')
-    #     diameter = radius * 2
-    #     circle_properties = ca.Function('circle_properties', [radius], [3.14159*diameter, 3.14159*radius**2, ca.if_else(3.14159*radius**2 > 10, 1, 2), ca.if_else(3.14159*radius**2 > 10, 10, 3.14159*radius**2), 8, 3, 12])
+    #     x = MXArray("x", 10)
+    #     y = MXArray("y", 10)
+    #     z = MXArray("z", 10)
+    #     u = MXArray('u', 10, 2)
+    #     v = MXArray('v', 2, 10)
+    #     w = MXArray('w', 2, 10)
+    #     b = MXArray("b")
+    #     n = MXArray("n")
+    #     s = MXArray('s', 10)
+    #     Arr = MXArray('Arr', 2, 2)
+    #     der_s = MXArray('der(s)', 10)
 
-    #     c = ca.MX.sym("c")
-    #     a = ca.MX.sym("a")
-    #     d = ca.MX.sym("d")
-    #     e = ca.MX.sym("e")
-    #     S1 = ca.MX.sym("S1")
-    #     S2 = ca.MX.sym("S2")
-    #     r = ca.MX.sym("r")
-    #     ref_model.alg_states = list(map(Variable, [c, a, d, e, S1, S2, r]))
-    #     ref_model.outputs = list(map(Variable, [c, a, d, e, S1, S2]))
-    #     ref_model.equations = [ca.vertcat(c, a, d, e, S1, S2) - ca.vertcat(*circle_properties.call([r])[0:-1])]
+    #     ref_model.states = list(map(Variable, [*s]))
+    #     ref_model.der_states = list(map(Variable, [*der_s]))
+    #     ref_model.alg_states = list(map(Variable, [*x, *y, *z, *u.flatten(), *v.flatten(), *w.flatten(), *b, *Arr.flatten()]))
+    #     ref_model.parameters = list(map(Variable, [*n]))
+    #     ref_model.parameters[0].value = 10
+
+    #     i = np.arange(1, 11)
+    #     ref_model.equations = [
+    #         *(x - (i + b)),
+    #         *(w[0, :] - i),
+    #         *(w[1, :] - 2 * i),
+    #         *(u - 1).flatten(),
+    #         *(v - 1).T.flatten(),
+    #         *y[0:5],
+    #         *(y[5:10] - 1),
+    #         *(z[0:5] - 2),
+    #         *(z[5:10] - 1),
+    #         *(der_s - 1),
+    #         *(Arr[0:2, 1] - 2),
+    #         *(Arr[0:2, 0] - 1)]
 
     #     self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
-
-
-    def test_forloop(self):
-        with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
-            txt = f.read()
-        ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'ForLoop')
-        print(casadi_model)
-        ref_model = Model()
-
-        x = MXArray("x", 10)
-        y = MXArray("y", 10)
-        z = MXArray("z", 10)
-        u = MXArray('u', 10, 2)
-        v = MXArray('v', 2, 10)
-        w = MXArray('w', 2, 10)
-        b = MXArray("b")
-        n = MXArray("n")
-        s = MXArray('s', 10)
-        Arr = MXArray('Arr', 2, 2)
-        der_s = MXArray('der(s)', 10)
-
-        ref_model.states = list(map(Variable, [*s]))
-        ref_model.der_states = list(map(Variable, [*der_s]))
-        ref_model.alg_states = list(map(Variable, [*x, *y, *z, *u.flatten(), *v.flatten(), *w.flatten(), *b, *Arr.flatten()]))
-        ref_model.parameters = list(map(Variable, [*n]))
-        ref_model.parameters[0].value = 10
-
-        i = np.arange(1, 11)
-        ref_model.equations = [
-            *(x - (i + b)),
-            *(w[0, :] - i),
-            *(w[1, :] - 2 * i),
-            *(u - 1).flatten(),
-            *(v - 1).T.flatten(),
-            *y[0:5],
-            *(y[5:10] - 1),
-            *(z[0:5] - 2),
-            *(z[5:10] - 1),
-            *(der_s - 1),
-            *(Arr[0:2, 1] - 2),
-            *(Arr[0:2, 0] - 1)]
-
-        self.assert_model_equivalent_numeric(ref_model, casadi_model)
-
 c = GenCasadiTest()
-c.test_forloop()
+c.test_function_call()

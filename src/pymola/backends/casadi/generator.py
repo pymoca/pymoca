@@ -173,7 +173,7 @@ class Generator(TreeListener):
             new_l = []
             for e in l:
                 if isinstance(e, np.ndarray):
-                    for e_sub in e:
+                    for e_sub in e.flatten():
                         new_l.append(e_sub)
                 else:
                     new_l.append(e)
@@ -326,9 +326,9 @@ class Generator(TreeListener):
 
                     src = np.array([f(a, b) for a, b in zip(lhs, rhs)])
             else:
-                # TODO(Array)
-                function = self.get_function(op)
-                src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
+                # We can only inline, as dimensions of array arguments may differ from call to call
+                inputs = [self.get_mx(operand) for operand in tree.operands]
+                src = self.get_function(op, inputs)
 
         self.src[tree] = src
 
@@ -354,12 +354,12 @@ class Generator(TreeListener):
         logger.debug('exitEquation')
 
         if isinstance(tree.left, list):
-            src_left = ca.vertcat(*[self.get_mx(c) for c in tree.left])
+            src_left = [self.get_mx(c) for c in tree.left]
         else:
             src_left = self.get_mx(tree.left)
 
         if isinstance(tree.right, list):
-            src_right = ca.vertcat(*[self.get_mx(c) for c in tree.right])
+            src_right = [self.get_mx(c) for c in tree.right]
         else:
             src_right = self.get_mx(tree.right)
 
@@ -369,11 +369,11 @@ class Generator(TreeListener):
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
         if isinstance(tree.right, ast.Expression) and tree.right.operator in self.root.classes:
-            if src_left.size1() < src_right.size1():
-                src_right = src_right[0:src_left.size1()]
+            if src_left.shape[0] < src_right.shape[0]:
+                src_right = src_right[0:src_left.shape[0]]
         if isinstance(tree.left, ast.Expression) and tree.left.operator in self.root.classes:
-            if src_left.size1() > src_right.size1():
-                src_left = src_left[0:src_right.size1()]
+            if src_left.shape[0] > src_right.shape[0]:
+                src_left = src_left[0:src_right.shape[0]]
 
         # If dimensions between the lhs and rhs do not match, but the dimensions of lhs
         # and transposed rhs do match, transpose the rhs.
@@ -508,26 +508,59 @@ class Generator(TreeListener):
     def enterForStatement(self, tree):
         logger.debug('enterForStatement')
 
-        self.for_loops.append(ForLoop(self, tree))
+        if not self.for_loops or tree is not self.for_loops[-1].tree:
+            self.for_loops.append(ForLoop(self, tree))
+
+            f = self.for_loops[-1]
+
+            for i in f.values[:-1]:
+                f.current_value = i
+                ast_walker = TreeWalker()
+                ast_walker.walk(self, tree)
+
+                # Reset the parsed tree to a previous state. We want to throw
+                # away all equations inside the current for block.
+                for x in list(self.src.keys()):
+                    if x not in f.orig_keys:
+                        f.tmp_src.setdefault(x, []).append(self.src[x])
+                        del self.src[x]
+            if len(f.values) > 0:
+                f.current_value = f.values[-1]
+            else:
+                # TODO: Because we are using a listener, and not a visitor, we
+                # will still go into the equations inside this ForEquation. To
+                # avoid exceptions, we have to set the index to some valid
+                # integer.
+                f.current_value = 1
+        else:
+            pass
 
     def exitForStatement(self, tree):
         logger.debug('exitForStatement')
 
-        all_assignments = []
+        f = self.for_loops[-1]
 
-        f = self.for_loops.pop()
-        if len(f.values) > 0:
-            for assignments in [self.get_mx(e) for e in tree.statements]:
-                for assignment in assignments:
-                    rhs = _safe_ndarray(assignment.right)
-                    for ind, s_i in np.ndenumerate(assignment.left):
-                        all_assignments.append(Assignment(
-                            _safe_ndarray(assignment.left[ind]),
-                            _safe_ndarray(rhs)))
+        if len(f.values) == 0:
+            self.src[tree] = np.array([])
+        elif f.current_value == f.values[-1]:
+            for x in list(self.src.keys()):
+                if x not in f.orig_keys:
+                    f.tmp_src.setdefault(x, []).append(self.src[x])
+
+            all_assignments = []
+
+            for i in range(len(f.values)):
+                for assignments in [f.tmp_src[e][i] for e in tree.statements]:
+                    for assignment in assignments:
+                        rhs = _safe_ndarray(assignment.right)
+                        for ind, s_i in np.ndenumerate(assignment.left):
+                            all_assignments.append(Assignment(
+                                _safe_ndarray(assignment.left[ind]),
+                                _safe_ndarray(rhs)))
 
             self.src[tree] = all_assignments
-        else:
-            self.src[tree] = []
+
+            f = self.for_loops.pop()
 
     def get_integer(self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]) -> Union[int, ca.MX, np.ndarray]:
         # CasADi needs to know the dimensions of symbols at instantiation.
@@ -715,15 +748,13 @@ class Generator(TreeListener):
             self.src[tree] = s
         return self.src[tree]
 
-    def get_function(self, function_name):
-        if function_name in self.functions:
-            return self.functions[function_name]
-
+    def get_function(self, function_name, args):
         try:
             tree = self.root.classes[function_name]
         except KeyError:
             raise Exception('Unknown function {}'.format(function_name))
 
+        # TODO: Match unspecified array dimensions of function inputs to arguments passed in
         inputs = []
         outputs = []
         tmp = []
@@ -747,13 +778,25 @@ class Generator(TreeListener):
             src = self.get_mx(statement)
             for assignment in src:
                 for ind, v_i in np.ndenumerate(assignment.left):
-                    [values[assignment.left]] = ca.substitute([assignment.right], list(values.keys()), list(values.values()))
+                    rhs = _safe_ndarray(assignment.right)
+                    [values[assignment.left[ind]]] = ca.substitute([rhs[ind]], list(values.keys()), list(values.values()))
 
-        output_expr = ca.substitute([values[output] for output in outputs], tmp, [values[t] for t in tmp])
-        function = ca.Function(tree.name, inputs, output_expr)
-        self.functions[function_name] = function
+        # Expand tmp
+        tmp = np.array(tmp).flatten().tolist()
+        tmp_values = [values[t] for t in tmp]
 
-        return function
+        for i, output in enumerate(outputs):
+            for ind, v_i in np.ndenumerate(output):
+                [outputs[i][ind]] = ca.substitute([values[output[ind]]], tmp, tmp_values)
+
+        inputs = np.array(inputs).flatten().tolist()
+        args = np.array(args).flatten().tolist()
+
+        for i, output in enumerate(outputs):
+            for ind, v_i in np.ndenumerate(output):
+                [outputs[i][ind]] = ca.substitute([output[ind]], inputs, args)
+
+        return outputs
 
 
 def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = {}) -> Model:
