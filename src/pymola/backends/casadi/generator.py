@@ -229,7 +229,7 @@ class Generator(TreeListener):
             src = self.get_mx(tree.operands[0])
             for i in tree.operands[1:]:
                 rhs = self.get_mx(i)
-                src = np.dot(src, rhs)
+                src = _safe_ndarray(np.dot(src, rhs))
         elif op == 'transpose' and n_operands == 1:
             src = np.transpose(self.get_mx(tree.operands[0]))
         elif op == 'sum' and n_operands == 1:
