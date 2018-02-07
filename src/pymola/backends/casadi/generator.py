@@ -25,6 +25,7 @@ logger = logging.getLogger("pymola")
 #  - Type annotations (what functions return what type. Especially get_indexed_symbol, etc)
 #  - Derivative as individual nodes, or one big node with array size of orig symbol
 #  - Simplify other tests as well
+#  - assert that get_mx never returns an MX? (lol), but always np.ndarray, or int, float.
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
           "-": "__sub__",
