@@ -73,26 +73,46 @@ class GenCasadiTest(unittest.TestCase):
 
         return True
 
-    def test_state_annotator(self):
-        with open(os.path.join(TEST_DIR, 'StateAnnotator.mo'), 'r') as f:
-            txt = f.read()
-        ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'StateAnnotator')
-        print(casadi_model)
+    def test_simplify_reduce_affine_expression_loop(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'expand_vectors': True,
+             'detect_aliases': True,
+             'reduce_affine_expression': True,
+             'replace_constant_expressions': True,
+             'replace_constant_values': True,
+             'replace_parameter_expressions': True,
+             'replace_parameter_values': True}
+
+        casadi_model = transfer_model(TEST_DIR, 'SimplifyLoop', compiler_options)
+
         ref_model = Model()
 
         x = ca.MX.sym('x')
-        y = ca.MX.sym('y')
-        z = ca.MX.sym('z')
-        der_x = ca.MX.sym('der(x)')
-        der_y = ca.MX.sym('der(y)')
-        der_z = ca.MX.sym('der(z)')
+        y0 = ca.MX.sym('y[0]')
+        y1 = ca.MX.sym('y[1]')
 
-        ref_model.states = list(map(Variable, [x, y, z]))
-        ref_model.der_states = list(map(Variable, [der_x, der_y, der_z]))
-        ref_model.equations = [der_x + der_y - 1, der_x * y + x * der_y - 2, (der_x * y - x * der_y) / (y**2) - 3, 2 * x * der_x - 4, der_z - 5, der_x * z + x * der_z + der_y * z + y * der_z - 4, 0]
+        A = ca.MX(2, 3)
+        A[0, 0] = -1
+        A[0, 1] = 1
+        A[0, 2] = 0
+        A[1, 0] = -2
+        A[1, 1] = 0
+        A[1, 2] = 1
+        b = ca.MX(2, 1)
+        b[0, 0] = 0
+        b[1, 0] = 0
 
-        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+        ref_model.states = list(map(Variable, []))
+        ref_model.der_states = list(map(Variable, []))
+        ref_model.alg_states = list(map(Variable, [x, y0, y1]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = list(map(Variable, []))
+        x = ca.vertcat(x, y0, y1)
+        ref_model.equations = [ca.mtimes(A, x) + b]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
 c = GenCasadiTest()
-c.test_state_annotator()
+c.test_simplify_reduce_affine_expression_loop()
