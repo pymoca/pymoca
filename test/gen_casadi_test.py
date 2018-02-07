@@ -22,6 +22,22 @@ from pymola import parser, ast
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
+def MXArray(name, *dimensions):
+    """
+    Function with the same signature as `ca.MX.sym`, but instead returns
+    a NumPy array of scalar MX symbols
+    """
+    if not dimensions:
+        return np.array([ca.MX.sym(name)])
+
+    arr = np.empty(dimensions, dtype=object)
+
+    for ind, _ in np.ndenumerate(arr):
+        arr[ind] = ca.MX.sym("{}[{}]".format(name, ", ".join((str(x + 1) for x in ind))))
+
+    return arr
+
+
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class GenCasadiTest(unittest.TestCase):
     def assert_model_equivalent(self, A, B):
@@ -487,30 +503,40 @@ class GenCasadiTest(unittest.TestCase):
         print(casadi_model)
         ref_model = Model()
 
-        x = ca.MX.sym("x", 10)
-        y = ca.MX.sym("y", 10)
-        z = ca.MX.sym("z", 10)
-        u = ca.MX.sym('u', 10, 2)
-        v = ca.MX.sym('v', 2, 10)
-        w = ca.MX.sym('w', 2, 10)
-        b = ca.MX.sym("b")
-        n = ca.MX.sym("n")
-        s = ca.MX.sym('s', 10)
-        Arr = ca.MX.sym('Arr', 2, 2)
-        der_s = ca.MX.sym('der(s)', 10)
+        x = MXArray("x", 10)
+        y = MXArray("y", 10)
+        z = MXArray("z", 10)
+        u = MXArray('u', 10, 2)
+        v = MXArray('v', 2, 10)
+        w = MXArray('w', 2, 10)
+        b = MXArray("b")
+        n = MXArray("n")
+        s = MXArray('s', 10)
+        Arr = MXArray('Arr', 2, 2)
+        der_s = MXArray('der(s)', 10)
 
-        ref_model.states = list(map(Variable, [s]))
-        ref_model.der_states = list(map(Variable, [der_s]))
-        ref_model.alg_states = list(map(Variable, [x, y, z, u, v, w, b, Arr]))
-        ref_model.parameters = list(map(Variable, [n]))
+        ref_model.states = list(map(Variable, [*s]))
+        ref_model.der_states = list(map(Variable, [*der_s]))
+        ref_model.alg_states = list(map(Variable, [*x, *y, *z, *u.flatten(), *v.flatten(), *w.flatten(), *b, *Arr.flatten()]))
+        ref_model.parameters = list(map(Variable, [*n]))
         ref_model.parameters[0].value = 10
+
+        i = np.arange(1, 11)
         ref_model.equations = [
-            ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2), u - np.ones((10, 2)), v.T - np.ones((10, 2))),
-            y[0:5] - np.zeros(5), y[5:] - np.ones(5),
-            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10), ca.horzcat(Arr[:, 1], Arr[:, 0]) - np.array([[2, 1], [2, 1]])]
+            *(x - (i + b)),
+            *(w[0, :] - i),
+            *(w[1, :] - 2 * i),
+            *(u - 1).flatten(),
+            *(v - 1).T.flatten(),
+            *y[0:5],
+            *(y[5:10] - 1),
+            *(z[0:5] - 2),
+            *(z[5:10] - 1),
+            *(der_s - 1),
+            *(Arr[0:2, 1] - 2),
+            *(Arr[0:2, 0] - 1)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
-
 
     def test_arrayexpressions(self):
         with open(os.path.join(TEST_DIR, 'ArrayExpressions.mo'), 'r') as f:
