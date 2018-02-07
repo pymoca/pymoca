@@ -657,6 +657,9 @@ class Generator(TreeListener):
         return s
 
     def get_derivative(self, s):
+        if np.isscalar(s):
+            return 0
+
         o = np.ndarray(s.shape, dtype=object)
 
         for ind, s_i in np.ndenumerate(s):
