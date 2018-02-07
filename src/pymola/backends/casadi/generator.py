@@ -89,8 +89,11 @@ class Generator(TreeListener):
         self.for_loops = deque()
         self.functions = {}
         self.entered_classes = deque()
-        self.map_mode = 'inline' if options.get('unroll_loops', True) else 'serial'
-        self.function_mode = (True, False) if options.get('inline_functions', True) else (False, True)
+        # NOTE(Tjerk): Functions can only be inlined, because:
+        # 1. handling fixed size arrays becomes hard/impossible with the nparray(MX)
+        # 2. Variable sized array arguments cannot be handled by CasADi. So we
+        # can only generate an expression based on the arguments passed into
+        # said function, which may differ from call to call.
 
     @property
     def current_class(self):
