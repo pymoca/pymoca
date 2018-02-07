@@ -546,8 +546,12 @@ class Generator(TreeListener):
         return s
 
     def get_derivative(self, s):
+
+        # Case 1: s is a constant, e.g. MX(5)
         if ca.MX(s).is_constant():
             return 0
+
+        # Case 2: s is a symbol, e.g. MX(x)
         elif s.is_symbolic():
             if s.name() not in self.derivative:
                 if len(self.for_loops) > 0 and s in self.for_loops[-1].indexed_symbols:
@@ -566,6 +570,20 @@ class Generator(TreeListener):
                     return der_s
             else:
                 return self.derivative[s.name()]
+
+        # Case 3: s is an already indexed symbol, e.g. MX(x[1])
+        elif s.is_op(ca.OP_GETNONZEROS) and s.dep().is_symbolic():
+            slice_info = s.info()['slice']
+            dep = s.dep()
+            if dep.name() not in self.derivative:
+                der_dep = ca.MX.sym("der({})".format(dep.name()), dep.size())
+                self.derivative[dep.name()] = der_dep
+                return der_dep[slice_info['start']:slice_info['stop']:slice_info['step']]
+            else:
+                return self.derivative[dep.name()][slice_info['start']:slice_info['stop']:slice_info['step']]
+
+        # Case 4: s is an expression that requires differentiation, e.g. MX(x2 * x2)
+        # Need to do this sort of expansion: der(x1 * x2) = der(x1) * x2 + x1 * der(x2)
         else:
             # Differentiate expression using CasADi
             orig_deps = ca.symvar(s)
