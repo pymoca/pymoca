@@ -1213,30 +1213,6 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEquals(casadi_model.states[0].aliases, ['-alias'])
 
-    def test_simplify_expand_vectors(self):
-        # Create model, cache it, and load the cache
-        compiler_options = \
-            {'expand_vectors': True}
-
-        casadi_model = transfer_model(TEST_DIR, 'SimplifyVector', compiler_options)
-
-        ref_model = Model()
-
-        x0 = ca.MX.sym('x[0]')
-        x1 = ca.MX.sym('x[1]')
-        der_x0 = ca.MX.sym('der(x)[0]')
-        der_x1 = ca.MX.sym('der(x)[1]')
-
-        ref_model.states = list(map(Variable, [x0, x1]))
-        ref_model.der_states = list(map(Variable, [der_x0, der_x1]))
-        ref_model.alg_states = list(map(Variable, []))
-        ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
-        ref_model.equations = [der_x0 - x0, der_x1 - x1]
-
-        # Compare
-        self.assert_model_equivalent_numeric(casadi_model, ref_model)
-
     def test_simplify_reduce_affine_expression_loop(self):
         # Create model, cache it, and load the cache
         compiler_options = \
