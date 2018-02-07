@@ -463,10 +463,6 @@ class GenCasadiTest(unittest.TestCase):
         print("FunctionCall", casadi_model)
         ref_model = Model()
 
-        radius = ca.MX.sym('radius')
-        diameter = radius * 2
-        circle_properties = ca.Function('circle_properties', [radius], [3.14159*diameter, 3.14159*radius**2, ca.if_else(3.14159*radius**2 > 10, 1, 2), ca.if_else(3.14159*radius**2 > 10, 10, 3.14159*radius**2), 8, 3, 12])
-
         c = ca.MX.sym("c")
         a = ca.MX.sym("a")
         d = ca.MX.sym("d")
@@ -476,24 +472,18 @@ class GenCasadiTest(unittest.TestCase):
         r = ca.MX.sym("r")
         ref_model.alg_states = list(map(Variable, [c, a, d, e, S1, S2, r]))
         ref_model.outputs = list(map(Variable, [c, a, d, e, S1, S2]))
-        ref_model.equations = [ca.vertcat(c, a, d, e, S1, S2) - ca.vertcat(*circle_properties.call([r])[0:-1])]
-
+        ref_model.equations = [
+            c - 3.14159*2*r,
+            a - 3.14159*r**2,
+            d - ca.if_else(3.14159*r**2 > 10,
+                           1,
+                           2),
+            e - ca.if_else(3.14159*r**2 > 10,
+                           10,
+                           3.14159*r**2),
+            S1 - 8,
+            S2 - 3]
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
-
-    @unittest.skip
-    def test_double_function_call(self):
-        with open(os.path.join(TEST_DIR, 'DoubleFunctionCall.mo'), 'r') as f:
-            txt = f.read()
-        ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
-        print("FunctionCall", casadi_model)
-        ref_model = Model()
-
-        # Check that both instances of the function call refer to the same node in the tree
-        func_a = casadi_model.equations[0].dep(1).dep(0).dep(0).dep(0).getFunction().__hash__()
-        func_b = casadi_model.equations[1].dep(1).dep(0).dep(0).dep(0).getFunction().__hash__()
-
-        self.assertEqual(func_a, func_b)
 
     def test_forloop(self):
         with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
