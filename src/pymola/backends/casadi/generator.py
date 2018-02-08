@@ -374,6 +374,9 @@ class Generator(TreeListener):
         else:
             src_right = self.get_mx(tree.right)
 
+        # Cast lists (e.g. from equations with arrays), floats, or ints to
+        # MXArrays. That way, we can compare, slice, and subtract easily now,
+        # and we will have to return an MXArray anyway.
         src_left = MXArray(src_left)
         src_right = MXArray(src_right)
 
