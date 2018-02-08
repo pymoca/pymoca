@@ -49,6 +49,7 @@ class GenCasadiTest(unittest.TestCase):
     def assert_model_equivalent_numeric(self, A, B, tol=1e-9):
         self.assertEqual(len(A.states), len(B.states))
         self.assertEqual(len(A.der_states), len(B.der_states))
+        self.assertEqual(len(A.alg_states), len(B.alg_states))
         self.assertEqual(len(A.inputs), len(B.inputs))
         self.assertEqual(len(A.outputs), len(B.outputs))
         self.assertEqual(len(A.constants), len(B.constants))
