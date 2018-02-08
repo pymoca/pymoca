@@ -234,7 +234,7 @@ class Generator(TreeListener):
             src = np.transpose(self.get_mx(tree.operands[0]))
         elif op == 'sum' and n_operands == 1:
             v = self.get_mx(tree.operands[0])
-            src = sum(v)
+            src = _safe_ndarray(sum(v))
         elif op == 'linspace' and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
@@ -259,7 +259,7 @@ class Generator(TreeListener):
         elif op in ("min", "max", "abs") and n_operands == 1:
             ca_op = getattr(ca.MX, "f" + op)
             src = _safe_ndarray(self.get_mx(tree.operands[0]))
-            src = functools.reduce(ca_op, src.flat)
+            src = _safe_ndarray(functools.reduce(ca_op, src.flat))
         elif op in ("min", "max", "abs") and n_operands == 2:
             ca_op = getattr(ca.MX, "f" + op)
 
@@ -269,7 +269,7 @@ class Generator(TreeListener):
             # Modelica Spec: Operation only allowed on scalars
             assert np.prod(lhs.shape) == 1 and np.prod(rhs.shape)
 
-            src = ca_op(lhs[0], rhs[0])
+            src = _safe_ndarray(ca_op(lhs[0], rhs[0]))
         elif op == 'cat':
             axis = self.get_integer(tree.operands[0]) - 1
             entries  = []
@@ -330,6 +330,8 @@ class Generator(TreeListener):
                 # We can only inline, as dimensions of array arguments may differ from call to call
                 inputs = [self.get_mx(operand) for operand in tree.operands]
                 src = self.get_function(op, inputs)
+
+        assert isinstance(src, (MXArray, np.ndarray, int, float, list))
 
         self.src[tree] = src
 
