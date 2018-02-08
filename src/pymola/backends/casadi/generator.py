@@ -26,6 +26,7 @@ logger = logging.getLogger("pymola")
 #  - Derivative as individual nodes, or one big node with array size of orig symbol
 #  - Simplify other tests as well
 #  - assert that get_mx never returns an MX? (lol), but always np.ndarray, or int, float. We can turn the latter two into np.ndarrays as well, but that causes issues elsewhere (e.g. attributes being "None")
+#  - Make lists an explicit type, like "ArgumentList".
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
           "-": "__sub__",
