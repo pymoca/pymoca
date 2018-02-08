@@ -694,7 +694,7 @@ class Generator(TreeListener):
             if isinstance(index, ast.ComponentRef):
                 for f in reversed(self.for_loops):
                     if index.name == f.name:
-                        sl = f.current_value - 1
+                        sl = int(f.current_value - 1)
 
             if sl is None:
                 sl = self.get_integer(index)
