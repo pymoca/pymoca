@@ -89,26 +89,27 @@ class GenCasadiTest(unittest.TestCase):
         ref_model = Model()
 
         x = ca.MX.sym('x')
-        y0 = ca.MX.sym('y[0]')
-        y1 = ca.MX.sym('y[1]')
+        y = MXArray("y", 3)
 
-        A = ca.MX(2, 3)
-        A[0, 0] = -1
+        A = ca.DM(2, 3)
+        A[0, 0] = -2
         A[0, 1] = 1
         A[0, 2] = 0
-        A[1, 0] = -2
+        A[1, 0] = -3
         A[1, 1] = 0
         A[1, 2] = 1
-        b = ca.MX(2, 1)
+        b = ca.DM(2, 1)
         b[0, 0] = 0
         b[1, 0] = 0
 
+        # NOTE: the symbol with the name y[1] (in Modelica/CasADi, y[0] here) is detected as an alias of x.
+
         ref_model.states = list(map(Variable, []))
         ref_model.der_states = list(map(Variable, []))
-        ref_model.alg_states = list(map(Variable, [x, y0, y1]))
+        ref_model.alg_states = list(map(Variable, [x, y[1], y[2]]))
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
-        x = ca.vertcat(x, y0, y1)
+        x = ca.vertcat(x, y[1], y[2])
         ref_model.equations = [ca.mtimes(A, x) + b]
 
         # Compare
