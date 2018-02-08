@@ -54,7 +54,7 @@ class ForLoop:
         start = e.start.value
         step = e.step.value
         stop = self.generator.get_integer(e.stop)
-        self.values = np.arange(start, stop + step, step, dtype=np.int)
+        self.values = np.arange(start, stop + step, step)
         self.name = i.name
         self.current_value = None
         self.orig_keys = set(self.generator.src.keys())
