@@ -748,6 +748,10 @@ class Generator(TreeListener):
             else:
                 raise Exception('Tried to look up expression before it was reached by the tree walker')
             self.src[tree] = s
+
+        # We can also choose to wrap _everything_ in a numpy array. But generaly I think it makes sense to keep integers as integers, and floats as floats.
+        assert self.src[tree] is None or isinstance(self.src[tree], (list, MXArray, np.ndarray, int, float))
+
         return self.src[tree]
 
     def get_function(self, function_name, args):
