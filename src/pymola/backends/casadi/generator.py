@@ -418,9 +418,9 @@ class Generator(TreeListener):
             if len(f.values) > 0:
                 f.current_value = f.values[-1]
             else:
-                # TODO: Because we are using a listener, and not a visitor, we
-                # will still go into the equations inside this ForEquation. To
-                # avoid exceptions, we have to set the index to some valid
+                # FIXME: Because we are using a listener, and not a visitor,
+                # we will still go into the equations inside this ForEquation.
+                # To avoid exceptions, we have to set the index to some valid
                 # integer.
                 f.current_value = 1
         else:
@@ -541,9 +541,9 @@ class Generator(TreeListener):
             if len(f.values) > 0:
                 f.current_value = f.values[-1]
             else:
-                # TODO: Because we are using a listener, and not a visitor, we
-                # will still go into the equations inside this ForEquation. To
-                # avoid exceptions, we have to set the index to some valid
+                # FIXME: Because we are using a listener, and not a visitor,
+                # we will still go into the equations inside this ForEquation.
+                # To avoid exceptions, we have to set the index to some valid
                 # integer.
                 f.current_value = 1
         else:
@@ -742,7 +742,7 @@ class Generator(TreeListener):
             s = self.get_indexed_symbol(tree, s)
         return s
 
-    def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef, ast.Expression]) -> ca.MX:
+    def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef, ast.Expression]) -> Union[None, list, MXArray, np.ndarray, int, float]
         """
         We pull components and symbols from the AST on demand.
         This is to ensure that parametrized vector dimensions can be resolved.  Vector
@@ -758,9 +758,6 @@ class Generator(TreeListener):
             else:
                 raise Exception('Tried to look up expression before it was reached by the tree walker')
             self.src[tree] = s
-
-        # We can also choose to wrap _everything_ in a numpy array. But generaly I think it makes sense to keep integers as integers, and floats as floats.
-        assert self.src[tree] is None or isinstance(self.src[tree], (list, MXArray, np.ndarray, int, float))
 
         return self.src[tree]
 
