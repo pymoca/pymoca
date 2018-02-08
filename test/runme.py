@@ -73,47 +73,39 @@ class GenCasadiTest(unittest.TestCase):
 
         return True
 
-    def test_simplify_reduce_affine_expression_loop(self):
-        # Create model, cache it, and load the cache
-        compiler_options = \
-            {'expand_vectors': True,
-             'detect_aliases': True,
-             'reduce_affine_expression': True,
-             'replace_constant_expressions': True,
-             'replace_constant_values': True,
-             'replace_parameter_expressions': True,
-             'replace_parameter_values': True}
-
-        casadi_model = transfer_model(TEST_DIR, 'SimplifyLoop', compiler_options)
-
+    def test_if_else(self):
+        with open(os.path.join(TEST_DIR, 'IfElse.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'IfElse')
         ref_model = Model()
 
-        x = ca.MX.sym('x')
-        y = MXArray("y", 3)
+        x = ca.MX.sym("x")
+        y1 = ca.MX.sym("y1")
+        y2 = ca.MX.sym("y2")
+        y3 = ca.MX.sym("y3")
+        y_max = ca.MX.sym("y_max")
 
-        A = ca.DM(2, 3)
-        A[0, 0] = -2
-        A[0, 1] = 1
-        A[0, 2] = 0
-        A[1, 0] = -3
-        A[1, 1] = 0
-        A[1, 2] = 1
-        b = ca.DM(2, 1)
-        b[0, 0] = 0
-        b[1, 0] = 0
+        ref_model.inputs = list(map(Variable, [x]))
+        ref_model.outputs = list(map(Variable, [y1, y2, y3]))
+        ref_model.alg_states = list(map(Variable, [y1, y2, y3]))
+        ref_model.parameters = list(map(Variable, [y_max]))
+        ref_model.parameters[0].value = 10
+        ref_model.equations = [
+            y1 - ca.if_else(x > 0, 1, 0) * y_max,
+            ca.if_else(x > 1,
+                           y2 - y_max,
+                           ca.if_else(x > 2,
+                               y2 - y_max - 1,
+                               y2)),
+            ca.if_else(x > 1,
+                           y3 - 100,
+                           ca.if_else(x > 2,
+                               y3 - 1000,
+                               y3 - 10000))
+            ]
 
-        # NOTE: the symbol with the name y[1] (in Modelica/CasADi, y[0] here) is detected as an alias of x.
-
-        ref_model.states = list(map(Variable, []))
-        ref_model.der_states = list(map(Variable, []))
-        ref_model.alg_states = list(map(Variable, [x, y[1], y[2]]))
-        ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
-        x = ca.vertcat(x, y[1], y[2])
-        ref_model.equations = [ca.mtimes(A, x) + b]
-
-        # Compare
-        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
 c = GenCasadiTest()
-c.test_simplify_reduce_affine_expression_loop()
+c.test_if_else()

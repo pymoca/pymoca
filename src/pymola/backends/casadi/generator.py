@@ -42,7 +42,26 @@ COMPARE_OP_MAP = {'>': '__gt__',
 
 
 class MXArray(np.ndarray):
-    pass
+    # See https://docs.scipy.org/doc/numpy-1.10.0/user/basics.subclassing.html
+    def __new__(cls, v, info=None):
+        if isinstance(v, ca.MX):
+            # We want the single MX symbol in an array. If we try to do
+            # np.array(x) directly in this case, we get an AttributeError:
+            # "'MX' object has no attribute 'full'"
+            input_array = np.array([v], dtype=object)
+        elif np.isscalar(v):
+            input_array = np.array([v], dtype=object)
+        else:
+            input_array = np.array(v, dtype=object)
+
+        obj = np.asarray(input_array).view(cls)
+
+        return obj
+
+    @staticmethod
+    def empty(*args, **kwargs):
+        kwargs['dtype'] = object
+        return MXArray(np.empty(*args, **kwargs))
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
@@ -63,18 +82,6 @@ class ForLoop:
 
 
 Assignment = namedtuple('Assignment', ['left', 'right'])
-
-
-def _safe_ndarray(x):
-    if isinstance(x, ca.MX):
-        # We want the single MX symbol in an array. If we try to do
-        # np.array(x) directly in this case, we get an AttributeError:
-        # "'MX' object has no attribute 'full'"
-        return np.array([x], dtype=object)
-    elif np.isscalar(x):
-        return np.array([x], dtype=object)
-    else:
-        return np.array(x, dtype=object)
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
@@ -110,7 +117,7 @@ class Generator(TreeListener):
                 if mx_symbol.is_empty():
                     continue
                 if differentiate:
-                    mx_symbol = self.get_derivative(_safe_ndarray(mx_symbol))[0]
+                    mx_symbol = self.get_derivative(MXArray(mx_symbol))[0]
                 python_type = self.get_python_type(ast_symbol)
                 variable = Variable(mx_symbol, python_type)
                 if not differentiate:
@@ -174,7 +181,7 @@ class Generator(TreeListener):
         def expand_ndarray(l):
             new_l = []
             for e in l:
-                if isinstance(e, np.ndarray):
+                if isinstance(e, MXArray):
                     for e_sub in e.flatten():
                         new_l.append(e_sub)
                 else:
@@ -230,12 +237,12 @@ class Generator(TreeListener):
             src = self.get_mx(tree.operands[0])
             for i in tree.operands[1:]:
                 rhs = self.get_mx(i)
-                src = _safe_ndarray(np.dot(src, rhs))
+                src = MXArray(np.dot(src, rhs))
         elif op == 'transpose' and n_operands == 1:
             src = np.transpose(self.get_mx(tree.operands[0]))
         elif op == 'sum' and n_operands == 1:
             v = self.get_mx(tree.operands[0])
-            src = _safe_ndarray(sum(v))
+            src = MXArray(sum(v))
         elif op == 'linspace' and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
@@ -259,18 +266,18 @@ class Generator(TreeListener):
             src = np.diag(diag)
         elif op in ("min", "max", "abs") and n_operands == 1:
             ca_op = getattr(ca.MX, "f" + op)
-            src = _safe_ndarray(self.get_mx(tree.operands[0]))
-            src = _safe_ndarray(functools.reduce(ca_op, src.flat))
+            src = MXArray(self.get_mx(tree.operands[0]))
+            src = MXArray(functools.reduce(ca_op, src.flat))
         elif op in ("min", "max", "abs") and n_operands == 2:
             ca_op = getattr(ca.MX, "f" + op)
 
-            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
-            rhs = _safe_ndarray(self.get_mx(tree.operands[1]))
+            lhs = MXArray(self.get_mx(tree.operands[0]))
+            rhs = MXArray(self.get_mx(tree.operands[1]))
 
             # Modelica Spec: Operation only allowed on scalars
             assert np.prod(lhs.shape) == 1 and np.prod(rhs.shape)
 
-            src = _safe_ndarray(ca_op(lhs[0], rhs[0]))
+            src = MXArray(ca_op(lhs[0], rhs[0]))
         elif op == 'cat':
             axis = self.get_integer(tree.operands[0]) - 1
             entries  = []
@@ -278,11 +285,11 @@ class Generator(TreeListener):
             for sym in [self.get_mx(op) for op in tree.operands[1:]]:
                 if isinstance(sym, list):
                     for e in sym:
-                        entries.append(_safe_ndarray(e))
+                        entries.append(MXArray(e))
                 else:
-                    entries.append(_safe_ndarray(sym))
+                    entries.append(MXArray(sym))
 
-            src = np.concatenate(entries, axis)
+            src = MXArray(np.concatenate(entries, axis))
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
             delay_time = self.get_mx(tree.operands[1])
@@ -295,23 +302,23 @@ class Generator(TreeListener):
             self.model.delayed_states.append(delayed_state)
             self.model.inputs.append(Variable(src))
         elif op in OP_MAP and n_operands == 2:
-            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
-            rhs = _safe_ndarray(self.get_mx(tree.operands[1]))
+            lhs = MXArray(self.get_mx(tree.operands[0]))
+            rhs = MXArray(self.get_mx(tree.operands[1]))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
-            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
+            lhs = MXArray(self.get_mx(tree.operands[0]))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         elif op in COMPARE_OP_MAP and n_operands == 2:
-            lhs = _safe_ndarray(self.get_mx(tree.operands[0]))
-            rhs = _safe_ndarray(self.get_mx(tree.operands[1]))
+            lhs = MXArray(self.get_mx(tree.operands[0]))
+            rhs = MXArray(self.get_mx(tree.operands[1]))
 
             # Only allowed for scalar expressions
             assert lhs.shape == (1,) and rhs.shape == (1,)
 
             lhs_op = getattr(lhs[0], COMPARE_OP_MAP[op])
-            src = _safe_ndarray(lhs_op(rhs[0]))
+            src = MXArray(lhs_op(rhs[0]))
         else:
             src = self.get_mx(tree.operands[0])
             # Check for built-in operations, such as the
@@ -321,12 +328,12 @@ class Generator(TreeListener):
                 f = getattr(ca.MX, op)
 
                 if n_operands == 1:
-                    src = np.array([f(x) for x in src])
+                    src = MXArray([f(x) for x in src])
                 else:
                     lhs = self.get_mx(tree.operands[0])
                     rhs = self.get_mx(tree.operands[1])
 
-                    src = np.array([f(a, b) for a, b in zip(lhs, rhs)])
+                    src = MXArray([f(a, b) for a, b in zip(lhs, rhs)])
             else:
                 # We can only inline, as dimensions of array arguments may differ from call to call
                 inputs = [self.get_mx(operand) for operand in tree.operands]
@@ -341,13 +348,13 @@ class Generator(TreeListener):
 
         assert (len(tree.conditions) + 1 == len(tree.expressions))
 
-        src = _safe_ndarray(self.get_mx(tree.expressions[-1]))
+        src = MXArray(self.get_mx(tree.expressions[-1]))
 
         for cond_index in range(len(tree.conditions)):
             cond = self.get_mx(tree.conditions[-(cond_index + 1)])
             assert cond.shape == (1,), "The expression of an if or elseif-clause must be a scalar Boolean expression"
 
-            expr1 = _safe_ndarray(self.get_mx(tree.expressions[-(cond_index + 2)]))
+            expr1 = MXArray(self.get_mx(tree.expressions[-(cond_index + 2)]))
 
             for ind, s_i in np.ndenumerate(src):
                 src[ind] = ca.if_else(cond[0], expr1[ind], src[ind], True)
@@ -367,8 +374,8 @@ class Generator(TreeListener):
         else:
             src_right = self.get_mx(tree.right)
 
-        src_left = _safe_ndarray(src_left)
-        src_right = _safe_ndarray(src_right)
+        src_left = MXArray(src_left)
+        src_right = MXArray(src_right)
 
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
@@ -422,14 +429,14 @@ class Generator(TreeListener):
         f = self.for_loops[-1]
 
         if len(f.values) == 0:
-            self.src[tree] = np.array([])
+            self.src[tree] = MXArray([])
         elif f.current_value == f.values[-1]:
             for x in list(self.src.keys()):
                 if x not in f.orig_keys:
                     f.tmp_src.setdefault(x, []).append(self.src[x])
             # A ForEquation is never a right-hand side, so we can flatten the
             # equations it contains into a 1-D array
-            self.src[tree] = np.concatenate([np.concatenate(f.tmp_src[x]) for x in tree.equations])
+            self.src[tree] = MXArray(np.concatenate([np.concatenate(f.tmp_src[x]) for x in tree.equations]))
             f = self.for_loops.pop()
 
     def exitIfEquation(self, tree):
@@ -455,7 +462,7 @@ class Generator(TreeListener):
             for ind, s_i in np.ndenumerate(src):
                 src[ind] = ca.if_else(cond[0], expr1[ind], src[ind], True)
 
-        self.src[tree] = src
+        self.src[tree] = MXArray(src)  # From ndarray back to MXArray
 
     def exitAssignmentStatement(self, tree):
         logger.debug('exitAssignmentStatement')
@@ -486,7 +493,7 @@ class Generator(TreeListener):
             for s in b:
                 assignments = self.get_mx(s)
                 for assignment in assignments:
-                    rhs = _safe_ndarray(assignment.right)
+                    rhs = MXArray(assignment.right)
                     for ind, s_i in np.ndenumerate(assignment.left):
                         expanded_blocks.setdefault(assignment.left[ind], []).append(rhs[ind])
 
@@ -505,7 +512,7 @@ class Generator(TreeListener):
                 src = ca.if_else(cond[0], rhs, src, True)
 
             # Pack into ndarray again
-            all_assignments.append(Assignment(_safe_ndarray(lhs), _safe_ndarray(src)))
+            all_assignments.append(Assignment(MXArray(lhs), MXArray(src)))
 
         self.src[tree] = all_assignments
 
@@ -556,11 +563,11 @@ class Generator(TreeListener):
             for i in range(len(f.values)):
                 for assignments in [f.tmp_src[e][i] for e in tree.statements]:
                     for assignment in assignments:
-                        rhs = _safe_ndarray(assignment.right)
+                        rhs = MXArray(assignment.right)
                         for ind, s_i in np.ndenumerate(assignment.left):
                             all_assignments.append(Assignment(
-                                _safe_ndarray(assignment.left[ind]),
-                                _safe_ndarray(rhs)))
+                                MXArray(assignment.left[ind]),
+                                MXArray(rhs)))
 
             self.src[tree] = all_assignments
 
@@ -646,9 +653,9 @@ class Generator(TreeListener):
         # We currently assume "a", and not "a[1]".
 
         if np.prod(shape) == 1:
-            s = np.array([ca.MX.sym(tree.name)])
+            s = MXArray([ca.MX.sym(tree.name)])
         else:
-            s = np.ndarray(shape, dtype=object)
+            s = MXArray.empty(shape)
 
             for ind in np.ndindex(s.shape):
                 ind_str = ",".join((str(x+1) for x in ind))
@@ -663,7 +670,7 @@ class Generator(TreeListener):
         if np.isscalar(s):
             return 0
 
-        o = np.ndarray(s.shape, dtype=object)
+        o = MXArray.empty(s.shape)
 
         for ind, s_i in np.ndenumerate(s):
             if ca.MX.is_constant(s_i):
@@ -672,14 +679,14 @@ class Generator(TreeListener):
                 if s_i.name() not in self.derivative:
                     der_s_i = ca.MX.sym("der({})".format(s_i.name()))
                     self.derivative[s_i.name()] = der_s_i
-                    self.nodes[self.current_class][der_s_i.name()] = _safe_ndarray(der_s_i)
+                    self.nodes[self.current_class][der_s_i.name()] = MXArray(der_s_i)
                     o[ind] = der_s_i
                 else:
                     o[ind] = self.derivative[s_i.name()]
             else:
                 # Differentiate expression using CasADi
                 orig_deps = ca.symvar(s_i)
-                o[ind] = sum(ca.jacobian(s_i, dep) * self.get_derivative(_safe_ndarray(dep))[0] for dep in orig_deps)
+                o[ind] = sum(ca.jacobian(s_i, dep) * self.get_derivative(MXArray(dep))[0] for dep in orig_deps)
 
             return o
 
@@ -712,14 +719,14 @@ class Generator(TreeListener):
         assert len(indices) <= 2, "Dimensions higher than two are not yet supported"
 
         if len(indices) == 1:
-            return _safe_ndarray(s[indices[0]])
+            return MXArray(s[indices[0]])
         else:
-            return _safe_ndarray(s[indices[0], indices[1]])
+            return MXArray(s[indices[0], indices[1]])
 
     def get_component(self, tree):
         # Check special symbols
         if tree.name == 'time':
-            return np.array([self.model.time], dtype=object)
+            return MXArray([self.model.time])
         else:
             for f in reversed(self.for_loops):
                 if tree.name == f.name:
@@ -784,7 +791,7 @@ class Generator(TreeListener):
             src = self.get_mx(statement)
             for assignment in src:
                 for ind, v_i in np.ndenumerate(assignment.left):
-                    rhs = _safe_ndarray(assignment.right)
+                    rhs = MXArray(assignment.right)
                     [values[assignment.left[ind]]] = ca.substitute([rhs[ind]], list(values.keys()), list(values.values()))
 
         # Expand tmp
