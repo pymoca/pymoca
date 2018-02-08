@@ -397,13 +397,13 @@ class GenCasadiTest(unittest.TestCase):
         bcomp3_a = ca.MX.sym('bcomp3.a')
         bcomp3_b = ca.MX.sym('bcomp3.b')
 
-        bcomp1_v = ca.MX.sym('bcomp1.v', 3)
-        bcomp2_v = ca.MX.sym('bcomp2.v', 4)
-        bcomp3_v = ca.MX.sym('bcomp3.v', 2)
+        bcomp1_v = MXArray('bcomp1.v', 3)
+        bcomp2_v = MXArray('bcomp2.v', 4)
+        bcomp3_v = MXArray('bcomp3.v', 2)
 
         ref_model.states = []
         ref_model.der_states = []
-        ref_model.alg_states = list(map(Variable, [bcomp1_v, bcomp2_v, bcomp3_v]))
+        ref_model.alg_states = list(map(Variable, [*bcomp1_v, *bcomp2_v, *bcomp3_v]))
         ref_model.parameters = list(map(Variable, [bcomp1_a, bcomp2_a, bcomp3_a, bcomp1_b, bcomp2_b, bcomp3_b]))
         ref_model.parameters[0].value = 0
         ref_model.parameters[1].value = 0
