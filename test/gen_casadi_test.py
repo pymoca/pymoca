@@ -1236,13 +1236,30 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym('x')
         y = ca.MX.sym('y')
         z = ca.MX.sym('z')
+        u = ca.MX.sym('u', 3)
+        v = ca.MX.sym('v', 3)
+        w = ca.MX.sym('w', 3)
         der_x = ca.MX.sym('der(x)')
         der_y = ca.MX.sym('der(y)')
         der_z = ca.MX.sym('der(z)')
+        der_u = ca.MX.sym('der(u)', 3)
+        der_v = ca.MX.sym('der(v)', 3)
+        der_w = ca.MX.sym('der(w)', 3)
 
-        ref_model.states = list(map(Variable, [x, y, z]))
-        ref_model.der_states = list(map(Variable, [der_x, der_y, der_z]))
-        ref_model.equations = [der_x + der_y - 1, der_x * y + x * der_y - 2, (der_x * y - x * der_y) / (y**2) - 3, 2 * x * der_x - 4, der_z - 5, der_x * z + x * der_z + der_y * z + y * der_z - 4, 0]
+        ref_model.states = list(map(Variable, [x, y, z, u, v, w]))
+        ref_model.der_states = list(map(Variable, [der_x, der_y, der_z, der_u, der_v, der_w]))
+        ref_model.equations = [der_x + der_y - 1,
+                               der_x * y + x * der_y - 2,
+                               (der_x * y - x * der_y) / (y**2) - 3,
+                               2 * x * der_x - 4,
+                               der_z - 5,
+                               der_x * z + x * der_z + der_y * z + y * der_z - 4,
+                               0,
+                               der_u - np.array([1, 2, 3]),
+                               der_v[0] - 4,
+                               der_v[1] - 5,
+                               der_v[2] - 6,
+                               der_w - np.array([7, 8, 9])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
