@@ -68,6 +68,7 @@ class Model:
         self.initial_equations = []
         self.time = ca.MX.sym('time')
         self.delayed_states = []
+        self._expand_mx_func = lambda x: x
 
     def __str__(self):
         r = ""
@@ -586,37 +587,33 @@ class Model:
                     setattr(self, equation_list, equations)
 
         if options.get('expand_mx', False):
-            logger.info("Expanding MX graph")
-            
-            if len(self.equations) > 0:
-                self.equations = ca.matrix_expand(self.equations)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.matrix_expand(self.initial_equations)
+            logger.info("Expanded MX functions will be returned")
+            self._expand_mx_func = lambda x: x.expand()
 
         logger.info("Finished model simplification")
 
     @property
     def dae_residual_function(self):
         if hasattr(self, '_states_vector'):
-            return ca.Function('dae_residual', [self.time, self._states_vector, self._der_states_vector,
+            return self._expand_mx_func(ca.Function('dae_residual', [self.time, self._states_vector, self._der_states_vector,
                                                 self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [])
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else []))
         else:
-            return ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
+            return self._expand_mx_func(ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
                                                 ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [])
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else []))
 
     # noinspection PyUnusedLocal
     @property
     def initial_residual_function(self):
         if hasattr(self, '_states_vector'):
-            return ca.Function('initial_residual', [self.time, self._states_vector, self._der_states_vector,
+            return self._expand_mx_func(ca.Function('initial_residual', [self.time, self._states_vector, self._der_states_vector,
                                                 self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else []))
         else:
-            return ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
+            return self._expand_mx_func(ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
                                                 ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [])
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else []))
 
     # noinspection PyPep8Naming
     @property
