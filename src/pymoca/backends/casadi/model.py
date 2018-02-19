@@ -660,4 +660,5 @@ class Model:
                 out_.append(o_)
             out = out_
             in_var = in_var_
-        return ca.Function('variable_metadata', [in_var], out)
+
+        return self._expand_mx_func(ca.Function('variable_metadata', [in_var], out))
