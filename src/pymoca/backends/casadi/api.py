@@ -145,7 +145,8 @@ def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
             os.remove(object_name)
     return library
 
-def _save_model(model_folder: str, model_name: str, model: Model, cache=True, codegen=False):
+def _save_model(model_folder: str, model_name: str, model: Model,
+                compiler_options: Dict[str, str], cache=True, codegen=False):
     # Compilation takes precedence over caching, and disables it
     if cache and codegen:
         logger.warning("Both 'cache' and 'codegen' specified. Code generation will take precedence.")
@@ -172,6 +173,8 @@ def _save_model(model_folder: str, model_name: str, model: Model, cache=True, co
         db.update(objects)
 
         db['library_os'] = os.name
+
+        db['options'] = compiler_options
 
         # Describe variables per category
         for key in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
@@ -208,6 +211,9 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
 
         if db['library_os'] != os.name:
             raise InvalidCacheError('Cache generated for incompatible OS')
+
+        if db['options'] != compiler_options:
+            raise InvalidCacheError('Cache generated for different compiler options')
 
         # Include references to the shared libraries
         for o in ['dae_residual', 'initial_residual', 'variable_metadata']:
@@ -294,7 +300,7 @@ def transfer_model(model_folder: str, model_name: str, compiler_options=None):
             if raise_expand_warning:
                 logger.warning("Caching implies expanding to SX. Setting 'expand_mx' to True.")
             model = _compile_model(model_folder, model_name, compiler_options)
-            _save_model(model_folder, model_name, model, cache, codegen)
+            _save_model(model_folder, model_name, model, compiler_options, cache, codegen)
             return model
     else:
         return _compile_model(model_folder, model_name, compiler_options)
