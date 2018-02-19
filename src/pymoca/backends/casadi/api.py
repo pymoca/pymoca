@@ -280,14 +280,19 @@ def transfer_model(model_folder: str, model_name: str, compiler_options=None):
     codegen = compiler_options.get('codegen', False)
 
     if cache or codegen:
-        # Until CasADi supports pickling MXFunctions, caching implies expanding to SX.
+        # Until CasADi supports pickling MXFunctions, caching implies
+        # expanding to SX. We only raise a warning when we have to (re)compile
+        # the model though.
+        raise_expand_warning = False
         if cache and not compiler_options.get('expand_mx', False):
-            logger.warning("Caching implies expanding to SX. Setting 'expand_mx' to True.")
             compiler_options['expand_mx'] = True
+            raise_expand_warning = True
 
         try:
             return _load_model(model_folder, model_name, compiler_options)
         except (FileNotFoundError, InvalidCacheError):
+            if raise_expand_warning:
+                logger.warning("Caching implies expanding to SX. Setting 'expand_mx' to True.")
             model = _compile_model(model_folder, model_name, compiler_options)
             _save_model(model_folder, model_name, model, cache, codegen)
             return model
