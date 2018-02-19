@@ -74,14 +74,6 @@ class CachedModel(Model):
 class InvalidCacheError(Exception):
     pass
 
-
-class ObjectData:
-    # This is not a named tuple, since we need read/write access to 'library'
-    def __init__(self, key, library):
-        self.key = key
-        self.library = library
-
-
 def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]):
     # Load folders
     tree = None
@@ -110,7 +102,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
 
     return model
 
-def _save_model(model_folder: str, model_name: str, model: Model):
+def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
     # Compile shared libraries
     if os.name == 'posix':
         compiler_flags = ['-O2', '-fPIC']
@@ -119,44 +111,54 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         compiler_flags = ['/O2', '/wd4101']  # Shut up unused local variable warnings.
         linker_flags = ['/DLL']
 
-    objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
-    for o, d in objects.items():
+    # Generate C code
+    logger.debug("Generating {}".format(library_name))
+
+    cg = ca.CodeGenerator(library_name)
+    cg.add(f, True) # Nondifferentiated function
+    cg.add(f.forward(1), True) # Jacobian-times-vector product
+    cg.add(f.reverse(1), True) # vector-times-Jacobian product
+    cg.add(f.reverse(1).forward(1), True) # Hessian-times-vector product
+    cg.generate(model_folder + '/')
+
+    compiler = distutils.ccompiler.new_compiler()
+
+    file_name = os.path.relpath(os.path.join(model_folder, library_name + '.c'))
+    object_name = compiler.object_filenames([file_name])[0]
+    library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
+    try:
+        # NOTE: For some reason running in debug mode in PyCharm (2017.1)
+        # on Windows causes cl.exe to fail on its own binary name (?!) and
+        # the include paths. This does not happen when running directly
+        # from cmd.exe / PowerShell or e.g. with debug mode in VS Code.
+        compiler.compile([file_name], extra_postargs=compiler_flags)
+
+        # We do not want the "lib" prefix on POSIX systems, so we call
+        # link() directly with our desired filename instead of
+        # link_shared_lib().
+        compiler.link(compiler.SHARED_LIBRARY, [object_name], library, extra_preargs=linker_flags)
+    except:
+        raise
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(file_name)
+            os.remove(object_name)
+    return library
+
+def _save_model(model_folder: str, model_name: str, model: Model, cache=True, codegen=False):
+    # Compilation takes precedence over caching, and disables it
+    if cache and codegen:
+        logger.warning("Both 'cache' and 'codegen' specified. Code generation will take precedence.")
+        cache = False
+
+    objects = {'dae_residual': None, 'initial_residual': None, 'variable_metadata': None}
+    for o in objects.keys():
         f = getattr(model, o + '_function')
 
-        # Generate C code
-        library_name = '{}_{}'.format(model_name, o)
-
-        logger.debug("Generating {}".format(library_name))
-
-        cg = ca.CodeGenerator(library_name)
-        cg.add(f, True) # Nondifferentiated function
-        cg.add(f.forward(1), True) # Jacobian-times-vector product
-        cg.add(f.reverse(1), True) # vector-times-Jacobian product
-        cg.add(f.reverse(1).forward(1), True) # Hessian-times-vector product
-        cg.generate(model_folder + '/')
-
-        compiler = distutils.ccompiler.new_compiler()
-
-        file_name = os.path.relpath(os.path.join(model_folder, library_name + '.c'))
-        object_name = compiler.object_filenames([file_name])[0]
-        d.library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
-        try:
-            # NOTE: For some reason running in debug mode in PyCharm (2017.1)
-            # on Windows causes cl.exe to fail on its own binary name (?!) and
-            # the include paths. This does not happen when running directly
-            # from cmd.exe / PowerShell or e.g. with debug mode in VS Code.
-            compiler.compile([file_name], extra_postargs=compiler_flags)
-
-            # We do not want the "lib" prefix on POSIX systems, so we call
-            # link() directly with our desired filename instead of
-            # link_shared_lib().
-            compiler.link(compiler.SHARED_LIBRARY, [object_name], d.library, extra_preargs=linker_flags)
-        except:
-            raise
-        finally:
-            with contextlib.suppress(FileNotFoundError):
-                os.remove(file_name)
-                os.remove(object_name)
+        if codegen:
+            objects[o] = _codegen_model(model_folder, f, '{}_{}'.format(model_name, o))
+        else:
+            objects[o] = f
 
     # Output metadata
     db_file = os.path.join(model_folder, model_name)
@@ -166,9 +168,9 @@ def _save_model(model_folder: str, model_name: str, model: Model):
         # Store version
         db['version'] = __version__
 
-        # Include references to the shared libraries
-        for o, d in objects.items():
-            db[d.key] = d.library
+        # Include references to the shared libraries (codegen) or pickled functions (cache)
+        db.update(objects)
+
         db['library_os'] = os.name
 
         # Describe variables per category
@@ -197,9 +199,6 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
     # Create empty model object
     model = CachedModel()
 
-    # Compile shared libraries
-    objects = {'dae_residual': ObjectData('dae_residual', ''), 'initial_residual': ObjectData('initial_residual', ''), 'variable_metadata': ObjectData('variable_metadata', '')}
-
     # Load metadata
     with open(db_file, 'rb') as f:
         db = pickle.load(f)
@@ -211,8 +210,14 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
             raise InvalidCacheError('Cache generated for incompatible OS')
 
         # Include references to the shared libraries
-        for o, d in objects.items():
-            f = ca.external(o, db[d.key])
+        for o in ['dae_residual', 'initial_residual', 'variable_metadata']:
+            if isinstance(db[o], str):
+                # Path to codegen'd library
+                f = ca.external(o, db[o])
+            else:
+                # Pickled CasADi Function; use as is
+                assert isinstance(db[o], ca.Function)
+                f = db[o]
 
             setattr(model, '_' + o + '_function', f)
 
@@ -271,12 +276,20 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
 def transfer_model(model_folder: str, model_name: str, compiler_options=None):
     if compiler_options is None:
         compiler_options = {}
-    if compiler_options.get('cache', False):
+    cache = compiler_options.get('cache', False)
+    codegen = compiler_options.get('codegen', False)
+
+    if cache or codegen:
+        # Until CasADi supports pickling MXFunctions, caching implies expanding to SX.
+        if cache and not compiler_options.get('expand_mx', False):
+            logger.warning("Caching implies expanding to SX. Setting 'expand_mx' to True.")
+            compiler_options['expand_mx'] = True
+
         try:
             return _load_model(model_folder, model_name, compiler_options)
         except (FileNotFoundError, InvalidCacheError):
             model = _compile_model(model_folder, model_name, compiler_options)
-            _save_model(model_folder, model_name, model)
+            _save_model(model_folder, model_name, model, cache, codegen)
             return model
     else:
         return _compile_model(model_folder, model_name, compiler_options)

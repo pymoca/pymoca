@@ -636,7 +636,30 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         self.assertTrue(True)
 
-    def test_caching(self):
+    def test_cache(self):
+        # Clear cache
+        db_file = os.path.join(MODEL_DIR, 'Aircraft')
+        try:
+            os.remove(db_file)
+        except:
+            pass
+
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'cache': True}
+
+        ref_model = transfer_model(MODEL_DIR, 'Aircraft', compiler_options)
+        self.assertIsInstance(ref_model, Model)
+        self.assertNotIsInstance(ref_model, CachedModel)
+
+        cached_model = transfer_model(MODEL_DIR, 'Aircraft', compiler_options)
+        self.assertIsInstance(cached_model, Model)
+        self.assertIsInstance(cached_model, CachedModel)
+
+        # Compare
+        self.assert_model_equivalent_numeric(ref_model, cached_model)
+
+    def test_codegen(self):
         # Clear cache
         db_file = os.path.join(MODEL_DIR, 'Aircraft')
         try:
@@ -653,7 +676,7 @@ class GenCasadiTest(unittest.TestCase):
 
         # Create model, cache it, and load the cache
         compiler_options = \
-            {'cache': True}
+            {'codegen': True}
 
         ref_model = transfer_model(MODEL_DIR, 'Aircraft', compiler_options)
         self.assertIsInstance(ref_model, Model)
