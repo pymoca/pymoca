@@ -1284,5 +1284,24 @@ class GenCasadiTest(unittest.TestCase):
         casadi_model = transfer_model(MODEL_DIR, 'InlineAssignment', {'detect_aliases': True})
         self.assertTrue(casadi_model.inputs[0].fixed)
 
+    def test_unspecified_dimensions(self):
+        with open(os.path.join(MODEL_DIR, 'UnspecifiedDimensions.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'B')
+
+        a_x = casadi_model.parameters[0]
+        a_y = casadi_model.parameters[1]
+
+        self.assertTrue(a_x.symbol.name() == "a.x")
+        self.assertEqual(a_x.value, [[ 88.3224,  281.642,  143.011],
+                                     [ 58.8183, -24.9845,      0.0],
+                                     [-1.45483,      0.0,      0.0]])
+
+        self.assertTrue(a_y.symbol.name() == "a.y")
+        self.assertEqual(a_y.value, [[1, 2],
+                                     [3, 4],
+                                     [5, 6]])
+
 if __name__ == "__main__":
     unittest.main()

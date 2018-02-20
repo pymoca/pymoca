@@ -541,6 +541,28 @@ class Generator(TreeListener):
         # Create symbol
         shape = self.get_shape(tree)
         assert(len(shape) <= 2)
+
+        if any(isinstance(x, slice) for x in shape):
+            # Symbol has unspecified dimensions. Value is specified, and
+            # carries the correct dimensions.
+
+            # We should only get slices as dimensions for a symbol if one of
+            # the dimensions is unspecified, i.e. None.
+            assert None in itertools.chain.from_iterable((x.start, x.stop) for x in shape if isinstance(x, slice))
+
+            val_shape = np.array(self.src[tree.value]).shape
+
+            # Check if specified dimensions agree between definition and value
+            for dim_i, dim_size in enumerate(shape):
+                if isinstance(dim_size, slice):
+                    continue
+
+                if val_shape[dim_i] != dim_size:
+                    raise Exception("Dimension {} of definition and value for symbol {} differs: {} != {}".format(
+                        dim_i + 1, tree.name, dim_size, val_shape[dim_i]))
+
+            shape = val_shape
+
         s = ca.MX.sym(tree.name, *shape)
         self.nodes[self.current_class][tree.name] = s
         return s
