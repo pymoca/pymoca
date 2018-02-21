@@ -13,7 +13,7 @@ from pymola import parser
 from pymola import tree
 from pymola import ast
 
-TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'models')
 
 
 class ParseTest(unittest.TestCase):
@@ -34,7 +34,7 @@ class ParseTest(unittest.TestCase):
         time.sleep(0.1)
 
     def test_aircraft(self):
-        with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         print('AST TREE\n', ast_tree)
@@ -44,7 +44,7 @@ class ParseTest(unittest.TestCase):
 
     @unittest.skip
     def test_bouncing_ball(self):
-        with open(os.path.join(TEST_DIR, 'BouncingBall.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'BouncingBall.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         print('AST TREE\n', ast_tree)
@@ -54,7 +54,7 @@ class ParseTest(unittest.TestCase):
         self.flush()
 
     def test_estimator(self):
-        with open(os.path.join(TEST_DIR, './Estimator.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, './Estimator.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         print('AST TREE\n', ast_tree)
@@ -63,7 +63,7 @@ class ParseTest(unittest.TestCase):
         self.flush()
 
     def test_spring(self):
-        with open(os.path.join(TEST_DIR, 'Spring.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Spring.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         print('AST TREE\n', ast_tree)
@@ -72,7 +72,7 @@ class ParseTest(unittest.TestCase):
         self.flush()
 
     def test_spring_system(self):
-        with open(os.path.join(TEST_DIR, 'SpringSystem.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'SpringSystem.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         print('AST TREE\n', ast_tree)
@@ -81,7 +81,7 @@ class ParseTest(unittest.TestCase):
         self.flush()
 
     def test_duplicate_state(self):
-        with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'DuplicateState.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         print('AST TREE\n', ast_tree)
@@ -90,7 +90,7 @@ class ParseTest(unittest.TestCase):
         self.flush()
 
     def test_connector(self):
-        with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Connector.mo'), 'r') as f:
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
@@ -102,7 +102,7 @@ class ParseTest(unittest.TestCase):
         self.flush()
 
     def test_inheritance(self):
-        with open(os.path.join(TEST_DIR, 'InheritanceInstantiation.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'InheritanceInstantiation.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='C2'))
@@ -112,7 +112,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['C2'].symbols['bcomp3.b'].value.value, 2.0)
 
     def test_nested_classes(self):
-        with open(os.path.join(TEST_DIR, 'NestedClasses.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'NestedClasses.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='C2'))
@@ -121,7 +121,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['C2'].symbols['v2'].nominal.value, 1000.0)
 
     def test_inheritance_symbol_modifiers(self):
-        with open(os.path.join(TEST_DIR, 'Inheritance.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Inheritance.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='Sub'))
@@ -129,7 +129,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['Sub'].symbols['x'].max.value, 30.0)
 
     def test_extends_modification(self):
-        with open(os.path.join(TEST_DIR, 'ExtendsModification.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ExtendsModification.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='MainModel'))
@@ -137,7 +137,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['MainModel'].symbols['e.HQ.H'].min.name, "e.H_b")
 
     def test_tree_lookup(self):
-        with open(os.path.join(TEST_DIR, 'TreeLookup.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'TreeLookup.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -155,7 +155,7 @@ class ParseTest(unittest.TestCase):
         self.assertIn('b',         flat_tree.classes['Test'].symbols.keys())
 
     def test_function_pull(self):
-        with open(os.path.join(TEST_DIR, 'FunctionPull.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'FunctionPull.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -190,7 +190,7 @@ class ParseTest(unittest.TestCase):
                          'Level1.Level2.Level3.TestPackage.times2')
 
     def test_nested_symbol_modification(self):
-        with open(os.path.join(TEST_DIR, 'NestedSymbolModification.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'NestedSymbolModification.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -202,7 +202,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['E'].symbols['c.x'].nominal.value, 2.0)
 
     def test_redeclare_in_extends(self):
-        with open(os.path.join(TEST_DIR, 'RedeclareInExtends.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'RedeclareInExtends.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -214,7 +214,7 @@ class ParseTest(unittest.TestCase):
         self.assertIn('down.Z', flat_tree.classes['ChannelZ'].symbols)
 
     def test_redeclaration_scope(self):
-        with open(os.path.join(TEST_DIR, 'RedeclarationScope.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'RedeclarationScope.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -227,7 +227,7 @@ class ParseTest(unittest.TestCase):
         self.assertIn('c.down.A', flat_tree.classes['ChannelZ'].symbols)
 
     def test_extends_redeclareable(self):
-        with open(os.path.join(TEST_DIR, 'ExtendsRedeclareable.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ExtendsRedeclareable.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -240,14 +240,14 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['E'].symbols['z.y'].nominal.value, 2.0)
 
     def test_redeclare_nested(self):
-        with open(os.path.join(TEST_DIR, 'RedeclareNestedClass.mo.fail_parse'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'RedeclareNestedClass.mo.fail_parse'), 'r') as f:
             txt = f.read()
 
         with self.assertRaises(Exception):
             ast_tree = parser.parse(txt)
 
     def test_extends_order(self):
-        with open(os.path.join(TEST_DIR, 'ExtendsOrder.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ExtendsOrder.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -259,7 +259,7 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['M'].symbols['at.m'].value.value, 0.0)
 
     def test_constant_references(self):
-        with open(os.path.join(TEST_DIR, 'ConstantReferences.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ConstantReferences.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -273,7 +273,7 @@ class ParseTest(unittest.TestCase):
 
 
     def test_parameter_modification_scope(self):
-        with open(os.path.join(TEST_DIR, 'ParameterScope.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ParameterScope.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 

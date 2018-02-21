@@ -15,6 +15,8 @@ from pymola import tree
 from pymola import ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+MODEL_DIR = os.path.join(TEST_DIR, 'models')
+GENERATED_DIR = os.path.join(TEST_DIR, 'generated')
 
 
 class GenSympyTest(unittest.TestCase):
@@ -35,11 +37,11 @@ class GenSympyTest(unittest.TestCase):
         time.sleep(0.01)
 
     def test_estimator(self):
-        with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Estimator.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, 'Estimator')
-        with open(os.path.join(TEST_DIR, 'generated/Estimator.py'), 'w') as f:
+        with open(os.path.join(GENERATED_DIR, 'Estimator.py'), 'w') as f:
             f.write(text)
         from test.generated.Estimator import Estimator as Estimator
         e = Estimator()
@@ -50,13 +52,13 @@ class GenSympyTest(unittest.TestCase):
         self.flush()
 
     def test_spring(self):
-        with open(os.path.join(TEST_DIR, 'SpringSystem.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'SpringSystem.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='SpringSystem'))
         print(flat_tree)
         text = gen_sympy.generate(ast_tree, 'SpringSystem')
-        with open(os.path.join(TEST_DIR, 'generated/Spring.py'), 'w') as f:
+        with open(os.path.join(GENERATED_DIR, 'Spring.py'), 'w') as f:
             f.write(text)
         from test.generated.Spring import SpringSystem as SpringSystem
         e = SpringSystem()
@@ -67,12 +69,12 @@ class GenSympyTest(unittest.TestCase):
         self.flush()
 
     def test_aircraft(self):
-        with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, 'Aircraft')
-        with open(os.path.join(TEST_DIR, 'generated/Aircraft.py'), 'w') as f:
+        with open(os.path.join(GENERATED_DIR, 'Aircraft.py'), 'w') as f:
             f.write(text)
         from test.generated.Aircraft import Aircraft as Aircraft
         e = Aircraft()
@@ -83,12 +85,12 @@ class GenSympyTest(unittest.TestCase):
         self.flush()
 
     def test_quad(self):
-        with open(os.path.join(TEST_DIR, 'Quad.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Quad.mo'), 'r') as f:
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, 'Quad')
-        with open(os.path.join(TEST_DIR, 'generated/Quad.py'), 'w') as f:
+        with open(os.path.join(GENERATED_DIR, 'Quad.py'), 'w') as f:
             f.write(text)
         from test.generated.Quad import Quad as Quad
         e = Quad()
@@ -100,7 +102,7 @@ class GenSympyTest(unittest.TestCase):
 
     @unittest.skip
     def test_connector(self):
-        with open(os.path.join(TEST_DIR, 'Connector.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Connector.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         # print(ast_tree)
@@ -132,7 +134,7 @@ class GenSympyTest(unittest.TestCase):
 
         # text = gen_sympy.generate(ast_tree, 'Aircraft')
         # print(text)
-        # with open(os.path.join(TEST_DIR, 'generated/Connect.py'), 'w') as f:
+        # with open(os.path.join(MODEL_DIR, 'generated/Connect.py'), 'w') as f:
         #    f.write(text)
 
         # from generated.Connect import Aircraft as Aircraft
