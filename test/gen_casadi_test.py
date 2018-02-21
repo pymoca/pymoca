@@ -19,7 +19,7 @@ from pymola.backends.casadi.api import transfer_model, CachedModel
 from pymola import parser, ast
 
 
-TEST_DIR = os.path.dirname(os.path.realpath(__file__))
+MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'models')
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
@@ -75,7 +75,7 @@ class GenCasadiTest(unittest.TestCase):
         return True
 
     def test_spring(self):
-        with open(os.path.join(TEST_DIR, 'Spring.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Spring.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Spring')
@@ -97,7 +97,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_estimator(self):
-        with open(os.path.join(TEST_DIR, 'Estimator.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Estimator.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Estimator')
@@ -117,7 +117,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_aircraft(self):
-        with open(os.path.join(TEST_DIR, 'Aircraft.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         # noinspection PyUnusedLocal
@@ -127,7 +127,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertTrue(True)
 
     def test_connector_hq(self):
-        with open(os.path.join(TEST_DIR, 'ConnectorHQ.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ConnectorHQ.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'System')
@@ -188,7 +188,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_connector_hqz(self):
-        with open(os.path.join(TEST_DIR, 'ConnectorHQZ.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ConnectorHQZ.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'SystemZ')
@@ -269,7 +269,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_tree_lookup(self):
-        with open(os.path.join(TEST_DIR, 'TreeLookup.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'TreeLookup.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
@@ -290,7 +290,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent(ref_model, casadi_model)
 
     def test_duplicate(self):
-        with open(os.path.join(TEST_DIR, 'DuplicateState.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'DuplicateState.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'DuplicateState')
@@ -309,7 +309,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_if_else(self):
-        with open(os.path.join(TEST_DIR, 'IfElse.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'IfElse.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'IfElse')
@@ -335,7 +335,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_inheritance(self):
-        with open(os.path.join(TEST_DIR, 'Inheritance.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Inheritance.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Sub')
@@ -359,7 +359,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_inheritance_instantiation(self):
-        with open(os.path.join(TEST_DIR, 'InheritanceInstantiation.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'InheritanceInstantiation.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'C2')
@@ -392,7 +392,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_nested_classes(self):
-        with open(os.path.join(TEST_DIR, 'NestedClasses.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'NestedClasses.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'C2')
@@ -412,7 +412,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_builtin(self):
-        with open(os.path.join(TEST_DIR, 'BuiltinFunctions.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'BuiltinFunctions.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'BuiltinFunctions')
@@ -433,7 +433,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_function_call(self):
-        with open(os.path.join(TEST_DIR, 'FunctionCall.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'FunctionCall.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
@@ -459,7 +459,7 @@ class GenCasadiTest(unittest.TestCase):
 
     @unittest.skip
     def test_double_function_call(self):
-        with open(os.path.join(TEST_DIR, 'DoubleFunctionCall.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'DoubleFunctionCall.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'FunctionCall')
@@ -473,7 +473,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(func_a, func_b)
 
     def test_forloop(self):
-        with open(os.path.join(TEST_DIR, 'ForLoop.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ForLoop.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'ForLoop')
@@ -505,7 +505,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_arrayexpressions(self):
-        with open(os.path.join(TEST_DIR, 'ArrayExpressions.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'ArrayExpressions.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'ArrayExpressions')
@@ -556,7 +556,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_matrixexpressions(self):
-        with open(os.path.join(TEST_DIR, 'MatrixExpressions.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'MatrixExpressions.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'MatrixExpressions')
@@ -584,7 +584,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_attributes(self):
-        with open(os.path.join(TEST_DIR, 'Attributes.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Attributes.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Attributes')
@@ -630,7 +630,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_type(self):
-        with open(os.path.join(TEST_DIR, 'Type.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'Type.mo'), 'r') as f:
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
@@ -638,28 +638,28 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_caching(self):
         # Clear cache
-        db_file = os.path.join(TEST_DIR, 'Aircraft')
+        db_file = os.path.join(MODEL_DIR, 'Aircraft')
         try:
             os.remove(db_file)
         except:
             pass
 
-        for f in glob.glob(os.path.join(TEST_DIR, "Aircraft*.so")):
+        for f in glob.glob(os.path.join(MODEL_DIR, "Aircraft*.so")):
             os.remove(f)
-        for f in glob.glob(os.path.join(TEST_DIR, "Aircraft*.dll")):
+        for f in glob.glob(os.path.join(MODEL_DIR, "Aircraft*.dll")):
             os.remove(f)
-        for f in glob.glob(os.path.join(TEST_DIR, "Aircraft*.dylib")):
+        for f in glob.glob(os.path.join(MODEL_DIR, "Aircraft*.dylib")):
             os.remove(f)
 
         # Create model, cache it, and load the cache
         compiler_options = \
             {'cache': True}
 
-        ref_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
+        ref_model = transfer_model(MODEL_DIR, 'Aircraft', compiler_options)
         self.assertIsInstance(ref_model, Model)
         self.assertNotIsInstance(ref_model, CachedModel)
 
-        cached_model = transfer_model(TEST_DIR, 'Aircraft', compiler_options)
+        cached_model = transfer_model(MODEL_DIR, 'Aircraft', compiler_options)
         self.assertIsInstance(cached_model, Model)
         self.assertIsInstance(cached_model, CachedModel)
 
@@ -671,7 +671,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'replace_constant_values': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -715,7 +715,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'replace_parameter_expressions': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -758,7 +758,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'replace_parameter_values': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -803,7 +803,7 @@ class GenCasadiTest(unittest.TestCase):
             {'replace_parameter_values': True,
              'replace_parameter_expressions': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -847,7 +847,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'eliminate_constant_assignments': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -892,7 +892,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'eliminable_variable_expression': r'_\w+'}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -936,7 +936,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'detect_aliases': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -978,7 +978,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'detect_aliases': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'NegativeAlias', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'NegativeAlias', compiler_options)
 
         ref_model = Model()
 
@@ -1004,7 +1004,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'expand_vectors': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'SimplifyVector', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'SimplifyVector', compiler_options)
 
         ref_model = Model()
 
@@ -1034,7 +1034,7 @@ class GenCasadiTest(unittest.TestCase):
              'replace_parameter_expressions': True,
              'replace_parameter_values': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'SimplifyLoop', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'SimplifyLoop', compiler_options)
 
         ref_model = Model()
 
@@ -1069,7 +1069,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'reduce_affine_expression': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -1140,7 +1140,7 @@ class GenCasadiTest(unittest.TestCase):
              'eliminable_variable_expression': r'_\w+',
              'reduce_affine_expression': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -1185,7 +1185,7 @@ class GenCasadiTest(unittest.TestCase):
         compiler_options = \
             {'expand_mx': True}
 
-        casadi_model = transfer_model(TEST_DIR, 'Simplify', compiler_options)
+        casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
         ref_model = Model()
 
@@ -1226,7 +1226,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_state_annotator(self):
-        with open(os.path.join(TEST_DIR, 'StateAnnotator.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, 'StateAnnotator.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'StateAnnotator')
@@ -1272,16 +1272,16 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(list(a), [('d', ['a', '-b', '-c'])])
 
     def test_cat_params(self):
-        casadi_model = transfer_model(TEST_DIR, 'Concat', {'replace_constant_values': True})
+        casadi_model = transfer_model(MODEL_DIR, 'Concat', {'replace_constant_values': True})
         c = [0, 1, 2, 2, 2, 0, 1]
         for i, e in enumerate(c):
             self.assertEqual(casadi_model.parameters[1].value[i], e)
 
     def test_inline_input_assignment(self):
-        casadi_model = transfer_model(TEST_DIR, 'InlineAssignment')
+        casadi_model = transfer_model(MODEL_DIR, 'InlineAssignment')
         self.assertTrue(casadi_model.inputs[0].fixed)
         self.assertFalse(casadi_model.alg_states[0].fixed)
-        casadi_model = transfer_model(TEST_DIR, 'InlineAssignment', {'detect_aliases': True})
+        casadi_model = transfer_model(MODEL_DIR, 'InlineAssignment', {'detect_aliases': True})
         self.assertTrue(casadi_model.inputs[0].fixed)
 
 if __name__ == "__main__":
