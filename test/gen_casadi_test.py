@@ -651,69 +651,41 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_delay_for_loop_with_expand_vectors(self):
-        with open(os.path.join(MODEL_DIR, 'DelayForLoop.mo'), 'r') as f:
-            txt = f.read()
-        ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'DelayForLoop')
-        casadi_model.simplify({'expand_vectors': True, 'detect_aliases': True})
-        print(casadi_model)
+        # There are two ways in which expansion of vectors happens; one with
+        # and one without expand_mx. We test both code paths.
+        for expand_mx in (True, False):
+            with open(os.path.join(MODEL_DIR, 'DelayForLoop.mo'), 'r') as f:
+                txt = f.read()
+            ast_tree = parser.parse(txt)
+            casadi_model = gen_casadi.generate(ast_tree, 'DelayForLoop')
+            casadi_model.simplify({'expand_vectors': True,
+                                   'detect_aliases': True,
+                                   'expand_mx': expand_mx})
 
-        ref_model = Model()
+            print(casadi_model)
 
-        def _array_mx(name, n):
-            return np.array([ca.MX.sym("{}[{}]".format(name, i+1)) for i in range(n)])
+            ref_model = Model()
 
-        x = _array_mx("x", 3)
-        y = _array_mx("y", 3)
-        a = _array_mx("a", 3)
-        z = _array_mx("z", 3)
-        at3_delayed = _array_mx("_pymoca_delay_0", 2)
-        delay_time = ca.MX.sym("delay_time")
-        eps = _array_mx("eps", 1)
+            def _array_mx(name, n):
+                return np.array([ca.MX.sym("{}[{}]".format(name, i+1)) for i in range(n)])
 
-        ref_model.alg_states = list(map(Variable, [*x, *y, *a]))
-        ref_model.parameters = list(map(Variable, [*eps]))
-        ref_model.inputs = list(map(Variable, [*at3_delayed, *z, delay_time]))
-        ref_model.inputs[-1].fixed = True
-        # TODO: "a" is not yet detected as an alias of "x" when expanding.
-        ref_model.equations = [*(x[1:3] - 5 * z[1:3] * eps), *(y[1:3] - at3_delayed), *(a - x)]
-        ref_model.delay_states = [*at3_delayed]
-        ref_model.delay_arguments = [DelayArgument(3 * a_i * eps[0], delay_time) for a_i in a[1:3]]
+            x = _array_mx("x", 3)
+            y = _array_mx("y", 3)
+            a = _array_mx("a", 3)
+            z = _array_mx("z", 3)
+            at3_delayed = _array_mx("_pymoca_delay_0", 2)
+            delay_time = ca.MX.sym("delay_time")
+            eps = _array_mx("eps", 1)
 
-        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+            ref_model.alg_states = list(map(Variable, [*x, y[0]]))
+            ref_model.parameters = list(map(Variable, [*eps]))
+            ref_model.inputs = list(map(Variable, [*at3_delayed, *z, delay_time]))
+            ref_model.inputs[-1].fixed = True
+            ref_model.equations = [*(x[1:] - 5 * z[1:] * eps)]
+            ref_model.delay_states = [*at3_delayed]
+            ref_model.delay_arguments = [DelayArgument(3 * x_i * eps[0], delay_time) for x_i in x[1:]]
 
-    def test_delay_for_loop_with_expand_vectors_and_expand_mx(self):
-        with open(os.path.join(MODEL_DIR, 'DelayForLoop.mo'), 'r') as f:
-            txt = f.read()
-        ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'DelayForLoop')
-        casadi_model.simplify({'expand_vectors': True,
-                               'detect_aliases': True,
-                               'expand_mx': True})
-        print(casadi_model)
-
-        ref_model = Model()
-
-        def _array_mx(name, n):
-            return np.array([ca.MX.sym("{}[{}]".format(name, i+1)) for i in range(n)])
-
-        x = _array_mx("x", 3)
-        y = _array_mx("y", 3)
-        a = _array_mx("a", 3)
-        z = _array_mx("z", 3)
-        at3_delayed = _array_mx("_pymoca_delay_0", 2)
-        delay_time = ca.MX.sym("delay_time")
-        eps = _array_mx("eps", 1)
-
-        ref_model.alg_states = list(map(Variable, [*x, y[0]]))
-        ref_model.parameters = list(map(Variable, [*eps]))
-        ref_model.inputs = list(map(Variable, [*at3_delayed, *z, delay_time]))
-        ref_model.inputs[-1].fixed = True
-        ref_model.equations = [*(x[1:] - 5 * z[1:] * eps)]
-        ref_model.delay_states = [*at3_delayed]
-        ref_model.delay_arguments = [DelayArgument(3 * x_i * eps[0], delay_time) for x_i in x[1:]]
-
-        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+            self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
     def test_array_3d(self):
         casadi_model = transfer_model(MODEL_DIR, 'Array3D', {'expand_vectors': True})
@@ -1319,6 +1291,9 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.outputs = []
         x = ca.vertcat(x, y2, y3)
         ref_model.equations = [ca.mtimes(A, x) + b]
+
+        # y[0] should be detected as an alias of x
+        self.assertIn('y[1]', casadi_model.alg_states[0].aliases)
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
