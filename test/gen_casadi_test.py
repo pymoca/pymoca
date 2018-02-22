@@ -116,12 +116,36 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def sim(self, dae, f_p, dt=0.1, t0=0, tf=10):
+        x0 = np.array(dae.start(ca.vertcat(*dae.x)))
+        integ = ca.integrator('Phi', 'cvodes', {
+            't': dae.t,
+            'x': ca.vertcat(*dae.x),
+            'p': ca.vertcat(*dae.p, *dae.u),
+            'ode': ca.vertcat(*dae.ode)}, {"tf": dt})
+        data = {'x': [], 't': []}
+        x = x0
+        t = t0
+        while t + dt < tf:
+            data['t'].append(t)
+            data['x'].append(x)
+            t += dt
+            x = np.array(integ(x0=x, p=f_p(t, x))["xf"])[:, 0]
+
+        for k in data.keys():
+            data[k] = np.array(data[k])
+        return data
+
     def test_aircraft(self):
         with open(os.path.join(MODEL_DIR, 'Aircraft.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         # noinspection PyUnusedLocal
         casadi_model = gen_casadi.generate(ast_tree, 'Aircraft')
+        casadi_model.dae.sanity_check()
+        casadi_model.dae.make_explicit()
+        casadi_model.dae.disp(True)
+        data = self.sim(casadi_model.dae, lambda t, x: [1, 1, 1, 1])
         # noinspection PyUnusedLocal
         ref_model = Model()
         self.assertTrue(True)

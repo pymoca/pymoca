@@ -65,6 +65,7 @@ class Model:
         self.initial_equations = []
         self.time = ca.MX.sym('time')
         self.delayed_states = []
+        self.dae = ca.DaeBuilder()
 
     def __str__(self):
         r = ""

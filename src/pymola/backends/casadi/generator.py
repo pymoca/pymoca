@@ -159,6 +159,14 @@ class Generator(TreeListener):
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
 
+        for i, eq in enumerate(self.model.equations):
+            der_names = ["der_" + l for l in self.derivative.keys()]
+            sym_names = [l.name() for l in ca.symvar(eq)]
+            if set(der_names).isdisjoint(sym_names):
+                self.model.dae.add_alg('eq_' + str(i), eq)
+            else:
+                self.model.dae.add_dae('eq_' + str(i), eq)
+
         if len(tree.statements) + len(tree.initial_statements) > 0:
             raise NotImplementedError('Statements are currently supported inside functions only')
 
@@ -537,11 +545,29 @@ class Generator(TreeListener):
     def get_shape(self, tree):
         return [self.get_integer(d) for d in tree.dimensions]
 
-    def get_symbol(self, tree):
+    def get_symbol(self, tree: ast.Symbol):
         # Create symbol
         shape = self.get_shape(tree)
         assert(len(shape) <= 2)
-        s = ca.MX.sym(tree.name, *shape)
+        try:
+            if len(shape) > 1 and shape[1] != 1:
+                print("daebuilder cannot handle shape", shape)
+                s = ca.MX.sym(tree.name, *shape)
+            else:
+                if 'state' in tree.prefixes:
+                    s, sdot = self.model.dae.add_s(tree.name, shape[0])
+                    self.nodes[self.current_class]["der_" + tree.name] = sdot
+                    self.derivative[tree.name] = sdot
+                elif 'input' in tree.prefixes:
+                    s = self.model.dae.add_u(tree.name, shape[0])
+                elif 'parameter' in tree.prefixes:
+                    s = self.model.dae.add_p(tree.name, shape[0])
+                else:
+                    s = self.model.dae.add_z(tree.name, shape[0])
+        except Exception as e:
+            print("failed to add symbol {:s} with prefixes {:s} to daebuilder".format(
+                tree.name, str(tree.prefixes)))
+            s = ca.MX.sym(tree.name, *shape)
         self.nodes[self.current_class][tree.name] = s
         return s
 
@@ -668,7 +694,7 @@ class Generator(TreeListener):
         This is to ensure that parametrized vector dimensions can be resolved.  Vector
         dimensions need to be known at CasADi MX creation time.
         :param tree: 
-        :return: 
+        :return:
         """
         if tree not in self.src:
             if isinstance(tree, ast.Symbol):
