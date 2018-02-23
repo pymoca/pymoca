@@ -10,7 +10,7 @@ import sympy
 
 
 # noinspection PyPep8Naming
-class OdeModel(object):
+class OdeModel:
     def __init__(self):
         self.t = sympy.symbols('t')
         self.x = sympy.Matrix([])

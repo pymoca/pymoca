@@ -65,7 +65,7 @@ Root Class
 """
 
 
-class Node(object):
+class Node:
     def __init__(self, **kwargs):
         self.set_args(**kwargs)
 
