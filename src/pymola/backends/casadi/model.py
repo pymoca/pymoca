@@ -54,7 +54,7 @@ DelayedState = namedtuple('DelayedState', ['name', 'origin', 'delay'])
 
 
 # noinspection PyUnresolvedReferences
-class Model(object):
+class Model:
 
     def __init__(self):
         self.states = []

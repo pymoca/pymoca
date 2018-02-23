@@ -24,7 +24,7 @@ logger = logging.getLogger("pymola")
 
 
 # noinspection PyPep8Naming
-class TreeListener(object):
+class TreeListener:
     """
     Defines interface for tree listeners.
     """
@@ -171,7 +171,7 @@ class TreeListener(object):
         pass
 
 
-class TreeWalker(object):
+class TreeWalker:
     """
     Defines methods for tree walker. Inherit from this to make your own.
     """
@@ -189,7 +189,7 @@ class TreeWalker(object):
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.__dict__.keys():
-            if isinstance(tree, ast.Class) and child_name in 'parent' or \
+            if isinstance(tree, ast.Class) and child_name == 'parent' or \
                 isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
                 # Do not go up again.
                 continue
@@ -738,8 +738,7 @@ class SymbolModificationApplier(TreeListener):
     #def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
     #     assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
 
-    @staticmethod
-    def exitInstanceClass(tree: ast.InstanceClass):
+    def exitInstanceClass(self, tree: ast.InstanceClass):
         assert tree.modification_environment is None or not tree.modification_environment.arguments, \
             "Found unhandled modification on instance class."
 
