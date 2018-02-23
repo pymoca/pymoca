@@ -124,7 +124,8 @@ class AliasRelation:
         else:
             return '-' + v
 
-    def __is_negative(self, v):
+    @staticmethod
+    def __is_negative(v):
         return True if v[0] == '-' else False
 
     def aliases(self, a):

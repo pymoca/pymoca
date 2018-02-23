@@ -14,7 +14,9 @@ CASADI_COMPARISON_DEPTH = 100
 
 
 class Variable:
-    def __init__(self, symbol, python_type=float, aliases=[]):
+    def __init__(self, symbol, python_type=float, aliases=None):
+        if aliases is None:
+            aliases = []
         self.symbol = symbol
         self.python_type = python_type
         self.aliases = aliases
@@ -52,7 +54,8 @@ DelayedState = namedtuple('DelayedState', ['name', 'origin', 'delay'])
 
 
 # noinspection PyUnresolvedReferences
-class Model:
+class Model(object):
+
     def __init__(self):
         self.states = []
         self.der_states = []
@@ -92,7 +95,8 @@ class Model:
                 "Number of states is {}, number of equations is {}.".format(
                     n_states, n_equations))
 
-    def _symbols(self, l):
+    @staticmethod
+    def _symbols(l):
         return [v.symbol for v in l]
 
     def simplify(self, options):

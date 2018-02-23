@@ -23,7 +23,7 @@ from .generated.ModelicaParser import ModelicaParser
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
-class ModelicaFile:
+class ModelicaFile(object):
     def __init__(self, **kwargs):
         self.within = []  # type: List[ComponentRef]
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]

@@ -18,6 +18,7 @@ logger = logging.getLogger("pymola")
 
 
 class CachedModel(Model):
+
     def __init__(self):
         self.states = []
         self.der_states = []
@@ -267,7 +268,9 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
     # Done
     return model
 
-def transfer_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]={}):
+def transfer_model(model_folder: str, model_name: str, compiler_options=None):
+    if compiler_options is None:
+        compiler_options = {}
     if compiler_options.get('cache', False):
         try:
             return _load_model(model_folder, model_name, compiler_options)
