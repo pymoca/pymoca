@@ -281,8 +281,8 @@ class Generator(TreeListener):
                     lhs_op = getattr(lhs, op)
                     src = lhs_op(rhs)
             else:
-                function = self.get_function(op)
-                src = ca.vertcat(*function.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
+                func = self.get_function(op)
+                src = ca.vertcat(*func.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
 
         self.src[tree] = src
 
@@ -483,7 +483,7 @@ class Generator(TreeListener):
         # CasADi needs to know the dimensions of symbols at instantiation.
         # We therefore need a mechanism to evaluate expressions that define dimensions of symbols.
         if isinstance(tree, ast.Primary):
-            return None if tree.value == None else int(tree.value)
+            return None if tree.value is None else int(tree.value)
         if isinstance(tree, ast.ComponentRef):
             s = self.current_class.symbols[tree.name]
             assert (s.type.name == 'Integer')
@@ -526,7 +526,8 @@ class Generator(TreeListener):
         else:
             raise Exception('Unexpected node type {}'.format(tree.__class__.__name__))
 
-    def get_python_type(self, tree):
+    @staticmethod
+    def get_python_type(tree):
         if tree.type.name == 'Boolean':
             return bool
         elif tree.type.name == 'Integer':
@@ -735,19 +736,21 @@ class Generator(TreeListener):
                 [values[assignment.left]] = ca.substitute([assignment.right], list(values.keys()), list(values.values()))
 
         output_expr = ca.substitute([values[output] for output in outputs], tmp, [values[t] for t in tmp])
-        function = ca.Function(tree.name, inputs, output_expr)
-        self.functions[function_name] = function
+        func = ca.Function(tree.name, inputs, output_expr)
+        self.functions[function_name] = func
 
-        return function
+        return func
 
 
-def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = {}) -> Model:
+def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool]=None) -> Model:
     """
     :param ast_tree: AST to generate from
     :param model_name: class to generate
     :param options: dictionary of generator options
     :return: casadi model
     """
+    if options is None:
+        options = {}
     component_ref = ast.ComponentRef.from_string(model_name)
     ast_walker = TreeWalker()
     flat_tree = flatten(ast_tree, component_ref)

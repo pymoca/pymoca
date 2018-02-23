@@ -139,7 +139,7 @@ class ComponentRef(Node):
         if self.child:
             return (self.name, ) + self.child[0].to_tuple()
         else:
-            return (self.name, )
+            return self.name,
 
     @classmethod
     def from_tuple(cls, components: tuple) -> 'ComponentRef':
@@ -174,8 +174,6 @@ class ComponentRef(Node):
         """
         Helper function to append two component references to eachother, e.g.
         a "within" component ref and an "object type" component ref.
-        :param a:
-        :param b:
         :return: New component reference, with other appended to self.
         """
 

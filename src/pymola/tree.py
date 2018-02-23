@@ -189,7 +189,7 @@ class TreeWalker(object):
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.__dict__.keys():
-            if isinstance(tree, ast.Class) and child_name in ('parent') or \
+            if isinstance(tree, ast.Class) and child_name in 'parent' or \
                 isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
                 # Do not go up again.
                 continue
@@ -670,7 +670,6 @@ def fully_scope_function_calls(node: ast.Tree, expression: ast.Expression, funct
     referenced functions are put into the functions set.
 
     :param node: collection for performing symbol lookup etc.
-    :param container: class
     :param expression: original expression
     :param function_set: output of function component references
     :return:
@@ -739,7 +738,8 @@ class SymbolModificationApplier(TreeListener):
     #def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
     #     assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
 
-    def exitInstanceClass(self, tree: ast.InstanceClass):
+    @staticmethod
+    def exitInstanceClass(tree: ast.InstanceClass):
         assert tree.modification_environment is None or not tree.modification_environment.arguments, \
             "Found unhandled modification on instance class."
 
@@ -829,7 +829,7 @@ def flatten_class(orig_class: ast.Class) -> ast.Class:
     return flat_class
 
 
-def expand_connectors(node: ast.Node) -> None:
+def expand_connectors(node: ast.Class) -> None:
     # keep track of which flow variables have been connected to, and which ones haven't
     disconnected_flow_variables = OrderedDict()
     for sym in node.symbols.values():
@@ -942,9 +942,9 @@ def expand_connectors(node: ast.Node) -> None:
 def add_state_value_equations(node: ast.Node) -> None:
     # we do this here, instead of in flatten_class, because symbol values
     # inside flattened classes may be modified later by modify_class().
-    non_state_prefixes = set(['constant', 'parameter'])
+    non_state_prefixes = {'constant', 'parameter'}
     for sym in node.symbols.values():
-        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
+        if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
             if len(non_state_prefixes & set(sym.prefixes)) == 0:
                 node.equations.append(ast.Equation(left=sym, right=sym.value))
                 sym.value = ast.Primary(value=None)
@@ -954,7 +954,7 @@ def add_variable_value_statements(node: ast.Node) -> None:
     # we do this here, instead of in flatten_class, because symbol values
     # inside flattened classes may be modified later by modify_class().
     for sym in node.symbols.values():
-        if not (isinstance(sym.value, ast.Primary) and sym.value.value == None):
+        if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
             node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
             sym.value = ast.Primary(value=None)
 
@@ -999,7 +999,6 @@ def annotate_states(node: ast.Node) -> None:
     """
     Finds all derivative expressions and annotates all differentiated
     symbols as states by adding state the prefix list
-    :param root: collection for performing symbol lookup etc.
     :param node: node of tree to walk
     :return:
     """
@@ -1025,8 +1024,8 @@ def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
 
     # add equations for state symbol values
     add_state_value_equations(flat_class)
-    for function in flat_class.functions.values():
-        add_variable_value_statements(function)
+    for func in flat_class.functions.values():
+        add_variable_value_statements(func)
 
     # annotate states
     annotate_states(flat_class)
