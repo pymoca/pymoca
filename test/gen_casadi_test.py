@@ -4,20 +4,18 @@ Modelica parse Tree to AST tree.
 """
 from __future__ import print_function, absolute_import, division, unicode_literals
 
-import os
 import glob
+import os
 import unittest
-import itertools
 
 import casadi as ca
 import numpy as np
 
 import pymola.backends.casadi.generator as gen_casadi
+from pymola import parser
 from pymola.backends.casadi.alias_relation import AliasRelation
-from pymola.backends.casadi.model import Model, Variable
 from pymola.backends.casadi.api import transfer_model, CachedModel
-from pymola import parser, ast
-
+from pymola.backends.casadi.model import Model, Variable
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'models')
 
@@ -95,6 +93,15 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [der_x - v_x, der_v_x - (-k * x - c * v_x)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_simple_circuit(self):
+        with open(os.path.join(MODEL_DIR, 'SimpleCircuit.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'SimpleCircuit')
+        # ref_model = Model()
+        print(casadi_model)
+        self.assertTrue(True)
 
     def test_estimator(self):
         with open(os.path.join(MODEL_DIR, 'Estimator.mo'), 'r') as f:
