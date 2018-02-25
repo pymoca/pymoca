@@ -7,6 +7,7 @@ import re
 
 from pymoca import ast
 from .alias_relation import AliasRelation
+from .mtensor import _MTensor
 
 logger = logging.getLogger("pymoca")
 
@@ -346,36 +347,28 @@ class Model:
                 new_vars = []
                 for old_var in old_vars:
                     if old_var.symbol.numel() > 1:
-                        rows = []
-                        for i in range(old_var.symbol.size1()):
-                            cols = []
-                            for j in range(old_var.symbol.size2()):
-                                if old_var.symbol.size1() > 1 and old_var.symbol.size2() > 1:
-                                    component_symbol = ca.MX.sym('{}[{},{}]'.format(old_var.symbol.name(), i+1, j+1))
-                                elif old_var.symbol.size1() > 1:
-                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), i+1))
-                                elif old_var.symbol.size2() > 1:
-                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), j+1))
+                        expanded_symbols = []
+                        for ind in np.ndindex(old_var.symbol._modelica_shape):
+                            component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), ",".join(str(i+1) for i in ind)))
+                            component_var = Variable(component_symbol, old_var.python_type)
+                            for attribute in CASADI_ATTRIBUTES:
+                                # Can't convert 3D arrays to MX, so we convert to nparray instead
+                                value = getattr(old_var, attribute)
+                                if not np.isscalar(value):
+                                    value = np.array(value)
                                 else:
-                                    raise AssertionError
-                                component_var = Variable(component_symbol, old_var.python_type)
-                                for attribute in CASADI_ATTRIBUTES:
                                     value = ca.MX(getattr(old_var, attribute))
-                                    if value.size1() == old_var.symbol.size1() and value.size2() == old_var.symbol.size2():
-                                        setattr(component_var, attribute, value[i, j])
-                                    elif value.size1() == old_var.symbol.size1():
-                                        setattr(component_var, attribute, value[i])
-                                    elif value.size2() == old_var.symbol.size2():
-                                        setattr(component_var, attribute, value[j])
-                                    else:
-                                        assert value.size1() == 1
-                                        assert value.size2() == 1
-                                        setattr(component_var, attribute, value)
-                                cols.append(component_var)
-                            rows.append(cols)
-                        symbols.append(old_var.symbol)
-                        values.append(ca.vertcat(*[ca.horzcat(*[v.symbol for v in row]) for row in rows]))
-                        new_vars.extend(itertools.chain.from_iterable(rows))
+
+                                if np.prod(value.shape) == 1:
+                                    setattr(component_var, attribute, value)
+                                else:
+                                    setattr(component_var, attribute, value[ind])
+                            expanded_symbols.append(component_var)
+
+                        s = old_var.symbol._mx if isinstance(old_var.symbol, _MTensor) else old_var.symbol
+                        symbols.append(s)
+                        values.append(ca.reshape(ca.vertcat(*[x.symbol for x in expanded_symbols]), *tuple(reversed(s.shape))).T)
+                        new_vars.extend(expanded_symbols)
 
                         try:
                             assert len(self.delay_states) == len(self.delay_arguments)
@@ -388,20 +381,12 @@ class Model:
                                 delay_state = self.delay_states.pop(i)
                                 delay_argument = self.delay_arguments.pop(i)
 
-                                for i in range(delay_argument.expr.size1()):
-                                    for j in range(delay_argument.expr.size2()):
-                                        if delay_argument.expr.size1() > 1 and delay_argument.expr.size2() > 1:
-                                            new_name = '{}[{},{}]'.format(delay_state, i, j)
-                                        elif delay_argument.expr.size1() > 1:
-                                            new_name = '{}[{}]'.format(delay_state, i)
-                                        elif delay_argument.expr.size2() > 1:
-                                            new_name = '{}[{}]'.format(delay_state, j)
-                                        else:
-                                            raise AssertionError
+                                for ind in np.ndindex(old_var.symbol._modelica_shape):
+                                    new_name = '{}[{}]'.format(delay_state, ",".join(str(i+1) for i in ind))
 
-                                        self.delay_states.append(new_name)
-                                        self.delay_arguments.append(
-                                            DelayArgument(delay_argument.expr[i, j], delay_argument.duration))
+                                    self.delay_states.append(new_name)
+                                    self.delay_arguments.append(
+                                        DelayArgument(delay_argument.expr[ind], delay_argument.duration))
                     else:
                         new_vars.append(old_var)
 

@@ -13,6 +13,7 @@ from pymoca.tree import TreeWalker, TreeListener, flatten
 
 from .alias_relation import AliasRelation
 from .model import Model, Variable, DelayArgument
+from .mtensor import _MTensor, _new_mx
 
 logger = logging.getLogger("pymoca")
 
@@ -50,7 +51,7 @@ class ForLoop:
         step = e.step.value
         stop = self.generator.get_integer(e.stop)
         self.values = np.arange(start, stop + step, step, dtype=np.int)
-        self.index_variable = ca.MX.sym(i.name)
+        self.index_variable = _new_mx(i.name)
         self.name = i.name
         self.indexed_symbols = OrderedDict()
 
@@ -85,6 +86,9 @@ class Generator(TreeListener):
         self.map_mode = 'inline' if options.get('unroll_loops', True) else 'serial'
         self.function_mode = (True, False) if options.get('inline_functions', True) else (False, True)
         self.delay_counter = 0
+
+        # NOTE: Part of MTensor workaround.
+        self._expand_vectors_enabled = options.get('expand_vectors', False)
 
     @property
     def current_class(self):
@@ -266,7 +270,7 @@ class Generator(TreeListener):
             expr = self.get_mx(tree.operands[0])
             duration = self.get_mx(tree.operands[1])
 
-            src = ca.MX.sym('_pymoca_delay_{}'.format(self.delay_counter), *expr.size())
+            src = _new_mx('_pymoca_delay_{}'.format(self.delay_counter), *expr.size())
             self.delay_counter += 1
 
             for f in self.for_loops:
@@ -400,7 +404,7 @@ class Generator(TreeListener):
                     res = res.T
 
                     # Make the symbol with the appropriate size, and replace the old symbol with the new one.
-                    orig_symbol = ca.MX.sym(k.name(), *res.size())
+                    orig_symbol = _new_mx(k.name(), *res.size())
 
                     model_input = next(x for x in self.model.inputs if x.symbol.name() == k.name())
                     model_input.symbol = orig_symbol
@@ -591,7 +595,6 @@ class Generator(TreeListener):
     def get_symbol(self, tree):
         # Create symbol
         shape = self.get_shape(tree)
-        assert(len(shape) <= 2)
 
         if any(isinstance(x, slice) for x in shape):
             # Symbol has unspecified dimensions. Value is specified, and
@@ -614,7 +617,17 @@ class Generator(TreeListener):
 
             shape = val_shape
 
-        s = ca.MX.sym(tree.name, *shape)
+        if len(shape) > 2:
+            # MX does not support this, so we have to use our own wrapper.
+            if not self._expand_vectors_enabled:
+                raise NotImplementedError("Cannot handle 3D+ arrays without setting 'expand_vectors'")
+            s = _MTensor(tree.name, *shape)
+        else:
+            s = _new_mx(tree.name, *shape)
+
+        # Make a notion of the original shape, as MX is always 2D (even for 1D symbols).
+        s._modelica_shape = tuple(shape)
+
         self.nodes[self.current_class][tree.name] = s
         return s
 
@@ -637,7 +650,7 @@ class Generator(TreeListener):
                     else:
                         return 0
                 else:
-                    der_s = ca.MX.sym("der({})".format(s.name()), s.size())
+                    der_s = _new_mx("der({})".format(s.name()), s.size())
                     self.derivative[s.name()] = der_s
                     self.nodes[self.current_class][der_s.name()] = der_s
                     return der_s
@@ -649,7 +662,7 @@ class Generator(TreeListener):
             slice_info = s.info()['slice']
             dep = s.dep()
             if dep.name() not in self.derivative:
-                der_dep = ca.MX.sym("der({})".format(dep.name()), dep.size())
+                der_dep = _new_mx("der({})".format(dep.name()), dep.size())
                 self.derivative[dep.name()] = der_dep
                 return der_dep[slice_info['start']:slice_info['stop']:slice_info['step']]
             else:
@@ -699,10 +712,10 @@ class Generator(TreeListener):
             if isinstance(indices[0], ca.MX):
                 if len(indices) > 1:
                     s = s[:, indices[1]]
-                    indexed_symbol = ca.MX.sym('{}[{},{}]'.format(tree.name, for_loop.name, indices[1]), s.size2())
+                    indexed_symbol = _new_mx('{}[{},{}]'.format(tree.name, for_loop.name, indices[1]), s.size2())
                     index_function = lambda i : (i, indices[1])
                 else:
-                    indexed_symbol = ca.MX.sym('{}[{}]'.format(tree.name, for_loop.name))
+                    indexed_symbol = _new_mx('{}[{}]'.format(tree.name, for_loop.name))
                     index_function = lambda i : i
 
                 # If the indexed symbol is empty, we know we do not have to
@@ -711,7 +724,7 @@ class Generator(TreeListener):
                     for_loop.register_indexed_symbol(indexed_symbol, index_function, True, tree, indices[0])
             else:
                 s = ca.transpose(s[indices[0], :])
-                indexed_symbol = ca.MX.sym('{}[{},{}]'.format(tree.name, indices[0], for_loop.name), s.size2())
+                indexed_symbol = _new_mx('{}[{},{}]'.format(tree.name, indices[0], for_loop.name), s.size2())
                 index_function = lambda i: (indices[0], i)
                 if np.prod(s.shape) != 0:
                     for_loop.register_indexed_symbol(indexed_symbol, index_function, False, tree, indices[1])
@@ -740,11 +753,11 @@ class Generator(TreeListener):
 
     def get_mx(self, tree: Union[ast.Symbol, ast.ComponentRef, ast.Expression]) -> ca.MX:
         """
-        We pull components and symbols from the AST on demand.  
+        We pull components and symbols from the AST on demand.
         This is to ensure that parametrized vector dimensions can be resolved.  Vector
         dimensions need to be known at CasADi MX creation time.
-        :param tree: 
-        :return: 
+        :param tree:
+        :return:
         """
         if tree not in self.src:
             if isinstance(tree, ast.Symbol):

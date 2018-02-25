@@ -183,7 +183,7 @@ class GenCasadiTest(unittest.TestCase):
                                c__up__Q + c__down__Q,
                                qa__down__Q + a__up__Q,
                                -p__Q + c__up__Q,
-                               a__down__Q + (b__up__Q + c__down__Q),   
+                               a__down__Q + (b__up__Q + c__down__Q),
                                b__down__Q + hb__up__Q,
                                zerotest__Q]
 
@@ -663,6 +663,25 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.delay_arguments = [DelayArgument(3 * x_i, delay_time) for x_i in x]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_array_3d(self):
+        casadi_model = transfer_model(MODEL_DIR, 'Array3D', {'expand_vectors': True})
+
+        target_param_values = np.array([[[ -5.326999,  54.050758,  0.000000],
+                                    [ -1.0,        0.0,       0.0]],
+                                   [[  0.000426,  -0.001241,  2.564056],
+                                    [ -1.0,        0.0,       0.0]],
+                                   [[  2.577975,  -5.203480,  0.000000],
+                                    [ -1.0,        0.0,       0.0]],
+                                   [[ 13.219650,  -3.097600, -7.551339],
+                                    [ -1.0,        0.0,       0.0]]])
+
+        param_symbols = [x.symbol for x in casadi_model.parameters]
+
+        for ind in np.ndindex(target_param_values.shape):
+            flat_index = np.ravel_multi_index(ind, target_param_values.shape)
+            self.assertEqual(param_symbols[flat_index].name(), "x[{}]".format(",".join((str(x + 1) for x in ind))))
+            self.assertEqual(casadi_model.parameters[flat_index].value, target_param_values[ind])
 
     def test_attributes(self):
         with open(os.path.join(MODEL_DIR, 'Attributes.mo'), 'r') as f:
@@ -1307,7 +1326,7 @@ class GenCasadiTest(unittest.TestCase):
         b[4] = -4
         x = ca.vertcat(x, der_x, alias, y, _tmp, cst)
         ref_model.equations = [ca.mtimes(A, x) + b]
-            
+
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
@@ -1360,7 +1379,7 @@ class GenCasadiTest(unittest.TestCase):
         b[1] = -7
         x = ca.vertcat(x, der_x, y)
         ref_model.equations = [ca.mtimes(A, x) + b]
-            
+
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
