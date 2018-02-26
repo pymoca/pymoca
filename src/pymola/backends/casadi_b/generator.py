@@ -184,7 +184,7 @@ class CasadiListener(TreeListener):
         }
             
     def exitComponentRef(self, tree: ast.ComponentRef):
-        #TODO while is Real an issue?
+        #TODO need to handle type and function refs properly
         if tree.name in self._unary_ops.keys() or tree.name == "Real":
             return
         try:
