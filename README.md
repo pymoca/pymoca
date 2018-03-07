@@ -20,8 +20,8 @@ jupyter notebook
 ```
 
 ## Examples
-[Sympy Example](test/Spring.ipynb)
-[Casadi Example](test/Casadi.ipynb)
+* [Sympy Example](test/notebooks/Spring.ipynb)
+* [Casadi Example](test/notebooks/Casadi.ipynb)
 
 ## Roadmap
 
