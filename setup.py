@@ -7,27 +7,16 @@ and enables interacting with Modelica easily in Python.
 """
 
 from __future__ import print_function
-from setuptools import setup
 
 import os
 import sys
 import subprocess
-import pprint
-import shutil
-import fnmatch
 
 from setuptools import setup, find_packages
-from setuptools.command.build_py import build_py
-from setuptools.command.build_ext import build_ext
 from setuptools import Command
 
 import versioneer
 
-MAJOR = 0
-MINOR = 1
-MICRO = 5
-ISRELEASED = True
-VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 DOCLINES = __doc__.split("\n")
 
 CLASSIFIERS = """\
@@ -58,7 +47,6 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 #pylint: disable=no-init, too-few-public-methods
 
 
-import sys
 python_version = '.'.join([str(i) for i in sys.version_info[:3]])
 python_version_required = '3.5.0'
 if python_version < python_version_required:
@@ -93,30 +81,13 @@ def setup_package():
     """
     Setup the package.
     """
-    src_path = os.path.dirname(os.path.abspath(sys.argv[0]))
-    old_path = os.getcwd()
-    os.chdir(src_path)
-    sys.path.insert(0, src_path)
-
-    # Install requirements
     with open('requirements.txt', 'r') as req_file:
         install_reqs = req_file.read().split('\n')
-    # pprint.pprint(install_reqs)
-    
-    if sys.platform == 'darwin':
-        # Disable compiler optimization.  We have to do this, as the default -O3 triggers a bug in clang causing an initialization failure.
-        #os.environ['CFLAGS'] = '-O0'
-        # Or alternatively, use gcc:
-        os.environ['CC'] = 'gcc-7'
-
-    # Without disabling this, it will reach a limit
-    # on tracking and disable tracking and then recompile, which is slow
-    os.environ['CFLAGS'] = '-fno-var-tracking-assignments'
 
     cmdclass_ = {'antlr': AntlrBuildCommand}
     cmdclass_.update(versioneer.get_cmdclass())
 
-    metadata = dict(
+    setup(
         version=versioneer.get_version(),
         name='pymola',
         maintainer="James Goppert",
@@ -139,12 +110,6 @@ def setup_package():
         cmdclass=cmdclass_
     )
 
-    try:
-        setup(**metadata)
-    finally:
-        del sys.path[0]
-        os.chdir(old_path)
-    return
 
 if __name__ == '__main__':
     setup_package()
