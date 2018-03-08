@@ -1,13 +1,10 @@
 # Adapted from https://packaging.python.org/en/latest/appveyor/
 
 environment:
+  # We just run 2 tests because it takes 3 min each to build
   matrix:
     - PYTHON: "C:\\Python35"
       TOX_ENV: "py35"
-    - PYTHON: "C:\\Python35-x64"
-      TOX_ENV: "py35"
-    - PYTHON: "C:\\Python36"
-      TOX_ENV: "py36"
     - PYTHON: "C:\\Python36-x64"
       TOX_ENV: "py36"
 
