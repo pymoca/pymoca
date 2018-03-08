@@ -25,21 +25,7 @@ jupyter notebook
 
 ## Roadmap
 
-### Completed Tasks
-
-* hello world compilation
-* Project setup.
-* Unit testing for parsers.
-* Parsing basic hello world example.
-* Travis continuous integration testing setup.
-* Coveralls coverage testing setup.
-
-### TODO
-
-* add more complicated test cases
-* resolve grammar issues
-* support more of modelica language
-* add modelica magic support for ipython?
+Test3.
 
 <!--- vim:ts=4:sw=4:expandtab:
 !-->
