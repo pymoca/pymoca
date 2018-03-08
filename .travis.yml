@@ -8,6 +8,9 @@ matrix:
     - os: linux
       python: 3.6
       env: TOXENV=py36
+      after_success:
+        - tox -e coverage-report
+        - coveralls
     - os: osx
       language: generic
       python: "3.6"
@@ -25,10 +28,6 @@ before_install:
 install: pip install tox
 
 script: tox -vv
-
-after_success:
-  - tox -e coverage-report
-  - coveralls
 
 cache: pip
 
