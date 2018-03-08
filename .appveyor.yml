@@ -1,5 +1,9 @@
 # Adapted from https://packaging.python.org/en/latest/appveyor/
 
+branches:
+  only:
+  - master
+
 environment:
   matrix:
     # only run 2 tests, these take 3 minutes each
