@@ -15,10 +15,10 @@
    id="svg2"
    sodipodi:version="0.32"
    inkscape:version="0.91 r13725"
-   sodipodi:docname="pymolalogoicon.svg"
+   sodipodi:docname="Pymocalogoicon.svg"
    width="272.35025pt"
    height="81.046288pt"
-   inkscape:export-filename="/home/wees/Desktop/pymola_logo_plain2.png"
+   inkscape:export-filename="/home/wees/Desktop/pymoca_logo_plain2.png"
    inkscape:export-xdpi="90"
    inkscape:export-ydpi="90">
   <metadata
@@ -332,5 +332,5 @@
        id="tspan4180"
        x="127.07842"
        y="73.679176"
-       style="font-style:italic;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:60px;font-family:Arial;-inkscape-font-specification:'Arial Bold Italic';fill:#4e90c3;fill-opacity:1;stroke:none;stroke-opacity:1">Pymola</tspan></text>
+       style="font-style:italic;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:60px;font-family:Arial;-inkscape-font-specification:'Arial Bold Italic';fill:#4e90c3;fill-opacity:1;stroke:none;stroke-opacity:1">Pymoca</tspan></text>
 </svg>

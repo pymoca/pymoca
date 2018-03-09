@@ -9,9 +9,9 @@ import sys
 import time
 import unittest
 
-from pymola import parser
-from pymola import tree
-from pymola import ast
+from pymoca import parser
+from pymoca import tree
+from pymoca import ast
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'models')
 

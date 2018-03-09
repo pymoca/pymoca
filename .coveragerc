@@ -1,7 +1,7 @@
 [run]
 branch = True
-source = pymola
-omit = src/pymola/_version.py
+source = pymoca
+omit = src/pymoca/_version.py
 
 [report]
 show_missing = true
@@ -11,5 +11,5 @@ exclude_lines =
 
 [paths]
 source =
-    src/pymola
-    .tox/*/lib/python*/site-packages/pymola
+    src/pymoca
+    .tox/*/lib/python*/site-packages/pymoca

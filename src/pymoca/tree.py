@@ -17,7 +17,7 @@ from . import ast
 
 CLASS_SEPARATOR = '.'
 
-logger = logging.getLogger("pymola")
+logger = logging.getLogger("pymoca")
 
 
 # TODO Flatten function vs. conversion classes

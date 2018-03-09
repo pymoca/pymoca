@@ -1,37 +1,37 @@
-pymola.generated package
+pymoca.generated package
 ========================
 
 Submodules
 ----------
 
-pymola.generated.ModelicaLexer module
+pymoca.generated.ModelicaLexer module
 -------------------------------------
 
-.. automodule:: pymola.generated.ModelicaLexer
+.. automodule:: pymoca.generated.ModelicaLexer
     :members:
     :undoc-members:
     :show-inheritance:
 
-pymola.generated.ModelicaListener module
+pymoca.generated.ModelicaListener module
 ----------------------------------------
 
-.. automodule:: pymola.generated.ModelicaListener
+.. automodule:: pymoca.generated.ModelicaListener
     :members:
     :undoc-members:
     :show-inheritance:
 
-pymola.generated.ModelicaParser module
+pymoca.generated.ModelicaParser module
 --------------------------------------
 
-.. automodule:: pymola.generated.ModelicaParser
+.. automodule:: pymoca.generated.ModelicaParser
     :members:
     :undoc-members:
     :show-inheritance:
 
-pymola.generated.ModelicaVisitor module
+pymoca.generated.ModelicaVisitor module
 ---------------------------------------
 
-.. automodule:: pymola.generated.ModelicaVisitor
+.. automodule:: pymoca.generated.ModelicaVisitor
     :members:
     :undoc-members:
     :show-inheritance:
@@ -40,7 +40,7 @@ pymola.generated.ModelicaVisitor module
 Module contents
 ---------------
 
-.. automodule:: pymola.generated
+.. automodule:: pymoca.generated
     :members:
     :undoc-members:
     :show-inheritance:

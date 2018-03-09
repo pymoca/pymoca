@@ -12,11 +12,11 @@ import itertools
 import casadi as ca
 import numpy as np
 
-import pymola.backends.casadi.generator as gen_casadi
-from pymola.backends.casadi.alias_relation import AliasRelation
-from pymola.backends.casadi.model import Model, Variable
-from pymola.backends.casadi.api import transfer_model, CachedModel
-from pymola import parser, ast
+import pymoca.backends.casadi.generator as gen_casadi
+from pymoca.backends.casadi.alias_relation import AliasRelation
+from pymoca.backends.casadi.model import Model, Variable
+from pymoca.backends.casadi.api import transfer_model, CachedModel
+from pymoca import parser, ast
 
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'models')

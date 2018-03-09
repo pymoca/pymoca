@@ -1,10 +1,10 @@
-# <img alt="Pymola" src="branding/icons/pymolalogo.svg" height="60">
+# <img alt="Pymoca" src="branding/icons/pymocalogo.svg" height="60">
 
 A python/modelica based simulation environment.
 
-[![Travis](https://img.shields.io/travis/pymola/pymola/master.svg?label=Travis%20CI)](https://travis-ci.org/pymola/pymola)
-[![AppVeyor](https://img.shields.io/appveyor/ci/pymola/pymola/master.svg?label=AppVeyor)](https://ci.appveyor.com/project/pymola/pymola)
-[![Coverage Status](https://img.shields.io/coveralls/pymola/pymola/master.svg)](https://coveralls.io/r/pymola/pymola)
+[![Travis](https://img.shields.io/travis/pymoca/pymoca/master.svg?label=Travis%20CI)](https://travis-ci.org/pymoca/pymoca)
+[![AppVeyor](https://img.shields.io/appveyor/ci/pymoca/pymoca/master.svg?label=AppVeyor)](https://ci.appveyor.com/project/pymoca/pymoca)
+[![Coverage Status](https://img.shields.io/coveralls/pymoca/pymoca/master.svg)](https://coveralls.io/r/pymoca/pymoca)
 
 
 ## Install
@@ -15,7 +15,7 @@ A python/modelica based simulation environment.
 
 ```bash
 ./create_conda_env.sh enduser
-. activate pymola
+. activate pymoca
 jupyter notebook
 ```
 

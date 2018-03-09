@@ -1,1 +1,1 @@
-src/pymola/_version.py export-subst
+src/pymoca/_version.py export-subst

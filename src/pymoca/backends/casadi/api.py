@@ -10,11 +10,11 @@ import logging
 import pickle
 import contextlib
 
-from pymola import parser, tree, ast, __version__
+from pymoca import parser, tree, ast, __version__
 from . import generator
 from .model import Model, Variable
 
-logger = logging.getLogger("pymola")
+logger = logging.getLogger("pymoca")
 
 
 class CachedModel(Model):
@@ -205,7 +205,7 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
         db = pickle.load(f)
 
         if db['version'] != __version__:
-            raise InvalidCacheError('Cache generated for a different version of pymola')
+            raise InvalidCacheError('Cache generated for a different version of pymoca')
 
         if db['library_os'] != os.name:
             raise InvalidCacheError('Cache generated for incompatible OS')
