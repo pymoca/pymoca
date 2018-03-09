@@ -42,8 +42,8 @@ def get_config():
     cfg.VCS = "git"
     cfg.style = "pep440"
     cfg.tag_prefix = ""
-    cfg.parentdir_prefix = "pymola-"
-    cfg.versionfile_source = "src/pymola/_version.py"
+    cfg.parentdir_prefix = "pymoca-"
+    cfg.versionfile_source = "src/pymoca/_version.py"
     cfg.verbose = False
     return cfg
 

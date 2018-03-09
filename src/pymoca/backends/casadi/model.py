@@ -5,10 +5,10 @@ import itertools
 import logging
 import re
 
-from pymola import ast
+from pymoca import ast
 from .alias_relation import AliasRelation
 
-logger = logging.getLogger("pymola")
+logger = logging.getLogger("pymoca")
 
 CASADI_COMPARISON_DEPTH = 100
 

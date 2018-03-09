@@ -56,7 +56,7 @@ docs/_build/
 *_parsetab.py*
 
 # version
-pymola/version.py
+pymoca/version.py
 .coveralls.yml
 
 # vi

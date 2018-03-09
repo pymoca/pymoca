@@ -8,13 +8,13 @@ import numpy as np
 import itertools
 from typing import Union, Dict
 
-from pymola import ast
-from pymola.tree import TreeWalker, TreeListener, flatten
+from pymoca import ast
+from pymoca.tree import TreeWalker, TreeListener, flatten
 
 from .alias_relation import AliasRelation
 from .model import Model, Variable, DelayedState
 
-logger = logging.getLogger("pymola")
+logger = logging.getLogger("pymoca")
 
 # TODO
 #  - Nested for loops

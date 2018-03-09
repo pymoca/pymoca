@@ -9,10 +9,10 @@ import sys
 import time
 import unittest
 
-import pymola.backends.sympy.generator as gen_sympy
-from pymola import parser
-from pymola import tree
-from pymola import ast
+import pymoca.backends.sympy.generator as gen_sympy
+from pymoca import parser
+from pymoca import tree
+from pymoca import ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(TEST_DIR, 'models')

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """A python/modelica based simulation environment.
 
-Pymola contains a Python based compiler for the modelica language
+Pymoca contains a Python based compiler for the modelica language
 and enables interacting with Modelica easily in Python.
 
 """
@@ -68,11 +68,11 @@ def call_antlr4(arg):
     #pylint: disable=unused-argument, unused-variable
     antlr_path = os.path.join(ROOT_DIR, "java", "antlr-4.7-complete.jar")
     classpath = ".:{:s}:$CLASSPATH".format(antlr_path)
-    generated = os.path.join(ROOT_DIR, 'src', 'pymola', 'generated')
+    generated = os.path.join(ROOT_DIR, 'src', 'pymoca', 'generated')
     cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
             " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
     print(cmd)
-    proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'src', 'pymola'))
+    proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'src', 'pymoca'))
     proc.communicate()
     with open(os.path.join(generated, '__init__.py'), 'w') as fid:
         fid.write('')
@@ -89,15 +89,15 @@ def setup_package():
 
     setup(
         version=versioneer.get_version(),
-        name='pymola',
+        name='pymoca',
         maintainer="James Goppert",
         maintainer_email="james.goppert@gmail.com",
         description=DOCLINES[0],
         long_description="\n".join(DOCLINES[2:]),
-        url='https://github.com/pymola/pymola',
+        url='https://github.com/pymoca/pymoca',
         author='James Goppert',
         author_email='james.goppert@gmail.com',
-        download_url='https://github.com/pymola/pymola',
+        download_url='https://github.com/pymoca/pymoca',
         license='BSD',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],

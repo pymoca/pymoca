@@ -68,7 +68,7 @@ html-view: html
 	$(BROWSER) build/html/index.html
 
 html-zip: html
-	cd build/html && zip -r ../pymola-doc.zip .
+	cd build/html && zip -r ../pymoca-doc.zip .
 
 dirhtml:
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml
@@ -101,17 +101,17 @@ qthelp:
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/pymola.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/pymoca.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/pymola.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/pymoca.qhc"
 
 devhelp:
 	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/pymola"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/pymola"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/pymoca"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/pymoca"
 	@echo "# devhelp"
 
 epub:

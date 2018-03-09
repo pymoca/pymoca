@@ -1,4 +1,4 @@
-pymola package
+pymoca package
 ==============
 
 Subpackages
@@ -6,47 +6,47 @@ Subpackages
 
 .. toctree::
 
-    pymola.generated
+    pymoca.generated
 
 Submodules
 ----------
 
-pymola.ast module
+pymoca.ast module
 -----------------
 
-.. automodule:: pymola.ast
+.. automodule:: pymoca.ast
     :members:
     :undoc-members:
     :show-inheritance:
 
-pymola.gen_sympy module
+pymoca.gen_sympy module
 -----------------------
 
-.. automodule:: pymola.gen_sympy
+.. automodule:: pymoca.gen_sympy
     :members:
     :undoc-members:
     :show-inheritance:
 
-pymola.parser module
+pymoca.parser module
 --------------------
 
-.. automodule:: pymola.parser
+.. automodule:: pymoca.parser
     :members:
     :undoc-members:
     :show-inheritance:
 
-pymola.sympy_runtime module
+pymoca.sympy_runtime module
 ---------------------------
 
-.. automodule:: pymola.sympy_runtime
+.. automodule:: pymoca.sympy_runtime
     :members:
     :undoc-members:
     :show-inheritance:
 
-pymola.tree module
+pymoca.tree module
 ------------------
 
-.. automodule:: pymola.tree
+.. automodule:: pymoca.tree
     :members:
     :undoc-members:
     :show-inheritance:
@@ -55,7 +55,7 @@ pymola.tree module
 Module contents
 ---------------
 
-.. automodule:: pymola
+.. automodule:: pymoca
     :members:
     :undoc-members:
     :show-inheritance:

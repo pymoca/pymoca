@@ -4,5 +4,5 @@
 .. toctree::
    :maxdepth: 4
 
-   pymola
+   pymoca
    setup

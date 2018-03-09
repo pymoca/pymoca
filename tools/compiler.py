@@ -9,7 +9,7 @@ import os
 import fnmatch
 import logging
 
-logger = logging.getLogger("pymola")
+logger = logging.getLogger("pymoca")
 
 # Parse command line arguments
 usage = "usage: %prog [options] MODEL_FOLDER MODEL_NAME"
@@ -30,8 +30,8 @@ model_name = args[1]
 # Set log level
 logging.basicConfig(level=logging.DEBUG if options.verbose else logging.INFO)
 
-# Import rest of pymola
-from pymola import parser, tree, ast
+# Import rest of pymoca
+from pymoca import parser, tree, ast
 
 # Compile
 if options.flatten_only:
@@ -56,7 +56,7 @@ else:
     if options.casadi_folder is not None:
         sys.path.append(options.casadi_folder)
 
-    from pymola.backends.casadi.api import transfer_model
+    from pymoca.backends.casadi.api import transfer_model
     import casadi as ca
 
     logger.info("Generating CasADi model")
