@@ -1,6 +1,7 @@
 # <img alt="Pymoca" src="branding/icons/pymocalogo.svg" height="60">
 
-A python/modelica based simulation environment.
+A Modelica to computer algebra system (CAS) compiler written in python.
+
 
 [![Travis](https://img.shields.io/travis/pymoca/pymoca/master.svg?label=Travis%20CI)](https://travis-ci.org/pymoca/pymoca)
 [![AppVeyor](https://img.shields.io/appveyor/ci/pymoca/pymoca/master.svg?label=AppVeyor)](https://ci.appveyor.com/project/pymoca/pymoca)
@@ -27,19 +28,15 @@ jupyter notebook
 
 ### Completed Tasks
 
-* hello world compilation
-* Project setup.
-* Unit testing for parsers.
-* Parsing basic hello world example.
-* Travis continuous integration testing setup.
-* Coveralls coverage testing setup.
+* Parsing Modelica
+* Sympy Simulation/CAS creation for simple models
+* Casadi CAS creation for simple models
 
 ### TODO
 
-* add more complicated test cases
-* resolve grammar issues
-* support more of modelica language
-* add modelica magic support for ipython?
+* Casadi simulation
+* Serializable model format (ModelicaXML)
+* Support more of Modelica language elements
 
 <!--- vim:ts=4:sw=4:expandtab:
 !-->
