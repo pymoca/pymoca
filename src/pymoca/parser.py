@@ -477,8 +477,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ctx.getText()
 
     def exitEquation_when(self, ctx: ModelicaParser.Equation_whenContext):
-        # TODO, add when ast
-        self.ast[ctx] = ctx.getText()
+        self.ast[ctx] = self.ast[ctx.when_equation()]
 
     # COMPONENTS ===========================================================
 
