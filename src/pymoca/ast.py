@@ -217,6 +217,14 @@ class IfEquation(Node):
         super().__init__(**kwargs)
 
 
+class WhenEquation(Node):
+    def __init__(self, **kwargs):
+        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.blocks = []  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
+
+
 class ForIndex(Node):
     def __init__(self, **kwargs):
         self.name = ''  # type: str
