@@ -16,8 +16,8 @@ matrix:
       python: "3.6"
       before_install:
         - brew update
-        - brew upgrade python
-        - python -m venv venv
+        - brew upgrade python3
+        - python3 -m venv venv
         - source venv/bin/activate
       env: TOXENV=py36
     # TODO: Meta for flake8
