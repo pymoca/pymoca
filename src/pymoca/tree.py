@@ -5,13 +5,13 @@ Tools for tree walking and visiting etc.
 
 from __future__ import print_function, absolute_import, division, unicode_literals
 
-import numpy as np
-import copy
+import copy  # TODO
 import logging
-import copy # TODO
 import sys
 from collections import OrderedDict
 from typing import Union
+
+import numpy as np
 
 from . import ast
 
@@ -38,155 +38,117 @@ class TreeListener:
     def exitEvery(self, tree: ast.Node):
         self.context[type(tree).__name__] = None
 
-    def enterClass(self, tree: ast.Class) -> None:
-        pass
+    # -------------------------------------------------------------------------
+    # enter ast listeners (sorted alphabetically)
+    # -------------------------------------------------------------------------
 
-    def exitClass(self, tree: ast.Class) -> None:
-        pass
+    def enterArray(self, tree: ast.Array) -> None: pass
 
-    def enterImportAsClause(self, tree: ast.ImportAsClause) -> None:
-        pass
+    def enterAssignmentStatement(self, tree: ast.AssignmentStatement) -> None: pass
 
-    def exitImportAsClause(self, tree: ast.ImportAsClause) -> None:
-        pass
+    def enterClass(self, tree: ast.Class) -> None: pass
 
-    def enterImportFromClause(self, tree: ast.ImportFromClause) -> None:
-        pass
+    def enterClassModification(self, tree: ast.ClassModification) -> None: pass
 
-    def exitImportFromClause(self, tree: ast.ImportFromClause) -> None:
-        pass
+    def enterComponentClause(self, tree: ast.ComponentClause) -> None: pass
 
-    def enterElementModification(self, tree: ast.ElementModification) -> None:
-        pass
+    def enterComponentRef(self, tree: ast.ComponentRef) -> None: pass
 
-    def exitElementModification(self, tree: ast.ElementModification) -> None:
-        pass
+    def enterConnectClause(self, tree: ast.ConnectClause) -> None: pass
 
-    def enterClassModification(self, tree: ast.ClassModification) -> None:
-        pass
+    def enterElementModification(self, tree: ast.ElementModification) -> None: pass
 
-    def exitClassModification(self, tree: ast.ClassModification) -> None:
-        pass
+    def enterEquation(self, tree: ast.Equation) -> None: pass
 
-    def enterExtendsClause(self, tree: ast.ExtendsClause) -> None:
-        pass
+    def enterExpression(self, tree: ast.Expression) -> None: pass
 
-    def exitExtendsClause(self, tree: ast.ExtendsClause) -> None:
-        pass
+    def enterExtendsClause(self, tree: ast.ExtendsClause) -> None: pass
 
-    def enterIfExpression(self, tree: ast.IfExpression) -> None:
-        pass
+    def enterForEquation(self, tree: ast.ForEquation) -> None: pass
 
-    def exitIfExpression(self, tree: ast.IfExpression) -> None:
-        pass
+    def enterForIndex(self, tree: ast.ForIndex) -> None: pass
 
-    def enterExpression(self, tree: ast.Expression) -> None:
-        pass
+    def enterForStatement(self, tree: ast.ForStatement) -> None: pass
 
-    def exitExpression(self, tree: ast.Expression) -> None:
-        pass
+    def enterFunction(self, tree: ast.Function) -> None: pass
 
-    def enterIfEquation(self, tree: ast.IfEquation) -> None:
-        pass
+    def enterIfEquation(self, tree: ast.IfEquation) -> None: pass
 
-    def exitIfEquation(self, tree: ast.IfEquation) -> None:
-        pass
+    def enterIfExpression(self, tree: ast.IfExpression) -> None: pass
 
-    def enterForIndex(self, tree: ast.ForIndex) -> None:
-        pass
+    def enterIfStatement(self, tree: ast.IfStatement) -> None: pass
 
-    def exitForIndex(self, tree: ast.ForIndex) -> None:
-        pass
+    def enterImportAsClause(self, tree: ast.ImportAsClause) -> None: pass
 
-    def enterForEquation(self, tree: ast.ForEquation) -> None:
-        pass
+    def enterImportFromClause(self, tree: ast.ImportFromClause) -> None: pass
 
-    def exitForEquation(self, tree: ast.ForEquation) -> None:
-        pass
+    def enterPrimary(self, tree: ast.Primary) -> None: pass
 
-    def enterEquation(self, tree: ast.Equation) -> None:
-        pass
+    def enterSlice(self, tree: ast.Slice) -> None: pass
 
-    def exitEquation(self, tree: ast.Equation) -> None:
-        pass
+    def enterSymbol(self, tree: ast.Symbol) -> None: pass
 
-    def enterConnectClause(self, tree: ast.ConnectClause) -> None:
-        pass
+    def enterTree(self, tree: ast.Tree) -> None: pass
 
-    def exitConnectClause(self, tree: ast.ConnectClause) -> None:
-        pass
+    def enterWhenEquation(self, tree: ast.WhenEquation) -> None: pass
 
-    def enterAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
-        pass
+    def enterWhenStatement(self, tree: ast.WhenStatement) -> None: pass
 
-    def exitAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
-        pass
+    # -------------------------------------------------------------------------
+    # exit ast listeners (sorted alphabetically)
+    # -------------------------------------------------------------------------
 
-    def enterIfStatement(self, tree: ast.IfStatement) -> None:
-        pass
+    def exitArray(self, tree: ast.Array) -> None: pass
 
-    def exitIfStatement(self, tree: ast.IfStatement) -> None:
-        pass
+    def exitAssignmentStatement(self, tree: ast.AssignmentStatement) -> None: pass
 
-    def enterForStatement(self, tree: ast.ForStatement) -> None:
-        pass
+    def exitClass(self, tree: ast.Class) -> None: pass
 
-    def exitForStatement(self, tree: ast.ForStatement) -> None:
-        pass
+    def exitClassModification(self, tree: ast.ClassModification) -> None: pass
 
-    def enterSymbol(self, tree: ast.Symbol) -> None:
-        pass
+    def exitComponentClause(self, tree: ast.ComponentClause) -> None: pass
 
-    def exitSymbol(self, tree: ast.Symbol) -> None:
-        pass
+    def exitComponentRef(self, tree: ast.ComponentRef) -> None: pass
 
-    def enterComponentClause(self, tree: ast.ComponentClause) -> None:
-        pass
+    def exitConnectClause(self, tree: ast.ConnectClause) -> None: pass
 
-    def exitComponentClause(self, tree: ast.ComponentClause) -> None:
-        pass
+    def exitElementModification(self, tree: ast.ElementModification) -> None: pass
 
-    def enterArray(self, tree: ast.Array) -> None:
-        pass
+    def exitEquation(self, tree: ast.Equation) -> None: pass
 
-    def exitArray(self, tree: ast.Array) -> None:
-        pass
+    def exitExpression(self, tree: ast.Expression) -> None: pass
 
-    def enterSlice(self, tree: ast.Slice) -> None:
-        pass
+    def exitExtendsClause(self, tree: ast.ExtendsClause) -> None: pass
 
-    def exitSlice(self, tree: ast.Slice) -> None:
-        pass
+    def exitForEquation(self, tree: ast.ForEquation) -> None: pass
 
-    def enterPrimary(self, tree: ast.Primary) -> None:
-        pass
+    def exitForIndex(self, tree: ast.ForIndex) -> None: pass
 
-    def exitPrimary(self, tree: ast.Primary) -> None:
-        pass
+    def exitForStatement(self, tree: ast.ForStatement) -> None: pass
 
-    def enterComponentRef(self, tree: ast.ComponentRef) -> None:
-        pass
+    def exitFunction(self, tree: ast.Function) -> None: pass
 
-    def exitComponentRef(self, tree: ast.ComponentRef) -> None:
-        pass
+    def exitIfEquation(self, tree: ast.IfEquation) -> None: pass
 
-    def enterWhenEquation(self, tree: ast.WhenEquation) -> None:
-        pass
+    def exitIfExpression(self, tree: ast.IfExpression) -> None: pass
 
-    def exitWhenEquation(self, tree: ast.WhenEquation) -> None:
-        pass
+    def exitIfStatement(self, tree: ast.IfStatement) -> None: pass
 
-    def enterWhenStatement(self, tree: ast.WhenStatement) -> None:
-        pass
+    def exitImportAsClause(self, tree: ast.ImportAsClause) -> None: pass
 
-    def exitWhenStatement(self, tree: ast.WhenStatement) -> None:
-        pass
+    def exitImportFromClause(self, tree: ast.ImportFromClause) -> None: pass
 
-    def enterTree(self, tree: ast.Tree) -> None:
-        pass
+    def exitPrimary(self, tree: ast.Primary) -> None: pass
 
-    def exitTree(self, tree: ast.Tree) -> None:
-        pass
+    def exitSlice(self, tree: ast.Slice) -> None: pass
+
+    def exitSymbol(self, tree: ast.Symbol) -> None: pass
+
+    def exitTree(self, tree: ast.Tree) -> None: pass
+
+    def exitWhenEquation(self, tree: ast.WhenEquation) -> None: pass
+
+    def exitWhenStatement(self, tree: ast.WhenStatement) -> None: pass
 
 
 class TreeWalker:
@@ -208,7 +170,7 @@ class TreeWalker:
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.__dict__.keys():
             if isinstance(tree, ast.Class) and child_name == 'parent' or \
-                isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
+                    isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
                 # Do not go up again.
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
@@ -236,7 +198,8 @@ class TreeWalker:
             pass
 
 
-def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None, parent=None) -> ast.InstanceClass:
+def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None,
+                    parent=None) -> ast.InstanceClass:
     extended_orig_class = ast.InstanceClass(
         name=orig_class.name,
         type=orig_class.type,
@@ -303,8 +266,8 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     return extended_orig_class
 
 
-def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None, parent=None) -> ast.InstanceClass:
-
+def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None,
+                        parent=None) -> ast.InstanceClass:
     extended_orig_class = flatten_extends(orig_class, modification_environment, parent)
 
     # Redeclarations take effect
@@ -753,7 +716,7 @@ class SymbolModificationApplier(TreeListener):
                 tree.class_modification = None
 
     # Class modification arguments may exist within annotations.
-    #def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
+    # def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
     #     assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
 
     def exitInstanceClass(self, tree: ast.InstanceClass):
@@ -937,7 +900,8 @@ def expand_connectors(node: ast.Class) -> None:
                 # All outer variables. Don't include unnecessary minus expressions.
                 operands = [op_spec[0] for op_spec in operand_specs]
             else:
-                operands = [op_spec[0] if op_spec[1] else ast.Expression(operator='-', operands=[op_spec[0]]) for op_spec in operand_specs]
+                operands = [op_spec[0] if op_spec[1] else ast.Expression(operator='-', operands=[op_spec[0]]) for
+                            op_spec in operand_specs]
             expr = operands[-1]
             for op in reversed(operands[:-1]):
                 expr = ast.Expression(operator='+', operands=[op, expr])

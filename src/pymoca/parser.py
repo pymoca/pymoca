@@ -485,8 +485,11 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.Array(values=v)
 
     def exitEquation_function(self, ctx: ModelicaParser.Equation_functionContext):
-        # TODO, add function ast
-        self.ast[ctx] = ctx.getText()
+        self.ast[ctx] = ast.Function(
+            name=ctx.name().getText(),
+            arguments=[self.ast[x.expression()]
+                for x in ctx.function_call_args().function_arguments().function_argument()]
+        )
 
     def exitEquation_when(self, ctx: ModelicaParser.Equation_whenContext):
         self.ast[ctx] = self.ast[ctx.when_equation()]
