@@ -264,6 +264,14 @@ class IfStatement(Node):
         super().__init__(**kwargs)
 
 
+class WhenStatement(Node):
+    def __init__(self, **kwargs):
+        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.blocks = []  # type: List[List[Union[AssignmentStatement, IfStatement, ForStatement]]]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
+
+
 class ForStatement(Node):
     def __init__(self, **kwargs):
         self.indices = []  # type: List[ForIndex]
