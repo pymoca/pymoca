@@ -1,0 +1,3 @@
+[submodule "src/pymoca/backends/xml/ModelicaXML"]
+	path = src/pymoca/backends/xml/ModelicaXML
+	url = https://github.com/modelica-association/ModelicaXML.git

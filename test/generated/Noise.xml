@@ -1,0 +1,71 @@
+<modelica xmlns:py="http://codespeak.net/lxml/objectify/pytype" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" format="1.0">
+  <declarations>
+    <classDefinition name="Noise">
+      <class kind="model">
+        <component name="x">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="dt">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="t_last" variability="discrete">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="y" variability="discrete">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <equation>
+          <equal>
+            <operator name="der">
+              <local name="x"/>
+            </operator>
+            <real value="1.0"/>
+          </equal>
+          <equal>
+            <local name="dt"/>
+            <apply builtin="-">
+              <local name="time"/>
+              <local name="t_last"/>
+            </apply>
+          </equal>
+          <when>
+            <cond>
+              <apply builtin="&gt;">
+                <local name="dt"/>
+                <real value="0.1"/>
+              </apply>
+            </cond>
+            <then>
+              <equal>
+                <local name="t_last"/>
+                <local name="time"/>
+              </equal>
+              <equal>
+                <local name="y"/>
+                <apply builtin="+">
+                  <apply builtin="+">
+                    <local name="x"/>
+                    <apply builtin="noise_gaussian">
+                      <real value="0.0"/>
+                      <real value="0.1"/>
+                    </apply>
+                  </apply>
+                  <apply builtin="noise_uniform">
+                    <operator name="-">
+                      <real value="0.01"/>
+                    </operator>
+                    <real value="0.01"/>
+                  </apply>
+                </apply>
+              </equal>
+            </then>
+          </when>
+        </equation>
+      </class>
+    </classDefinition>
+  </declarations>
+</modelica>

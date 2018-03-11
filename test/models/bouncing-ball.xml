@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<modelica format="1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="../../src/pymoca/backends/xml/ModelicaXML/schemas/Modelica.xsd">
+    <declarations>
+        <classDefinition name="BouncingBall">
+            <class kind="model">
+                <!-- declarations -->
+                <!-- parameter Real g = 9.8; -->
+                <component name="g" variability="parameter">
+                    <builtin name="Real"/>
+                    <modifier>
+                        <item name="value">
+                            <real value="9.8"/>
+                        </item>
+                    </modifier>
+                </component>
+                <!-- parameter Real c = 0.7; -->
+                <component name="c" variability="parameter">
+                    <builtin name="Real"/>
+                    <modifier>
+                        <item name="value">
+                            <real value="0.7"/>
+                        </item>
+                    </modifier>
+                </component>
+                <!-- Real x(start=1); -->
+                <component name="x">
+                    <builtin name="Real"/>
+                    <modifier>
+                        <item name="start">
+                            <real value="1"/>
+                        </item>
+                    </modifier>
+                </component>
+                <!-- Real v(start=0); -->
+                <component name="v">
+                    <builtin name="Real"/>
+                    <modifier>
+                        <item name="start">
+                            <real value="0"/>
+                        </item>
+                        <item name="fixed">
+                            <true/>
+                        </item>
+                    </modifier>
+                </component>
+                <!-- discrete Real y(start=2); -->
+                <component name="y" variability="discrete">
+                    <builtin name="Real"/>
+                    <modifier>
+                        <item name="start">
+                            <real value="2"/>
+                        </item>
+                    </modifier>
+                </component>
+                <!-- equation section -->
+                <equation>
+                    <!-- der(x) = v -->
+                    <equal>
+                        <operator name="der">
+                            <local name="x"/>
+                        </operator>
+                        <local name="v"/>
+                    </equal>
+                    <!-- if x < 0 then -->
+                    <!--   der(v) = 0; -->
+                    <!-- else -->
+                    <!--   der(v) = -g; -->
+                    <!-- end if; -->
+                    <if>
+                        <cond>
+                            <operator name="&lt;">
+                                <local name="x"/>
+                                <real value="0"/>
+                            </operator>
+                        </cond>
+                        <then>
+                            <equal>
+                                <operator name="der">
+                                    <local name="v"/>
+                                </operator>
+                                <real value="0"/>
+                            </equal>
+                        </then>
+                        <else>
+                            <equal>
+                                <operator name="der">
+                                    <local name="v"/>
+                                </operator>
+                                <apply builtin="-">
+                                    <local name="g"/>
+                                </apply>
+                            </equal>
+                        </else>
+                    </if>
+                    <!-- when x < 0 then -->
+                    <!--    then reinit(v, -cv); -->
+                    <!--    y = v; -->
+                    <!-- end when; -->
+                    <when>
+                        <cond>
+                            <operator name="&lt;">
+                                <local name="x"/>
+                                <real value="0"/>
+                            </operator>
+                        </cond>
+                            <then>
+                                <apply builtin="reinit">
+                                <local name="v"/>
+                                <operator name="*">
+                                    <local name="c"/>
+                                    <operator name="-">
+                                        <local name="v"/>
+                                    </operator>
+                                </operator>
+                            </apply>
+                            <equal>
+                                <local name="y"/>
+                                <local name="v"/>
+                            </equal>
+                        </then>
+                    </when>
+                    <!-- when((abs(v) < 0.1 and x < 0) then -->
+                    <!--    reinit(v,0); -->
+                    <!-- end when; -->
+                    <when>
+                        <cond>
+                            <operator name="and">
+                                <operator name="&lt;">
+                                    <operator name="abs">
+                                        <local name="v"/>
+                                    </operator>
+                                    <real value="0.1"/>
+                                </operator>
+                                <operator name="&lt;">
+                                    <local name="x"/>
+                                    <real value="0"/>
+                                </operator>
+                            </operator>
+                        </cond>
+                        <then>
+                            <apply builtin="reinit">
+                                <local name="v"/>
+                                <real value="0"/>
+                            </apply>
+                        </then>
+                    </when>
+                </equation>
+            </class>
+        </classDefinition>
+    </declarations>
+</modelica>
