@@ -1,0 +1,411 @@
+<modelica xmlns:py="http://codespeak.net/lxml/objectify/pytype" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" format="1.0">
+  <declarations>
+    <classDefinition name="SimpleCircuit">
+      <class kind="model">
+        <component name="i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R1.p.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R1.p.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R1.n.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R1.n.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R1.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R1.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R1.R" variability="parameter">
+          <builtin name="Real"/>
+          <modifier>
+            <item name="value">
+              <real value="10.0"/>
+            </item>
+          </modifier>
+        </component>
+        <component name="C.p.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="C.p.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="C.n.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="C.n.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="C.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="C.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="C.C" variability="parameter">
+          <builtin name="Real"/>
+          <modifier>
+            <item name="value">
+              <real value="0.01"/>
+            </item>
+          </modifier>
+        </component>
+        <component name="R2.p.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R2.p.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R2.n.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R2.n.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R2.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R2.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="R2.R" variability="parameter">
+          <builtin name="Real"/>
+          <modifier>
+            <item name="value">
+              <real value="100.0"/>
+            </item>
+          </modifier>
+        </component>
+        <component name="L.p.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="L.p.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="L.n.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="L.n.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="L.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="L.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="L.L" variability="parameter">
+          <builtin name="Real"/>
+          <modifier>
+            <item name="value">
+              <real value="0.1"/>
+            </item>
+          </modifier>
+        </component>
+        <component name="AC.p.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="AC.p.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="AC.n.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="AC.n.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="AC.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="AC.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="AC.VA" variability="parameter">
+          <builtin name="Real"/>
+          <modifier>
+            <item name="value">
+              <real value="220.0"/>
+            </item>
+          </modifier>
+        </component>
+        <component name="AC.f" variability="parameter">
+          <builtin name="Real"/>
+          <modifier>
+            <item name="value">
+              <real value="50.0"/>
+            </item>
+          </modifier>
+        </component>
+        <component name="AC.PI" variability="constant">
+          <builtin name="Real"/>
+          <modifier>
+            <item name="value">
+              <real value="3.14159"/>
+            </item>
+          </modifier>
+        </component>
+        <component name="G.p.v">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <component name="G.p.i">
+          <builtin name="Real"/>
+          <modifier/>
+        </component>
+        <equation>
+          <equal>
+            <local name="R1.v"/>
+            <apply builtin="-">
+              <local name="R1.p.v"/>
+              <local name="R1.n.v"/>
+            </apply>
+          </equal>
+          <equal>
+            <real value="0.0"/>
+            <apply builtin="+">
+              <local name="R1.p.i"/>
+              <local name="R1.n.i"/>
+            </apply>
+          </equal>
+          <equal>
+            <local name="R1.i"/>
+            <local name="R1.p.i"/>
+          </equal>
+          <equal>
+            <local name="R1.v"/>
+            <apply builtin="*">
+              <local name="R1.i"/>
+              <local name="R1.R"/>
+            </apply>
+          </equal>
+          <equal>
+            <local name="C.v"/>
+            <apply builtin="-">
+              <local name="C.p.v"/>
+              <local name="C.n.v"/>
+            </apply>
+          </equal>
+          <equal>
+            <real value="0.0"/>
+            <apply builtin="+">
+              <local name="C.p.i"/>
+              <local name="C.n.i"/>
+            </apply>
+          </equal>
+          <equal>
+            <local name="C.i"/>
+            <local name="C.p.i"/>
+          </equal>
+          <equal>
+            <local name="C.i"/>
+            <apply builtin="*">
+              <local name="C.C"/>
+              <operator name="der">
+                <local name="C.v"/>
+              </operator>
+            </apply>
+          </equal>
+          <equal>
+            <local name="R2.v"/>
+            <apply builtin="-">
+              <local name="R2.p.v"/>
+              <local name="R2.n.v"/>
+            </apply>
+          </equal>
+          <equal>
+            <real value="0.0"/>
+            <apply builtin="+">
+              <local name="R2.p.i"/>
+              <local name="R2.n.i"/>
+            </apply>
+          </equal>
+          <equal>
+            <local name="R2.i"/>
+            <local name="R2.p.i"/>
+          </equal>
+          <equal>
+            <local name="R2.v"/>
+            <apply builtin="*">
+              <local name="R2.i"/>
+              <local name="R2.R"/>
+            </apply>
+          </equal>
+          <equal>
+            <local name="L.v"/>
+            <apply builtin="-">
+              <local name="L.p.v"/>
+              <local name="L.n.v"/>
+            </apply>
+          </equal>
+          <equal>
+            <real value="0.0"/>
+            <apply builtin="+">
+              <local name="L.p.i"/>
+              <local name="L.n.i"/>
+            </apply>
+          </equal>
+          <equal>
+            <local name="L.i"/>
+            <local name="L.p.i"/>
+          </equal>
+          <equal>
+            <local name="L.v"/>
+            <apply builtin="*">
+              <local name="L.L"/>
+              <operator name="der">
+                <local name="L.i"/>
+              </operator>
+            </apply>
+          </equal>
+          <equal>
+            <local name="AC.v"/>
+            <apply builtin="-">
+              <local name="AC.p.v"/>
+              <local name="AC.n.v"/>
+            </apply>
+          </equal>
+          <equal>
+            <real value="0.0"/>
+            <apply builtin="+">
+              <local name="AC.p.i"/>
+              <local name="AC.n.i"/>
+            </apply>
+          </equal>
+          <equal>
+            <local name="AC.i"/>
+            <local name="AC.p.i"/>
+          </equal>
+          <equal>
+            <local name="AC.v"/>
+            <apply builtin="*">
+              <local name="AC.VA"/>
+              <operator name="sin">
+                <apply builtin="*">
+                  <apply builtin="*">
+                    <apply builtin="*">
+                      <real value="2.0"/>
+                      <local name="AC.PI"/>
+                    </apply>
+                    <local name="AC.f"/>
+                  </apply>
+                  <local name="time"/>
+                </apply>
+              </operator>
+            </apply>
+          </equal>
+          <equal>
+            <local name="G.p.v"/>
+            <real value="0.0"/>
+          </equal>
+          <equal>
+            <local name="i"/>
+            <local name="L.i"/>
+          </equal>
+          <equal>
+            <local name="AC.p.v"/>
+            <local name="R1.p.v"/>
+          </equal>
+          <equal>
+            <local name="R1.n.v"/>
+            <local name="C.p.v"/>
+          </equal>
+          <equal>
+            <local name="C.n.v"/>
+            <local name="AC.n.v"/>
+          </equal>
+          <equal>
+            <local name="R1.p.v"/>
+            <local name="R2.p.v"/>
+          </equal>
+          <equal>
+            <local name="R2.n.v"/>
+            <local name="L.p.v"/>
+          </equal>
+          <equal>
+            <local name="L.n.v"/>
+            <local name="C.n.v"/>
+          </equal>
+          <equal>
+            <local name="AC.n.v"/>
+            <local name="G.p.v"/>
+          </equal>
+          <equal>
+            <apply builtin="+">
+              <local name="AC.p.i"/>
+              <apply builtin="+">
+                <local name="R1.p.i"/>
+                <local name="R2.p.i"/>
+              </apply>
+            </apply>
+            <real value="0"/>
+          </equal>
+          <equal>
+            <apply builtin="+">
+              <local name="R1.n.i"/>
+              <local name="C.p.i"/>
+            </apply>
+            <real value="0"/>
+          </equal>
+          <equal>
+            <apply builtin="+">
+              <local name="C.n.i"/>
+              <apply builtin="+">
+                <local name="AC.n.i"/>
+                <apply builtin="+">
+                  <local name="L.n.i"/>
+                  <local name="G.p.i"/>
+                </apply>
+              </apply>
+            </apply>
+            <real value="0"/>
+          </equal>
+          <equal>
+            <apply builtin="+">
+              <local name="R2.n.i"/>
+              <local name="L.p.i"/>
+            </apply>
+            <real value="0"/>
+          </equal>
+        </equation>
+      </class>
+    </classDefinition>
+  </declarations>
+</modelica>
