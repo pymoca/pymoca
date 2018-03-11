@@ -306,12 +306,24 @@ class ASTListener(ModelicaListener):
     def exitStatement_for(self, ctx: ModelicaParser.Statement_forContext):
         self.ast[ctx] = self.ast[ctx.for_statement()]
 
+    def exitStatement_when(self, ctx: ModelicaParser.Equation_whenContext):
+        self.ast[ctx] = self.ast[ctx.when_equation()]
+
     def exitIf_statement(self, ctx: ModelicaParser.If_statementContext):
         blocks = [self.ast[b] for b in ctx.blocks]
         conditions = [self.ast[c] for c in ctx.conditions]
         if len(conditions) == len(blocks) - 1:
             conditions.append(True)
         self.ast[ctx] = ast.IfStatement(
+            conditions=conditions,
+            blocks=blocks)
+
+    def exitWhen_statement(self, ctx: ModelicaParser.When_statementContext):
+        blocks = [self.ast[b] for b in ctx.blocks]
+        conditions = [self.ast[c] for c in ctx.conditions]
+        if len(conditions) == len(blocks) - 1:
+            conditions.append(True)
+        self.ast[ctx] = ast.WhenStatement(
             conditions=conditions,
             blocks=blocks)
 

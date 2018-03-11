@@ -170,6 +170,24 @@ class TreeListener:
     def exitComponentRef(self, tree: ast.ComponentRef) -> None:
         pass
 
+    def enterWhenEquation(self, tree: ast.WhenEquation) -> None:
+        pass
+
+    def exitWhenEquation(self, tree: ast.WhenEquation) -> None:
+        pass
+
+    def enterWhenStatement(self, tree: ast.WhenStatement) -> None:
+        pass
+
+    def exitWhenStatement(self, tree: ast.WhenStatement) -> None:
+        pass
+
+    def enterTree(self, tree: ast.Tree) -> None:
+        pass
+
+    def exitTree(self, tree: ast.Tree) -> None:
+        pass
+
 
 class TreeWalker:
     """
