@@ -76,7 +76,9 @@ class Node:
             self.__dict__[key] = kwargs[key]
 
     def __repr__(self):
-        return json.dumps(self.to_json(self), indent=2, sort_keys=True)
+        d = self.to_json(self)
+        d['_type'] = self.__class__.__name__
+        return json.dumps(d, indent=2, sort_keys=True)
 
     @classmethod
     def to_json(cls, var):
@@ -276,6 +278,14 @@ class ForStatement(Node):
     def __init__(self, **kwargs):
         self.indices = []  # type: List[ForIndex]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
+        self.comment = ''  # type: str
+        super().__init__(**kwargs)
+
+
+class Function(Node):
+    def __init__(self, **kwargs):
+        self.name = '' # type: str
+        self.arguments = []  # type: List[Union[Expression, Primary, ComponentRef, Array]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
