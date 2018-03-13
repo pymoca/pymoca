@@ -9,11 +9,10 @@ and enables interacting with Modelica easily in Python.
 from __future__ import print_function
 
 import os
-import sys
 import subprocess
+import sys
 
-from setuptools import setup, find_packages
-from setuptools import Command
+from setuptools import Command, find_packages, setup
 
 import versioneer
 
@@ -44,38 +43,48 @@ Topic :: Software Development :: Embedded Systems
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-#pylint: disable=no-init, too-few-public-methods
+# pylint: disable=no-init, too-few-public-methods
 
 
-python_version = '.'.join([str(i) for i in sys.version_info[:3]])
-python_version_required = '3.5.0'
-if python_version < python_version_required:
-    sys.exit("Sorry, only Python >= {:s} is supported".format(python_version_required))
+PYTHON_VERSION = '.'.join([str(i) for i in sys.version_info[:3]])
+PYTHON_VERSION_REQUIRED = '3.5.0'
+if PYTHON_VERSION < PYTHON_VERSION_REQUIRED:
+    sys.exit("Sorry, only Python >= {:s} is supported".format(
+        PYTHON_VERSION_REQUIRED))
+
 
 class AntlrBuildCommand(Command):
     """Customized setuptools build command."""
-    user_options=[]
+
+    user_options = []
+
     def initialize_options(self):
+        """initialize options"""
         pass
+
     def finalize_options(self):
+        """finalize options"""
         pass
+
     def run(self):
         "Run the build command"
         call_antlr4('Modelica.g4')
 
+
 def call_antlr4(arg):
     "calls antlr4 on grammar file"
-    #pylint: disable=unused-argument, unused-variable
+    # pylint: disable=unused-argument, unused-variable
     antlr_path = os.path.join(ROOT_DIR, "java", "antlr-4.7-complete.jar")
     classpath = ".:{:s}:$CLASSPATH".format(antlr_path)
     generated = os.path.join(ROOT_DIR, 'src', 'pymoca', 'generated')
     cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
-            " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
+          " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
     print(cmd)
     proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'src', 'pymoca'))
     proc.communicate()
     with open(os.path.join(generated, '__init__.py'), 'w') as fid:
         fid.write('')
+
 
 def setup_package():
     """
