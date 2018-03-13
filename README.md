@@ -34,8 +34,9 @@ jupyter notebook
 
 ### TODO
 
-* Casadi simulation
-* Serializable model format (ModelicaXML)
+* Gather requirements and unify Casadi model
+* AST manipulation API
+* Lazy parsing for reading large libraries
 * Support more of Modelica language elements
 
 <!--- vim:ts=4:sw=4:expandtab:
