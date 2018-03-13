@@ -20,7 +20,11 @@ matrix:
         - python3 -m venv venv
         - source venv/bin/activate
       env: TOXENV=py36
-    # TODO: Meta for flake8
+
+    # Meta
+    - os: linux
+      python: 3.6
+      env: TOXENV=flake8
 
 before_install:
   - pip install coveralls
