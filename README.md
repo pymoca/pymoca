@@ -23,6 +23,7 @@ jupyter notebook
 ## Examples
 * [Sympy Example](test/notebooks/Spring.ipynb)
 * [Casadi Example](test/notebooks/Casadi.ipynb)
+* [ModelicaXML Example](test/notebooks/XML.ipynb)
 
 ## Roadmap
 
