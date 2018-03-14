@@ -10,6 +10,11 @@ A Modelica to computer algebra system (CAS) compiler written in python.
 
 ## Install
 
+Python / PyPI:
+
+`pip install pymoca`
+
+Anaconda / Conda:
 1. Install anaconda 3.
 
 2. Setup environment.
