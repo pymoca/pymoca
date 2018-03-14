@@ -26,6 +26,15 @@ matrix:
       python: 3.6
       env: TOXENV=flake8
 
+    # Deployment when all tests succeed. Skip installation and script.
+    - stage: deploy
+      before_install: true
+      install: true
+      script: true
+      os: linux
+      python: 3.6
+      env: DEPLOY=true
+
 before_install:
   - pip install coveralls
 
@@ -47,3 +56,4 @@ deploy:
   distributions: "sdist bdist_wheel"
   on:
     tags: true
+    condition: $DEPLOY = true
