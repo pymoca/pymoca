@@ -546,6 +546,56 @@ class Class(Node):
         new.parent = _parent
         return new
 
+    def add_class(self, c: 'Class') -> None:
+        """
+        Add a (sub)class to this class.
+
+        :param c: (Sub)class to add.
+        """
+        self.classes[c.name] = c
+        c.parent = self
+
+    def remove_class(self, c: 'Class') -> None:
+        """
+        Removes a (sub)class from this class.
+
+        :param c: (Sub)class to remove.
+        """
+        del self.classes[c.name]
+        c.parent = None
+
+    def add_symbol(self, s: Symbol) -> None:
+        """
+        Add a symbol to this class.
+
+        :param s: Symbol to add.
+        """
+        self.symbols[s.name] = s
+
+    def remove_symbol(self, s: Symbol) -> None:
+        """
+        Removes a symbol from this class.
+
+        :param s: Symbol to remove.
+        """
+        del self.symbols[s.name]
+
+    def add_equation(self, e: Equation) -> None:
+        """
+        Add an equation to this class.
+
+        :param e: Equation to add.
+        """
+        self.equations.append(e)
+
+    def remove_equation(self, e: Equation) -> None:
+        """
+        Removes an equation from this class.
+
+        :param e: Equation to remove.
+        """
+        self.equations.remove(e)
+
 
 class InstanceClass(Class):
     """
