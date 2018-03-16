@@ -43,7 +43,6 @@ jupyter notebook
 ### TODO
 
 * Gather requirements and unify Casadi model
-* AST manipulation API
 * Lazy parsing for reading large libraries
 * Support more of Modelica language elements
 
