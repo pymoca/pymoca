@@ -3,6 +3,7 @@ from typing import Dict
 import distutils.ccompiler
 import casadi as ca
 import numpy as np
+import copy
 import sys
 import os
 import fnmatch
@@ -145,18 +146,22 @@ def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
             os.remove(object_name)
     return library
 
-def _save_model(model_folder: str, model_name: str, model: Model,
-                compiler_options: Dict[str, str], cache=True, codegen=False):
-    # Compilation takes precedence over caching, and disables it
-    if cache and codegen:
-        logger.warning("Both 'cache' and 'codegen' specified. Code generation will take precedence.")
-        cache = False
+def save_model(model_folder: str, model_name: str, model: Model,
+               compiler_options: Dict[str, str]) -> None:
+    """
+    Saves a CasADi model to disk.
+
+    :param model_folder: Folder where the precompiled CasADi model will be stored.
+    :param model_name: Name of the model.
+    :param model: Model instance.
+    :param compiler_options: Dictionary of compiler options.
+    """
 
     objects = {'dae_residual': None, 'initial_residual': None, 'variable_metadata': None}
     for o in objects.keys():
         f = getattr(model, o + '_function')
 
-        if codegen:
+        if compiler_options.get('codegen', False):
             objects[o] = _codegen_model(model_folder, f, '{}_{}'.format(model_name, o))
         else:
             objects[o] = f
@@ -186,7 +191,17 @@ def _save_model(model_folder: str, model_name: str, model: Model,
 
         pickle.dump(db, f)
 
-def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]) -> CachedModel:
+def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]) -> CachedModel:
+    """
+    Loads a precompiled CasADi model into a CachedModel instance.
+
+    :param model_folder: Folder where the precompiled CasADi model is located.
+    :param model_name: Name of the model.
+    :param compiler_options: Dictionary of compiler options.
+
+    :returns: CachedModel instance.
+    """
+
     db_file = os.path.join(model_folder, model_name)
 
     if compiler_options.get('mtime_check', True):
@@ -282,8 +297,16 @@ def _load_model(model_folder: str, model_name: str, compiler_options: Dict[str, 
 def transfer_model(model_folder: str, model_name: str, compiler_options=None):
     if compiler_options is None:
         compiler_options = {}
-    cache = compiler_options.get('cache', False)
-    codegen = compiler_options.get('codegen', False)
+    else:
+        compiler_options = copy.copy(compiler_options)
+
+    cache = compiler_options.setdefault('cache', False)
+    codegen = compiler_options.setdefault('codegen', False)
+
+    # Compilation takes precedence over caching, and disables it
+    if cache and codegen:
+        logger.warning("Both 'cache' and 'codegen' specified. Code generation will take precedence.")
+        cache = compiler_options['cache'] = False
 
     if cache or codegen:
         # Until CasADi supports pickling MXFunctions, caching implies
@@ -295,12 +318,12 @@ def transfer_model(model_folder: str, model_name: str, compiler_options=None):
             raise_expand_warning = True
 
         try:
-            return _load_model(model_folder, model_name, compiler_options)
+            return load_model(model_folder, model_name, compiler_options)
         except (FileNotFoundError, InvalidCacheError):
             if raise_expand_warning:
                 logger.warning("Caching implies expanding to SX. Setting 'expand_mx' to True.")
             model = _compile_model(model_folder, model_name, compiler_options)
-            _save_model(model_folder, model_name, model, compiler_options, cache, codegen)
+            save_model(model_folder, model_name, model, compiler_options)
             return model
     else:
         return _compile_model(model_folder, model_name, compiler_options)
