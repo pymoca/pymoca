@@ -1,7 +1,9 @@
 [run]
 branch = True
 source = pymoca
-omit = src/pymoca/_version.py
+omit =
+	src/pymoca/_version.py
+	src/pymoca/generated/*
 
 [report]
 show_missing = true
