@@ -266,6 +266,17 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     return extended_orig_class
 
 
+def extends_builtin(class_: ast.Class) -> bool:
+    ret = False
+    for extends in class_.extends:
+        try:
+            c = class_.find_class(extends.component)
+            ret |= extends_builtin(c)
+        except ast.FoundElementaryClassError:
+            return True
+    return ret
+
+
 def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None,
                         parent=None) -> ast.InstanceClass:
     extended_orig_class = flatten_extends(orig_class, modification_environment, parent)
@@ -377,18 +388,38 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
             # Fix component references to be one level deeper. E.g. applying a
             # modification "a.x = 3.0" on a symbol "a", will mean we pass
             # along a modification "x = 3.0" to the symbol's class instance.
+            # We should only do this if we are not (in)directly inheriting from a builtin.
+            inheriting_from_builtin = extends_builtin(c)
+            sym_mod = ast.ClassModification()
             for arg in sym_arguments:
                 if arg.value.component.indices:
                     raise Exception("Subscripting modifiers is not allowed.")
 
-                arg.value.component = arg.value.component.child[0]
+                if inheriting_from_builtin:
+                    for el_arg in arg.value.modifications:
+                        if not isinstance(el_arg, ast.ClassModification):
+                            # If the value is being set, we make a new class
+                            # modification with attribute name "value" that we
+                            # pick up later in modify_symbol()
+
+                            # TODO: Figure out if it's easier to directly do this
+                            # in the parser.
+                            vmod_arg = ast.ClassModificationArgument()
+                            vmod_arg.scope = arg.scope
+                            vmod_arg.value = ast.ElementModification()
+                            vmod_arg.value.component = ast.ComponentRef(name="value")
+                            vmod_arg.value.modifications = [el_arg]
+                            sym_mod.arguments.append(vmod_arg)
+                        else:
+                            sym_mod.arguments.extend(el_arg.arguments)
+                else:
+                    arg.value.component = arg.value.component.child[0]
+                    sym_mod.arguments.append(arg)
 
             if sym.class_modification:
-                sym.class_modification.arguments.extend(sym_arguments)
+                sym.class_modification.arguments.extend(sym_mod.arguments)
             else:
-                sym_modification = ast.ClassModification()
-                sym_modification.arguments = sym_arguments
-                sym.class_modification = sym_modification
+                sym.class_modification = sym_mod
 
             # Set the correct scope, e.g. for redeclaration modifications
             for arg in sym.class_modification.arguments:

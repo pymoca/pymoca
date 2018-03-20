@@ -288,12 +288,13 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
-        class_name = 'CustomUnits'
+        class_name = 'A'
         comp_ref = ast.ComponentRef.from_string(class_name)
 
         flat_tree = tree.flatten(ast_tree, comp_ref)
 
-        self.assertEqual(flat_tree.classes['CustomUnits'].symbols['dummy_parameter'].unit.value, "m/s")
+        self.assertEqual(flat_tree.classes['A'].symbols['dummy_parameter'].unit.value, "m/s")
+        self.assertEqual(flat_tree.classes['A'].symbols['dummy_parameter'].value.value, 10.0)
 
 
 if __name__ == "__main__":
