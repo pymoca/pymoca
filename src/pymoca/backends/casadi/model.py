@@ -11,6 +11,7 @@ from .alias_relation import AliasRelation
 logger = logging.getLogger("pymoca")
 
 CASADI_COMPARISON_DEPTH = 100
+CASADI_ATTRIBUTES = [attr for attr in ast.Symbol.ATTRIBUTES if not attr == 'unit']
 
 
 class Variable:
@@ -131,7 +132,7 @@ class Model:
 
                 # Replace parameter expressions in metadata
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                    for attribute in ast.Symbol.ATTRIBUTES:
+                    for attribute in CASADI_ATTRIBUTES:
                         value = getattr(variable, attribute)
                         if isinstance(value, ca.MX) and not value.is_constant():
                             [value] = ca.substitute([value], symbols, values)
@@ -167,7 +168,7 @@ class Model:
 
                 # Replace constant expressions in metadata
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                    for attribute in ast.Symbol.ATTRIBUTES:
+                    for attribute in CASADI_ATTRIBUTES:
                         value = getattr(variable, attribute)
                         if isinstance(value, ca.MX) and not value.is_constant():
                             [value] = ca.substitute([value], symbols, values)
@@ -240,7 +241,7 @@ class Model:
 
             # Replace parameter values in metadata
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in ast.Symbol.ATTRIBUTES:
+                for attribute in CASADI_ATTRIBUTES:
                     value = getattr(variable, attribute)
                     if isinstance(value, ca.MX) and not value.is_constant():
                         [value] = ca.substitute([value], symbols, values)
@@ -260,7 +261,7 @@ class Model:
 
             # Replace constant values in metadata
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in ast.Symbol.ATTRIBUTES:
+                for attribute in CASADI_ATTRIBUTES:
                     value = getattr(variable, attribute)
                     if isinstance(value, ca.MX) and not value.is_constant():
                         [value] = ca.substitute([value], symbols, values)
@@ -344,7 +345,7 @@ class Model:
                                 else:
                                     raise AssertionError
                                 component_var = Variable(component_symbol, old_var.python_type)
-                                for attribute in ast.Symbol.ATTRIBUTES:
+                                for attribute in CASADI_ATTRIBUTES:
                                     value = ca.MX(getattr(old_var, attribute))
                                     if value.size1() == old_var.symbol.size1() and value.size2() == old_var.symbol.size2():
                                         setattr(component_var, attribute, value[i, j])
@@ -374,7 +375,7 @@ class Model:
 
             # Replace values in metadata
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in ast.Symbol.ATTRIBUTES:
+                for attribute in CASADI_ATTRIBUTES:
                     value = getattr(variable, attribute)
                     if isinstance(value, ca.MX) and not value.is_constant():
                         [value] = ca.substitute([value], symbols, values)
@@ -623,9 +624,9 @@ class Model:
         is_affine = True
         zero, one = ca.MX(0), ca.MX(1) # Recycle these common nodes as much as possible.
         for variable_list in [self.states, self.alg_states, self.inputs, self.parameters, self.constants]:
-            attribute_lists = [[] for i in range(len(ast.Symbol.ATTRIBUTES))]
+            attribute_lists = [[] for i in range(len(CASADI_ATTRIBUTES))]
             for variable in variable_list:
-                for attribute_list_index, attribute in enumerate(ast.Symbol.ATTRIBUTES):
+                for attribute_list_index, attribute in enumerate(CASADI_ATTRIBUTES):
                     value = ca.MX(getattr(variable, attribute))
                     if value.is_zero():
                         value = zero

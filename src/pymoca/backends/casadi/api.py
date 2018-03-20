@@ -13,7 +13,7 @@ import contextlib
 
 from pymoca import parser, tree, ast, __version__
 from . import generator
-from .model import Model, Variable
+from .model import CASADI_ATTRIBUTES, Model, Variable
 
 logger = logging.getLogger("pymoca")
 
@@ -265,7 +265,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         for key in variables_with_metadata:
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
-                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
+                for j, tmp in enumerate(CASADI_ATTRIBUTES):
                     setattr(variable, tmp, metadata[key][i, j])
 
         # 2.  Plug independent values back into metadata function, to obtain values (such as bounds, or starting values)
@@ -274,7 +274,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         for key in variables_with_metadata:
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
-                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
+                for j, tmp in enumerate(CASADI_ATTRIBUTES):
                     setattr(variable, tmp, metadata[key][i, j])
 
         # 3.  Fill in any irregular elements with expressions to be evaluated later.
@@ -285,7 +285,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         for k, key in enumerate(variables_with_metadata):
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
-                for j, tmp in enumerate(ast.Symbol.ATTRIBUTES):
+                for j, tmp in enumerate(CASADI_ATTRIBUTES):
                     if not getattr(variable, tmp).is_regular():
                         if (not isinstance(metadata[key][i, j], ca.DM)
                             and ca.depends_on(metadata[key][i, j], parameter_vector)):
