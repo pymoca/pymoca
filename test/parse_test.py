@@ -283,6 +283,18 @@ class ParseTest(unittest.TestCase):
 
         self.assertEqual(flat_tree.classes['ScopeTest'].symbols['nc.p'].value.name, 'p')
 
+    def test_custom_units(self):
+        with open(os.path.join(MODEL_DIR, 'CustomUnits.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'CustomUnits'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertEqual(flat_tree.classes['CustomUnits'].symbols['dummy_parameter'].unit.value, "m/s")
+
 
 if __name__ == "__main__":
     unittest.main()
