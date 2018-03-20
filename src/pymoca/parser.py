@@ -411,7 +411,9 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.Primary(value=float(ctx.getText()))
 
     def exitPrimary_string(self, ctx: ModelicaParser.Primary_stringContext):
-        self.ast[ctx] = ast.Primary(value=ctx.getText())
+        val = ctx.getText()
+        assert val.startswith('"') and val.endswith('"')
+        self.ast[ctx] = ast.Primary(value=val[1:-1])
 
     def exitPrimary_false(self, ctx: ModelicaParser.Primary_falseContext):
         self.ast[ctx] = ast.Primary(value=False)
