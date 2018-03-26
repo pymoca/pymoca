@@ -60,6 +60,7 @@ class Model:
         self.states = []
         self.der_states = []
         self.alg_states = []
+        self.discrete_states = []
         self.inputs = []
         self.outputs = []
         self.constants = []
@@ -68,6 +69,13 @@ class Model:
         self.initial_equations = []
         self.time = ca.MX.sym('time')
         self.delayed_states = []
+        self.conditions = []
+        self.condition_relations = []
+        self.reinit_equations = []
+        self.discrete_update = []
+        self.pre_conditions = []
+        self.pre_discrete_states = []
+
         self._expand_mx_func = lambda x: x
 
     def __str__(self):
@@ -77,12 +85,20 @@ class Model:
         r += "states: " + str(self.states) + "\n"
         r += "der_states: " + str(self.der_states) + "\n"
         r += "alg_states: " + str(self.alg_states) + "\n"
+        r += "discrete states: " + str(self.discrete_states) + "\n"
         r += "inputs: " + str(self.inputs) + "\n"
         r += "outputs: " + str(self.outputs) + "\n"
         r += "constants: " + str(self.constants) + "\n"
         r += "parameters: " + str(self.parameters) + "\n"
         r += "equations: " + str(self.equations) + "\n"
         r += "initial equations: " + str(self.initial_equations) + "\n"
+        r += "delayed states: " + str(self.delayed_states) + "\n"
+        r += "conditions: " + str(self.conditions) + "\n"
+        r += "condition relations: " + str(self.condition_relations) + "\n"
+        r += "reinit equations: " + str(self.reinit_equations) + "\n"
+        r += "discrete update: " + str(self.discrete_update) + "\n"
+        r += "pre conditions: " + str(self.pre_conditions) + "\n"
+        r += "pre discrete states: " + str(self.pre_discrete_states) + "\n"
         return r
 
     def check_balanced(self):

@@ -24,12 +24,19 @@ class CachedModel(Model):
         self.states = []
         self.der_states = []
         self.alg_states = []
+        self.discrete_states = []
         self.inputs = []
         self.outputs = []
         self.constants = []
         self.parameters = []
         self.time = ca.MX.sym('time')
         self.delayed_states = []
+        self.conditions = []
+        #self.condition_relations = []
+        #self.reinit_equations = []
+        #self.discrete_update = []
+        self.pre_conditions = []
+        self.pre_discrete_states = []
 
         self._dae_residual_function = None
         self._initial_residual_function = None
@@ -42,10 +49,15 @@ class CachedModel(Model):
         r += "states: " + str(self.states) + "\n"
         r += "der_states: " + str(self.der_states) + "\n"
         r += "alg_states: " + str(self.alg_states) + "\n"
+        r += "discrete_states: " + str(self.discrete_states) + "\n"
         r += "inputs: " + str(self.inputs) + "\n"
         r += "outputs: " + str(self.outputs) + "\n"
         r += "constants: " + str(self.constants) + "\n"
         r += "parameters: " + str(self.parameters) + "\n"
+        r += "delayed states: " + str(self.delayed_states) + "\n"
+        r += "conditions: " + str(self.conditions) + "\n"
+        r += "pre conditions: " + str(self.pre_conditions) + "\n"
+        r += "pre discrete states: " + str(self.pre_discrete_states) + "\n"
         return r
 
     @property
@@ -55,6 +67,18 @@ class CachedModel(Model):
     @property
     def initial_residual_function(self):
         return self._initial_residual_function
+
+    @property
+    def condition_relations(self):
+        raise NotImplementedError
+
+    @property
+    def reinit_equations(self):
+        raise NotImplementedError
+
+    @property
+    def discrete_update(self):
+        raise NotImplementedError
 
     @property
     def variable_metadata_function(self):
@@ -182,7 +206,7 @@ def save_model(model_folder: str, model_name: str, model: Model,
         db['options'] = compiler_options
 
         # Describe variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
+        for key in ['states', 'der_states', 'alg_states', 'discrete_states', 'inputs', 'parameters', 'constants', 'conditions', 'pre_conditions', 'pre_discrete_states']:
             db[key] = [e.to_dict() for e in getattr(model, key)]
 
         db['outputs'] = model.outputs
@@ -243,7 +267,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             setattr(model, '_' + o + '_function', f)
 
         # Load variables per category
-        variables_with_metadata = ['states', 'alg_states', 'inputs', 'parameters', 'constants']
+        variables_with_metadata = ['states', 'alg_states', 'discrete_states', 'inputs', 'parameters', 'constants', 'conditions', 'pre_conditions', 'pre_discrete_states']
         variable_dict = {}
         for key in variables_with_metadata:
             variables = getattr(model, key)

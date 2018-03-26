@@ -19,7 +19,6 @@ logger = logging.getLogger("pymoca")
 # TODO
 #  - Nested for loops
 #  - Delay operator on arbitrary expressions
-#  - Pre operator
 
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
@@ -81,6 +80,11 @@ class Generator(TreeListener):
         self.derivative = {}
         self.for_loops = deque()
         self.functions = {}
+        self.conditions = {}
+        self.pre_conditions = {}
+        self.pre_discrete_states = {}
+        self.discrete_update = {}
+        self.reinit_equations = {}
         self.entered_classes = deque()
         self.map_mode = 'inline' if options.get('unroll_loops', True) else 'serial'
         self.function_mode = (True, False) if options.get('inline_functions', True) else (False, True)
@@ -124,6 +128,7 @@ class Generator(TreeListener):
 
         ode_states = []
         alg_states = []
+        discrete_states = []
         inputs = []
         constants = []
         parameters = []
@@ -137,12 +142,15 @@ class Generator(TreeListener):
                 inputs.append(s)
             elif 'state' in s.prefixes:
                 ode_states.append(s)
+            elif 'discrete' in s.prefixes:
+                discrete_states.append(s)
             else:
                 alg_states.append(s)
 
         self.model.states = self._ast_symbols_to_variables(ode_states)
         self.model.der_states = self._ast_symbols_to_variables(ode_states, differentiate=True)
         self.model.alg_states = self._ast_symbols_to_variables(alg_states)
+        self.model.discrete_states = self._ast_symbols_to_variables(discrete_states)
         self.model.constants = self._ast_symbols_to_variables(constants)
         self.model.parameters = self._ast_symbols_to_variables(parameters)
 
@@ -156,8 +164,17 @@ class Generator(TreeListener):
         def discard_empty(l):
             return list(filter(lambda x: not ca.MX(x).is_empty(), l))
 
-        self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
+        self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations if not isinstance(e, ast.WhenEquation)])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
+
+        self.model.discrete_update = [self.discrete_update.get(v.symbol, v.symbol) for v in self.model.discrete_states]
+        self.model.reinit_equations = [self.reinit_equations.get(v.symbol, v.symbol) for v in self.model.states]
+
+        self.model.conditions = self.conditions.keys()
+        self.model.condition_relations = self.conditions.values()
+
+        self.model.pre_conditions = [self.get_pre_condition(cond) for cond in self.model.conditions]
+        self.model.pre_discrete_states = [self.get_pre_discrete_state(state) for state in self.model.discrete_states]
 
         if len(tree.statements) + len(tree.initial_statements) > 0:
             raise NotImplementedError('Statements are currently supported inside functions only')
@@ -258,6 +275,9 @@ class Generator(TreeListener):
             delayed_state = DelayedState(src.name(), expr.name(), delay_time)
             self.model.delayed_states.append(delayed_state)
             self.model.inputs.append(Variable(src))
+        elif op == 'pre' and n_operands == 1:
+            expr = self.get_mx(tree.operands[0])
+            src = self.get_pre_discrete_state(expr)
         elif op in OP_MAP and n_operands == 2:
             lhs = ca.MX(self.get_mx(tree.operands[0]))
             rhs = ca.MX(self.get_mx(tree.operands[1]))
@@ -380,6 +400,7 @@ class Generator(TreeListener):
         # is not strictly necessary, see the Modelica Spec on if equations.
         assert tree.conditions[-1] == True
 
+        # Build CasADi if/else expression
         src = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[-1]])
 
         for cond_index in range(1, len(tree.conditions)):
@@ -388,6 +409,39 @@ class Generator(TreeListener):
             src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
+
+        # Create conditions
+        for cond in tree.conditions[:-1]:
+            self.create_condition(self.get_mx(cond))
+
+    def exitWhenEquation(self, tree):
+        logger.debug('exitWhenEquation')
+
+        for c, b in zip(tree.conditions, tree.blocks):
+            # Create condition
+            cond_sym = self.create_condition(self.get_mx(c))
+
+            # Handle equations for this condition
+            for e in b:
+                if isinstance(e, ast.Function):
+                    # reinit function
+                    assert e.name == 'reinit'
+                    assert len(e.arguments) == 2
+
+                    sub_var = self.get_mx(e.arguments[0])
+                    sub_expr = ca.if_else(self.get_edge(cond_sym), self.get_mx(e.arguments[1]), sub_var)
+
+                    self.reinit_equations[sub_var] = ca.substitute(self.reinit_equations.get(sub_var, sub_var), sub_var, sub_expr)
+                else:
+                    # Assignment y = x
+                    expr = self.get_mx(e)
+
+                    assert expr.is_op(ca.OP_SUB) and expr.n_dep() == 2
+
+                    sub_var = expr.dep(0)
+                    sub_expr = ca.if_else(self.get_edge(cond_sym), expr.dep(1), sub_var)
+
+                    self.discrete_update[sub_var] = ca.substitute(self.discrete_update.get(sub_var, sub_var), sub_var, sub_expr)
 
     def exitAssignmentStatement(self, tree):
         logger.debug('exitAssignmentStatement')
@@ -740,6 +794,21 @@ class Generator(TreeListener):
         self.functions[function_name] = func
 
         return func
+
+    def create_condition(self, expr):
+        c = ca.SX.sym('_c_{:d}'.format(len(self.conditions)))
+        self.conditions[c] = expr
+        return c
+
+    def get_pre_condition(self, x):
+        return self.pre_conditions.setdefault(x, ca.MX.sym('pre({:s})'.format(x.name())))
+
+    def get_pre_discrete_state(self, x):
+        return self.pre_discrete_states.setdefault(x, ca.MX.sym('pre({:s})'.format(x.name())))
+
+    def get_edge(self, c):
+        """rising edge"""
+        return ca.logic_and(c, ca.logic_not(self.get_pre_condition(c)))
 
 
 def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool]=None) -> Model:
