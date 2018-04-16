@@ -9,6 +9,8 @@ model ForLoop
     Real b;
     Real s[n];
     Real Arr[2, 2];
+    Real ArrEmtpy[2, 0];
+    Real VecEmtpy[0];
 equation
 	for i in 1:n loop
     	x[i] = i+b;
@@ -36,5 +38,6 @@ equation
     for m in 1:2 loop
         Arr[m, 2] = 2.0;
         Arr[m, 1] = 1.0;
+        ArrEmtpy[m, :] = 2.0 * VecEmtpy[:];
     end for;
 end ForLoop;
