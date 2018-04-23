@@ -222,7 +222,7 @@ class IfEquation(Node):
 class WhenEquation(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.blocks = []  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
+        self.blocks = []  # type: List[List[Union[Expression, ForEquation, Function, IfEquation]]]
         self.comment = ''  # type: str
         super().__init__(**kwargs)
 
@@ -334,7 +334,7 @@ class ComponentClause(Node):
 class EquationSection(Node):
     def __init__(self, **kwargs):
         self.initial = False  # type: bool
-        self.equations = []  # type: List[Union[Equation, IfEquation, ForEquation, ConnectClause]]
+        self.equations = []  # type: List[Union[Equation, IfEquation, ForEquation, WhenEquation, ConnectClause]]
         super().__init__(**kwargs)
 
 
