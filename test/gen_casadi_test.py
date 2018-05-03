@@ -14,7 +14,7 @@ import numpy as np
 
 import pymoca.backends.casadi.generator as gen_casadi
 from pymoca.backends.casadi.alias_relation import AliasRelation
-from pymoca.backends.casadi.model import Model, Variable, DelayArgument
+from pymoca.backends.casadi.model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
 from pymoca.backends.casadi.api import transfer_model, CachedModel
 from pymoca import parser, ast
 
@@ -660,6 +660,43 @@ class GenCasadiTest(unittest.TestCase):
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         self.assertTrue(True)
+
+    def test_variable_metadata_function(self):
+        with open(os.path.join(MODEL_DIR, 'ParameterAttributes.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ParameterAttributes')
+
+        # Alias detection results in fmin/fmax function calls in the attributes
+        casadi_model.simplify({'detect_aliases': True})
+
+        in_var = ca.veccat(*casadi_model._symbols(casadi_model.parameters))
+        function_metadata = casadi_model.variable_metadata_function(in_var)
+
+        orig_metadata = []
+
+        variables_with_metadata = ['states', 'alg_states', 'inputs', 'parameters', 'constants']
+        for variable_list in variables_with_metadata:
+            attribute_lists = [[] for i in range(len(CASADI_ATTRIBUTES))]
+            for variable in getattr(casadi_model, variable_list):
+                for attribute_list_index, attribute in enumerate(CASADI_ATTRIBUTES):
+                    value = ca.MX(getattr(variable, attribute))
+                    value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
+                    attribute_lists[attribute_list_index].append(value)
+            expr = ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists])
+            orig_metadata.append(expr)
+
+        # Check that the output of the variable metadata function matches the original metadata
+        for a, b in zip(orig_metadata, function_metadata):
+            this = ca.Function('tmp', [in_var], [a])
+            that = ca.Function('tmp', [in_var], [b])
+
+            args_in = ca.DM([2, 11])
+
+            this_out = np.array(this(args_in))
+            that_out = np.array(that(args_in))
+
+            self.assertTrue(np.allclose(this_out, that_out, 0, 0, True))
 
     def test_cache(self):
         # Clear cache
