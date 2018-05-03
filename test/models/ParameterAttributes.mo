@@ -1,5 +1,5 @@
 model ParameterAttributes
-	parameter Real min_;
+	parameter Real min_ = 3.0;
     parameter Real max_;
 	Real a(min=min_, max=10.0);
 	Real b(min=0.0,  max=max_);

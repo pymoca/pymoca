@@ -266,39 +266,18 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         model.delay_states = db['delay_states']
 
         # Evaluate variable metadata:
-        # We do this in three passes, so that we have constant attributes available through the API,
-        # and non-constant expressions as Function calls.
-
-        # 1.  Extract independent parameter values
-        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters]))))
-        for key in variables_with_metadata:
-            for i, d in enumerate(db[key]):
-                variable = variable_dict[d['name']]
-                for j, tmp in enumerate(CASADI_ATTRIBUTES):
-                    setattr(variable, tmp, metadata[key][i, j])
-
-        # 2.  Plug independent values back into metadata function, to obtain values (such as bounds, or starting values)
-        # dependent upon independent parameter values.
-        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else np.nan for v in model.parameters]))))
-        for key in variables_with_metadata:
-            for i, d in enumerate(db[key]):
-                variable = variable_dict[d['name']]
-                for j, tmp in enumerate(CASADI_ATTRIBUTES):
-                    setattr(variable, tmp, metadata[key][i, j])
-
-        # 3.  Fill in any irregular elements with expressions to be evaluated later.
-        # Note that an expression is neccessary only if the function value actually depends on the inputs.
-        # Otherwise, we would be dealing with a genuine NaN value.
         parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
-        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[v.value if v.value.is_regular() else v.symbol for v in model.parameters]))))
+        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(parameter_vector)))
+        independent_metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters]))))
+
         for k, key in enumerate(variables_with_metadata):
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(CASADI_ATTRIBUTES):
-                    if not getattr(variable, tmp).is_regular():
-                        if (not isinstance(metadata[key][i, j], ca.DM)
-                            and ca.depends_on(metadata[key][i, j], parameter_vector)):
-                            setattr(variable, tmp, metadata[key][i, j])
+                    if ca.depends_on(metadata[key][i, j], parameter_vector):
+                        setattr(variable, tmp, metadata[key][i, j])
+                    else:
+                        setattr(variable, tmp, independent_metadata[key][i, j])
 
     # Done
     return model
