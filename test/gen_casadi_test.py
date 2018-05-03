@@ -53,7 +53,7 @@ class GenCasadiTest(unittest.TestCase):
 
             args_in = []
             for i in range(this.n_in()):
-                sp = this.sparsity_in(0)
+                sp = this.sparsity_in(i)
                 r = ca.DM(sp, np.random.random(sp.nnz()))
                 args_in.append(r)
 
