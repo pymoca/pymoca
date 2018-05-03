@@ -296,6 +296,48 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['A'].symbols['dummy_parameter'].unit.value, "m/s")
         self.assertEqual(flat_tree.classes['A'].symbols['dummy_parameter'].value.value, 10.0)
 
+    def test_check_array_indexing(self):
+
+        def _flatten_array_example(equation):
+            txt = """
+                model A
+                    parameter Real n = 3;
+                    Real z[n];
+                end A;
+
+                model B
+                    A a[3];
+                end B;
+
+                model NestedArrayExpressions
+                    B b;
+                end NestedArrayExpressions;
+
+                model ArrayExpressions
+                    NestedArrayExpressions nested2[2];
+                equation
+                    {};
+                end ArrayExpressions;
+                """.format(equation)
+
+            ast_tree = parser.parse(txt)
+
+            class_name = 'ArrayExpressions'
+            comp_ref = ast.ComponentRef.from_string(class_name)
+
+            flat_tree = tree.flatten(ast_tree, comp_ref)
+
+            return flat_tree
+
+        with self.assertRaisesRegexp(IndexError, "index scalar"):
+            _flatten_array_example("nested2[1].b[2].a[1].z = {2, 3, 4}")
+
+        with self.assertRaisesRegexp(IndexError, "has 1 dimension.*? not 0"):
+            _flatten_array_example("nested2[1].b.a.z = {2, 3, 4}")
+
+        # Sanity check with correct example:
+        _flatten_array_example("nested2[1].b.a[1].z = {2, 3, 4}")
+
 
 if __name__ == "__main__":
     unittest.main()
