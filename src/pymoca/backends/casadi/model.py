@@ -638,9 +638,16 @@ class Model:
             expr = ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists])
             if len(self.parameters) > 0 and isinstance(expr, ca.MX):
                 f = ca.Function('f', [in_var], [expr])
-                contains_if_else = ca.OP_IF_ELSE_ZERO in [f.instruction_id(k) for k in range(f.n_instructions())]
+                # NOTE: This is not a complete list of operations that can be
+                # handled in an affine expression. That said, it should
+                # capture the most common ways variable attributes are
+                # expressed as a function of parameters.
+                allowed_ops = {ca.OP_INPUT, ca.OP_OUTPUT, ca.OP_CONST,
+                               ca.OP_SUB, ca.OP_ADD, ca.OP_SUB, ca.OP_MUL, ca.OP_DIV, ca.OP_NEG}
+                f_ops = {f.instruction_id(k) for k in range(f.n_instructions())}
+                contains_unallowed_ops = not f_ops.issubset(allowed_ops)
                 zero_hessian = ca.jacobian(ca.jacobian(expr, in_var), in_var).is_zero()
-                if contains_if_else or not zero_hessian:
+                if contains_unallowed_ops or not zero_hessian:
                     is_affine = False
             out.append(expr)
         if len(self.parameters) > 0 and is_affine:
