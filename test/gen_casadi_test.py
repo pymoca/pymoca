@@ -662,41 +662,64 @@ class GenCasadiTest(unittest.TestCase):
         self.assertTrue(True)
 
     def test_variable_metadata_function(self):
-        with open(os.path.join(MODEL_DIR, 'ParameterAttributes.mo'), 'r') as f:
-            txt = f.read()
-        ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'ParameterAttributes')
+        # Clear cache
+        db_file = os.path.join(MODEL_DIR, 'ParameterAttributes')
+        try:
+            os.remove(db_file)
+        except:
+            pass
 
         # Alias detection results in fmin/fmax function calls in the attributes
-        casadi_model.simplify({'detect_aliases': True})
+        compiler_options = \
+            {'cache': True,
+             'detect_aliases': True}
 
-        in_var = ca.veccat(*casadi_model._symbols(casadi_model.parameters))
-        function_metadata = casadi_model.variable_metadata_function(in_var)
+        ref_model = transfer_model(MODEL_DIR, 'ParameterAttributes', compiler_options)
+        self.assertIsInstance(ref_model, Model)
+        self.assertNotIsInstance(ref_model, CachedModel)
+
+        cached_model = transfer_model(MODEL_DIR, 'ParameterAttributes', compiler_options)
+        self.assertIsInstance(cached_model, Model)
+        self.assertIsInstance(cached_model, CachedModel)
+
+        in_var = ca.veccat(*ref_model._symbols(ref_model.parameters))
+        function_metadata = ref_model.variable_metadata_function(in_var)
+
+        cached_in_var = ca.veccat(*cached_model._symbols(cached_model.parameters))
 
         orig_metadata = []
+        cached_metadata = []
 
         variables_with_metadata = ['states', 'alg_states', 'inputs', 'parameters', 'constants']
-        for variable_list in variables_with_metadata:
-            attribute_lists = [[] for i in range(len(CASADI_ATTRIBUTES))]
-            for variable in getattr(casadi_model, variable_list):
-                for attribute_list_index, attribute in enumerate(CASADI_ATTRIBUTES):
-                    value = ca.MX(getattr(variable, attribute))
-                    value = value if value.numel() != 1 else ca.repmat(value, *variable.symbol.size())
-                    attribute_lists[attribute_list_index].append(value)
-            expr = ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists])
-            orig_metadata.append(expr)
 
-        # Check that the output of the variable metadata function matches the original metadata
-        for a, b in zip(orig_metadata, function_metadata):
-            this = ca.Function('tmp', [in_var], [a])
-            that = ca.Function('tmp', [in_var], [b])
+        for model, metadata in [(ref_model, orig_metadata), (cached_model, cached_metadata)]:
+            for variable_list in variables_with_metadata:
+                attribute_lists = [[] for i in range(len(CASADI_ATTRIBUTES))]
+                for variable in getattr(model, variable_list):
+                    for attribute_list_index, attribute in enumerate(CASADI_ATTRIBUTES):
+                        value = ca.MX(getattr(variable, attribute))
+                        value = value if value.numel() != 1 else ca.repmat(
+                            value, *variable.symbol.size())
+                        attribute_lists[attribute_list_index].append(value)
+                expr = ca.horzcat(*[
+                    ca.veccat(*attribute_list) for attribute_list in attribute_lists])
+                metadata.append(expr)
+
+        # Check that the output of the variable metadata function matches the
+        # original metadata and cached metadata
+        for a, b, c in zip(orig_metadata, function_metadata, cached_metadata):
+            f_a = ca.Function('tmp', [in_var], [a])
+            f_b = ca.Function('tmp', [in_var], [b])
+            f_c = ca.Function('tmp', [cached_in_var], [c])
 
             args_in = ca.DM([2, 11])
 
-            this_out = np.array(this(args_in))
-            that_out = np.array(that(args_in))
+            a_out = np.array(f_a(args_in))
+            b_out = np.array(f_b(args_in))
+            c_out = np.array(f_c(args_in))
 
-            self.assertTrue(np.allclose(this_out, that_out, 0, 0, True))
+            self.assertTrue(np.allclose(a_out, b_out, 0, 0, True))
+            self.assertTrue(np.allclose(a_out, c_out, 0, 0, True))
 
     def test_cache(self):
         # Clear cache
