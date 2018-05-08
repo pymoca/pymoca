@@ -52,7 +52,7 @@ class ForLoop:
         self.values = np.arange(start, stop + step, step, dtype=np.int)
         self.index_variable = ca.MX.sym(i.name)
         self.name = i.name
-        self.indexed_symbols = {}
+        self.indexed_symbols = OrderedDict()
 
     def register_indexed_symbol(self, e, index_function, transpose, tree, index_expr=None):
         if isinstance(index_expr, ca.MX) and index_expr is not self.index_variable:
@@ -251,16 +251,21 @@ class Generator(TreeListener):
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
             duration = self.get_mx(tree.operands[1])
-            
+
             src = ca.MX.sym('_pymoca_delay_{}'.format(self.delay_counter), *expr.size())
             self.delay_counter += 1
+
+            for f in self.for_loops:
+                syms = set(ca.symvar(expr))
+                if syms.intersection(f.indexed_symbols):
+                    f.register_indexed_symbol(src, lambda i: i, True, tree.operands[0], f.index_variable)
 
             self.model.delay_states.append(src.name())
             self.model.inputs.append(Variable(src))
 
             delay_argument = DelayArgument(expr, duration)
             self.model.delay_arguments.append(delay_argument)
-    
+
         elif op in OP_MAP and n_operands == 2:
             lhs = ca.MX(self.get_mx(tree.operands[0]))
             rhs = ca.MX(self.get_mx(tree.operands[1]))
@@ -358,7 +363,35 @@ class Generator(TreeListener):
             indexed_symbols_full = []
             for k in indexed_symbols:
                 s = f.indexed_symbols[k]
-                orig_symbol = self.nodes[self.current_class][s.tree.name]
+                try:
+                    i = self.model.delay_states.index(k.name())
+                except ValueError:
+                    orig_symbol = self.nodes[self.current_class][s.tree.name]
+                else:
+                    # We are missing a similarly shaped delayed symbol. Make a new one with the appropriate shape.
+                    delay_symbol = self.model.delay_arguments[i]
+
+                    # We need to figure out the shape of the expression that
+                    # we are delaying. The symbols that can occur in the delay
+                    # expression should have been encountered before this
+                    # iteration of the loop. The assert statement below covers
+                    # this.
+                    delay_expr_args = all_args[:len(indexed_symbols_full)+1]
+                    assert set(ca.symvar(delay_symbol.expr)).issubset(delay_expr_args)
+
+                    f_delay_expr = ca.Function('delay_expr', delay_expr_args, [delay_symbol.expr])
+                    f_delay_map = f_delay_expr.map("map", self.map_mode, len(f.values), list(
+                        range(len(args), len(all_args))), [])
+                    [res] = f_delay_map.call([f.values] + indexed_symbols_full + free_vars)
+                    res = res.T
+
+                    # Make the symbol with the appropriate size, and replace the old symbol with the new one.
+                    orig_symbol = ca.MX.sym(k.name(), *res.size())
+
+                    model_input = next(x for x in self.model.inputs if x.symbol.name() == k.name())
+                    model_input.symbol = orig_symbol
+                    self.model.delay_arguments[i] = DelayArgument(res, delay_symbol.duration)
+
                 indexed_symbol = orig_symbol[s.indices]
                 if s.transpose:
                     indexed_symbol = ca.transpose(indexed_symbol)

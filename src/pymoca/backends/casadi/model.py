@@ -376,8 +376,35 @@ class Model:
                         symbols.append(old_var.symbol)
                         values.append(ca.vertcat(*[ca.horzcat(*[v.symbol for v in row]) for row in rows]))
                         new_vars.extend(itertools.chain.from_iterable(rows))
+
+                        try:
+                            assert len(self.delay_states) == len(self.delay_arguments)
+
+                            i = self.delay_states.index(old_var.symbol.name())
+                        except ValueError:
+                            pass
+                        else:
+                            if self.delay_arguments[i].expr.numel() > 1:
+                                delay_state = self.delay_states.pop(i)
+                                delay_argument = self.delay_arguments.pop(i)
+
+                                for i in range(delay_argument.expr.size1()):
+                                    for j in range(delay_argument.expr.size2()):
+                                        if delay_argument.expr.size1() > 1 and delay_argument.expr.size2() > 1:
+                                            new_name = '{}[{},{}]'.format(delay_state, i, j)
+                                        elif delay_argument.expr.size1() > 1:
+                                            new_name = '{}[{}]'.format(delay_state, i)
+                                        elif delay_argument.expr.size2() > 1:
+                                            new_name = '{}[{}]'.format(delay_state, j)
+                                        else:
+                                            raise AssertionError
+
+                                        self.delay_states.append(new_name)
+                                        self.delay_arguments.append(DelayArgument(delay_argument.expr[i, j], delay_argument.duration))
+
                     else:
                         new_vars.append(old_var)
+
                 setattr(self, l, new_vars)
 
             if len(self.equations) > 0:
@@ -388,6 +415,10 @@ class Model:
                 self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
             if len(self.delay_arguments) > 0:
                 self.delay_arguments = self._substitute_delay_arguments(symbols, values)
+
+            # Make sure that the naming in the main loop and the delay argument loop match
+            input_names = [v.symbol.name() for v in self.inputs]
+            assert set(self.delay_states).issubset(input_names)
 
             # Replace values in metadata
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
