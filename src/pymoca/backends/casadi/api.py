@@ -224,11 +224,13 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         if db['version'] != __version__:
             raise InvalidCacheError('Cache generated for a different version of pymoca')
 
-        if db['library_os'] != os.name:
-            raise InvalidCacheError('Cache generated for incompatible OS')
-
         if db['options'] != compiler_options:
             raise InvalidCacheError('Cache generated for different compiler options')
+
+        # Pickles are platform independent, but dynamic libraries are not
+        if compiler_options['codegen']:
+            if db['library_os'] != os.name:
+                raise InvalidCacheError('Cache generated for incompatible OS')
 
         # Include references to the shared libraries
         for o in ['dae_residual', 'initial_residual', 'variable_metadata']:
