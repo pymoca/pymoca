@@ -355,7 +355,7 @@ class Model:
                 old_vars = getattr(self, l)
                 new_vars = []
                 for old_var in old_vars:
-                    if old_var.symbol.numel() > 1:
+                    if old_var.symbol._modelica_shape != (1,):
                         expanded_symbols = []
                         for ind in np.ndindex(old_var.symbol._modelica_shape):
                             component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), ",".join(str(i+1) for i in ind)))
