@@ -326,6 +326,14 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
 
                 model.delay_arguments.append(DelayArgument(expr, dur))
 
+        # Try to coerce parameters into their Python types
+        for p in model.parameters:
+            for attr in CASADI_ATTRIBUTES:
+                v = getattr(p, attr)
+                v_mx = ca.MX(v)
+                if v_mx.is_constant() and v_mx.is_regular():
+                    setattr(p, attr, p.python_type(v))
+
     # Done
     return model
 
