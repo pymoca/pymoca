@@ -51,7 +51,7 @@ class Variable:
         return variable
 
 
-DelayedState = namedtuple('DelayedState', ['name', 'origin', 'delay'])
+DelayArgument = namedtuple('DelayArgument', ['expr', 'duration'])
 
 
 # noinspection PyUnresolvedReferences
@@ -68,7 +68,8 @@ class Model:
         self.equations = []
         self.initial_equations = []
         self.time = ca.MX.sym('time')
-        self.delayed_states = []
+        self.delay_states = []
+        self.delay_arguments = []
         self._expand_mx_func = lambda x: x
 
     def __str__(self):
@@ -663,3 +664,15 @@ class Model:
             in_var = in_var_
 
         return self._expand_mx_func(ca.Function('variable_metadata', [in_var], out))
+
+    # noinspection PyPep8Naming
+    @property
+    def delay_arguments_function(self):
+        if hasattr(self, '_states_vector'):
+            return self._expand_mx_func(ca.Function('delay_arguments', [self.time, self._states_vector, self._der_states_vector,
+                                                self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.horzcat(delay_argument.expr, delay_argument.duration) for delay_argument in self.delay_arguments] if len(self.delay_arguments) > 0 else []))
+        else:
+            return self._expand_mx_func(ca.Function('delay_arguments', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
+                                                ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.horzcat(delay_argument.expr, delay_argument.duration) for delay_argument in self.delay_arguments] if len(self.delay_arguments) > 0 else []))

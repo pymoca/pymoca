@@ -14,7 +14,7 @@ import numpy as np
 
 import pymoca.backends.casadi.generator as gen_casadi
 from pymoca.backends.casadi.alias_relation import AliasRelation
-from pymoca.backends.casadi.model import Model, Variable
+from pymoca.backends.casadi.model import Model, Variable, DelayArgument
 from pymoca.backends.casadi.api import transfer_model, CachedModel
 from pymoca import parser, ast
 
@@ -38,12 +38,14 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(len(A.outputs), len(B.outputs))
         self.assertEqual(len(A.constants), len(B.constants))
         self.assertEqual(len(A.parameters), len(B.parameters))
+        self.assertEqual(len(A.delay_states), len(B.delay_states))
 
         if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
             self.assertEqual(len(A.equations), len(B.equations))
             self.assertEqual(len(A.initial_equations), len(B.initial_equations))
+            self.assertEqual(len(A.delay_arguments), len(B.delay_arguments))
 
-        for f_name in ['dae_residual', 'initial_residual', 'variable_metadata']:
+        for f_name in ['dae_residual', 'initial_residual', 'variable_metadata', 'delay_arguments']:
             this = getattr(A, f_name + '_function')
             that = getattr(B, f_name + '_function')
 
@@ -580,6 +582,29 @@ class GenCasadiTest(unittest.TestCase):
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
         ref_model.equations = [ca.mtimes(A, b) - c, ca.mtimes(A.T, b) - d, F[1, 2]]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_delay(self):
+        with open(os.path.join(MODEL_DIR, 'Delay.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Delay')
+        print(casadi_model)
+        ref_model = Model()
+
+        x = ca.MX.sym("x")
+        x_delayed = ca.MX.sym("_pymoca_delay_0")
+        y = ca.MX.sym("y")
+        hour = ca.MX.sym("hour")
+
+        ref_model.alg_states = list(map(Variable, [x, y]))
+        ref_model.parameters = list(map(Variable, [hour]))
+        ref_model.inputs = list(map(Variable, [x_delayed]))
+        ref_model.parameters[0].value = 3600
+        ref_model.equations = [y - x_delayed]
+        ref_model.delay_states = [x_delayed]
+        ref_model.delay_arguments = [DelayArgument(x, 6 * hour)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

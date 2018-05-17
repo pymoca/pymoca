@@ -29,11 +29,12 @@ class CachedModel(Model):
         self.constants = []
         self.parameters = []
         self.time = ca.MX.sym('time')
-        self.delayed_states = []
+        self.delay_states = []
 
         self._dae_residual_function = None
         self._initial_residual_function = None
         self._variable_metadata_function = None
+        self._delay_arguments_function = None
 
     def __str__(self):
         r = ""
@@ -61,12 +62,20 @@ class CachedModel(Model):
         return self._variable_metadata_function
 
     @property
+    def delay_arguments_function(self):
+        return self._delay_arguments_function
+
+    @property
     def equations(self):
         raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
 
     @property
     def initial_equations(self):
         raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
+
+    @property
+    def delay_arguments(self):
+        raise NotImplementedError("Cannot access delay arguments on cached model.  Use delay arguments function instead.")
 
     def simplify(self, options):
         raise NotImplementedError("Cannot simplify cached model")
@@ -157,7 +166,7 @@ def save_model(model_folder: str, model_name: str, model: Model,
     :param compiler_options: Dictionary of compiler options.
     """
 
-    objects = {'dae_residual': None, 'initial_residual': None, 'variable_metadata': None}
+    objects = {'dae_residual': None, 'initial_residual': None, 'variable_metadata': None, 'delay_arguments': None}
     for o in objects.keys():
         f = getattr(model, o + '_function')
 
@@ -187,7 +196,7 @@ def save_model(model_folder: str, model_name: str, model: Model,
 
         db['outputs'] = model.outputs
 
-        db['delayed_states'] = model.delayed_states
+        db['delay_states'] = model.delay_states
 
         pickle.dump(db, f)
 
@@ -231,7 +240,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             raise InvalidCacheError('Cache generated for different compiler options')
 
         # Include references to the shared libraries
-        for o in ['dae_residual', 'initial_residual', 'variable_metadata']:
+        for o in ['dae_residual', 'initial_residual', 'variable_metadata', 'delay_arguments']:
             if isinstance(db[o], str):
                 # Path to codegen'd library
                 f = ca.external(o, db[o])
@@ -254,7 +263,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
 
         model.der_states = [Variable.from_dict(d) for d in db['der_states']]
         model.outputs = db['outputs']
-        model.delayed_states = db['delayed_states']
+        model.delay_states = db['delay_states']
 
         # Evaluate variable metadata:
         # We do this in three passes, so that we have constant attributes available through the API,
