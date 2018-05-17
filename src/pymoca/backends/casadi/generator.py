@@ -12,7 +12,7 @@ from pymoca import ast
 from pymoca.tree import TreeWalker, TreeListener, flatten
 
 from .alias_relation import AliasRelation
-from .model import Model, Variable, DelayedState
+from .model import Model, Variable, DelayArgument
 
 logger = logging.getLogger("pymoca")
 
@@ -84,6 +84,7 @@ class Generator(TreeListener):
         self.entered_classes = deque()
         self.map_mode = 'inline' if options.get('unroll_loops', True) else 'serial'
         self.function_mode = (True, False) if options.get('inline_functions', True) else (False, True)
+        self.delay_counter = 0
 
     @property
     def current_class(self):
@@ -249,15 +250,17 @@ class Generator(TreeListener):
             src = ca.vertcat(*entries)
         elif op == 'delay' and n_operands == 2:
             expr = self.get_mx(tree.operands[0])
-            delay_time = self.get_mx(tree.operands[1])
-            if not isinstance(expr, ca.MX) or not expr.is_symbolic():
-                # TODO
-                raise NotImplementedError('Currently, delay() is only supported with a variable as argument.')
-            src = ca.MX.sym('{}_delayed_{}'.format(
-                expr.name(), delay_time), *expr.size())
-            delayed_state = DelayedState(src.name(), expr.name(), delay_time)
-            self.model.delayed_states.append(delayed_state)
+            duration = self.get_mx(tree.operands[1])
+            
+            src = ca.MX.sym('_pymoca_delay_{}'.format(self.delay_counter), *expr.size())
+            self.delay_counter += 1
+
+            self.model.delay_states.append(src.name())
             self.model.inputs.append(Variable(src))
+
+            delay_argument = DelayArgument(expr, duration)
+            self.model.delay_arguments.append(delay_argument)
+    
         elif op in OP_MAP and n_operands == 2:
             lhs = ca.MX(self.get_mx(tree.operands[0]))
             rhs = ca.MX(self.get_mx(tree.operands[1]))
