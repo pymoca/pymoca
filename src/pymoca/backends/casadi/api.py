@@ -233,7 +233,14 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         if db['version'] != __version__:
             raise InvalidCacheError('Cache generated for a different version of pymoca')
 
-        if db['options'] != compiler_options:
+        # Check compiler options. We ignore the library folders, as they have
+        # already been checked, and checking them will impede platform
+        # portability of the cache.
+        exclude_options = ['library_folders']
+        old_opts = {k: v for k, v in db['options'].items() if k not in exclude_options}
+        new_opts = {k: v for k, v in compiler_options.items() if k not in exclude_options}
+
+        if old_opts != new_opts:
             raise InvalidCacheError('Cache generated for different compiler options')
 
         # Pickles are platform independent, but dynamic libraries are not
