@@ -102,6 +102,11 @@ class Model:
     def _symbols(l):
         return [v.symbol for v in l]
 
+    def _substitute_delay_arguments(self, symbols, values):
+        exprs = ca.substitute([argument.expr for argument in self.delay_arguments], symbols, values)
+        durations = ca.substitute([argument.duration for argument in self.delay_arguments], symbols, values)
+        self.delay_arguments = [DelayArgument(expr, duration) for expr, duration in zip(exprs, durations)]
+
     def simplify(self, options):
         if options.get('replace_parameter_expressions', False):
             logger.info("Replacing parameter expressions")
@@ -130,6 +135,8 @@ class Model:
                     self.equations = ca.substitute(self.equations, symbols, values)
                 if len(self.initial_equations) > 0:
                     self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                if len(self.delay_arguments) > 0:
+                    self._substitute_delay_arguments(symbols, values)
 
                 # Replace parameter expressions in metadata
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
@@ -166,6 +173,8 @@ class Model:
                     self.equations = ca.substitute(self.equations, symbols, values)
                 if len(self.initial_equations) > 0:
                     self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                if len(self.delay_arguments) > 0:
+                    self._substitute_delay_arguments(symbols, values)
 
                 # Replace constant expressions in metadata
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
@@ -258,6 +267,8 @@ class Model:
                 self.equations = ca.substitute(self.equations, symbols, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+            if len(self.delay_arguments) > 0:
+                self._substitute_delay_arguments(symbols, values)
             self.constants = []
 
             # Replace constant values in metadata
@@ -321,6 +332,8 @@ class Model:
                 self.equations = ca.substitute(self.equations, variables, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+            if len(self.delay_arguments) > 0:
+                self._substitute_delay_arguments(variables, values)
 
         if options.get('expand_vectors', False):
             logger.info("Expanding vectors")
@@ -373,6 +386,8 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
                 self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
+            if len(self.delay_arguments) > 0:
+                self._substitute_delay_arguments(variables, values)
 
             # Replace values in metadata
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
@@ -549,6 +564,8 @@ class Model:
                 self.equations = ca.substitute(self.equations, variables, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+            if len(self.delay_arguments) > 0:
+                self._substitute_delay_arguments(variables, values)
 
         if options.get('reduce_affine_expression', False):
             logger.info("Collapsing model into an affine expression")
