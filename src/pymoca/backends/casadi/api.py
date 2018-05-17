@@ -13,7 +13,7 @@ import contextlib
 
 from pymoca import parser, tree, ast, __version__
 from . import generator
-from .model import CASADI_ATTRIBUTES, Model, Variable
+from .model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
 
 logger = logging.getLogger("pymoca")
 
@@ -30,6 +30,7 @@ class CachedModel(Model):
         self.parameters = []
         self.time = ca.MX.sym('time')
         self.delay_states = []
+        self.delay_arguments = []
 
         self._dae_residual_function = None
         self._initial_residual_function = None
@@ -72,10 +73,6 @@ class CachedModel(Model):
     @property
     def initial_equations(self):
         raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
-
-    @property
-    def delay_arguments(self):
-        raise NotImplementedError("Cannot access delay arguments on cached model.  Use delay arguments function instead.")
 
     def simplify(self, options):
         raise NotImplementedError("Cannot simplify cached model")
@@ -287,6 +284,47 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                         setattr(variable, tmp, metadata[key][i, j])
                     else:
                         setattr(variable, tmp, independent_metadata[key][i, j])
+
+        # Evaluate delay arguments:
+        args = [model.time,
+                ca.veccat(*model._symbols(model.states)),
+                ca.veccat(*model._symbols(model.der_states)),
+                ca.veccat(*model._symbols(model.alg_states)),
+                ca.veccat(*model._symbols(model.inputs)),
+                ca.veccat(*model._symbols(model.constants)),
+                ca.veccat(*model._symbols(model.parameters))]
+        delay_arguments_raw = model.delay_arguments_function(*args)
+
+        nan_args = [ca.repmat(np.nan, *arg.size()) for arg in args]
+        independent_delay_arguments_raw = model.delay_arguments_function(*nan_args)
+
+        if delay_arguments_raw is not None:
+            all_symbols = ca.veccat(*args)
+
+            delay_expressions_raw = delay_arguments_raw[::2]
+            delay_durations_raw = delay_arguments_raw[1::2]
+            independent_delay_durations_raw = independent_delay_arguments_raw[1::2]
+
+            assert 1 == len({len(delay_expressions_raw), len(delay_durations_raw),
+                len(independent_delay_durations_raw)})
+
+            for i, expr in enumerate(delay_expressions_raw):
+                assert ca.depends_on(ca.MX(expr), all_symbols), \
+                    "Expression to be delayed can not be a constant"
+
+                if ca.depends_on(ca.MX(delay_durations_raw[i]), all_symbols):
+                    dur = delay_durations_raw[i]
+                    false_deps = ca.vertcat(*[
+                        var for var in ca.symvar(dur) if not ca.depends_on(dur, var)])
+                    if false_deps.size1() > 0:
+                        [dur] = ca.substitute(
+                            [dur],
+                            [false_deps],
+                            [ca.DM(np.full(false_deps.size1(), np.nan))])
+                else:
+                    dur = independent_delay_durations_raw[i]
+
+                model.delay_arguments.append(DelayArgument(expr, dur))
 
     # Done
     return model

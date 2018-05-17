@@ -102,6 +102,11 @@ class Model:
     def _symbols(l):
         return [v.symbol for v in l]
 
+    def _substitute_delay_arguments(self, delay_arguments, symbols, values):
+        exprs = ca.substitute([ca.MX(argument.expr) for argument in delay_arguments], symbols, values)
+        durations = ca.substitute([ca.MX(argument.duration) for argument in delay_arguments], symbols, values)
+        return [DelayArgument(expr, duration) for expr, duration in zip(exprs, durations)]
+
     def simplify(self, options):
         if options.get('replace_parameter_expressions', False):
             logger.info("Replacing parameter expressions")
@@ -130,6 +135,8 @@ class Model:
                     self.equations = ca.substitute(self.equations, symbols, values)
                 if len(self.initial_equations) > 0:
                     self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                if len(self.delay_arguments) > 0:
+                    self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
 
                 # Replace parameter expressions in metadata
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
@@ -166,6 +173,8 @@ class Model:
                     self.equations = ca.substitute(self.equations, symbols, values)
                 if len(self.initial_equations) > 0:
                     self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                if len(self.delay_arguments) > 0:
+                    self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
 
                 # Replace constant expressions in metadata
                 for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
@@ -258,6 +267,8 @@ class Model:
                 self.equations = ca.substitute(self.equations, symbols, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+            if len(self.delay_arguments) > 0:
+                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
             self.constants = []
 
             # Replace constant values in metadata
@@ -321,6 +332,8 @@ class Model:
                 self.equations = ca.substitute(self.equations, variables, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+            if len(self.delay_arguments) > 0:
+                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
         if options.get('expand_vectors', False):
             logger.info("Expanding vectors")
@@ -363,8 +376,35 @@ class Model:
                         symbols.append(old_var.symbol)
                         values.append(ca.vertcat(*[ca.horzcat(*[v.symbol for v in row]) for row in rows]))
                         new_vars.extend(itertools.chain.from_iterable(rows))
+
+                        try:
+                            assert len(self.delay_states) == len(self.delay_arguments)
+
+                            i = self.delay_states.index(old_var.symbol.name())
+                        except ValueError:
+                            pass
+                        else:
+                            if self.delay_arguments[i].expr.numel() > 1:
+                                delay_state = self.delay_states.pop(i)
+                                delay_argument = self.delay_arguments.pop(i)
+
+                                for i in range(delay_argument.expr.size1()):
+                                    for j in range(delay_argument.expr.size2()):
+                                        if delay_argument.expr.size1() > 1 and delay_argument.expr.size2() > 1:
+                                            new_name = '{}[{},{}]'.format(delay_state, i, j)
+                                        elif delay_argument.expr.size1() > 1:
+                                            new_name = '{}[{}]'.format(delay_state, i)
+                                        elif delay_argument.expr.size2() > 1:
+                                            new_name = '{}[{}]'.format(delay_state, j)
+                                        else:
+                                            raise AssertionError
+
+                                        self.delay_states.append(new_name)
+                                        self.delay_arguments.append(
+                                            DelayArgument(delay_argument.expr[i, j], delay_argument.duration))
                     else:
                         new_vars.append(old_var)
+
                 setattr(self, l, new_vars)
 
             if len(self.equations) > 0:
@@ -373,6 +413,12 @@ class Model:
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
                 self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
+            if len(self.delay_arguments) > 0:
+                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
+
+            # Make sure that the naming in the main loop and the delay argument loop match
+            input_names = [v.symbol.name() for v in self.inputs]
+            assert set(self.delay_states).issubset(input_names)
 
             # Replace values in metadata
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
@@ -549,6 +595,8 @@ class Model:
                 self.equations = ca.substitute(self.equations, variables, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+            if len(self.delay_arguments) > 0:
+                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
         if options.get('reduce_affine_expression', False):
             logger.info("Collapsing model into an affine expression")
@@ -675,11 +723,32 @@ class Model:
     # noinspection PyPep8Naming
     @property
     def delay_arguments_function(self):
+        # We cannot assume that we can ca.horzcat/vertcat all delay arguments
+        # and expressions due to shape differences, so instead we flatten our
+        # delay expressions and durations into list, i.e. [delay_expr_1,
+        # delay_duration_1, delay_expr_2, delay_duration_2, ...].
+
+        out_arguments = list(itertools.chain.from_iterable(self.delay_arguments))
+
         if hasattr(self, '_states_vector'):
-            return self._expand_mx_func(ca.Function('delay_arguments', [self.time, self._states_vector, self._der_states_vector,
-                                                self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.horzcat(delay_argument.expr, delay_argument.duration) for delay_argument in self.delay_arguments] if len(self.delay_arguments) > 0 else []))
+            return self._expand_mx_func(ca.Function(
+                'delay_arguments',
+                [self.time,
+                 self._states_vector,
+                 self._der_states_vector,
+                 self._alg_states_vector,
+                 self._inputs_vector,
+                 ca.veccat(*self._symbols(self.constants)),
+                 ca.veccat(*self._symbols(self.parameters))],
+                out_arguments))
         else:
-            return self._expand_mx_func(ca.Function('delay_arguments', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
-                                                ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.horzcat(delay_argument.expr, delay_argument.duration) for delay_argument in self.delay_arguments] if len(self.delay_arguments) > 0 else []))
+            return self._expand_mx_func(ca.Function(
+                'delay_arguments',
+                [self.time,
+                 ca.veccat(*self._symbols(self.states)),
+                 ca.veccat(*self._symbols(self.der_states)),
+                 ca.veccat(*self._symbols(self.alg_states)),
+                 ca.veccat(*self._symbols(self.inputs)),
+                 ca.veccat(*self._symbols(self.constants)),
+                 ca.veccat(*self._symbols(self.parameters))],
+                out_arguments))
