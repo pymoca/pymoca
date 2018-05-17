@@ -114,12 +114,21 @@ class Model:
 
             simple_parameters, symbols, values = [], [], []
             for p in self.parameters:
-                value = ca.MX(p.value)
-                if value.is_constant():
+                if isinstance(p.value, list):
+                    p.value = np.array(p.value)
+
+                    if not np.issubdtype(p.value.dtype, np.number):
+                        raise NotImplementedError(
+                            "Only parameters arrays with numeric values can be simplified")
+
                     simple_parameters.append(p)
                 else:
-                    symbols.append(p.symbol)
-                    values.append(value)
+                    value = ca.MX(p.value)
+                    if value.is_constant():
+                        simple_parameters.append(p)
+                    else:
+                        symbols.append(p.symbol)
+                        values.append(value)
 
             self.parameters = simple_parameters
 
