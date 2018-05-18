@@ -666,7 +666,7 @@ class GenCasadiTest(unittest.TestCase):
         db_file = os.path.join(MODEL_DIR, 'ParameterAttributes')
         try:
             os.remove(db_file)
-        except:
+        except FileNotFoundError:
             pass
 
         # Alias detection results in fmin/fmax function calls in the attributes
@@ -726,7 +726,7 @@ class GenCasadiTest(unittest.TestCase):
         db_file = os.path.join(MODEL_DIR, 'Aircraft')
         try:
             os.remove(db_file)
-        except:
+        except FileNotFoundError:
             pass
 
         # Create model, cache it, and load the cache
@@ -749,7 +749,7 @@ class GenCasadiTest(unittest.TestCase):
         db_file = os.path.join(MODEL_DIR, 'Aircraft')
         try:
             os.remove(db_file)
-        except:
+        except FileNotFoundError:
             pass
 
         for f in glob.glob(os.path.join(MODEL_DIR, "Aircraft*.so")):
