@@ -103,8 +103,8 @@ class Model:
         return [v.symbol for v in l]
 
     def _substitute_delay_arguments(self, symbols, values):
-        exprs = ca.substitute([argument.expr for argument in self.delay_arguments], symbols, values)
-        durations = ca.substitute([argument.duration for argument in self.delay_arguments], symbols, values)
+        exprs = ca.substitute([ca.MX(argument.expr) for argument in self.delay_arguments], symbols, values)
+        durations = ca.substitute([ca.MX(argument.duration) for argument in self.delay_arguments], symbols, values)
         return [DelayArgument(expr, duration) for expr, duration in zip(exprs, durations)]
 
     def simplify(self, options):
