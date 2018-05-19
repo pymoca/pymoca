@@ -274,7 +274,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(CASADI_ATTRIBUTES):
-                    if ca.depends_on(metadata[key][i, j], parameter_vector):
+                    if ca.depends_on(ca.MX(metadata[key][i, j]), parameter_vector):
                         setattr(variable, tmp, metadata[key][i, j])
                     else:
                         setattr(variable, tmp, independent_metadata[key][i, j])
