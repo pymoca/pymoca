@@ -387,7 +387,7 @@ class Model:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
                 self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
             if len(self.delay_arguments) > 0:
-                self.delay_arguments = self._substitute_delay_arguments(variables, values)
+                self.delay_arguments = self._substitute_delay_arguments(symbols, values)
 
             # Replace values in metadata
             for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
