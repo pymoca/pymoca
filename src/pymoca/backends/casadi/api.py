@@ -290,8 +290,8 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
 
         # 3.  Piece together
         if delay_arguments_raw is not None:
-            model.delay_arguments = [DelayArgument(delay_arguments_raw[i, 0], independent_delay_arguments_raw[i, 1])
-                for i in range(delay_arguments_raw.size1())]
+            model.delay_arguments = [DelayArgument(a, b) for a, b in zip(
+                delay_arguments_raw[::2], independent_delay_arguments_raw[1::2])]
 
     # Done
     return model

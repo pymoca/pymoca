@@ -692,11 +692,18 @@ class Model:
     # noinspection PyPep8Naming
     @property
     def delay_arguments_function(self):
+        # We cannot assume that we can ca.horzcat/vertcat all delay arguments
+        # and expressions due to shape differences, so instead we flatten our
+        # delay expressions and durations into list, i.e. [delay_expr_1,
+        # delay_duration_1, delay_expr_2, delay_duration_2, ...].
+
+        out_arguments = list(itertools.chain.from_iterable(self.delay_arguments))
+
         if hasattr(self, '_states_vector'):
             return self._expand_mx_func(ca.Function('delay_arguments', [self.time, self._states_vector, self._der_states_vector,
                                                 self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.horzcat(delay_argument.expr, delay_argument.duration) for delay_argument in self.delay_arguments] if len(self.delay_arguments) > 0 else []))
+                                                ca.veccat(*self._symbols(self.parameters))], out_arguments))
         else:
             return self._expand_mx_func(ca.Function('delay_arguments', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
                                                 ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.horzcat(delay_argument.expr, delay_argument.duration) for delay_argument in self.delay_arguments] if len(self.delay_arguments) > 0 else []))
+                                                ca.veccat(*self._symbols(self.parameters))], out_arguments))
