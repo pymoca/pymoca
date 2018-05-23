@@ -24,6 +24,13 @@ MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'models')
 
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class GenCasadiTest(unittest.TestCase):
+    def assertMatrixEqual(self, a, b):
+        self.assertEqual(a.shape, b.shape)
+
+        for i in range(a.shape[0]):
+            for j in range(a.shape[1]):
+                self.assertEqual(a[i, j], b[i, j])
+
     def assert_model_equivalent(self, A, B):
         def sstr(a): return set([str(e) for e in a])
 
@@ -605,6 +612,23 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [y - x_delayed]
         ref_model.delay_states = [x_delayed]
         ref_model.delay_arguments = [DelayArgument(x, 6 * hour)]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_array_parameters(self):
+        with open(os.path.join(MODEL_DIR, 'ArrayParameters.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ArrayParameters')
+        print(casadi_model)
+        ref_model = Model()
+
+        n = ca.MX.sym("n")
+        a = ca.MX.sym("a", 3)
+
+        ref_model.parameters = list(map(Variable, [n, a]))
+        ref_model.parameters[0].value = 1
+        ref_model.parameters[1].value = ca.vertcat(n, 2, 3)
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -1402,14 +1426,14 @@ class GenCasadiTest(unittest.TestCase):
         a_y = casadi_model.parameters[1]
 
         self.assertTrue(a_x.symbol.name() == "a.x")
-        self.assertEqual(a_x.value, [[ 88.3224,  281.642,  143.011],
+        self.assertMatrixEqual(a_x.value, ca.DM([[ 88.3224,  281.642,  143.011],
                                      [ 58.8183, -24.9845,      0.0],
-                                     [-1.45483,      0.0,      0.0]])
+                                     [-1.45483,      0.0,      0.0]]))
 
         self.assertTrue(a_y.symbol.name() == "a.y")
-        self.assertEqual(a_y.value, [[1, 2],
+        self.assertMatrixEqual(a_y.value, ca.DM([[1, 2],
                                      [3, 4],
-                                     [5, 6]])
+                                     [5, 6]]))
 
 if __name__ == "__main__":
     unittest.main()

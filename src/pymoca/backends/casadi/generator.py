@@ -166,7 +166,10 @@ class Generator(TreeListener):
         self.entered_classes.pop()
 
     def exitArray(self, tree):
-        self.src[tree] = [self.src[e] for e in tree.values]
+        # When creating a matrix as an array of arrays, the inner arrays are rows,
+        # and the outer array a stack of rows.  In this case, we need to transpose the
+        # inner symbols, an operation that is harmless if the inner symbols are scalar.
+        self.src[tree] = ca.vertcat(*[ca.transpose(self.get_mx(e)) for e in tree.values])
 
     def exitPrimary(self, tree):
         self.src[tree] = tree.value
@@ -233,7 +236,8 @@ class Generator(TreeListener):
             src = ca.DM.eye(n)
         elif op == 'diagonal' and n_operands == 1:
             diag = self.get_mx(tree.operands[0])
-            n = len(diag)
+            n = diag.size1()
+            assert diag.size2() == 1
             indices = list(range(n))
             src = ca.DM.triplet(indices, indices, diag, n, n)
         elif op == 'cat':
@@ -554,7 +558,7 @@ class Generator(TreeListener):
             # the dimensions is unspecified, i.e. None.
             assert None in itertools.chain.from_iterable((x.start, x.stop) for x in shape if isinstance(x, slice))
 
-            val_shape = np.array(self.src[tree.value]).shape
+            val_shape = self.src[tree.value].shape
 
             # Check if specified dimensions agree between definition and value
             for dim_i, dim_size in enumerate(shape):
