@@ -13,7 +13,7 @@ import contextlib
 
 from pymoca import parser, tree, ast, __version__
 from . import generator
-from .model import CASADI_ATTRIBUTES, Model, Variable
+from .model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
 
 logger = logging.getLogger("pymoca")
 
@@ -72,10 +72,6 @@ class CachedModel(Model):
     @property
     def initial_equations(self):
         raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
-
-    @property
-    def delay_arguments(self):
-        raise NotImplementedError("Cannot access delay arguments on cached model.  Use delay arguments function instead.")
 
     def simplify(self, options):
         raise NotImplementedError("Cannot simplify cached model")
@@ -287,6 +283,24 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                         setattr(variable, tmp, metadata[key][i, j])
                     else:
                         setattr(variable, tmp, independent_metadata[key][i, j])
+
+        # Delay arguments
+        # 1.  Evaluate for expressions
+        args = [model.time, ca.veccat(*model._symbols(model.states)), ca.veccat(*model._symbols(model.der_states)),
+                ca.veccat(*model._symbols(model.alg_states)), ca.veccat(*model._symbols(model.inputs)), ca.veccat(*model._symbols(model.constants)),
+                ca.veccat(*model._symbols(model.parameters))]
+        delay_arguments_raw = model.delay_arguments_function(*args)
+
+        # 2.  Evaluate for durations
+        for i in range(len(args)):
+            args[i] = ca.repmat(np.nan, *args[i].size())
+        args[6] = ca.veccat(*[v.value if v.value.is_regular() else v.symbol for v in model.parameters])
+        independent_delay_arguments_raw = model.delay_arguments_function(*args)
+
+        # 3.  Piece together
+        if delay_arguments_raw is not None:
+            model.delay_arguments = [DelayArgument(a, b) for a, b in zip(
+                delay_arguments_raw[::2], independent_delay_arguments_raw[1::2])]
 
     # Done
     return model

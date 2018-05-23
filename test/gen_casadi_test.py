@@ -283,7 +283,7 @@ class GenCasadiTest(unittest.TestCase):
         elem__tc__a = ca.MX.sym("elem.tc.a")
         b = ca.MX.sym("b")
 
-        ref_model.alg_states = map(Variable, [elem__tc__i, elem__tc__a, b])
+        ref_model.alg_states = list(map(Variable, [elem__tc__i, elem__tc__a, b]))
 
         ref_model.equations = [elem__tc__i - 1,
                                elem__tc__a - b]
@@ -502,7 +502,8 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [
             ca.horzcat(x - (np.arange(1, 11) + b), w[0, :].T - np.arange(1, 11), w[1, :].T - np.arange(2, 21, 2), u - np.ones((10, 2)), v.T - np.ones((10, 2))),
             y[0:5] - np.zeros(5), y[5:] - np.ones(5),
-            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10), ca.horzcat(Arr[:, 1], Arr[:, 0]) - np.array([[2, 1], [2, 1]])]
+            ca.horzcat(z[0:5] - np.array([2, 2, 2, 2, 2]), z[5:10] - np.array([1, 1, 1, 1, 1])), der_s - np.ones(10),
+            ca.horzcat(Arr[:, 1], Arr[:, 0]) - np.array([[2, 1], [2, 1]])]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -605,6 +606,56 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [y - x_delayed]
         ref_model.delay_states = [x_delayed]
         ref_model.delay_arguments = [DelayArgument(x, 6 * hour)]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_delay_for_loop(self):
+        with open(os.path.join(MODEL_DIR, 'DelayForLoop.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DelayForLoop')
+        print(casadi_model)
+
+        ref_model = Model()
+
+        x = ca.MX.sym("x", 2)
+        y = ca.MX.sym("y", 2)
+        z = ca.MX.sym("z", 2)
+        xt3_delayed = ca.MX.sym("_pymoca_delay_0", 2)
+        delay_time = ca.MX.sym("delay_time")
+
+        ref_model.alg_states = list(map(Variable, [x, y]))
+        ref_model.inputs = list(map(Variable, [xt3_delayed, z, delay_time]))
+        ref_model.equations = [ca.horzcat(x - 5 * z, y - xt3_delayed)]
+        ref_model.delay_states = [xt3_delayed]
+        ref_model.delay_arguments = [DelayArgument(3 * x, delay_time)]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_delay_for_loop_with_expand_vectors(self):
+        with open(os.path.join(MODEL_DIR, 'DelayForLoop.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DelayForLoop')
+        casadi_model.simplify({'expand_vectors': True})
+        print(casadi_model)
+
+        ref_model = Model()
+
+        def _array_mx(name, n):
+            return np.array([ca.MX.sym("{}[{}]".format(name, i)) for i in range(n)])
+
+        x = _array_mx("x", 2)
+        y = _array_mx("y", 2)
+        z = _array_mx("z", 2)
+        xt3_delayed = _array_mx("_pymoca_delay_0", 2)
+        delay_time = ca.MX.sym("delay_time")
+
+        ref_model.alg_states = list(map(Variable, [*x, *y]))
+        ref_model.inputs = list(map(Variable, [*xt3_delayed, *z, delay_time]))
+        ref_model.equations = [*(x - 5 * z), *(y - xt3_delayed)]
+        ref_model.delay_states = [*xt3_delayed]
+        ref_model.delay_arguments = [DelayArgument(3 * x_i, delay_time) for x_i in x]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
