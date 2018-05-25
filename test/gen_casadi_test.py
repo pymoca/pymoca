@@ -682,6 +682,39 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_delay_for_loop_with_expand_vectors_and_expand_mx(self):
+        with open(os.path.join(MODEL_DIR, 'DelayForLoop.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DelayForLoop')
+        casadi_model.simplify({'expand_vectors': True,
+                               'detect_aliases': True,
+                               'expand_mx': True})
+        print(casadi_model)
+
+        ref_model = Model()
+
+        def _array_mx(name, n):
+            return np.array([ca.MX.sym("{}[{}]".format(name, i+1)) for i in range(n)])
+
+        x = _array_mx("x", 3)
+        y = _array_mx("y", 3)
+        a = _array_mx("a", 3)
+        z = _array_mx("z", 3)
+        at3_delayed = _array_mx("_pymoca_delay_0", 2)
+        delay_time = ca.MX.sym("delay_time")
+        eps = _array_mx("eps", 1)
+
+        ref_model.alg_states = list(map(Variable, [*x, y[0]]))
+        ref_model.parameters = list(map(Variable, [*eps]))
+        ref_model.inputs = list(map(Variable, [*at3_delayed, *z, delay_time]))
+        ref_model.inputs[-1].fixed = True
+        ref_model.equations = [*(x[1:] - 5 * z[1:] * eps)]
+        ref_model.delay_states = [*at3_delayed]
+        ref_model.delay_arguments = [DelayArgument(3 * x_i * eps[0], delay_time) for x_i in x[1:]]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_array_3d(self):
         casadi_model = transfer_model(MODEL_DIR, 'Array3D', {'expand_vectors': True})
 
@@ -1256,21 +1289,23 @@ class GenCasadiTest(unittest.TestCase):
              'replace_constant_expressions': True,
              'replace_constant_values': True,
              'replace_parameter_expressions': True,
-             'replace_parameter_values': True}
+             'replace_parameter_values': True,
+             'expand_mx': True}
 
         casadi_model = transfer_model(MODEL_DIR, 'SimplifyLoop', compiler_options)
 
         ref_model = Model()
 
         x = ca.MX.sym('x')
-        y1 = ca.MX.sym('y[1]')
+        # NOTE: y[1] is detected as an alias of x
         y2 = ca.MX.sym('y[2]')
+        y3 = ca.MX.sym('y[3]')
 
         A = ca.MX(2, 3)
-        A[0, 0] = -1
+        A[0, 0] = -2
         A[0, 1] = 1
         A[0, 2] = 0
-        A[1, 0] = -2
+        A[1, 0] = -3
         A[1, 1] = 0
         A[1, 2] = 1
         b = ca.MX(2, 1)
@@ -1279,10 +1314,10 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = list(map(Variable, []))
         ref_model.der_states = list(map(Variable, []))
-        ref_model.alg_states = list(map(Variable, [x, y1, y2]))
+        ref_model.alg_states = list(map(Variable, [x, y2, y3]))
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
-        x = ca.vertcat(x, y1, y2)
+        x = ca.vertcat(x, y2, y3)
         ref_model.equations = [ca.mtimes(A, x) + b]
 
         # Compare
