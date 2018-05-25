@@ -351,11 +351,11 @@ class Model:
                             cols = []
                             for j in range(old_var.symbol.size2()):
                                 if old_var.symbol.size1() > 1 and old_var.symbol.size2() > 1:
-                                    component_symbol = ca.MX.sym('{}[{},{}]'.format(old_var.symbol.name(), i, j))
+                                    component_symbol = ca.MX.sym('{}[{},{}]'.format(old_var.symbol.name(), i+1, j+1))
                                 elif old_var.symbol.size1() > 1:
-                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), i))
+                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), i+1))
                                 elif old_var.symbol.size2() > 1:
-                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), j))
+                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), j+1))
                                 else:
                                     raise AssertionError
                                 component_var = Variable(component_symbol, old_var.python_type)
