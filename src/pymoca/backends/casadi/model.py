@@ -102,7 +102,122 @@ class Model:
     def _symbols(l):
         return [v.symbol for v in l]
 
+    @staticmethod
+    def _expand_simplify_mx(equations):
+        # Sometimes MX expressions can end up horribly nested and complicated,
+        # which makes further simplifications like alias detection difficult.
+        # We can simplify the equations by expanding to SX, and then
+        # rebuilding them with MX symbols again.
+
+        # TODO: Test if this function also works if the MX symbols are _not_
+        # scalars.
+
+        if not equations:
+            return []
+
+        symbols_mx = ca.symvar(ca.veccat(*equations))
+        # symbols_mx = list(itertools.chain.from_iterable((self._symbols(x) for x in (self.states, self.alg_states, self.inputs, self.parameters, self.constants))))
+
+        f_mx = ca.Function('tmp_mx', symbols_mx, equations).expand()
+        symbols_sx = [ca.SX.sym(x.name(), *x.shape) for x in symbols_mx]
+        sx_equations = f_mx.call(symbols_sx)
+
+        sx_to_mx_map = {s: m for s, m in zip(symbols_sx, symbols_mx)}
+
+        def _sx_to_mx(sx_expr):
+            if not sx_expr.is_scalar():
+                rows = []
+                for i in range(sx_expr.size1()):
+                    cols = []
+                    for j in range(sx_expr.size2()):
+                        cols.append(_sx_to_mx(sx_expr[i, j]))
+                    rows.append(cols)
+                return ca.vertcat(*[ca.horzcat(*row) for row in rows])
+            elif sx_expr.op() == ca.OP_PARAMETER:
+                assert sx_expr in sx_to_mx_map.keys()
+                return sx_to_mx_map[sx_expr]
+            elif sx_expr.op() == ca.OP_CONST:
+                return ca.MX(ca.DM(sx_expr))
+            elif sx_expr.n_dep() == 1:
+                return ca.MX.unary(sx_expr.op(), _sx_to_mx(sx_expr.dep(0)))
+            elif sx_expr.n_dep() == 2:
+                return ca.MX.binary(sx_expr.op(), _sx_to_mx(sx_expr.dep(0)), _sx_to_mx(sx_expr.dep(1)))
+            else:
+                raise Exception("Unsupported operation in SX expression.")
+
+        equations = []
+        for eq in sx_equations:
+            try:
+                equations.append(_sx_to_mx(eq))
+            except Exception:
+                equations.append(eq)
+
+        return equations
+
     def simplify(self, options):
+        if options.get('expand_vectors', False):
+            logger.info("Expanding vectors")
+
+            symbols = []
+            values = []
+
+            for l in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
+                old_vars = getattr(self, l)
+                new_vars = []
+                for old_var in old_vars:
+                    if old_var.symbol.numel() > 1:
+                        rows = []
+                        for i in range(old_var.symbol.size1()):
+                            cols = []
+                            for j in range(old_var.symbol.size2()):
+                                if old_var.symbol.size1() > 1 and old_var.symbol.size2() > 1:
+                                    component_symbol = ca.MX.sym('{}[{},{}]'.format(old_var.symbol.name(), i, j))
+                                elif old_var.symbol.size1() > 1:
+                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), i))
+                                elif old_var.symbol.size2() > 1:
+                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), j))
+                                else:
+                                    raise AssertionError
+                                component_var = Variable(component_symbol, old_var.python_type)
+                                for attribute in CASADI_ATTRIBUTES:
+                                    value = ca.MX(getattr(old_var, attribute))
+                                    if value.size1() == old_var.symbol.size1() and value.size2() == old_var.symbol.size2():
+                                        setattr(component_var, attribute, value[i, j])
+                                    elif value.size1() == old_var.symbol.size1():
+                                        setattr(component_var, attribute, value[i])
+                                    elif value.size2() == old_var.symbol.size2():
+                                        setattr(component_var, attribute, value[j])
+                                    else:
+                                        assert value.size1() == 1
+                                        assert value.size2() == 1
+                                        setattr(component_var, attribute, value)
+                                cols.append(component_var)
+                            rows.append(cols)
+                        symbols.append(old_var.symbol)
+                        values.append(ca.vertcat(*[ca.horzcat(*[v.symbol for v in row]) for row in rows]))
+                        new_vars.extend(itertools.chain.from_iterable(rows))
+                    else:
+                        new_vars.append(old_var)
+                setattr(self, l, new_vars)
+
+            if len(self.equations) > 0:
+                self.equations = ca.substitute(self.equations, symbols, values)
+                self.equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.equations))
+            if len(self.initial_equations) > 0:
+                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
+
+            # Replace values in metadata
+            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+                for attribute in CASADI_ATTRIBUTES:
+                    value = getattr(variable, attribute)
+                    if isinstance(value, ca.MX) and not value.is_constant():
+                        [value] = ca.substitute([value], symbols, values)
+                        setattr(variable, attribute, value)
+
+            self.equations = self._expand_simplify_mx(self.equations)
+            self.initial_equations = self._expand_simplify_mx(self.initial_equations)
+
         if options.get('replace_parameter_expressions', False):
             logger.info("Replacing parameter expressions")
 
@@ -321,66 +436,6 @@ class Model:
                 self.equations = ca.substitute(self.equations, variables, values)
             if len(self.initial_equations) > 0:
                 self.initial_equations = ca.substitute(self.initial_equations, variables, values)
-
-        if options.get('expand_vectors', False):
-            logger.info("Expanding vectors")
-
-            symbols = []
-            values = []
-
-            for l in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
-                old_vars = getattr(self, l)
-                new_vars = []
-                for old_var in old_vars:
-                    if old_var.symbol.numel() > 1:
-                        rows = []
-                        for i in range(old_var.symbol.size1()):
-                            cols = []
-                            for j in range(old_var.symbol.size2()):
-                                if old_var.symbol.size1() > 1 and old_var.symbol.size2() > 1:
-                                    component_symbol = ca.MX.sym('{}[{},{}]'.format(old_var.symbol.name(), i, j))
-                                elif old_var.symbol.size1() > 1:
-                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), i))
-                                elif old_var.symbol.size2() > 1:
-                                    component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), j))
-                                else:
-                                    raise AssertionError
-                                component_var = Variable(component_symbol, old_var.python_type)
-                                for attribute in CASADI_ATTRIBUTES:
-                                    value = ca.MX(getattr(old_var, attribute))
-                                    if value.size1() == old_var.symbol.size1() and value.size2() == old_var.symbol.size2():
-                                        setattr(component_var, attribute, value[i, j])
-                                    elif value.size1() == old_var.symbol.size1():
-                                        setattr(component_var, attribute, value[i])
-                                    elif value.size2() == old_var.symbol.size2():
-                                        setattr(component_var, attribute, value[j])
-                                    else:
-                                        assert value.size1() == 1
-                                        assert value.size2() == 1
-                                        setattr(component_var, attribute, value)
-                                cols.append(component_var)
-                            rows.append(cols)
-                        symbols.append(old_var.symbol)
-                        values.append(ca.vertcat(*[ca.horzcat(*[v.symbol for v in row]) for row in rows]))
-                        new_vars.extend(itertools.chain.from_iterable(rows))
-                    else:
-                        new_vars.append(old_var)
-                setattr(self, l, new_vars)
-
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, symbols, values)
-                self.equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.equations))
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
-                self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
-
-            # Replace values in metadata
-            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in CASADI_ATTRIBUTES:
-                    value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX) and not value.is_constant():
-                        [value] = ca.substitute([value], symbols, values)
-                        setattr(variable, attribute, value)
 
         if options.get('factor_and_simplify_equations', False):
             # Operations that preserve the equivalence of an equation
