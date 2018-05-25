@@ -124,7 +124,195 @@ class Model:
         durations = ca.substitute([ca.MX(argument.duration) for argument in delay_arguments], symbols, values)
         return [DelayArgument(expr, duration) for expr, duration in zip(exprs, durations)]
 
+
+    @staticmethod
+    def _expand_simplify_mx(equations):
+        # Sometimes MX expressions can end up horribly nested and complicated,
+        # which makes further simplifications like alias detection difficult.
+        # We can simplify the equations by expanding to SX, and then
+        # rebuilding them with MX symbols again.
+
+        if not equations:
+            return []
+
+        symbols_mx = ca.symvar(ca.veccat(*equations))
+        assert all(x.shape == (1, 1) for x in symbols_mx), "Vector/Matrix SX symbols cannot be mapped"
+
+        f_mx = ca.Function('tmp_mx', symbols_mx, equations).expand()
+        symbols_sx = [ca.SX.sym(x.name(), *x.shape) for x in symbols_mx]
+        sx_equations = f_mx.call(symbols_sx)
+
+        sx_to_mx_map = {s: m for s, m in zip(symbols_sx, symbols_mx)}
+
+        def _sx_to_mx(sx_expr):
+            if not sx_expr.is_scalar():
+                rows = []
+                for i in range(sx_expr.size1()):
+                    cols = []
+                    for j in range(sx_expr.size2()):
+                        cols.append(_sx_to_mx(sx_expr[i, j]))
+                    rows.append(cols)
+                return ca.vertcat(*[ca.horzcat(*row) for row in rows])
+            elif sx_expr.op() == ca.OP_PARAMETER:
+                assert sx_expr in sx_to_mx_map.keys()
+                return sx_to_mx_map[sx_expr]
+            elif sx_expr.op() == ca.OP_CONST:
+                return ca.MX(ca.DM(sx_expr))
+            elif sx_expr.n_dep() == 1:
+                return ca.MX.unary(sx_expr.op(), _sx_to_mx(sx_expr.dep(0)))
+            elif sx_expr.n_dep() == 2:
+                return ca.MX.binary(sx_expr.op(), _sx_to_mx(sx_expr.dep(0)), _sx_to_mx(sx_expr.dep(1)))
+            else:
+                raise Exception("Unsupported operation in SX expression.")
+
+        equations = []
+        for eq in sx_equations:
+            try:
+                equations.append(_sx_to_mx(eq))
+            except Exception:
+                equations.append(eq)
+
+        return equations
+
+    def _expand_vectors(self):
+        logger.info("Expanding vectors")
+
+        symbols = []
+        values = []
+
+        for l in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
+            old_vars = getattr(self, l)
+            new_vars = []
+            for old_var in old_vars:
+                # For delayed states we do not have any reliable shape
+                # information available due to it being an arbitrary
+                # expression, so we just always expand.
+                if (set(old_var.symbol._modelica_shape) != {(None,)}
+                        or old_var.symbol.name() in self.delay_states):
+                    expanded_symbols = []
+
+                    # Prepare a component_name_format in which the different possible
+                    # combinations of indices can later be inserted.
+                    # For example: a.b[{}].c[{},{}]
+                    if old_var.symbol.name() in self.delay_states:
+                        # For delay states we use the _modelica_shape as is
+                        iterator_shape = old_var.symbol._modelica_shape
+                        component_name_format = \
+                            old_var.symbol.name() + '[' + \
+                            ','.join('{}' for _ in range(len(iterator_shape))) + ']'
+                    else:
+                        # For (nested) array symbols the _modelica_shape contains a tuple of
+                        # tuples containing the shape for each of the nested symbols.
+                        # For example, symbol name a.b.c and shape ((None,),(3,),(1,3)) means
+                        # a was a scalar, b a 1d array of size [3] and c a 2d array of size
+                        # [1,3].
+                        modelica_shape = old_var.symbol._modelica_shape
+                        symbol_names = old_var.symbol.name().split('.')
+                        assert len(symbol_names) == len(modelica_shape)
+                        component_name_format = ''
+                        for i, symbol_name in enumerate(symbol_names):
+                            if i != 0:
+                                component_name_format += '.'
+                            component_name_format += symbol_name
+                            if modelica_shape[i] != (None,):
+                                component_name_format += \
+                                    '[' + \
+                                    ','.join('{}' for _ in range(len(modelica_shape[i]))) + \
+                                    ']'
+
+                        iterator_shape = tuple([d for var_shape in modelica_shape
+                                                for d in var_shape if d is not None])
+
+                    # Generate symbols for each possible combination of indices
+                    for ind in np.ndindex(iterator_shape):
+                        component_symbol = ca.MX.sym(component_name_format
+                                                     .format(*tuple(i + 1 for i in ind)))
+                        component_var = Variable(component_symbol, old_var.python_type)
+                        for attribute in CASADI_ATTRIBUTES:
+                            # Can't convert 3D arrays to MX, so we convert to nparray instead
+                            value = getattr(old_var, attribute)
+                            if not isinstance(value, ca.MX) and not np.isscalar(value):
+                                value = np.array(value)
+                            else:
+                                value = ca.MX(getattr(old_var, attribute))
+
+                            if np.prod(value.shape) == 1:
+                                setattr(component_var, attribute, value)
+                            else:
+                                setattr(component_var, attribute, value[ind])
+                        expanded_symbols.append(component_var)
+
+                    s = old_var.symbol._mx if isinstance(old_var.symbol, _MTensor) else old_var.symbol
+                    symbols.append(s)
+                    values.append(ca.reshape(ca.vertcat(*[x.symbol for x in expanded_symbols]), *tuple(reversed(s.shape))).T)
+                    new_vars.extend(expanded_symbols)
+
+                    # Replace variable in delay expressions and durations if needed
+                    try:
+                        assert len(self.delay_states) == len(self.delay_arguments)
+
+                        i = self.delay_states.index(old_var.symbol.name())
+                    except ValueError:
+                        pass
+                    else:
+                        delay_state = self.delay_states.pop(i)
+                        delay_argument = self.delay_arguments.pop(i)
+
+                        for ind in np.ndindex(old_var.symbol._modelica_shape):
+                            new_name = '{}[{}]'.format(delay_state, ",".join(str(i+1) for i in ind))
+
+                            self.delay_states.append(new_name)
+                            self.delay_arguments.append(
+                                DelayArgument(delay_argument.expr[ind], delay_argument.duration))
+
+                    # Replace variable in list of outputs if needed
+                    try:
+                        i = self.outputs.index(old_var.symbol.name())
+                    except ValueError:
+                        pass
+                    else:
+                        self.outputs.pop(i)
+                        for new_s in reversed(expanded_symbols):
+                            self.outputs.insert(i, new_s.symbol.name())
+                else:
+                    new_vars.append(old_var)
+
+            setattr(self, l, new_vars)
+
+        if len(self.equations) > 0:
+            self.equations = ca.substitute(self.equations, symbols, values)
+            self.equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.equations))
+        if len(self.initial_equations) > 0:
+            self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+            self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
+        if len(self.delay_arguments) > 0:
+            self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
+
+        # Make sure that the naming in the main loop and the delay argument loop match
+        input_names = [v.symbol.name() for v in self.inputs]
+        assert set(self.delay_states).issubset(input_names)
+
+        # Replace values in metadata
+        for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+            for attribute in CASADI_ATTRIBUTES:
+                value = getattr(variable, attribute)
+                if isinstance(value, ca.MX) and not value.is_constant():
+                    [value] = ca.substitute([value], symbols, values)
+                    setattr(variable, attribute, value)
+
     def simplify(self, options):
+        if options.get('expand_vectors', False) and options.get('expand_mx', False):
+            # If we are _not_ expanding MX to SX, we do the expansion of
+            # vectors first, such that we are be able to detect more aliases
+            # (e.g individual array elements, or elements in a for loop).
+            self._expand_vectors()
+
+            # Expand to SX, and back again to MX such that the remaining
+            # simplification steps can be applied. We also do this to make
+            # sure we only ever expose MX to the outside world.
+            self.equations = self._expand_simplify_mx(self.equations)
+            self.initial_equations = self._expand_simplify_mx(self.initial_equations)
+
         if options.get('replace_parameter_expressions', False):
             logger.info("Replacing parameter expressions")
 
@@ -361,131 +549,9 @@ class Model:
             if len(self.delay_arguments) > 0:
                 self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
-        if options.get('expand_vectors', False):
-            logger.info("Expanding vectors")
-
-            symbols = []
-            values = []
-
-            for l in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
-                old_vars = getattr(self, l)
-                new_vars = []
-                for old_var in old_vars:
-                    # For delayed states we do not have any reliable shape
-                    # information available due to it being an arbitrary
-                    # expression, so we just always expand.
-                    if (set(old_var.symbol._modelica_shape) != {(None,)}
-                            or old_var.symbol.name() in self.delay_states):
-                        expanded_symbols = []
-
-                        # Prepare a component_name_format in which the different possible
-                        # combinations of indices can later be inserted.
-                        # For example: a.b[{}].c[{},{}]
-                        if old_var.symbol.name() in self.delay_states:
-                            # For delay states we use the _modelica_shape as is
-                            iterator_shape = old_var.symbol._modelica_shape
-                            component_name_format = \
-                                old_var.symbol.name() + '[' + \
-                                ','.join('{}' for _ in range(len(iterator_shape))) + ']'
-                        else:
-                            # For (nested) array symbols the _modelica_shape contains a tuple of
-                            # tuples containing the shape for each of the nested symbols.
-                            # For example, symbol name a.b.c and shape ((None,),(3,),(1,3)) means
-                            # a was a scalar, b a 1d array of size [3] and c a 2d array of size
-                            # [1,3].
-                            modelica_shape = old_var.symbol._modelica_shape
-                            symbol_names = old_var.symbol.name().split('.')
-                            assert len(symbol_names) == len(modelica_shape)
-                            component_name_format = ''
-                            for i, symbol_name in enumerate(symbol_names):
-                                if i != 0:
-                                    component_name_format += '.'
-                                component_name_format += symbol_name
-                                if modelica_shape[i] != (None,):
-                                    component_name_format += \
-                                        '[' + \
-                                        ','.join('{}' for _ in range(len(modelica_shape[i]))) + \
-                                        ']'
-
-                            iterator_shape = tuple([d for var_shape in modelica_shape
-                                                    for d in var_shape if d is not None])
-
-                        # Generate symbols for each possible combination of indices
-                        for ind in np.ndindex(iterator_shape):
-                            component_symbol = ca.MX.sym(component_name_format
-                                                         .format(*tuple(i + 1 for i in ind)))
-                            component_var = Variable(component_symbol, old_var.python_type)
-                            for attribute in CASADI_ATTRIBUTES:
-                                # Can't convert 3D arrays to MX, so we convert to nparray instead
-                                value = getattr(old_var, attribute)
-                                if not isinstance(value, ca.MX) and not np.isscalar(value):
-                                    value = np.array(value)
-                                else:
-                                    value = ca.MX(getattr(old_var, attribute))
-
-                                if np.prod(value.shape) == 1:
-                                    setattr(component_var, attribute, value)
-                                else:
-                                    setattr(component_var, attribute, value[ind])
-                            expanded_symbols.append(component_var)
-
-                        s = old_var.symbol._mx if isinstance(old_var.symbol, _MTensor) else old_var.symbol
-                        symbols.append(s)
-                        values.append(ca.reshape(ca.vertcat(*[x.symbol for x in expanded_symbols]), *tuple(reversed(s.shape))).T)
-                        new_vars.extend(expanded_symbols)
-
-                        # Replace variable in delay expressions and durations if needed
-                        try:
-                            assert len(self.delay_states) == len(self.delay_arguments)
-
-                            i = self.delay_states.index(old_var.symbol.name())
-                        except ValueError:
-                            pass
-                        else:
-                            delay_state = self.delay_states.pop(i)
-                            delay_argument = self.delay_arguments.pop(i)
-
-                            for ind in np.ndindex(old_var.symbol._modelica_shape):
-                                new_name = '{}[{}]'.format(delay_state, ",".join(str(i+1) for i in ind))
-
-                                self.delay_states.append(new_name)
-                                self.delay_arguments.append(
-                                    DelayArgument(delay_argument.expr[ind], delay_argument.duration))
-
-                        # Replace variable in list of outputs if needed
-                        try:
-                            i = self.outputs.index(old_var.symbol.name())
-                        except ValueError:
-                            pass
-                        else:
-                            self.outputs.pop(i)
-                            for new_s in reversed(expanded_symbols):
-                                self.outputs.insert(i, new_s.symbol.name())
-                    else:
-                        new_vars.append(old_var)
-
-                setattr(self, l, new_vars)
-
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, symbols, values)
-                self.equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.equations))
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
-                self.initial_equations = list(itertools.chain.from_iterable(ca.vertsplit(ca.vec(eq)) for eq in self.initial_equations))
-            if len(self.delay_arguments) > 0:
-                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
-
-            # Make sure that the naming in the main loop and the delay argument loop match
-            input_names = [v.symbol.name() for v in self.inputs]
-            assert set(self.delay_states).issubset(input_names)
-
-            # Replace values in metadata
-            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in CASADI_ATTRIBUTES:
-                    value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX) and not value.is_constant():
-                        [value] = ca.substitute([value], symbols, values)
-                        setattr(variable, attribute, value)
+        if options.get('expand_vectors', False) and not options.get('expand_mx', False):
+            # If we are _not_ expanding MX to SX, we do the expansion of vectors here
+            self._expand_vectors()
 
         if options.get('factor_and_simplify_equations', False):
             # Operations that preserve the equivalence of an equation
