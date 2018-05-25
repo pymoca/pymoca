@@ -355,7 +355,10 @@ class Model:
                 old_vars = getattr(self, l)
                 new_vars = []
                 for old_var in old_vars:
-                    if old_var.symbol._modelica_shape != (1,):
+                    # For delayed states we do not have any reliable shape
+                    # information available due to it being an arbitrary
+                    # expression, so we just always expand.
+                    if (old_var.symbol._modelica_shape != (1,) or old_var.symbol.name() in self.delay_states):
                         expanded_symbols = []
                         for ind in np.ndindex(old_var.symbol._modelica_shape):
                             component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), ",".join(str(i+1) for i in ind)))
@@ -386,16 +389,15 @@ class Model:
                         except ValueError:
                             pass
                         else:
-                            if self.delay_arguments[i].expr.numel() > 1:
-                                delay_state = self.delay_states.pop(i)
-                                delay_argument = self.delay_arguments.pop(i)
+                            delay_state = self.delay_states.pop(i)
+                            delay_argument = self.delay_arguments.pop(i)
 
-                                for ind in np.ndindex(old_var.symbol._modelica_shape):
-                                    new_name = '{}[{}]'.format(delay_state, ",".join(str(i+1) for i in ind))
+                            for ind in np.ndindex(old_var.symbol._modelica_shape):
+                                new_name = '{}[{}]'.format(delay_state, ",".join(str(i+1) for i in ind))
 
-                                    self.delay_states.append(new_name)
-                                    self.delay_arguments.append(
-                                        DelayArgument(delay_argument.expr[ind], delay_argument.duration))
+                                self.delay_states.append(new_name)
+                                self.delay_arguments.append(
+                                    DelayArgument(delay_argument.expr[ind], delay_argument.duration))
                     else:
                         new_vars.append(old_var)
 

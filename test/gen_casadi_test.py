@@ -597,8 +597,13 @@ class GenCasadiTest(unittest.TestCase):
         with open(os.path.join(MODEL_DIR, 'Delay.mo'), 'r') as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+
         casadi_model = gen_casadi.generate(ast_tree, 'Delay')
-        print(casadi_model)
+        # Important to also test expansion of delay expressions of scalar size
+        ast_tree = parser.parse(txt)
+        casadi_model_expanded = gen_casadi.generate(ast_tree, 'Delay')
+        casadi_model_expanded.simplify({'expand_vectors': True})
+
         ref_model = Model()
 
         x = ca.MX.sym("x")
@@ -615,6 +620,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.delay_arguments = [DelayArgument(x, 6 * hour)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model_expanded)
 
     def test_delay_for_loop(self):
         with open(os.path.join(MODEL_DIR, 'DelayForLoop.mo'), 'r') as f:
