@@ -272,7 +272,11 @@ class Generator(TreeListener):
             expr = self.get_mx(tree.operands[0])
             duration = self.get_mx(tree.operands[1])
 
-            src = _new_mx('_pymoca_delay_{}'.format(self.delay_counter), *expr.size())
+            try:
+                src = _new_mx('_pymoca_delay_{}'.format(self.delay_counter), *expr._modelica_shape)
+            except AttributeError:
+                src = _new_mx('_pymoca_delay_{}'.format(self.delay_counter), *expr.size())
+
             self.delay_counter += 1
 
             for f in self.for_loops:
@@ -652,7 +656,10 @@ class Generator(TreeListener):
                     else:
                         return 0
                 else:
-                    der_s = _new_mx("der({})".format(s.name()), s.size())
+                    try:
+                        der_s = _new_mx("der({})".format(s.name()), s._modelica_shape)
+                    except AttributeError:
+                        der_s = _new_mx("der({})".format(s.name()), s.size())
                     self.derivative[s.name()] = der_s
                     self.nodes[self.current_class][der_s.name()] = der_s
                     return der_s
@@ -664,7 +671,10 @@ class Generator(TreeListener):
             slice_info = s.info()['slice']
             dep = s.dep()
             if dep.name() not in self.derivative:
-                der_dep = _new_mx("der({})".format(dep.name()), dep.size())
+                try:
+                    der_dep = _new_mx("der({})".format(dep.name()), dep._modelica_shape)
+                except AttributeError:
+                    der_dep = _new_mx("der({})".format(dep.name()), dep.size())
                 self.derivative[dep.name()] = der_dep
                 return der_dep[slice_info['start']:slice_info['stop']:slice_info['step']]
             else:
