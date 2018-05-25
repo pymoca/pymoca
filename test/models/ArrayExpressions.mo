@@ -52,7 +52,8 @@ equation
 
     // Nesting
     nested1.z = ones(3);
-    nested2[1].z = {4, 5, 6};
+    // FIXME: We should be able to index with `nested2[1].z`, but we currently need the `[:]`.
+    nested2[1].z[:] = {4, 5, 6};
     nested2[2].z[1] = 3;
     nested2[2].z[2] = 2;
     nested2[2].z[3] = 1;
