@@ -760,7 +760,8 @@ class GenCasadiTest(unittest.TestCase):
         # Alias detection results in fmin/fmax function calls in the attributes
         compiler_options = \
             {'cache': True,
-             'detect_aliases': True}
+             'detect_aliases': True,
+             'expand_vectors': True}
 
         ref_model = transfer_model(MODEL_DIR, 'ParameterAttributes', compiler_options)
         self.assertIsInstance(ref_model, Model)

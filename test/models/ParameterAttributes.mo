@@ -4,6 +4,7 @@ model ParameterAttributes
 	Real a(min=min_, max=10.0);
 	Real b(min=0.0,  max=max_);
 	Real c;
+	Real[3] d(each min=-max_, each max=max_);
 equation
 	a = b;
 	c = a * b;
