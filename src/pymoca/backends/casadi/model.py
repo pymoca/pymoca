@@ -366,7 +366,7 @@ class Model:
                             for attribute in CASADI_ATTRIBUTES:
                                 # Can't convert 3D arrays to MX, so we convert to nparray instead
                                 value = getattr(old_var, attribute)
-                                if not np.isscalar(value):
+                                if not isinstance(value, ca.MX) and not np.isscalar(value):
                                     value = np.array(value)
                                 else:
                                     value = ca.MX(getattr(old_var, attribute))
