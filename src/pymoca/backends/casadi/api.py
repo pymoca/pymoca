@@ -241,7 +241,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             raise InvalidCacheError('Cache generated for different compiler options')
 
         # Pickles are platform independent, but dynamic libraries are not
-        if compiler_options['codegen']:
+        if compiler_options.get('codegen', False):
             if db['library_os'] != os.name:
                 raise InvalidCacheError('Cache generated for incompatible OS')
 
