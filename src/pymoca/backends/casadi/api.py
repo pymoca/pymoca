@@ -191,6 +191,45 @@ def save_model(model_folder: str, model_name: str, model: Model,
         for key in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
             db[key] = [e.to_dict() for e in getattr(model, key)]
 
+
+        # Caching using CasADi functions will lead to constants seemingly
+        # depending on MX variables. Figuring out that they do not is slow,
+        # especially when doing it on a lazy function call, as would be the
+        # case when reading from cache. So instead, we do the depency check
+        # once when saving the model.
+
+        # Metadata dependency checking
+        parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
+
+        for k, key in enumerate(['states', 'alg_states', 'inputs', 'parameters', 'constants']):
+            metadata_shape = (len(getattr(model, key)), len(CASADI_ATTRIBUTES))
+            m = db[key + "__metadata_dependent"] = np.zeros(metadata_shape, dtype=bool)
+            for i, v in enumerate(getattr(model, key)):
+                for j, tmp in enumerate(CASADI_ATTRIBUTES):
+                    attr = getattr(v, tmp)
+                    if isinstance(attr, ca.MX) and ca.depends_on(attr, parameter_vector):
+                        m[i, j] = True
+
+        # Delay dependency checking
+        if model.delay_states:
+
+            all_symbols = [model.time,
+                           *model._symbols(model.states),
+                           *model._symbols(model.der_states),
+                           *model._symbols(model.alg_states),
+                           *model._symbols(model.inputs),
+                           *model._symbols(model.constants),
+                           *model._symbols(model.parameters)]
+            symbol_to_index = {x: i for i, x in enumerate(all_symbols)}
+
+            expressions, durations = zip(*model.delay_arguments)
+
+            duration_dependencies = []
+            for dur in durations:
+                duration_dependencies.append(
+                    [symbol_to_index[var] for var in ca.symvar(dur) if ca.depends_on(dur, var)])
+            db['__delay_duration_dependent'] = duration_dependencies
+
         db['outputs'] = model.outputs
 
         db['delay_states'] = model.delay_states
@@ -277,29 +316,28 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         independent_metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters]))))
 
         for k, key in enumerate(variables_with_metadata):
+            m = db[key + "__metadata_dependent"]
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(CASADI_ATTRIBUTES):
-                    if ca.depends_on(ca.MX(metadata[key][i, j]), parameter_vector):
+                    if m[i, j]:
                         setattr(variable, tmp, metadata[key][i, j])
                     else:
                         setattr(variable, tmp, independent_metadata[key][i, j])
 
         # Evaluate delay arguments:
-        args = [model.time,
-                ca.veccat(*model._symbols(model.states)),
-                ca.veccat(*model._symbols(model.der_states)),
-                ca.veccat(*model._symbols(model.alg_states)),
-                ca.veccat(*model._symbols(model.inputs)),
-                ca.veccat(*model._symbols(model.constants)),
-                ca.veccat(*model._symbols(model.parameters))]
-        delay_arguments_raw = model.delay_arguments_function(*args)
+        if model.delay_states:
+            args = [model.time,
+                    ca.veccat(*model._symbols(model.states)),
+                    ca.veccat(*model._symbols(model.der_states)),
+                    ca.veccat(*model._symbols(model.alg_states)),
+                    ca.veccat(*model._symbols(model.inputs)),
+                    ca.veccat(*model._symbols(model.constants)),
+                    ca.veccat(*model._symbols(model.parameters))]
+            delay_arguments_raw = model.delay_arguments_function(*args)
 
-        nan_args = [ca.repmat(np.nan, *arg.size()) for arg in args]
-        independent_delay_arguments_raw = model.delay_arguments_function(*nan_args)
-
-        if delay_arguments_raw is not None:
-            all_symbols = ca.veccat(*args)
+            nan_args = [ca.repmat(np.nan, *arg.size()) for arg in args]
+            independent_delay_arguments_raw = model.delay_arguments_function(*nan_args)
 
             delay_expressions_raw = delay_arguments_raw[::2]
             delay_durations_raw = delay_arguments_raw[1::2]
@@ -308,19 +346,29 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             assert 1 == len({len(delay_expressions_raw), len(delay_durations_raw),
                 len(independent_delay_durations_raw)})
 
-            for i, expr in enumerate(delay_expressions_raw):
-                assert ca.depends_on(ca.MX(expr), all_symbols), \
-                    "Expression to be delayed can not be a constant"
+            all_symbols = [model.time,
+                           *model._symbols(model.states),
+                           *model._symbols(model.der_states),
+                           *model._symbols(model.alg_states),
+                           *model._symbols(model.inputs),
+                           *model._symbols(model.constants),
+                           *model._symbols(model.parameters)]
 
-                if ca.depends_on(ca.MX(delay_durations_raw[i]), all_symbols):
+            duration_dependencies = db['__delay_duration_dependent']
+
+            for i, expr in enumerate(delay_expressions_raw):
+                if duration_dependencies[i]:
                     dur = delay_durations_raw[i]
-                    false_deps = ca.vertcat(*[
-                        var for var in ca.symvar(dur) if not ca.depends_on(dur, var)])
-                    if false_deps.size1() > 0:
+
+                    deps = set(ca.symvar(dur))
+                    actual_deps = {all_symbols[j] for j in duration_dependencies[i]}
+                    false_deps = deps - actual_deps
+
+                    if false_deps:
                         [dur] = ca.substitute(
                             [dur],
-                            [false_deps],
-                            [ca.DM(np.full(false_deps.size1(), np.nan))])
+                            list(false_deps),
+                            [ca.repmat(np.nan, *d.size()) for d in false_deps])
                 else:
                     dur = independent_delay_durations_raw[i]
 
