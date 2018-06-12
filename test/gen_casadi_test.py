@@ -1522,5 +1522,13 @@ class GenCasadiTest(unittest.TestCase):
                                      [3, 4],
                                      [5, 6]])
 
+    def test_skip_annotations(self):
+        with open(os.path.join(MODEL_DIR, 'Annotations.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        casadi_model = gen_casadi.generate(ast_tree, 'A')
+
+
 if __name__ == "__main__":
     unittest.main()

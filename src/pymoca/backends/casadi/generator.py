@@ -70,6 +70,16 @@ class ForLoop:
 Assignment = namedtuple('Assignment', ['left', 'right'])
 
 
+class GeneratorWalker(TreeWalker):
+    """TreeWalker that skips processing of annotations"""
+
+    def skip_child(self, tree: ast.Node, child_name: str) -> bool:
+        skip = super().skip_child(tree, child_name)
+        if isinstance(tree, ast.Class) and child_name == "annotation":
+            return True
+        return skip
+
+
 # noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
     def __init__(self, root: ast.Tree, class_name: str, options: Dict[str, bool]):
@@ -820,7 +830,7 @@ def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool]=None)
     if options is None:
         options = {}
     component_ref = ast.ComponentRef.from_string(model_name)
-    ast_walker = TreeWalker()
+    ast_walker = GeneratorWalker()
     flat_tree = flatten(ast_tree, component_ref)
     component_ref_tuple = component_ref.to_tuple()
     casadi_gen = Generator(flat_tree, component_ref_tuple[-1], options)
