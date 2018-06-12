@@ -382,6 +382,7 @@ class Model:
                         values.append(ca.reshape(ca.vertcat(*[x.symbol for x in expanded_symbols]), *tuple(reversed(s.shape))).T)
                         new_vars.extend(expanded_symbols)
 
+                        # Replace variable in delay expressions and durations if needed
                         try:
                             assert len(self.delay_states) == len(self.delay_arguments)
 
@@ -398,6 +399,16 @@ class Model:
                                 self.delay_states.append(new_name)
                                 self.delay_arguments.append(
                                     DelayArgument(delay_argument.expr[ind], delay_argument.duration))
+
+                        # Replace variable in list of outputs if needed
+                        try:
+                            i = self.outputs.index(old_var.symbol.name())
+                        except ValueError:
+                            pass
+                        else:
+                            self.outputs.pop(i)
+                            for new_s in reversed(expanded_symbols):
+                                self.outputs.insert(i, new_s.symbol.name())
                     else:
                         new_vars.append(old_var)
 
