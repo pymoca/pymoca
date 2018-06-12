@@ -157,6 +157,17 @@ class TreeWalker:
     Defines methods for tree walker. Inherit from this to make your own.
     """
 
+    def skip_child(self, tree: ast.Node, child_name: str) -> bool:
+        """
+        Skip certain childs in the tree walking. By default it prevents
+        endless recursion by skipping references to e.g. parent nodes.
+        :return: True if child needs to be skipped, False otherwise.
+        """
+        if isinstance(tree, ast.Class) and child_name == 'parent' or \
+                isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
+            return True
+        return False
+
     def walk(self, listener: TreeListener, tree: ast.Node) -> None:
         """
         Walks an AST tree recursively
@@ -170,9 +181,7 @@ class TreeWalker:
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
         for child_name in tree.__dict__.keys():
-            if isinstance(tree, ast.Class) and child_name == 'parent' or \
-                    isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
-                # Do not go up again.
+            if self.skip_child(tree, child_name):
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
         if hasattr(listener, 'exitEvery'):
