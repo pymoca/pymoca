@@ -658,7 +658,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model = Model()
 
         def _array_mx(name, n):
-            return np.array([ca.MX.sym("{}[{}]".format(name, i)) for i in range(n)])
+            return np.array([ca.MX.sym("{}[{}]".format(name, i+1)) for i in range(n)])
 
         x = _array_mx("x", 2)
         y = _array_mx("y", 2)
@@ -1225,17 +1225,17 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model = Model()
 
-        x0 = ca.MX.sym('x[0]')
         x1 = ca.MX.sym('x[1]')
-        der_x0 = ca.MX.sym('der(x)[0]')
+        x2 = ca.MX.sym('x[2]')
         der_x1 = ca.MX.sym('der(x)[1]')
+        der_x2 = ca.MX.sym('der(x)[2]')
 
-        ref_model.states = list(map(Variable, [x0, x1]))
-        ref_model.der_states = list(map(Variable, [der_x0, der_x1]))
+        ref_model.states = list(map(Variable, [x1, x2]))
+        ref_model.der_states = list(map(Variable, [der_x1, der_x2]))
         ref_model.alg_states = list(map(Variable, []))
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
-        ref_model.equations = [der_x0 - x0, der_x1 - x1]
+        ref_model.equations = [der_x1 - x1, der_x2 - x2]
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
@@ -1256,8 +1256,8 @@ class GenCasadiTest(unittest.TestCase):
         ref_model = Model()
 
         x = ca.MX.sym('x')
-        y0 = ca.MX.sym('y[0]')
         y1 = ca.MX.sym('y[1]')
+        y2 = ca.MX.sym('y[2]')
 
         A = ca.MX(2, 3)
         A[0, 0] = -1
@@ -1272,10 +1272,10 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model.states = list(map(Variable, []))
         ref_model.der_states = list(map(Variable, []))
-        ref_model.alg_states = list(map(Variable, [x, y0, y1]))
+        ref_model.alg_states = list(map(Variable, [x, y1, y2]))
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = list(map(Variable, []))
-        x = ca.vertcat(x, y0, y1)
+        x = ca.vertcat(x, y1, y2)
         ref_model.equations = [ca.mtimes(A, x) + b]
 
         # Compare
