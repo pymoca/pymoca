@@ -1227,15 +1227,17 @@ class GenCasadiTest(unittest.TestCase):
 
         x1 = ca.MX.sym('x[1]')
         x2 = ca.MX.sym('x[2]')
+        y1 = ca.MX.sym('y[1]')
+        y2 = ca.MX.sym('y[2]')
         der_x1 = ca.MX.sym('der(x)[1]')
         der_x2 = ca.MX.sym('der(x)[2]')
 
         ref_model.states = list(map(Variable, [x1, x2]))
         ref_model.der_states = list(map(Variable, [der_x1, der_x2]))
-        ref_model.alg_states = list(map(Variable, []))
+        ref_model.alg_states = list(map(Variable, [y1, y2]))
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = []
-        ref_model.equations = [der_x1 - x1, der_x2 - x2]
+        ref_model.outputs = ['y[1]', 'y[2]']
+        ref_model.equations = [der_x1 - x1, der_x2 - x2, y1 - x1, y2 - x2]
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
