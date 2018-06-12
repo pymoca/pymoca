@@ -913,7 +913,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, []))
         constant_values = []
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -956,7 +956,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
         constant_values = [3]
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1000,7 +1000,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
         constant_values = [3]
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1043,7 +1043,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
         constant_values = [3]
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1090,7 +1090,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c, cst]))
         constant_values = [3, 4]
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1134,7 +1134,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
         constant_values = [3]
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1175,7 +1175,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [y, _tmp, cst]))
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
         constant_values = [3]
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1209,7 +1209,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, []))
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.equations = [der_x - x]
 
         # Compare
@@ -1234,7 +1234,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = list(map(Variable, [der_x1, der_x2]))
         ref_model.alg_states = list(map(Variable, []))
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.equations = [der_x1 - x1, der_x2 - x2]
 
         # Compare
@@ -1274,7 +1274,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = list(map(Variable, []))
         ref_model.alg_states = list(map(Variable, [x, y1, y2]))
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         x = ca.vertcat(x, y1, y2)
         ref_model.equations = [ca.mtimes(A, x) + b]
 
@@ -1312,7 +1312,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
         constant_values = [3]
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1373,7 +1373,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [y]))
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, []))
         constant_values = []
         for _cst, v in zip(ref_model.constants, constant_values):
@@ -1428,7 +1428,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
         ref_model.inputs = list(map(Variable, []))
-        ref_model.outputs = list(map(Variable, []))
+        ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
         constant_values = [3]
         for _cst, v in zip(ref_model.constants, constant_values):
