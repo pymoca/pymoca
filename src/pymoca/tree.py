@@ -22,6 +22,8 @@ logger = logging.getLogger("pymoca")
 
 
 # TODO Flatten function vs. conversion classes
+class ModificationTargetNotFound(Exception):
+    pass
 
 
 # noinspection PyPep8Naming
@@ -337,6 +339,14 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
 
         extended_orig_class.classes[class_name] = build_instance_tree(c, sub_class_modification, extended_orig_class)
 
+    # Check that all symbol modifications to be applied on this class exist
+    for arg in extended_orig_class.modification_environment.arguments:
+        if not arg.value.component.name in extended_orig_class.symbols:
+            raise ModificationTargetNotFound("Trying to modify symbol {}, which does not exist in class {}".format(
+                arg.value.component.name,
+                extended_orig_class.full_reference()
+            ))
+
     # Merge/pass along modifications for symbols, including redeclares
     for sym_name, sym in extended_orig_class.symbols.items():
         class_name = sym.type
@@ -436,7 +446,12 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
                 if arg.scope is None:
                     arg.scope = extended_orig_class
 
-            sym.type = build_instance_tree(c, sym.class_modification, c.parent)
+            try:
+                sym.type = build_instance_tree(c, sym.class_modification, c.parent)
+            except Exception as e:
+                error_sym = str(orig_class.full_reference()) + "." + sym_name
+                raise type(e)('Processing failed for symbol "{}"'.format(error_sym)) from e
+
             sym.class_modification = None
 
     return extended_orig_class

@@ -159,6 +159,19 @@ class ParseTest(unittest.TestCase):
 
         self.assertEqual(flat_tree.classes['MainModel'].symbols['e.HQ.H'].min.name, "e.H_b")
 
+    def test_modification_typo(self):
+        with open(os.path.join(MODEL_DIR, 'ModificationTypo.mo'), 'r') as f:
+            txt = f.read()
+
+        for c in ["Wrong1", "Wrong2"]:
+            with self.assertRaises(tree.ModificationTargetNotFound):
+                ast_tree = parser.parse(txt)
+                flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name=c))
+
+        for c in ["Good1", "Good2"]:
+            ast_tree = parser.parse(txt)
+            flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name=c))
+
     def test_tree_lookup(self):
         with open(os.path.join(MODEL_DIR, 'TreeLookup.mo'), 'r') as f:
             txt = f.read()
