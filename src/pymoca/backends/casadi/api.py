@@ -313,7 +313,9 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         # Evaluate variable metadata:
         parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(parameter_vector)))
-        independent_metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters]))))
+        independent_metadata = dict(zip(
+            variables_with_metadata,
+            (np.array(x) for x in model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters])))))
 
         for k, key in enumerate(variables_with_metadata):
             m = db[key + "__metadata_dependent"]
