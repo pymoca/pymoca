@@ -142,9 +142,14 @@ class AliasRelation:
     def aliases(self, a):
         if self.__is_negative(a):
             a = self.__toggle_sign(a)
-            return OrderedSet([self.__toggle_sign(v) for v in self._aliases.get(a, OrderedSet([a]))])
+            return OrderedSet([self.__toggle_sign(v) for v in self.aliases(a)])
         else:
-            return self._aliases.get(a, OrderedSet([a]))
+            # Instead of the dictionary's "get" method, we avoid always
+            # instatiating an OrderedSet by explicitly checking
+            if a in self._aliases:
+                return self._aliases[a]
+            else:
+                return OrderedSet([a])
 
     def canonical_signed(self, a):
         if self.__is_negative(a):
