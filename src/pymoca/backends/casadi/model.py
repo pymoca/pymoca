@@ -18,7 +18,7 @@ CASADI_ATTRIBUTES = [attr for attr in ast.Symbol.ATTRIBUTES if not attr == 'unit
 class Variable:
     def __init__(self, symbol, python_type=float, aliases=None):
         if aliases is None:
-            aliases = []
+            aliases = set()
         self.symbol = symbol
         self.python_type = python_type
         self.aliases = aliases
@@ -634,6 +634,7 @@ class Model:
 
                     del all_states[alias]
 
+                assert isinstance(aliases, set)
                 canonical_state.aliases = aliases
                 canonical_state.python_type = python_type
                 canonical_state.start = start

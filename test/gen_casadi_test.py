@@ -1193,7 +1193,7 @@ class GenCasadiTest(unittest.TestCase):
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
-        self.assertEquals(casadi_model.states[0].aliases, ['alias'])
+        self.assertEquals(casadi_model.states[0].aliases, {'alias'})
 
     def test_simplify_detect_negative_alias(self):
         # Create model, cache it, and load the cache
@@ -1219,7 +1219,7 @@ class GenCasadiTest(unittest.TestCase):
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
-        self.assertEquals(casadi_model.states[0].aliases, ['-alias'])
+        self.assertEquals(casadi_model.states[0].aliases, {'-alias'})
 
     def test_simplify_expand_vectors(self):
         # Create model, cache it, and load the cache
@@ -1493,7 +1493,7 @@ class GenCasadiTest(unittest.TestCase):
         a.add('a', '-b')
         a.add('b', 'c')
         a.add('d', '-b')
-        self.assertEqual(list(a), [('d', ['a', '-b', '-c'])])
+        self.assertEqual(list(a), [('d', {'a', '-b', '-c'})])
 
     def test_cat_params(self):
         casadi_model = transfer_model(MODEL_DIR, 'Concat', {'replace_constant_values': True})
