@@ -298,7 +298,7 @@ class Symbol(Node):
 
     def __init__(self, **kwargs):
         self.name = ''  # type: str
-        self.type = ComponentRef()  # type: ComponentRef
+        self.type = ComponentRef()  # type: Union[ComponentRef, InstanceClass]
         self.prefixes = []  # type: List[str]
         self.redeclare = False  # type: bool
         self.final = False  # type: bool
@@ -608,6 +608,18 @@ class InstanceClass(Class):
         super().__init__(*args, **kwargs)
         self.modification_environment = ClassModification()
 
+    def copy_including_children(self):
+        symbol_parents = {k: v.type.parent for k,v in self.symbols.items() if isinstance(v.type, InstanceClass)}
+        for k in symbol_parents.keys():
+            self.symbols[k].type.parent = None
+
+        new = super().copy_including_children()
+
+        for k, v in symbol_parents.items():
+            new.symbols[k].type.parent = v
+            self.symbols[k].type.parent = v
+
+        return new
 
 class Tree(Class):
     """
