@@ -1,0 +1,39 @@
+model A
+  Real x;
+end A;
+
+model B
+  A y;
+end B;
+
+model Test
+  model C
+    extends B;
+  end C;
+  // time needed for flattening of these symbols increased exponentially
+  C c_1;
+  C c_2;
+  C c_3;
+  C c_4;
+  C c_5;
+  C c_6;
+  C c_7;
+  C c_8;
+  C c_9;
+  C c_10;
+  C c_11;
+  C c_12;
+  C c_13;
+  C c_14;
+  C c_15;
+  C c_16;
+  C c_17;
+  C c_18;
+  C c_19;
+  C c_20;
+  C c_21;
+  C c_22;
+  C c_23;
+  C c_24;
+  C c_25;
+end Test;
