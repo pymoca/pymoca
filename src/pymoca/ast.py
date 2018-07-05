@@ -105,11 +105,17 @@ class Primary(Node):
         self.value = None  # type: Union[bool, float, int, str, type(None)]
         super().__init__(**kwargs)
 
+    def __str__(self):
+        return '{} value {}'.format(type(self).__name__, self.value)
+
 
 class Array(Node):
     def __init__(self, **kwargs):
         self.values = []  # type: List[Union[Expression, Primary, ComponentRef, Array]]
         super().__init__(**kwargs)
+
+    def __str__(self):
+        return '{} {}'.format(type(self).__name__, self.values)
 
 
 class Slice(Node):
@@ -118,6 +124,10 @@ class Slice(Node):
         self.stop = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef]
         self.step = Primary(value=1)  # type: Union[Expression, Primary, ComponentRef]
         super().__init__(**kwargs)
+
+    def __str__(self):
+        return '{} start: {}, stop: {}, step: {}'.format(
+            type(self).__name__, self.start, self.stop, self.step)
 
 
 class ComponentRef(Node):
@@ -319,6 +329,9 @@ class Symbol(Node):
         self.visibility = Visibility.PRIVATE  # type: Visibility
         self.class_modification = None  # type: ClassModification
         super().__init__(**kwargs)
+
+    def __str__(self):
+        return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
 
 
 class ComponentClause(Node):
@@ -596,6 +609,9 @@ class Class(Node):
         :param e: Equation to remove.
         """
         self.equations.remove(e)
+
+    def __str__(self):
+        return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
 
 
 class InstanceClass(Class):
