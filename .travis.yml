@@ -11,15 +11,7 @@ matrix:
       after_success:
         - tox -e coverage-report
         - coveralls
-    - os: osx
-      language: generic
-      python: "3.6"
-      before_install:
-        - brew update
-        - brew upgrade python3
-        - python3 -m venv venv
-        - source venv/bin/activate
-      env: TOXENV=py36
+    # TODO: Re-add testing on MacOS
 
     # Meta
     - os: linux
