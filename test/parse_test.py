@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import unittest
+import threading
 
 from pymoca import parser
 from pymoca import tree
@@ -51,6 +52,29 @@ class ParseTest(unittest.TestCase):
         print(flat_tree)
         print('AST TREE FLAT\n', flat_tree)
         self.flush()
+
+    def test_deep_copy_timeout(self):
+        with open(os.path.join(MODEL_DIR, 'DeepCopyTimeout.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        # Start a background thread which will run the flattening, such that
+        # we can kill it if takes to long.
+        # noinspection PyTypeChecker
+        thread = threading.Thread(target=tree.flatten, args=(ast_tree, ast.ComponentRef(name='Test'),))
+
+        # Daemon threads automatically stop when the program stops (and do not
+        # prevent the program from exiting)
+        thread.setDaemon(True)
+        thread.start()
+
+        # Use a timeout of 5 seconds. We check every 100 ms sec, such that the
+        # test is fast to succeed when everything works as expected.
+        for i in range(50):
+            time.sleep(0.1)
+            if not thread.isAlive():
+                return
+        self.assertFalse(thread.isAlive(), msg='Timeout occurred')
 
     def test_estimator(self):
         with open(os.path.join(MODEL_DIR, './Estimator.mo'), 'r') as f:
