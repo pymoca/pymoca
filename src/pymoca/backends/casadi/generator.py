@@ -108,10 +108,10 @@ class Generator(TreeListener):
         variables = []
         for ast_symbol in ast_symbols:
             mx_symbol = self.get_mx(ast_symbol)
+            modelica_shape = mx_symbol._modelica_shape
             if mx_symbol.is_empty():
                 continue
             if differentiate:
-                modelica_shape = mx_symbol._modelica_shape
                 mx_symbol = self.get_derivative(mx_symbol)
                 mx_symbol._modelica_shape = modelica_shape
             python_type = self.get_python_type(ast_symbol)
@@ -120,6 +120,11 @@ class Generator(TreeListener):
                 for a in ast.Symbol.ATTRIBUTES:
                     v = self.get_mx(getattr(ast_symbol, a))
                     if v is not None:
+                        if isinstance(v, ca.DM) and modelica_shape == (1,):
+                            # Scalar numeric type that behaves like an array.
+                            # Coerce to Pyhton type to avoid interpretation
+                            # issues.
+                            v = python_type(v)
                         setattr(variable, a, v)
                 variable.prefixes = ast_symbol.prefixes
             variables.append(variable)
