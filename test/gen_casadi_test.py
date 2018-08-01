@@ -637,11 +637,13 @@ class GenCasadiTest(unittest.TestCase):
         z = ca.MX.sym("z", 2)
         at3_delayed = ca.MX.sym("_pymoca_delay_0", 2)
         delay_time = ca.MX.sym("delay_time")
+        eps = ca.MX.sym("eps")
 
         ref_model.alg_states = list(map(Variable, [x, y]))
+        ref_model.parameters = list(map(Variable, [eps]))
         ref_model.inputs = list(map(Variable, [at3_delayed, z, delay_time]))
         ref_model.inputs[-1].fixed = True
-        ref_model.equations = [ca.horzcat(x - 5 * z, y - at3_delayed)]
+        ref_model.equations = [ca.horzcat(x - 5 * z * eps, y - at3_delayed)]
         ref_model.delay_states = [at3_delayed]
         ref_model.delay_arguments = [DelayArgument(3 * x, delay_time)]
 
@@ -666,12 +668,14 @@ class GenCasadiTest(unittest.TestCase):
         z = _array_mx("z", 2)
         at3_delayed = _array_mx("_pymoca_delay_0", 2)
         delay_time = ca.MX.sym("delay_time")
+        eps = _array_mx("eps", 1)
 
         ref_model.alg_states = list(map(Variable, [*x, *y, *a]))
+        ref_model.parameters = list(map(Variable, [*eps]))
         ref_model.inputs = list(map(Variable, [*at3_delayed, *z, delay_time]))
         ref_model.inputs[-1].fixed = True
         # TODO: "a" is not yet deteced as an alias of "x" when expanding.
-        ref_model.equations = [*(x - 5 * z), *(y - at3_delayed), *(a - x)]
+        ref_model.equations = [*(x - 5 * z * eps), *(y - at3_delayed), *(a - x)]
         ref_model.delay_states = [*at3_delayed]
         ref_model.delay_arguments = [DelayArgument(3 * a_i, delay_time) for a_i in a]
 

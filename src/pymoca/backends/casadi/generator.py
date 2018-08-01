@@ -401,9 +401,8 @@ class Generator(TreeListener):
                     assert set(ca.symvar(delay_symbol.expr)).issubset(delay_expr_args)
 
                     f_delay_expr = ca.Function('delay_expr', delay_expr_args, [delay_symbol.expr])
-                    f_delay_map = f_delay_expr.map("map", self.map_mode, len(f.values), list(
-                        range(len(args), len(all_args))), [])
-                    [res] = f_delay_map.call([f.values] + indexed_symbols_full + free_vars)
+                    f_delay_map = f_delay_expr.map("map", self.map_mode, len(f.values), [], [])
+                    [res] = f_delay_map.call([f.values] + indexed_symbols_full)
                     res = res.T
 
                     # Make the symbol with the appropriate size, and replace the old symbol with the new one.
