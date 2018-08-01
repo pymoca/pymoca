@@ -632,9 +632,9 @@ class GenCasadiTest(unittest.TestCase):
 
         ref_model = Model()
 
-        x = ca.MX.sym("x", 2)
-        y = ca.MX.sym("y", 2)
-        z = ca.MX.sym("z", 2)
+        x = ca.MX.sym("x", 3)
+        y = ca.MX.sym("y", 3)
+        z = ca.MX.sym("z", 3)
         at3_delayed = ca.MX.sym("_pymoca_delay_0", 2)
         delay_time = ca.MX.sym("delay_time")
         eps = ca.MX.sym("eps")
@@ -643,9 +643,9 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters = list(map(Variable, [eps]))
         ref_model.inputs = list(map(Variable, [at3_delayed, z, delay_time]))
         ref_model.inputs[-1].fixed = True
-        ref_model.equations = [ca.horzcat(x - 5 * z * eps, y - at3_delayed)]
+        ref_model.equations = [ca.horzcat(x[1:3] - 5 * z[1:3] * eps, y[1:3] - at3_delayed)]
         ref_model.delay_states = [at3_delayed]
-        ref_model.delay_arguments = [DelayArgument(3 * x, delay_time)]
+        ref_model.delay_arguments = [DelayArgument(3 * x[1:3], delay_time)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -662,10 +662,10 @@ class GenCasadiTest(unittest.TestCase):
         def _array_mx(name, n):
             return np.array([ca.MX.sym("{}[{}]".format(name, i+1)) for i in range(n)])
 
-        x = _array_mx("x", 2)
-        y = _array_mx("y", 2)
-        a = _array_mx("a", 2)
-        z = _array_mx("z", 2)
+        x = _array_mx("x", 3)
+        y = _array_mx("y", 3)
+        a = _array_mx("a", 3)
+        z = _array_mx("z", 3)
         at3_delayed = _array_mx("_pymoca_delay_0", 2)
         delay_time = ca.MX.sym("delay_time")
         eps = _array_mx("eps", 1)
@@ -674,10 +674,10 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.parameters = list(map(Variable, [*eps]))
         ref_model.inputs = list(map(Variable, [*at3_delayed, *z, delay_time]))
         ref_model.inputs[-1].fixed = True
-        # TODO: "a" is not yet deteced as an alias of "x" when expanding.
-        ref_model.equations = [*(x - 5 * z * eps), *(y - at3_delayed), *(a - x)]
+        # TODO: "a" is not yet detected as an alias of "x" when expanding.
+        ref_model.equations = [*(x[1:3] - 5 * z[1:3] * eps), *(y[1:3] - at3_delayed), *(a - x)]
         ref_model.delay_states = [*at3_delayed]
-        ref_model.delay_arguments = [DelayArgument(3 * a_i, delay_time) for a_i in a]
+        ref_model.delay_arguments = [DelayArgument(3 * a_i, delay_time) for a_i in a[1:3]]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 

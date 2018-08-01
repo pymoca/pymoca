@@ -398,6 +398,7 @@ class Generator(TreeListener):
             indexed_symbols_full = []
             for k in indexed_symbols:
                 s = f.indexed_symbols[k]
+                indices = s.indices
                 try:
                     i = self.model.delay_states.index(k.name())
                 except ValueError:
@@ -421,12 +422,14 @@ class Generator(TreeListener):
 
                     # Make the symbol with the appropriate size, and replace the old symbol with the new one.
                     orig_symbol = _new_mx(k.name(), *res.size())
+                    assert res.size1() == 1 or res.size2() == 1, "Slicing does not yet work with 2-D indices"
+                    indices = slice(None, None)
 
                     model_input = next(x for x in self.model.inputs if x.symbol.name() == k.name())
                     model_input.symbol = orig_symbol
                     self.model.delay_arguments[i] = DelayArgument(res, delay_symbol.duration)
 
-                indexed_symbol = orig_symbol[s.indices]
+                indexed_symbol = orig_symbol[indices]
                 if s.transpose:
                     indexed_symbol = ca.transpose(indexed_symbol)
                 indexed_symbols_full.append(indexed_symbol)

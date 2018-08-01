@@ -1,10 +1,10 @@
 model DelayForLoop
-  Real[2] x, y, a;
-  input Real z[2];
+  Real[3] x, y, a;
+  input Real z[3];
   input Real delay_time(fixed=true);
   parameter Real eps;
 equation
-  for i in 1:2 loop
+  for i in 2:3 loop
     x[i] = 5 * z[i] * eps;
     y[i] = delay(3 * a[i], delay_time);
   end for;
