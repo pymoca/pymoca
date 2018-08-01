@@ -6,7 +6,7 @@ model DelayForLoop
 equation
   for i in 2:3 loop
     x[i] = 5 * z[i] * eps;
-    y[i] = delay(3 * a[i], delay_time);
+    y[i] = delay(3 * a[i] * eps, delay_time);
   end for;
   a = x;
 end DelayForLoop;

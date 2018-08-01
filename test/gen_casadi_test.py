@@ -645,7 +645,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.inputs[-1].fixed = True
         ref_model.equations = [ca.horzcat(x[1:3] - 5 * z[1:3] * eps, y[1:3] - at3_delayed)]
         ref_model.delay_states = [at3_delayed]
-        ref_model.delay_arguments = [DelayArgument(3 * x[1:3], delay_time)]
+        ref_model.delay_arguments = [DelayArgument(3 * x[1:3] * eps, delay_time)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
@@ -677,7 +677,7 @@ class GenCasadiTest(unittest.TestCase):
         # TODO: "a" is not yet detected as an alias of "x" when expanding.
         ref_model.equations = [*(x[1:3] - 5 * z[1:3] * eps), *(y[1:3] - at3_delayed), *(a - x)]
         ref_model.delay_states = [*at3_delayed]
-        ref_model.delay_arguments = [DelayArgument(3 * a_i, delay_time) for a_i in a[1:3]]
+        ref_model.delay_arguments = [DelayArgument(3 * a_i * eps[0], delay_time) for a_i in a[1:3]]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
