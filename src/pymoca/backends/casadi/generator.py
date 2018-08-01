@@ -412,12 +412,13 @@ class Generator(TreeListener):
                     # expression should have been encountered before this
                     # iteration of the loop. The assert statement below covers
                     # this.
-                    delay_expr_args = all_args[:len(indexed_symbols_full)+1]
+                    delay_expr_args = free_vars + all_args[:len(indexed_symbols_full)+1]
                     assert set(ca.symvar(delay_symbol.expr)).issubset(delay_expr_args)
 
                     f_delay_expr = ca.Function('delay_expr', delay_expr_args, [delay_symbol.expr])
-                    f_delay_map = f_delay_expr.map("map", self.map_mode, len(f.values), [], [])
-                    [res] = f_delay_map.call([f.values] + indexed_symbols_full)
+                    f_delay_map = f_delay_expr.map("map", self.map_mode, len(f.values), list(
+                        range(len(free_vars))), [])
+                    [res] = f_delay_map.call(free_vars + [f.values] + indexed_symbols_full)
                     res = res.T
 
                     # Make the symbol with the appropriate size, and replace the old symbol with the new one.
