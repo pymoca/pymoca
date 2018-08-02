@@ -407,8 +407,6 @@ class ClassModificationArgument(Node):
         self.redeclare = False
         super().__init__(**kwargs)
 
-    # FIXME: This is not a pretty way of avoiding memory copies it. See #62
-    # for discussion.
     def __deepcopy__(self, memo):
         _scope, _deepcp = self.scope, self.__deepcopy__
         self.scope, self.__deepcopy__ = None, None
@@ -553,12 +551,7 @@ class Class(Node):
             return self.parent.root
 
     def copy_including_children(self):
-        _parent = self.parent
-        self.parent = None
-        new = copy.deepcopy(self)
-        self.parent = _parent
-        new.parent = _parent
-        return new
+        return copy.deepcopy(self)
 
     def add_class(self, c: 'Class') -> None:
         """
@@ -610,6 +603,18 @@ class Class(Node):
         """
         self.equations.remove(e)
 
+    def __deepcopy__(self, memo):
+        # Avoid copying the entire tree
+        if self.parent is not None and self.parent not in memo:
+            memo[id(self.parent)] = self.parent
+
+        _deepcp = self.__deepcopy__
+        self.__deepcopy__ = None
+        new = copy.deepcopy(self, memo)
+        self.__deepcopy__ = _deepcp
+        new.__deepcopy__ = _deepcp
+        return new
+
     def __str__(self):
         return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
 
@@ -624,18 +629,6 @@ class InstanceClass(Class):
         super().__init__(*args, **kwargs)
         self.modification_environment = ClassModification()
 
-    def copy_including_children(self):
-        symbol_parents = {k: v.type.parent for k,v in self.symbols.items() if isinstance(v.type, InstanceClass)}
-        for k in symbol_parents.keys():
-            self.symbols[k].type.parent = None
-
-        new = super().copy_including_children()
-
-        for k, v in symbol_parents.items():
-            new.symbols[k].type.parent = v
-            self.symbols[k].type.parent = v
-
-        return new
 
 class Tree(Class):
     """
