@@ -184,20 +184,6 @@ class Generator(TreeListener):
         if len(tree.statements) + len(tree.initial_statements) > 0:
             raise NotImplementedError('Statements are currently supported inside functions only')
 
-        # We do not support delayMax yet, so delay durations can only depend
-        # on constants, parameters and fixed inputs.
-        if self.model.delay_states:
-            delay_durations = ca.veccat(*(x.duration for x in self.model.delay_arguments))
-            disallowed_duration_symbols = ca.vertcat(self.model.time,
-                ca.veccat(*self.model._symbols(self.model.states)),
-                ca.veccat(*self.model._symbols(self.model.der_states)),
-                ca.veccat(*self.model._symbols(self.model.alg_states)),
-                ca.veccat(*(x.symbol for x in self.model.inputs if not x.fixed)))
-
-            if ca.depends_on(delay_durations, disallowed_duration_symbols):
-                raise ValueError(
-                    "Delay durations can only depend on parameters, constants and fixed inputs.")
-
         self.entered_classes.pop()
 
     def exitArray(self, tree):

@@ -107,6 +107,8 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     if compiler_options.get('verbose', False):
         model.check_balanced()
 
+    model._post_checks()
+
     return model
 
 def _codegen_model(model_folder: str, f: ca.Function, library_name: str):

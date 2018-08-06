@@ -99,6 +99,21 @@ class Model:
                 "Number of states is {}, number of equations is {}.".format(
                     n_states, n_equations))
 
+    def _post_checks(self):
+        # We do not support delayMax yet, so delay durations can only depend
+        # on constants, parameters and fixed inputs.
+        if self.delay_states:
+            delay_durations = ca.veccat(*(x.duration for x in self.delay_arguments))
+            disallowed_duration_symbols = ca.vertcat(self.time,
+                ca.veccat(*self._symbols(self.states)),
+                ca.veccat(*self._symbols(self.der_states)),
+                ca.veccat(*self._symbols(self.alg_states)),
+                ca.veccat(*(x.symbol for x in self.inputs if not x.fixed)))
+
+            if ca.depends_on(delay_durations, disallowed_duration_symbols):
+                raise ValueError(
+                    "Delay durations can only depend on parameters, constants and fixed inputs.")
+
     @staticmethod
     def _symbols(l):
         return [v.symbol for v in l]
