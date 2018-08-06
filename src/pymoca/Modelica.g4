@@ -79,7 +79,7 @@ composition :
     )*
     ( 'external' language_specification?
         external_function_call?
-        ext_annotation=annotation? ':')?
+        ext_annotation=annotation? ';')?
     (comp_annotation=annotation ';')?
     ;
 
