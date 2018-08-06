@@ -187,8 +187,8 @@ def serializedATN():
         buf.write("\u0124\u0126\5\30\r\2\u0125\u0124\3\2\2\2\u0125\u0126")
         buf.write("\3\2\2\2\u0126\u0128\3\2\2\2\u0127\u0129\5\u0098M\2\u0128")
         buf.write("\u0127\3\2\2\2\u0128\u0129\3\2\2\2\u0129\u012a\3\2\2\2")
-        buf.write("\u012a\u012c\7\24\2\2\u012b\u0120\3\2\2\2\u012b\u012c")
-        buf.write("\3\2\2\2\u012c\u0130\3\2\2\2\u012d\u012e\5\u0098M\2\u012e")
+        buf.write("\u012a\u012c\7\3\2\2\u012b\u0120\3\2\2\2\u012b\u012c\3")
+        buf.write("\2\2\2\u012c\u0130\3\2\2\2\u012d\u012e\5\u0098M\2\u012e")
         buf.write("\u012f\7\3\2\2\u012f\u0131\3\2\2\2\u0130\u012d\3\2\2\2")
         buf.write("\u0130\u0131\3\2\2\2\u0131\25\3\2\2\2\u0132\u0133\7[\2")
         buf.write("\2\u0133\27\3\2\2\2\u0134\u0135\5\u0080A\2\u0135\u0136")
@@ -1785,7 +1785,7 @@ class ModelicaParser ( Parser ):
 
 
                 self.state = 296
-                self.match(ModelicaParser.T__17)
+                self.match(ModelicaParser.T__0)
 
 
             self.state = 302
