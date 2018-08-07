@@ -297,7 +297,7 @@ class Generator(TreeListener):
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         else:
-            src = self.get_mx(tree.operands[0])
+            src = ca.MX(self.get_mx(tree.operands[0]))
             # Check for built-in operations, such as the
             # elementary functions, first.
             if hasattr(src, op) and n_operands <= 2:
