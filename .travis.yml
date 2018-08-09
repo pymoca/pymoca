@@ -8,6 +8,12 @@ matrix:
     - os: linux
       python: 3.6
       env: TOXENV=py36
+    - os: linux
+      python: 3.7
+      # FIXME: Workaround for Python 3.7 support on TravisCI
+      dist: xenial
+      sudo: true
+      env: TOXENV=py37
       after_success:
         - tox -e coverage-report
         - coveralls
@@ -15,6 +21,7 @@ matrix:
 
     # Meta
     - os: linux
+      # TODO: Use 3.7 when TravisCI has proper support for it
       python: 3.6
       env: TOXENV=flake8
 
@@ -24,6 +31,7 @@ matrix:
       install: true
       script: true
       os: linux
+      # TODO: Use 3.7 when TravisCI has proper support for it
       python: 3.6
       env: DEPLOY=true
 
