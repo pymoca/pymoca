@@ -1526,6 +1526,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(a_y.value, [[1, 2],
                                      [3, 4],
                                      [5, 6]])
+    # todo add additional test with slicing and nesting to test replacement of correct slice
 
     def test_skip_annotations(self):
         with open(os.path.join(MODEL_DIR, 'Annotations.mo'), 'r') as f:
@@ -1534,6 +1535,100 @@ class GenCasadiTest(unittest.TestCase):
 
         casadi_model = gen_casadi.generate(ast_tree, 'A')
 
+    def test_size_one_array(self):
+        txt = """
+            model Test
+                parameter Integer m = 2;
+                parameter Integer n = 1;
+                Real v[m];
+                Real w[n];
+                Real x[1];
+                Real y;
+                Real z[1,1];
+            equation
+                x[1] = y
+                w[1] = y
+                z[1,1] = v[2]
+            end Test;
+            """
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        casadi_model.simplify({'expand_vectors': True})
+        print(casadi_model)
+
+        ref_model = Model()
+        m = ca.MX.sym('m')
+        n = ca.MX.sym('n')
+        v1 = ca.MX.sym('v[1]')
+        v2 = ca.MX.sym('v[2]')
+        w1 = ca.MX.sym('w[1]')
+        x1 = ca.MX.sym('x[1]')
+        y = ca.MX.sym('y')
+        z11 = ca.MX.sym('z[1,1]')
+
+        ref_model.alg_states = list(map(Variable, [v1, v2, w1, x1, y, z11]))
+        ref_model.parameters = list(map(Variable, [m, n]))
+        ref_model.equations = [x1 - y,
+                               w1 - y,
+                               z11 - v2]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
+    def test_nested_2d_indices(self):
+        txt = """
+            model A
+                Real x[3];
+            end A;
+
+            model B
+                A a;
+            end B;
+
+            model C
+                B b[2];
+            end C;
+
+            model Test
+                C c;
+            equation
+                c.b[1].a.x[1] = 1
+            end Test;
+            """
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test', {'expand_vectors': True})
+        casadi_model.simplify({'expand_vectors': True})
+        i = 1
+        # todo it should be c.b[1].a.x[1] instead of c.b.a.x[1,1] etc.
+
+    def test_nested_3d_indices(self):
+        txt = """
+            model A
+                Real x[3][2];
+            end A;
+
+            model B
+                A a[3];
+            end B;
+
+            model C
+                B b;
+            end C;
+
+            model D
+                C c[2];
+            end D;
+
+            model Test
+                D d;
+            end Test;
+            """
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test', {'expand_vectors': True})
+        casadi_model.simplify({'expand_vectors': True})
+        i = 1
+        # todo it should be d.c[1].b.a[1].x[1] instead of d.c.b.a.x[1,1,1] etc.
+
+    # todo add nested case where a variable is 2d
 
 if __name__ == "__main__":
     unittest.main()

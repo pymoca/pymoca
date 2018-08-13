@@ -373,9 +373,12 @@ class Model:
                     # For delayed states we do not have any reliable shape
                     # information available due to it being an arbitrary
                     # expression, so we just always expand.
-                    if (old_var.symbol._modelica_shape != (1,) or old_var.symbol.name() in self.delay_states):
+                    if (old_var.symbol._modelica_shape != ((None,),) or old_var.symbol.name() in self.delay_states):
                         expanded_symbols = []
-                        for ind in np.ndindex(old_var.symbol._modelica_shape):
+                        modelica_shape = old_var.symbol._modelica_shape
+                        iterator_shape = tuple([d for var_shape in modelica_shape for d in var_shape if d is not None])
+                        for ind in np.ndindex(iterator_shape):
+                            # todo use None's in modelica_shape to insert the indices after the correct variable name instead
                             component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), ",".join(str(i+1) for i in ind)))
                             component_var = Variable(component_symbol, old_var.python_type)
                             for attribute in CASADI_ATTRIBUTES:

@@ -596,43 +596,53 @@ class Generator(TreeListener):
             return float
 
     def get_shape(self, tree):
-        return [self.get_integer(d) for d in tree.dimensions]
+        return [[self.get_integer(d) for d in d_list] for d_list in tree.dimensions]
 
     def get_symbol(self, tree):
         # Create symbol
         shape = self.get_shape(tree)
 
-        if any(isinstance(x, slice) for x in shape):
+        if any(isinstance(x, slice) for var_shape in shape for x in var_shape):
             # Symbol has unspecified dimensions. Value is specified, and
             # carries the correct dimensions.
 
             # We should only get slices as dimensions for a symbol if one of
             # the dimensions is unspecified, i.e. None.
-            assert None in itertools.chain.from_iterable((x.start, x.stop) for x in shape if isinstance(x, slice))
+            assert None in (itertools.chain.from_iterable((x.start, x.stop)
+                            for var_shape in shape for x in var_shape if isinstance(x, slice)))
 
             val_shape = np.array(self.src[tree.value]).shape
 
             # Check if specified dimensions agree between definition and value
-            for dim_i, dim_size in enumerate(shape):
-                if isinstance(dim_size, slice):
-                    continue
+            val_dim_i = -1
+            for var_i, var_shape in enumerate(shape):
+                for dim_i, dim_size in enumerate(var_shape):
+                    if dim_size is None:
+                        continue
 
-                if val_shape[dim_i] != dim_size:
-                    raise Exception("Dimension {} of definition and value for symbol {} differs: {} != {}".format(
-                        dim_i + 1, tree.name, dim_size, val_shape[dim_i]))
+                    val_dim_i += 1
+                    if isinstance(dim_size, slice):
+                        shape[var_i][dim_i] = val_shape[val_dim_i]
+                        continue
 
-            shape = val_shape
+                    if val_shape[val_dim_i] != dim_size:
+                        raise Exception("Dimension {} of definition and value for symbol {} "
+                                        "differs: {} != {}"
+                                        .format(val_dim_i + 1, tree.name, dim_size,
+                                                val_shape[val_dim_i]))
 
-        if len(shape) > 2:
+        tensor_shape = [d for var_shape in shape for d in var_shape if d is not None]
+        if len(tensor_shape) > 2:
             # MX does not support this, so we have to use our own wrapper.
             if not self._expand_vectors_enabled:
                 raise NotImplementedError("Cannot handle 3D+ arrays without setting 'expand_vectors'")
-            s = _MTensor(tree.name, *shape)
+            s = _MTensor(tree.name, *tensor_shape)
         else:
-            s = _new_mx(tree.name, *shape)
+            s = _new_mx(tree.name, *tensor_shape)
 
-        # Make a notion of the original shape, as MX is always 2D (even for 1D symbols).
-        s._modelica_shape = tuple(shape)
+        # Make a notion of the original shape, as MX is always 2D (even for 1D symbols),
+        # and for nested classes we want to remember at which symbols to place indices.
+        s._modelica_shape = tuple([tuple(var_shape) for var_shape in shape])
 
         self.nodes[self.current_class][tree.name] = s
         return s
