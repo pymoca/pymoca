@@ -314,7 +314,7 @@ class Symbol(Node):
         self.final = False  # type: bool
         self.inner = False  # type: bool
         self.outer = False  # type: bool
-        self.dimensions = [Primary(value=1)]  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.dimensions = [Primary(value=None)]  # type: List[Union[Expression, Primary, ComponentRef]]
         self.comment = ''  # type: str
         # params start value is 0 by default from Modelica spec
         self.start = Primary(value=0)  # type: Union[Expression, Primary, ComponentRef, Array]
@@ -338,7 +338,7 @@ class ComponentClause(Node):
     def __init__(self, **kwargs):
         self.prefixes = []  # type: List[str]
         self.type = ComponentRef()  # type: ComponentRef
-        self.dimensions = [Primary(value=1)]  # type: List[Union[Expression, Primary, ComponentRef]]
+        self.dimensions = [Primary(value=None)]  # type: List[Union[Expression, Primary, ComponentRef]]
         self.comment = []  # type: List[str]
         self.symbol_list = []  # type: List[Symbol]
         super().__init__(**kwargs)
