@@ -27,7 +27,8 @@ class GenCasadiTest(unittest.TestCase):
     def assert_model_equivalent(self, A, B):
         def sstr(a): return set([str(e) for e in a])
 
-        for l in ["states", "der_states", "inputs", "outputs", "constants", "parameters"]:
+        for l in ["alg_states", "states", "der_states", "inputs", "outputs", "constants",
+                  "parameters"]:
             self.assertEqual(sstr(getattr(A, l)), sstr(getattr(B, l)))
 
     def assert_model_equivalent_numeric(self, A, B, tol=1e-9):
