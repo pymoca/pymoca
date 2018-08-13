@@ -1526,7 +1526,32 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(a_y.value, [[1, 2],
                                      [3, 4],
                                      [5, 6]])
-    # todo add additional test with slicing and nesting to test replacement of correct slice
+
+    def test_wrong_unspecified_dimensions(self):
+        txt = """
+            model A
+              parameter Real x[:, :];
+              parameter Real y[:, 4];
+            end A;
+
+            model B
+              A a(x = {{ 88.3224,   281.642,  143.011},
+                       { 58.8183,  -24.9845,      0.0},
+                       {-1.45483,       0.0,      0.0}},
+                  y = {{ 88.3224,   281.642,  143.011},
+                       { 58.8183,  -24.9845,      0.0},
+                       {-1.45483,       0.0,      0.0}});
+            end B;"""
+
+        ast_tree = parser.parse(txt)
+        try:
+            casadi_model = gen_casadi.generate(ast_tree, 'B')
+        except Exception as e:
+            assert e.args[0] == 'Dimension 2 of definition and ' \
+                                'value for symbol a.y differs: 4 != 3'
+            return
+
+        assert False, "No exception raised on wrong dimensionality."
 
     def test_skip_annotations(self):
         with open(os.path.join(MODEL_DIR, 'Annotations.mo'), 'r') as f:
