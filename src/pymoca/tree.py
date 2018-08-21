@@ -511,6 +511,13 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
 
             # carry class dimensions over to symbols
             for flat_class_symbol in flat_sub_class.symbols.values():
+                if hasattr(flat_class_symbol, '_orig_dimensions'):
+                    setattr(flat_class_symbol, '_orig_dimensions',
+                            [flat_sym.dimensions, *flat_class_symbol._orig_dimensions])
+                else:
+                    setattr(flat_class_symbol, '_orig_dimensions',
+                            [flat_sym.dimensions.copy(), flat_class_symbol.dimensions.copy()])
+
                 if len(flat_class_symbol.dimensions) == 1 \
                         and isinstance(flat_class_symbol.dimensions[0], ast.Primary) \
                         and flat_class_symbol.dimensions[0].value == 1:
@@ -637,13 +644,70 @@ class ComponentRefFlattener(TreeListener):
         # Only when modifications have been applied, will they be picked up
         # below.
         if new_name in self.container.symbols and self.inside_modification == 0:
+            all_indices = [tree.indices.copy()]
+            if not all_indices[0]:
+                all_indices[0] = None
+
             tree.name = new_name
             c = tree
             while len(c.child) > 0:
                 c = c.child[0]
                 if len(c.indices) > 0:
+                    all_indices.append(c.indices)
                     tree.indices += c.indices
+                else:
+                    all_indices.append(None)
+
+            s = self.container.symbols[new_name]
+
+            def is_scalar_dim(dim):
+                return (len(dim) == 1
+                        and isinstance(dim[0], ast.Primary)
+                        and isinstance(dim[0].value, int))
+
             tree.child = []
+
+            if not hasattr(s, '_orig_dimensions'):
+                # Non-nested symbol
+                setattr(s, '_orig_dimensions', [s.dimensions])
+
+            # Check if the last symbol is an array reference without indices.
+            # If it is, we will append indices as to slice it.
+            # Example: a[1].x becomes a[1].x[:]
+            if all_indices[-1] is None:
+                if not is_scalar_dim(s._orig_dimensions[-1]):
+                    all_indices[-1] = [
+                        ast.Slice() for x in range(len(s._orig_dimensions[-1]))]
+                    tree.indices += all_indices[-1]
+
+            # If we are checking a parameter or constant, we assume that only
+            # the last indices matter. That is the way the backends currently
+            # handle it.
+            if 'parameter' in s.prefixes or 'constant' in s.prefixes:
+                check_indices = all_indices[-1:]
+                check_dimensions = s._orig_dimensions[-1:]
+                offs = len(s._orig_dimensions)
+            else:
+                check_indices = all_indices
+                check_dimensions = s._orig_dimensions
+                offs = 1
+
+            # Check that all symbols are properly indexed
+            assert len(check_indices) == len(check_dimensions)
+            for i, (a, b) in enumerate(zip(check_indices, check_dimensions)):
+                if is_scalar_dim(b):
+                    # Symbol is of scalar type
+                    if a is not None:
+                        component_name = ".".join(tree.name.split('.')[:i+offs])
+                        raise IndexError("Tried to index scalar symbol '{}'".format(
+                            component_name))
+                else:
+                    # Symbol is array type
+                    if a is None or len(b) != len(a):
+                        component_name = ".".join(tree.name.split('.')[:i+offs])
+                        raise IndexError("Symbol '{}' has {} dimension(s), not {}.".format(
+                            component_name, len(b), 0 if a is None else len(a)))
+
         else:
             # The component was not found in the container.  We leave this
             # reference alone.

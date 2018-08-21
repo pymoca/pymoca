@@ -466,6 +466,19 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_check_equation_shape(self):
+        txt = """
+            model ArrayAssignment
+                Real a[2, 3];
+            equation
+                a[2, :] = 1;
+            end ArrayAssignment;
+            """
+        ast_tree = parser.parse(txt)
+
+        with self.assertRaisesRegexp(ValueError, "shape mismatch"):
+            casadi_model = gen_casadi.generate(ast_tree, 'ArrayAssignment')
+
     @unittest.skip
     def test_double_function_call(self):
         with open(os.path.join(MODEL_DIR, 'DoubleFunctionCall.mo'), 'r') as f:
