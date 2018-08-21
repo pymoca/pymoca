@@ -375,11 +375,43 @@ class Model:
                     # expression, so we just always expand.
                     if (old_var.symbol._modelica_shape != ((None,),) or old_var.symbol.name() in self.delay_states):
                         expanded_symbols = []
-                        modelica_shape = old_var.symbol._modelica_shape
-                        iterator_shape = tuple([d for var_shape in modelica_shape for d in var_shape if d is not None])
+
+                        # Prepare a component_name_format in which the different possible
+                        # combinations of indices can later be inserted.
+                        # For example: a.b[{}].c[{},{}]
+                        if old_var.symbol.name() in self.delay_states:
+                            # For delay states we use the _modelica_shape as is
+                            iterator_shape = old_var.symbol._modelica_shape
+                            component_name_format = \
+                                old_var.symbol.name() + '[' + \
+                                ','.join('{}' for _ in range(len(iterator_shape))) + ']'
+                        else:
+                            # For (nested) array symbols the _modelica_shape contains a tuple of
+                            # tuples containing the shape for each of the nested symbols.
+                            # For example, symbol name a.b.c and shape ((None,),(3,),(1,3)) means
+                            # a was a scalar, b a 1d array of size [3] and c a 2d array of size
+                            # [1,3].
+                            modelica_shape = old_var.symbol._modelica_shape
+                            symbol_names = old_var.symbol.name().split('.')
+                            assert len(symbol_names) == len(modelica_shape)
+                            component_name_format = ''
+                            for i, symbol_name in enumerate(symbol_names):
+                                if i != 0:
+                                    component_name_format += '.'
+                                component_name_format += symbol_name
+                                if modelica_shape[i] != (None,):
+                                    component_name_format += \
+                                        '[' + \
+                                        ','.join('{}' for _ in range(len(modelica_shape[i]))) + \
+                                        ']'
+
+                            iterator_shape = tuple([d for var_shape in modelica_shape
+                                                    for d in var_shape if d is not None])
+
+                        # Generate symbols for each possible combination of indices
                         for ind in np.ndindex(iterator_shape):
-                            # todo use None's in modelica_shape to insert the indices after the correct variable name instead
-                            component_symbol = ca.MX.sym('{}[{}]'.format(old_var.symbol.name(), ",".join(str(i+1) for i in ind)))
+                            component_symbol = ca.MX.sym(component_name_format
+                                                         .format(*tuple(i + 1 for i in ind)))
                             component_var = Variable(component_symbol, old_var.python_type)
                             for attribute in CASADI_ATTRIBUTES:
                                 # Can't convert 3D arrays to MX, so we convert to nparray instead
