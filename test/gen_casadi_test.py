@@ -1599,7 +1599,7 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
-    def test_nested_2d_indices(self):
+    def test_nested_indices_simple(self):
         txt = """
             model A
                 Real x[3];
@@ -1617,22 +1617,37 @@ class GenCasadiTest(unittest.TestCase):
                 C c;
             equation
                 c.b[1].a.x[1] = 1
+                c.b[2].a.x[3] = 2
             end Test;
             """
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Test', {'expand_vectors': True})
         casadi_model.simplify({'expand_vectors': True})
-        i = 1
-        # todo it should be c.b[1].a.x[1] instead of c.b.a.x[1,1] etc.
+        print(casadi_model)
 
-    def test_nested_3d_indices(self):
+        ref_model = Model()
+        c11 = ca.MX.sym('c.b[1].a.x[1]')
+        c12 = ca.MX.sym('c.b[1].a.x[2]')
+        c13 = ca.MX.sym('c.b[1].a.x[3]')
+        c21 = ca.MX.sym('c.b[2].a.x[1]')
+        c22 = ca.MX.sym('c.b[2].a.x[2]')
+        c23 = ca.MX.sym('c.b[2].a.x[3]')
+
+        ref_model.alg_states = list(map(Variable, [c11, c12, c13, c21, c22, c23]))
+        ref_model.equations = [c11 - 1,
+                               c23 - 2]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_nested_indices_hard(self):
         txt = """
             model A
-                Real x[3][2];
+                Real x[1,2];
             end A;
 
             model B
-                A a[3];
+                A a[3,1];
             end B;
 
             model C
@@ -1650,10 +1665,28 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, 'Test', {'expand_vectors': True})
         casadi_model.simplify({'expand_vectors': True})
-        i = 1
-        # todo it should be d.c[1].b.a[1].x[1] instead of d.c.b.a.x[1,1,1] etc.
+        print(casadi_model)
 
-    # todo add nested case where a variable is 2d
+        ref_model = Model()
+        c11111 = ca.MX.sym('d.c[1].b.a[1,1].x[1,1]')
+        c11112 = ca.MX.sym('d.c[1].b.a[1,1].x[1,2]')
+        c12111 = ca.MX.sym('d.c[1].b.a[2,1].x[1,1]')
+        c12112 = ca.MX.sym('d.c[1].b.a[2,1].x[1,2]')
+        c13111 = ca.MX.sym('d.c[1].b.a[3,1].x[1,1]')
+        c13112 = ca.MX.sym('d.c[1].b.a[3,1].x[1,2]')
+        c21111 = ca.MX.sym('d.c[2].b.a[1,1].x[1,1]')
+        c21112 = ca.MX.sym('d.c[2].b.a[1,1].x[1,2]')
+        c22111 = ca.MX.sym('d.c[2].b.a[2,1].x[1,1]')
+        c22112 = ca.MX.sym('d.c[2].b.a[2,1].x[1,2]')
+        c23111 = ca.MX.sym('d.c[2].b.a[3,1].x[1,1]')
+        c23112 = ca.MX.sym('d.c[2].b.a[3,1].x[1,2]')
+
+        ref_model.alg_states = list(map(Variable,
+                    [c11111, c11112, c12111, c12112, c13111, c13112,
+                     c21111, c21112, c22111, c22112, c23111, c23112]))
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
 
 if __name__ == "__main__":
     unittest.main()
