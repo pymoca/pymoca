@@ -444,7 +444,7 @@ class ASTListener(ModelicaListener):
     def exitType_specifier_element(self, ctx: ModelicaParser.Type_specifier_elementContext):
         self.ast[ctx] = ast.ComponentRef(
             name=ctx.IDENT().getText(),
-            indices=[],
+            indices=[[None]],
             child=[]
         )
 
@@ -456,9 +456,9 @@ class ASTListener(ModelicaListener):
 
     def exitComponent_reference_element(self, ctx: ModelicaParser.Component_reference_elementContext):
         if ctx.array_subscripts() is not None:
-            indices = [self.ast[x] for x in ctx.array_subscripts().subscript()]
+            indices = [[self.ast[x] for x in ctx.array_subscripts().subscript()]]
         else:
-            indices = []
+            indices = [[None]]
         self.ast[ctx] = ast.ComponentRef(
             name=ctx.IDENT().getText(),
             indices=indices,

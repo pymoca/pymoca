@@ -133,7 +133,7 @@ class Slice(Node):
 class ComponentRef(Node):
     def __init__(self, **kwargs):
         self.name = ''  # type: str
-        self.indices = []  # type: List[Union[Expression, Slice, Primary, ComponentRef]]
+        self.indices = [[None]]  # type: List[List[Union[Expression, Slice, Primary, ComponentRef]]]
         self.child = []  # type: List[ComponentRef]
         super().__init__(**kwargs)
 

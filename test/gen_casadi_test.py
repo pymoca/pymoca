@@ -1687,6 +1687,65 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_assigning_without_index(self):
+        txt = """
+            model Test
+                Real x[3];
+                Real y[3]
+            equation
+                x = {4, 5, 6}; //this should be equivalent to x[:] = {1, 2, 3}
+                y[:] = {3, 2, 1};
+            end Test;"""
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test', {'expand_vectors': True})
+        casadi_model.simplify({'expand_vectors': True})
+        print(casadi_model)
+
+        ref_model = Model()
+        x1 = ca.MX.sym('x[1]')
+        x2 = ca.MX.sym('x[2]')
+        x3 = ca.MX.sym('x[3]')
+        y1 = ca.MX.sym('y[1]')
+        y2 = ca.MX.sym('y[2]')
+        y3 = ca.MX.sym('y[3]')
+
+        ref_model.alg_states = list(map(Variable, [x1, x2, x3, y1, y2, y3]))
+        ref_model.equations = [x1 - 4, x2 - 5, x3 - 6, y1 - 3, y2 - 2, y3 - 1]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_assigning_without_index_nested(self):
+        txt = """
+            model A
+                Real x[3];
+            end A;
+
+            model Test
+                A a[2];
+            equation
+                a[1].x[:] = {4, 5, 6};
+                a[2].x = {3, 2, 1}; //this should be equivalent to a[2].x[:] = {3, 2, 1}
+            end Test;"""
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        casadi_model.simplify({'expand_vectors': True})
+        print(casadi_model)
+
+        ref_model = Model()
+        v11 = ca.MX.sym('a[1].x[1]')
+        v12 = ca.MX.sym('a[1].x[2]')
+        v13 = ca.MX.sym('a[1].x[3]')
+        v21 = ca.MX.sym('a[2].x[1]')
+        v22 = ca.MX.sym('a[2].x[2]')
+        v23 = ca.MX.sym('a[2].x[3]')
+
+        ref_model.alg_states = list(map(Variable, [v11, v12, v13, v21, v22, v23]))
+        ref_model.equations = [v11 - 4, v12 - 5, v13 - 6, v21 - 3, v22 - 2, v23 - 1]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
 
 if __name__ == "__main__":
     unittest.main()

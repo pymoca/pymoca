@@ -368,7 +368,7 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
             sym_mod = ast.ClassModification()
 
             for arg in sym_arguments:
-                if arg.value.component.indices:
+                if arg.value.component.indices != [[None]]:
                     raise Exception("Subscripting modifiers is not allowed.")
                 for el_arg in arg.value.modifications:
                     # Behavior is different depending on whether the value is
@@ -412,7 +412,7 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
             inheriting_from_builtin = extends_builtin(c)
             sym_mod = ast.ClassModification()
             for arg in sym_arguments:
-                if arg.value.component.indices:
+                if arg.value.component.indices != [[None]]:
                     raise Exception("Subscripting modifiers is not allowed.")
 
                 if inheriting_from_builtin:
@@ -635,8 +635,7 @@ class ComponentRefFlattener(TreeListener):
             c = tree
             while len(c.child) > 0:
                 c = c.child[0]
-                if len(c.indices) > 0:
-                    tree.indices += c.indices
+                tree.indices += c.indices
             tree.child = []
         else:
             # The component was not found in the container.  We leave this
@@ -906,15 +905,25 @@ def expand_connectors(node: ast.Class) -> None:
                 for connector_variable in flat_class_left.symbols.values():
                     left_name = equation.left.name + CLASS_SEPARATOR + connector_variable.name
                     right_name = equation.right.name + CLASS_SEPARATOR + connector_variable.name
-                    left = ast.ComponentRef(name=left_name, indices=equation.left.indices)
-                    right = ast.ComponentRef(name=right_name, indices=equation.right.indices)
+                    left = ast.ComponentRef(name=left_name,
+                                            indices=equation.left.indices
+                                                    + connector_variable.type.indices)
+                    right = ast.ComponentRef(name=right_name,
+                                             indices=equation.right.indices
+                                                     + connector_variable.type.indices)
                     if len(connector_variable.prefixes) == 0 or connector_variable.prefixes[0] in ['input', 'output']:
                         connect_equation = ast.Equation(left=left, right=right)
                         node.equations.append(connect_equation)
                     elif connector_variable.prefixes == ['flow']:
                         # TODO generic way to get a tuple representation of a component ref, including indices.
-                        left_key = (left_name, tuple(i.value for i in left.indices), equation.__left_inner)
-                        right_key = (right_name, tuple(i.value for i in right.indices), equation.__right_inner)
+                        left_key = (left_name,
+                                    tuple(i.value for index_array in left.indices
+                                          for i in index_array if i is not None),
+                                    equation.__left_inner)
+                        right_key = (right_name,
+                                     tuple(i.value for index_array in right.indices
+                                           for i in index_array if i is not None),
+                                     equation.__right_inner)
 
                         left_connected_variables = flow_connections.get(left_key, OrderedDict())
                         right_connected_variables = flow_connections.get(right_key, OrderedDict())
