@@ -120,7 +120,7 @@ class Generator(TreeListener):
                 for a in ast.Symbol.ATTRIBUTES:
                     v = self.get_mx(getattr(ast_symbol, a))
                     if v is not None:
-                        if isinstance(v, ca.DM) and modelica_shape == (1,):
+                        if isinstance(v, ca.DM) and modelica_shape == ((None,),):
                             # Scalar numeric type that behaves like an array.
                             # Coerce to Pyhton type to avoid interpretation
                             # issues.
