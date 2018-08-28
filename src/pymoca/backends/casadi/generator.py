@@ -667,6 +667,12 @@ class Generator(TreeListener):
                         return 0
                 else:
                     der_s = _new_mx("der({})".format(s.name()), s.size())
+                    # If the derivative contains an expression (e.g. der(x + y)) this method is
+                    # called with MX variables that are the result of a ca.symvar call. This
+                    # ca.symvar call strips the _modelica_shape field from the MX variable,
+                    # therefore we need to find the original MX to get the modelica shape.
+                    der_s._modelica_shape = \
+                        self.nodes[self.current_class][s.name()]._modelica_shape
                     self.derivative[s.name()] = der_s
                     self.nodes[self.current_class][der_s.name()] = der_s
                     return der_s
@@ -696,31 +702,40 @@ class Generator(TreeListener):
             return ca.mtimes(J(deps), ca.vertcat(*der_deps))
 
     def get_indexed_symbol(self, tree, s):
+        assert len(s._modelica_shape) == len(tree.indices)
         # Check whether we loop over an index of this symbol
         indices = []
         for_loop = None
-        for index in tree.indices:
-            sl = None
+        for index_array, shape in zip(tree.indices, s._modelica_shape):
+            for index, dim in zip(index_array, shape):
+                if index is None and dim is None:
+                    continue
 
-            if isinstance(index, ast.ComponentRef):
-                for f in self.for_loops:
-                    if index.name == f.name:
-                        # TODO support nested loops
-                        for_loop = f
-                        sl = for_loop.index_variable
+                sl = None
 
-            if sl is None:
-                sl = self.get_integer(index)
-                if isinstance(sl, int):
-                    # Modelica indexing starts from one;  Python from zero.
-                    sl = sl - 1
-                elif isinstance(sl, slice):
-                    # Modelica indexing starts from one;  Python from zero.
-                    sl = slice(None if sl.start is None else sl.start - 1, sl.stop, sl.step)
-                else:
-                    for_loop = self.for_loops[-1]
+                if isinstance(index, ast.ComponentRef):
+                    for f in self.for_loops:
+                        if index.name == f.name:
+                            # TODO support nested loops
+                            for_loop = f
+                            sl = for_loop.index_variable
 
-            indices.append(sl)
+                if sl is None:
+                    sl = self.get_integer(index) if index is not None else None
+
+                    # todo check if sl <= dim? (might be caught earlier), if so, make error message useful
+                    if sl is None and dim is not None:
+                        sl = slice(None, None, 1)
+                    elif isinstance(sl, int):
+                        # Modelica indexing starts from one;  Python from zero.
+                        sl = sl - 1
+                    elif isinstance(sl, slice):
+                        # Modelica indexing starts from one;  Python from zero.
+                        sl = slice(None if sl.start is None else sl.start - 1, sl.stop, sl.step)
+                    else:
+                        for_loop = self.for_loops[-1]
+
+                indices.append(sl)
 
         assert len(indices) <= 2, "Dimensions higher than two are not yet supported"
 
@@ -763,7 +778,8 @@ class Generator(TreeListener):
         # Check ordinary symbols
         symbol = self.current_class.symbols[tree.name]
         s = self.get_mx(symbol)
-        if len(tree.indices) > 0:
+        if len([index for index_array in tree.indices
+                for index in index_array if index is not None]) > 0:
             s = self.get_indexed_symbol(tree, s)
         return s
 
