@@ -71,6 +71,7 @@ class Model:
         self.time = ca.MX.sym('time')
         self.delay_states = []
         self.delay_arguments = []
+        self.alias_relation = AliasRelation()
         self._expand_mx_func = lambda x: x
 
     def __str__(self):
@@ -537,8 +538,6 @@ class Model:
             all_states.update(inputs)
             all_states.update(parameters)
 
-            alias_rel = AliasRelation()
-
             # For now, we only eliminate algebraic states.
             do_not_eliminate = set(list(der_states) + list(states) + list(inputs) + list(parameters))
 
@@ -564,23 +563,23 @@ class Model:
                             # states in the default order will cause the new canonical variable
                             # to be other_state, unseating (and eliminating) the current
                             # canonical variable (which is in do_not_eliminate).
-                            if alias_rel.canonical_signed(alg_state.name())[0] in do_not_eliminate:
+                            if self.alias_relation.canonical_signed(alg_state.name())[0] in do_not_eliminate:
                                 # swap the states
                                 other_state, alg_state = alg_state, other_state
 
                         if alg_state is not None:
                             # Check to see if we are linking two entries in do_not_eliminate
-                            if alias_rel.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
-                               alias_rel.canonical_signed(other_state.name())[0] in do_not_eliminate:
+                            if self.alias_relation.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
+                               self.alias_relation.canonical_signed(other_state.name())[0] in do_not_eliminate:
                                 # Don't do anything for now, we only eliminate alg_states
                                 pass
 
                             else:
                                 # Eliminate alg_state by aliasing it to other_state
                                 if eq.is_op(ca.OP_SUB):
-                                    alias_rel.add(other_state.name(), alg_state.name())
+                                    self.alias_relation.add(other_state.name(), alg_state.name())
                                 else:
-                                    alias_rel.add(other_state.name(), '-' + alg_state.name())
+                                    self.alias_relation.add(other_state.name(), '-' + alg_state.name())
 
                                 # To keep equations balanced, drop this equation
                                 continue
@@ -590,7 +589,7 @@ class Model:
 
             # Eliminate alias variables
             variables, values = [], []
-            for canonical, aliases in alias_rel:
+            for canonical, aliases in self.alias_relation:
                 canonical_state = all_states[canonical]
 
                 python_type = canonical_state.python_type
