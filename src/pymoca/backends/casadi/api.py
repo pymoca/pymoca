@@ -13,6 +13,7 @@ import contextlib
 
 from pymoca import parser, tree, ast, __version__
 from . import generator
+from .alias_relation import AliasRelation
 from .model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
 
 logger = logging.getLogger("pymoca")
@@ -31,6 +32,7 @@ class CachedModel(Model):
         self.time = ca.MX.sym('time')
         self.delay_states = []
         self.delay_arguments = []
+        self.alias_relation = AliasRelation()
 
         self._dae_residual_function = None
         self._initial_residual_function = None
@@ -236,6 +238,8 @@ def save_model(model_folder: str, model_name: str, model: Model,
 
         db['delay_states'] = model.delay_states
 
+        db['alias_relation'] = model.alias_relation
+
         pickle.dump(db, f)
 
 def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]) -> CachedModel:
@@ -311,6 +315,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         model.der_states = [Variable.from_dict(d) for d in db['der_states']]
         model.outputs = db['outputs']
         model.delay_states = db['delay_states']
+        model.alias_relation = db['alias_relation']
 
         # Evaluate variable metadata:
         parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
