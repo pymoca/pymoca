@@ -1746,6 +1746,62 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent(ref_model, casadi_model)
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_indexing_error(self):
+        txt = """
+                model Test
+                    Real x[3];
+                equation
+                    x[4] = 1;
+                end Test;"""
+
+        ast_tree = parser.parse(txt)
+        try:
+            casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        except Exception as e:
+            assert e.args[0] == 'Index 4 of symbol x is out of bounds. Index should be in range ' \
+                                '[1,3] (Modelica uses 1-based indexing).'
+            return
+        assert false
+
+    def test_1based_indexing_error(self):
+        txt = """
+                        model Test
+                            Real x[3];
+                        equation
+                            x[0] = 1;
+                        end Test;"""
+
+        ast_tree = parser.parse(txt)
+        try:
+            casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        except Exception as e:
+            assert e.args[0] == 'Index 0 of symbol x is out of bounds. Index should be in range ' \
+                                '[1,3] (Modelica uses 1-based indexing).'
+            return
+        assert false
+
+    def test_nested_indexing_error(self):
+        txt = """
+            model A
+                Real x[3];
+            end A;
+
+            model Test
+                A a[2];
+            equation
+                a[1].x[3] = 3;
+                a[1].x[4] = 4;
+            end Test;"""
+
+        ast_tree = parser.parse(txt)
+        try:
+            casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        except Exception as e:
+            assert e.args[0] == 'Index 4 of symbol x in nested symbol a.x is out of bounds. ' \
+                                'Index should be in range [1,3] (Modelica uses 1-based indexing).'
+            return
+        assert false
+
 
 if __name__ == "__main__":
     unittest.main()

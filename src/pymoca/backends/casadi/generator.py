@@ -706,7 +706,7 @@ class Generator(TreeListener):
         # Check whether we loop over an index of this symbol
         indices = []
         for_loop = None
-        for index_array, shape in zip(tree.indices, s._modelica_shape):
+        for i, (index_array, shape) in enumerate(zip(tree.indices, s._modelica_shape)):
             for index, dim in zip(index_array, shape):
                 if index is None and dim is None:
                     continue
@@ -723,11 +723,17 @@ class Generator(TreeListener):
                 if sl is None:
                     sl = self.get_integer(index) if index is not None else None
 
-                    # todo check if sl <= dim? (might be caught earlier), if so, make error message useful
                     if sl is None and dim is not None:
                         sl = slice(None, None, 1)
                     elif isinstance(sl, int):
                         # Modelica indexing starts from one;  Python from zero.
+                        if sl <= 0 or sl > dim:
+                            symbol_name = s.name() if len(tree.indices) == 1 \
+                                else s.name().split('.')[i] + ' in nested symbol ' + s.name()
+                            raise ValueError("Index {} of symbol {} is out of bounds. "
+                                             "Index should be in range [1,{}] "
+                                             "(Modelica uses 1-based indexing)."
+                                             .format(sl, symbol_name, dim))
                         sl = sl - 1
                     elif isinstance(sl, slice):
                         # Modelica indexing starts from one;  Python from zero.
