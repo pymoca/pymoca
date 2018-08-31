@@ -240,7 +240,7 @@ def save_model(model_folder: str, model_name: str, model: Model,
 
         db['alias_relation'] = model.alias_relation
 
-        pickle.dump(db, f)
+        pickle.dump(db, f, protocol=-1)
 
 def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]) -> CachedModel:
     """
