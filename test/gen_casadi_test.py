@@ -1746,6 +1746,137 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent(ref_model, casadi_model)
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_nested_equations_indexing(self):
+        txt = """
+            model A
+                Real x[3];
+                Real y[3];
+            equation
+                x = {4, 5, 6};
+                y[:] = {3, 2, 1};
+            end A;
+
+            model Test
+                A a[1];
+            end Test;"""
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        casadi_model.simplify({'expand_vectors': True})
+        print(casadi_model)
+
+        ref_model = Model()
+        ax1 = ca.MX.sym('a[1].x[1]')
+        ax2 = ca.MX.sym('a[1].x[2]')
+        ax3 = ca.MX.sym('a[1].x[3]')
+        ay1 = ca.MX.sym('a[1].y[1]')
+        ay2 = ca.MX.sym('a[1].y[2]')
+        ay3 = ca.MX.sym('a[1].y[3]')
+
+        ref_model.alg_states = list(map(Variable, [ax1, ax2, ax3, ay1, ay2, ay3]))
+        ref_model.equations = [ax1 - 4, ax2 - 5, ax3 - 6, ay1 - 3, ay2 - 2, ay3 - 1]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_nested_equations_indexing_hard_2d(self):
+        txt = """
+            model A
+                Real x[3];
+            end A;
+
+            model B
+                A a[2];
+            equation
+                a[2].x = {3, 4, 5};
+            end B;
+
+            model Test
+                B b;
+            equation
+                b.a[1].x = {6, 7, 8};
+            end Test;"""
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test', {'expand_vectors': True})
+        casadi_model.simplify({'expand_vectors': True})
+        print(casadi_model)
+
+        ref_model = Model()
+        b1a1x1 = ca.MX.sym('b.a[1].x[1]')
+        b1a1x2 = ca.MX.sym('b.a[1].x[2]')
+        b1a1x3 = ca.MX.sym('b.a[1].x[3]')
+        b1a2x1 = ca.MX.sym('b.a[2].x[1]')
+        b1a2x2 = ca.MX.sym('b.a[2].x[2]')
+        b1a2x3 = ca.MX.sym('b.a[2].x[3]')
+
+        ref_model.alg_states = list(map(Variable, [b1a1x1, b1a1x2, b1a1x3,
+                                                   b1a2x1, b1a2x2, b1a2x3]))
+        ref_model.equations = [b1a2x1 - 3, b1a2x2 - 4, b1a2x3 - 5,
+                               b1a1x1 - 6, b1a1x2 - 7, b1a1x3 - 8]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
+    def test_nested_equations_indexing_hard_3d(self):
+        txt = """
+            model A
+                Real x[3];
+            end A;
+
+            model B
+                A a[2];
+            equation
+                a[2].x = {3, 4, 5};
+            end B;
+
+            model Test
+                B b[2];
+            equation
+                b[1].a[1].x = {6, 7, 8};
+                b[2].a[1].x = {9, 8, 7};
+            end Test;"""
+
+        ast_tree = parser.parse(txt)
+        try:
+            casadi_model = gen_casadi.generate(ast_tree, 'Test', {'expand_vectors': True})
+            casadi_model.simplify({'expand_vectors': True})
+        except AssertionError as e:
+            assert e.args[0] == 'Dimensions higher than two are not yet supported'
+            return
+        assert false
+
+        # This will be an interesting test case once we do decide to support dimensions higher
+        # than two. The output should then be as follows.
+        print(casadi_model)
+
+        ref_model = Model()
+        b1a1x1 = ca.MX.sym('b[1].a[1].x[1]')
+        b1a1x2 = ca.MX.sym('b[1].a[1].x[2]')
+        b1a1x3 = ca.MX.sym('b[1].a[1].x[3]')
+        b2a1x1 = ca.MX.sym('b[2].a[1].x[1]')
+        b2a1x2 = ca.MX.sym('b[2].a[1].x[2]')
+        b2a1x3 = ca.MX.sym('b[2].a[1].x[3]')
+
+        b1a2x1 = ca.MX.sym('b[1].a[2].x[1]')
+        b1a2x2 = ca.MX.sym('b[1].a[2].x[2]')
+        b1a2x3 = ca.MX.sym('b[1].a[2].x[3]')
+        b2a2x1 = ca.MX.sym('b[2].a[2].x[1]')
+        b2a2x2 = ca.MX.sym('b[2].a[2].x[2]')
+        b2a2x3 = ca.MX.sym('b[2].a[2].x[3]')
+
+        ref_model.alg_states = list(map(Variable, [b1a1x1, b1a1x2, b1a1x3,
+                                                   b2a1x1, b2a1x2, b2a1x3,
+                                                   b1a2x1, b1a2x2, b1a2x3,
+                                                   b2a2x1, b2a2x2, b2a2x3]))
+        ref_model.equations = [b1a2x1 - 3, b1a2x2 - 4, b1a2x3 - 5,
+                               b2a2x1 - 3, b2a2x2 - 4, b2a2x3 - 5,
+                               b1a1x1 - 6, b1a1x2 - 7, b1a1x3 - 8,
+                               b2a1x1 - 9, b2a1x2 - 8, b2a1x3 - 7]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_indexing_error(self):
         txt = """
                 model Test

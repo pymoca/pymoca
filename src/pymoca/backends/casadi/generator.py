@@ -702,11 +702,22 @@ class Generator(TreeListener):
             return ca.mtimes(J(deps), ca.vertcat(*der_deps))
 
     def get_indexed_symbol(self, tree, s):
-        assert len(s._modelica_shape) == len(tree.indices)
+        assert len([dim for shape in s._modelica_shape for dim in shape if dim is not None]) <= 2,\
+            "Dimensions higher than two are not yet supported"
+
+        assert len(s._modelica_shape) >= len(tree.indices)
+
+        # For nested variables where an equation is defined at one of the nested models,
+        # the modelica shape will contain the shape for the whole nested variable, but the indices
+        # will only contain the indices for the symbol in the nested model. We only use the last
+        # part of _modelica_shape in this case.
+        assert tree.indices
+        shapes = s._modelica_shape[-len(tree.indices):]
+
         # Check whether we loop over an index of this symbol
         indices = []
         for_loop = None
-        for i, (index_array, shape) in enumerate(zip(tree.indices, s._modelica_shape)):
+        for i, (index_array, shape) in enumerate(zip(tree.indices, shapes)):
             for index, dim in zip(index_array, shape):
                 if index is None and dim is None:
                     continue
@@ -742,8 +753,6 @@ class Generator(TreeListener):
                         for_loop = self.for_loops[-1]
 
                 indices.append(sl)
-
-        assert len(indices) <= 2, "Dimensions higher than two are not yet supported"
 
         if for_loop is not None:
             if isinstance(indices[0], ca.MX):
