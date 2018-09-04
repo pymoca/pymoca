@@ -718,6 +718,12 @@ class Generator(TreeListener):
         indices = []
         for_loop = None
         for i, (index_array, shape) in enumerate(zip(tree.indices, shapes)):
+            if len(index_array) > len(shape):
+                symbol_name = s.name() if len(tree.indices) == 1 \
+                    else s.name().split('.')[i] + ' in nested symbol ' + s.name()
+                raise ValueError('Too many indices found for symbol {}, check if the symbol has '
+                                 'the correct dimensions.'.format(symbol_name))
+
             for index, dim in zip(index_array, shape):
                 if index is None and dim is None:
                     continue
@@ -736,6 +742,11 @@ class Generator(TreeListener):
 
                     if sl is None and dim is not None:
                         sl = slice(None, None, 1)
+                    if sl is not None and dim is None:
+                        symbol_name = s.name() if len(tree.indices) == 1 \
+                            else s.name().split('.')[i] + ' in nested symbol ' + s.name()
+                        raise ValueError('Symbol {} was given an index of {} but this symbol '
+                                         'is not an array.'.format(symbol_name, sl))
                     elif isinstance(sl, int):
                         # Modelica indexing starts from one;  Python from zero.
                         if sl <= 0 or sl > dim:

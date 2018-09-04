@@ -1933,6 +1933,50 @@ class GenCasadiTest(unittest.TestCase):
             return
         assert false
 
+    def test_index_at_wrong_symbol_error(self):
+        txt = """
+            model A
+                Real x[3];
+            end A;
+
+            model Test
+                A a;
+            equation
+                a[1].x = 1;
+                a[2].x = 2;
+                a[3].x = 3;
+            end Test;"""
+
+        ast_tree = parser.parse(txt)
+        try:
+            casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        except Exception as e:
+            assert e.args[0] == 'Symbol a in nested symbol a.x was given an index of 1 ' \
+                                'but this symbol is not an array.'
+            return
+        assert false
+
+    def test_2d_index_at_wrong_symbol_error(self):
+        txt = """
+            model A
+                Real x[3];
+            end A;
+
+            model Test
+                A a[2];
+            equation
+                a[1,1].x = 1;
+            end Test;"""
+
+        ast_tree = parser.parse(txt)
+        try:
+            casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        except Exception as e:
+            assert e.args[0] == 'Too many indices found for symbol a in nested symbol a.x, ' \
+                                'check if the symbol has the correct dimensions.'
+            return
+        assert false
+
 
 if __name__ == "__main__":
     unittest.main()
