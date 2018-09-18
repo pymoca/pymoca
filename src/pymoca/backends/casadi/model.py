@@ -373,7 +373,8 @@ class Model:
                     # For delayed states we do not have any reliable shape
                     # information available due to it being an arbitrary
                     # expression, so we just always expand.
-                    if (old_var.symbol._modelica_shape != ((None,),) or old_var.symbol.name() in self.delay_states):
+                    if (set(old_var.symbol._modelica_shape) != {(None,)}
+                            or old_var.symbol.name() in self.delay_states):
                         expanded_symbols = []
 
                         # Prepare a component_name_format in which the different possible
