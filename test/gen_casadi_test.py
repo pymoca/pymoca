@@ -1977,6 +1977,41 @@ class GenCasadiTest(unittest.TestCase):
             return
         assert false
 
+    def test_nested_constants(self):
+        txt = """
+            package P1
+              constant Real p = 1;
+            end P1;
+
+            model A
+              parameter Real q = P1.p;
+            end A;
+
+            model Test
+              A a1;
+              A a2;
+            end Test;"""
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test')
+
+        ref_model = Model()
+        q1 = ca.MX.sym('a1.q')
+        q2 = ca.MX.sym('a2.q')
+
+        c1 = ca.MX.sym('a1.P1.p')
+        c2 = ca.MX.sym('a2.P1.p')
+
+        ref_model.parameters = list(map(Variable, [q1, q2]))
+        ref_model.constants = list(map(Variable, [c1, c2]))
+        # TODO: Fix these values once it actually gets through the flattening/model generation
+        ref_model.parameters[0].value = c1
+        ref_model.parameters[1].value = c2
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+        self.assertEqual(casadi_model.parameters[0].value.name(), c1.name())
+        self.assertEqual(casadi_model.parameters[1].value.name(), c2.name())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -570,7 +570,7 @@ class ASTListener(ModelicaListener):
         # (ComponentRef) object until we can fill it.
         clause.type.__dict__.update(self.ast[ctx.type_specifier()].__dict__)
         if ctx.array_subscripts() is not None:
-            clause.dimensions = self.ast[ctx.array_subscripts()]
+            clause.dimensions = [self.ast[ctx.array_subscripts()]]
             for sym in self.comp_clause.symbol_list:
                 s = self.class_node.symbols[sym.name]
                 s.dimensions = clause.dimensions
@@ -644,7 +644,7 @@ class ASTListener(ModelicaListener):
     def exitDeclaration(self, ctx: ModelicaParser.DeclarationContext):
         sym = self.symbol_node
         if ctx.array_subscripts() is not None:
-            sym.dimensions = self.ast[ctx.array_subscripts()]
+            sym.dimensions = [self.ast[ctx.array_subscripts()]]
         if ctx.modification() is not None:
             for mod in self.ast[ctx.modification()]:
                 if isinstance(mod, ast.ClassModification):
