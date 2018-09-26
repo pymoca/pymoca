@@ -1,4 +1,5 @@
-from collections import OrderedDict, MutableSet
+from collections import OrderedDict
+from collections.abc import MutableSet
 
 class OrderedSet(MutableSet):
     """
