@@ -756,7 +756,7 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_variable_metadata_function(self):
         # Clear cache
-        db_file = os.path.join(MODEL_DIR, 'ParameterAttributes')
+        db_file = os.path.join(MODEL_DIR, 'ParameterAttributes.pymoca_cache')
         try:
             os.remove(db_file)
         except FileNotFoundError:
@@ -817,7 +817,7 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_cache(self):
         # Clear cache
-        db_file = os.path.join(MODEL_DIR, 'Aircraft')
+        db_file = os.path.join(MODEL_DIR, 'Aircraft.pymoca_cache')
         try:
             os.remove(db_file)
         except FileNotFoundError:
@@ -840,7 +840,7 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_cache_delay_arguments(self):
         # Clear cache
-        db_file = os.path.join(MODEL_DIR, 'Delay')
+        db_file = os.path.join(MODEL_DIR, 'Delay.pymoca_cache')
         try:
             os.remove(db_file)
         except FileNotFoundError:
@@ -860,7 +860,7 @@ class GenCasadiTest(unittest.TestCase):
 
     def test_codegen(self):
         # Clear cache
-        db_file = os.path.join(MODEL_DIR, 'Aircraft')
+        db_file = os.path.join(MODEL_DIR, 'Aircraft.pymoca_cache')
         try:
             os.remove(db_file)
         except FileNotFoundError:

@@ -175,7 +175,7 @@ def save_model(model_folder: str, model_name: str, model: Model,
             objects[o] = f
 
     # Output metadata
-    db_file = os.path.join(model_folder, model_name)
+    db_file = os.path.join(model_folder, model_name + ".pymoca_cache")
     with open(db_file, 'wb') as f:
         db = {}
 
@@ -249,7 +249,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
     :returns: CachedModel instance.
     """
 
-    db_file = os.path.join(model_folder, model_name)
+    db_file = os.path.join(model_folder, model_name + ".pymoca_cache")
 
     if compiler_options.get('mtime_check', True):
         # Mtime check
