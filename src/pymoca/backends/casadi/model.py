@@ -231,15 +231,27 @@ class Model:
                         for attribute in CASADI_ATTRIBUTES:
                             # Can't convert 3D arrays to MX, so we convert to nparray instead
                             value = getattr(old_var, attribute)
-                            if not isinstance(value, ca.MX) and not np.isscalar(value):
+                            if isinstance(value, (np.ndarray, list)):
                                 value = np.array(value)
+                                # We do not support NumPy arrays of e.g. MX symbols
+                                assert np.issubdtype(value.dtype, np.number)
+                                value = old_var.python_type(value[ind])
+                            elif ((isinstance(value, ca.MX) and value.is_constant())
+                                  or isinstance(value, ca.DM)):
+                                # Directly casting to int does not work. We
+                                # therefore always cast to float first.
+                                value = old_var.python_type(float(value[ind]))
+                            elif isinstance(value, ca.MX):
+                                # Symbolic expression. Index it, but do not coerce to Python type.
+                                assert not value.is_constant()
+                                if np.prod(value.shape) > 1:
+                                    value = value[ind]
                             else:
-                                value = ca.MX(getattr(old_var, attribute))
+                                assert np.isscalar(value)
+                                value = old_var.python_type(value)
 
-                            if np.prod(value.shape) == 1:
-                                setattr(component_var, attribute, value)
-                            else:
-                                setattr(component_var, attribute, value[ind])
+                            setattr(component_var, attribute, value)
+
                         expanded_symbols.append(component_var)
 
                     s = old_var.symbol._mx if isinstance(old_var.symbol, _MTensor) else old_var.symbol
