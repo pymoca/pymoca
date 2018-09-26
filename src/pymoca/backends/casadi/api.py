@@ -211,7 +211,8 @@ def save_model(model_folder: str, model_name: str, model: Model,
             for i, v in enumerate(getattr(model, key)):
                 for j, tmp in enumerate(CASADI_ATTRIBUTES):
                     attr = getattr(v, tmp)
-                    if isinstance(attr, ca.MX) and ca.depends_on(attr, parameter_vector):
+                    if (isinstance(attr, ca.MX) and not attr.is_constant()
+                        and ca.depends_on(attr, parameter_vector)):
                         m[i, j] = True
 
         # Delay dependency checking
