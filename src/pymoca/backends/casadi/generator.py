@@ -336,11 +336,15 @@ class Generator(TreeListener):
             src_left = ca.vertcat(*[self.get_mx(c) for c in tree.left])
         else:
             src_left = self.get_mx(tree.left)
+            if isinstance(src_left, list):
+                src_left = ca.vertcat(*src_left)
 
         if isinstance(tree.right, list):
             src_right = ca.vertcat(*[self.get_mx(c) for c in tree.right])
         else:
             src_right = self.get_mx(tree.right)
+            if isinstance(src_right, list):
+                src_right = ca.vertcat(*src_right)
 
         src_left = ca.MX(src_left)
         src_right = ca.MX(src_right)
