@@ -35,7 +35,9 @@ OP_MAP = {'*': "__mul__",
           '==': '__eq__',
           "min": "fmin",
           "max": "fmax",
-          "abs": "fabs"}
+          "abs": "fabs",
+          "and": "__mul__",
+          "or": "__add__"}
 
 ForLoopIndexedSymbol = namedtuple('ForLoopIndexedSymbol', ['tree', 'transpose', 'indices'])
 
@@ -211,6 +213,8 @@ class Generator(TreeListener):
             src = self.get_derivative(v)
         elif op == '-' and n_operands == 1:
             src = -self.get_mx(tree.operands[0])
+        elif op == 'not' and n_operands == 1:
+            src = ca.if_else(self.get_mx(tree.operands[0]), 0, 1, True)
         elif op == 'mtimes':
             assert n_operands >= 2
             src = self.get_mx(tree.operands[0])
