@@ -1518,6 +1518,25 @@ class GenCasadiTest(unittest.TestCase):
         casadi_model = transfer_model(MODEL_DIR, 'InlineAssignment', {'detect_aliases': True})
         self.assertTrue(casadi_model.inputs[0].fixed)
 
+    def test_logic(self):
+        casadi_model = transfer_model(MODEL_DIR, 'Logic')
+
+        ref_model = Model()
+
+        a = ca.MX.sym('a')
+        b = ca.MX.sym('b')
+        c = ca.MX.sym('c')
+        d = ca.MX.sym('d')
+        e = ca.MX.sym('e')
+
+        ref_model.alg_states = list(map(Variable, [a, b, c, d, e]))
+        ref_model.equations = [b - ca.if_else(a, 0, 1, True),
+                               c - a * b,
+                               d - (a + b),
+                               e]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_unspecified_dimensions(self):
         with open(os.path.join(MODEL_DIR, 'UnspecifiedDimensions.mo'), 'r') as f:
             txt = f.read()

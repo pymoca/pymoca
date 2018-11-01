@@ -384,6 +384,24 @@ class ASTListener(ModelicaListener):
             operands=[self.ast[e] for e in ctx.expr()]
         )
 
+    def exitExpr_not(self, ctx: ModelicaParser.Expr_notContext):
+        self.ast[ctx] = ast.Expression(
+            operator='not',
+            operands=[self.ast[ctx.expr()]]
+        )
+
+    def exitExpr_and(self, ctx: ModelicaParser.Expr_andContext):
+        self.ast[ctx] = ast.Expression(
+            operator='and',
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
+
+    def exitExpr_or(self, ctx: ModelicaParser.Expr_orContext):
+        self.ast[ctx] = ast.Expression(
+            operator='or',
+            operands=[self.ast[e] for e in ctx.expr()]
+        )
+
     def exitExpr_neg(self, ctx: ModelicaParser.Expr_negContext):
         self.ast[ctx] = ast.Expression(
             operator=ctx.op.text,
