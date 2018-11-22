@@ -1158,6 +1158,35 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_simplify_eliminable_variable_expression_if_else(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'eliminable_variable_expression': r'_\w+',
+             'expand_vectors': True,
+             'expand_mx': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'SimplifyIfElse', compiler_options)
+
+        ref_model = Model()
+
+        b = ca.MX.sym('b')
+        y = ca.MX.sym('y')
+
+        ref_model.states = []
+        ref_model.der_states = []
+        ref_model.alg_states = list(map(Variable, [y]))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = []
+        ref_model.constants = []
+        ref_model.parameters = list(map(Variable, [b]))
+        parameter_values = [True]
+        for par, v in zip(ref_model.parameters, parameter_values):
+            par.value = v
+        ref_model.equations = [y - (1 + ca.if_else(b != 0, 2, 0, True) + ca.if_else(b == 0, 3, 0, True))]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
     def test_simplify_detect_aliases(self):
         # Create model, cache it, and load the cache
         compiler_options = \
