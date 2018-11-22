@@ -513,10 +513,17 @@ class Model:
 
             p = re.compile(options['eliminable_variable_expression'])
 
+            states = OrderedDict([(s.symbol.name(), s) for s in self.states])
             alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
 
+            all_states = OrderedDict([(s.symbol.name(), s) for s in itertools.chain(self.states, self.alg_states)])
+
+            # NOTE: dictionary keys are the correspondig _state_'s name, not
+            # the names of the derivative states themselves.
+            der_states = OrderedDict(zip(states.keys(), self.der_states))
+
             def extract_assignment(eq):
-                if eq.is_symbolic() and eq.name() in alg_states and p.match(eq.name()):
+                if eq.is_symbolic() and eq.name() in all_states and p.match(eq.name()):
                     return eq, 0.0
 
                 if eq.is_op(ca.OP_IF_ELSE_ZERO):
@@ -528,10 +535,17 @@ class Model:
                         return variable, ca.if_else(cond, value, 0)
 
                 if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                    # Prefer eliminating alg states
                     if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and p.match(eq.dep(0).name()):
                         variable = eq.dep(0)
                         value = eq.dep(1)
                     elif eq.dep(1).is_symbolic() and eq.dep(1).name() in alg_states and p.match(eq.dep(1).name()):
+                        variable = eq.dep(1)
+                        value = eq.dep(0)
+                    elif eq.dep(0).is_symbolic() and eq.dep(0).name() in states and p.match(eq.dep(0).name()):
+                        variable = eq.dep(0)
+                        value = eq.dep(1)
+                    elif eq.dep(1).is_symbolic() and eq.dep(1).name() in states and p.match(eq.dep(1).name()):
                         variable = eq.dep(1)
                         value = eq.dep(0)
                     else:
@@ -568,13 +582,48 @@ class Model:
             variables = []
             values = []
 
+            def get_derivative(expr):
+                if expr.is_constant():
+                    return 0.0
+                elif expr.is_symbolic():
+                    if expr.name() in states:
+                        return der_states[expr.name()].symbol
+                    elif expr.name() in alg_states:
+                        # This algebraic state must now become a differentiated state.
+                        states[expr.name()] = alg_states.pop(expr.name())
+                        der_sym = ca.MX.sym('der({})'.format(expr.name()))
+                        der_states[expr.name()] = Variable(der_sym, float)
+                        return der_sym
+                    else:
+                        return 0.0
+                else:
+                    # Differentiate using CasADi and chain rule
+                    orig_deps = ca.symvar(expr)
+                    deps = ca.vertcat(*orig_deps)
+                    J = ca.Function('J', [deps], [ca.jacobian(expr, deps)])
+                    J_sparsity = J.sparsity_out(0)
+                    der_deps = [get_derivative(dep) if J_sparsity.has_nz(0, j) else ca.DM.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
+                    return ca.mtimes(J(deps), ca.vertcat(*der_deps))
+
             reduced_equations = []
             for eq in self.equations:
                 variable, value = extract_assignment(eq)
                 if variable is not None:
+                    if variable.name() in states:
+                        # Mark derivative state for replacement too.
+                        derivative = get_derivative(value)
+
+                        del states[variable.name()]
+
+                        variables.append(der_states.pop(variable.name()).symbol)
+                        values.append(derivative)
+
+                    elif variable.name() in alg_states:
+                        del alg_states[variable.name()]
+
                     variables.append(variable)
                     values.append(value)
-                    del alg_states[variable.name()]
+
                     # Skip this equation
                     continue
 
@@ -582,7 +631,10 @@ class Model:
                 reduced_equations.append(eq)
 
             # Eliminate alias variables
+            self.states = list(states.values())
             self.alg_states = list(alg_states.values())
+            self.der_states = list(der_states.values())
+
             self.equations = reduced_equations
 
             if len(values) > 0:
