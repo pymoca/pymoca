@@ -504,21 +504,28 @@ class Model:
         if options.get('eliminable_variable_expression', None) is not None:
             logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
 
+            # Due to CasADi's ca.is_equal not properly matching short-
+            # circuited MX if-else expressions, we can end up in an infinite
+            # loop. With expanded (to SX and back) equations we are safe, as
+            # SX does not support short-circuiting.
+            assert options.get('expand_mx', True), \
+                "The current implementation assumes that the option 'expand_mx' is set to True"
+
             p = re.compile(options['eliminable_variable_expression'])
 
             alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
 
-            variables = []
-            values = []
-
-            reduced_equations = []
-            for eq in self.equations:
+            def extract_assignment(eq):
                 if eq.is_symbolic() and eq.name() in alg_states and p.match(eq.name()):
-                    variables.append(eq)
-                    values.append(0.0)
-                    del alg_states[eq.name()]
-                    # Skip this equation
-                    continue
+                    return eq, 0.0
+
+                if eq.is_op(ca.OP_IF_ELSE_ZERO):
+                    cond = eq.dep(0)
+                    nested_eq = eq.dep(1)
+
+                    variable, value = extract_assignment(nested_eq)
+                    if variable is not None:
+                        return variable, ca.if_else(cond, value, 0)
 
                 if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
                     if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and p.match(eq.dep(0).name()):
@@ -532,16 +539,44 @@ class Model:
                         value = None
 
                     if variable is not None:
-                        del alg_states[variable.name()]
-
-                        variables.append(variable)
                         if eq.is_op(ca.OP_SUB):
-                            values.append(value)
+                            return variable, value
                         else:
-                            values.append(-value)
+                            return variable, -value
 
-                        # Skip this equation
-                        continue
+                if eq.n_dep() == 2 \
+                    and eq.is_op(ca.OP_ADD) \
+                    and eq.dep(0).is_op(ca.OP_IF_ELSE_ZERO) \
+                    and eq.dep(1).is_op(ca.OP_IF_ELSE_ZERO):
+                    # Once passed through _expand_simplify_mx, a CasADi if_else
+                    # is converted to a sum of two if_else_zero operations.
+
+                    cond_1 = eq.dep(0).dep(0)
+                    cond_2 = eq.dep(1).dep(0)
+                    nested_eq_1 = eq.dep(0).dep(1)
+                    nested_eq_2 = eq.dep(1).dep(1)
+
+                    variable_1, value_1 = extract_assignment(nested_eq_1)
+                    variable_2, value_2 = extract_assignment(nested_eq_2)
+
+                    if variable_1 is not None and variable_2 is not None and variable_1.name() == variable_2.name():
+                        return variable_1, ca.if_else(cond_1, value_1, 0) + ca.if_else(cond_2, value_2, 0)
+
+                # Nothing found
+                return None, None
+
+            variables = []
+            values = []
+
+            reduced_equations = []
+            for eq in self.equations:
+                variable, value = extract_assignment(eq)
+                if variable is not None:
+                    variables.append(variable)
+                    values.append(value)
+                    del alg_states[variable.name()]
+                    # Skip this equation
+                    continue
 
                 # Keep this equation
                 reduced_equations.append(eq)
@@ -550,12 +585,24 @@ class Model:
             self.alg_states = list(alg_states.values())
             self.equations = reduced_equations
 
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, variables, values)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, variables, values)
-            if len(self.delay_arguments) > 0:
-                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
+            if len(values) > 0:
+                # Resolve expressions that include other, non-simple parameter
+                # expressions.
+                for i in range(SUBSTITUTE_LOOP_LIMIT):
+                    new_values = ca.substitute(values, variables, values)
+                    converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
+                    values = new_values
+                    if converged:
+                        break
+                else:
+                    raise Exception("Substitution of expressions exceeded maximum iteration limit.")
+
+                if len(self.equations) > 0:
+                    self.equations = ca.substitute(self.equations, variables, values)
+                if len(self.initial_equations) > 0:
+                    self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+                if len(self.delay_arguments) > 0:
+                    self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
         if options.get('expand_vectors', False) and not options.get('expand_mx', False):
             # If we are _not_ expanding MX to SX, we do the expansion of vectors here
