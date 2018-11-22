@@ -1488,6 +1488,28 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_simplify_differentiated_state(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'eliminable_variable_expression': r'_\w+'}
+
+        casadi_model = transfer_model(MODEL_DIR, 'SimplifyDifferentiatedState', compiler_options)
+
+        ref_model = Model()
+
+        y = ca.MX.sym('y')
+        der_y = ca.MX.sym('der(y)')
+
+        ref_model.states = list(map(Variable, [y]))
+        ref_model.der_states = list(map(Variable, [der_y]))
+        ref_model.alg_states = list(map(Variable, []))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = []
+        ref_model.equations = [3 * der_y - 1]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
     def test_state_annotator(self):
         with open(os.path.join(MODEL_DIR, 'StateAnnotator.mo'), 'r') as f:
             txt = f.read()
