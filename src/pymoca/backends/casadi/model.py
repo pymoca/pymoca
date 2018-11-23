@@ -4,6 +4,7 @@ import numpy as np
 import itertools
 import logging
 import re
+import sys
 
 from pymoca import ast
 from .alias_relation import AliasRelation
@@ -11,7 +12,8 @@ from .mtensor import _MTensor
 
 logger = logging.getLogger("pymoca")
 
-CASADI_COMPARISON_DEPTH = 100
+CASADI_COMPARISON_DEPTH = sys.maxsize
+SUBSTITUTE_LOOP_LIMIT = 100
 CASADI_ATTRIBUTES = [attr for attr in ast.Symbol.ATTRIBUTES if not attr == 'unit']
 
 
@@ -339,11 +341,14 @@ class Model:
             if len(values) > 0:
                 # Resolve expressions that include other, non-simple parameter
                 # expressions.
-                converged = False
-                while not converged:
+                for i in range(SUBSTITUTE_LOOP_LIMIT):
                     new_values = ca.substitute(values, symbols, values)
                     converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
                     values = new_values
+                    if converged:
+                        break
+                else:
+                    raise Exception("Substitution of expressions exceeded maximum iteration limit.")
 
                 if len(self.equations) > 0:
                     self.equations = ca.substitute(self.equations, symbols, values)
@@ -377,11 +382,14 @@ class Model:
             if len(values) > 0:
                 # Resolve expressions that include other, non-simple parameter
                 # expressions.
-                converged = False
-                while not converged:
+                for i in range(SUBSTITUTE_LOOP_LIMIT):
                     new_values = ca.substitute(values, symbols, values)
                     converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
                     values = new_values
+                    if converged:
+                        break
+                else:
+                    raise Exception("Substitution of expressions exceeded maximum iteration limit.")
 
                 if len(self.equations) > 0:
                     self.equations = ca.substitute(self.equations, symbols, values)
