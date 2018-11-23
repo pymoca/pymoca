@@ -378,7 +378,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                         [dur] = ca.substitute(
                             [dur],
                             list(false_deps),
-                            [ca.repmat(np.nan, *d.size()) for d in false_deps])
+                            [np.nan] * len(false_deps))
                 else:
                     dur = independent_delay_durations_raw[i]
 
