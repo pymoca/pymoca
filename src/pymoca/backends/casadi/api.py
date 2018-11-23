@@ -366,19 +366,39 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
 
             duration_dependencies = db['__delay_duration_dependent']
 
+            # Get rid of false dependency symbols not used in any delay
+            # durations. This significantly reduces the work the (slow)
+            # substitute() calls have to do later on.
+            actual_deps = sorted(set(np.array(duration_dependencies).ravel()))
+
+            actual_dep_symbols = [np.nan] * len(all_symbols)
+            for i in actual_deps:
+                actual_dep_symbols[i] = all_symbols[i]
+
+            delay_durations_simplified = ca.Function(
+                'replace_false_deps',
+                all_symbols,
+                delay_durations_raw).call(
+                    actual_dep_symbols)
+
+            # Get rid of remaining hidden dependencies in the delay durations
             for i, expr in enumerate(delay_expressions_raw):
                 if duration_dependencies[i]:
-                    dur = delay_durations_raw[i]
+                    dur = delay_durations_simplified[i]
 
-                    deps = set(ca.symvar(dur))
-                    actual_deps = {all_symbols[j] for j in duration_dependencies[i]}
-                    false_deps = deps - actual_deps
+                    if len(duration_dependencies[i]) < len(actual_deps):
+                        deps = set(ca.symvar(dur))
+                        actual_deps = {all_symbols[j] for j in duration_dependencies[i]}
+                        false_deps = deps - actual_deps
 
-                    if false_deps:
-                        [dur] = ca.substitute(
-                            [dur],
-                            list(false_deps),
-                            [np.nan] * len(false_deps))
+                        if false_deps:
+                            [dur] = ca.substitute(
+                                [dur],
+                                list(false_deps),
+                                [np.nan] * len(false_deps))
+                    else:
+                        # Already removed all false dependencies
+                        pass
                 else:
                     dur = independent_delay_durations_raw[i]
 
