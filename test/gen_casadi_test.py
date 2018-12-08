@@ -2012,6 +2012,44 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(casadi_model.parameters[0].value.name(), c1.name())
         self.assertEqual(casadi_model.parameters[1].value.name(), c2.name())
 
+    def test_derivative_(self):
+        # The initial equation is encountered first, and should properly
+        # initialize the corresponding symbol for the derivative.
+        txt = """
+            model A
+              Real x[3], y;
+            equation
+              for i in 2:3 loop
+                der(x[i]) = x[i] + y;
+              end for;
+            end A;
+
+            model Test
+              A a;
+
+            initial equation
+              der(a.x[2]) = 0.0;
+            end Test;
+            """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test')
+
+        ref_model = Model()
+
+        a_x = ca.MX.sym('a.x', 3)
+        a_y = ca.MX.sym('a.y')
+        der_a_x = ca.MX.sym('der(a.x)', 3)
+
+        ref_model.alg_states = [Variable(a_y)]
+        ref_model.states = [Variable(a_x)]
+        ref_model.der_states = [Variable(der_a_x)]
+
+        ref_model.initial_equations = [der_a_x[1]]
+        ref_model.equations = [der_a_x[1:3] - (a_x[1:3] - a_y)]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
 
 if __name__ == "__main__":
     unittest.main()

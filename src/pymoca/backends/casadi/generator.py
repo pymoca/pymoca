@@ -685,7 +685,10 @@ class Generator(TreeListener):
             dep = s.dep()
             if dep.name() not in self.derivative:
                 der_dep = _new_mx("der({})".format(dep.name()), dep.size())
+                der_dep._modelica_shape = \
+                    self.nodes[self.current_class][dep.name()]._modelica_shape
                 self.derivative[dep.name()] = der_dep
+                self.nodes[self.current_class][der_dep.name()] = der_dep
                 return der_dep[slice_info['start']:slice_info['stop']:slice_info['step']]
             else:
                 return self.derivative[dep.name()][slice_info['start']:slice_info['stop']:slice_info['step']]
