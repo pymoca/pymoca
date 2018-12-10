@@ -333,6 +333,20 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes['A'].symbols['dummy_parameter'].unit.value, "m/s")
         self.assertEqual(flat_tree.classes['A'].symbols['dummy_parameter'].value.value, 10.0)
 
+    def test_extend_from_self(self):
+        txt = """
+        model A
+          extends A;
+        end A;"""
+
+        ast_tree = parser.parse(txt)
+
+        class_name = 'A'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        with self.assertRaisesRegex(Exception, "Cannot extend class 'A' with itself"):
+            flat_tree = tree.flatten(ast_tree, comp_ref)
+
 
 if __name__ == "__main__":
     unittest.main()
