@@ -225,6 +225,9 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     for extends in orig_class.extends:
         c = orig_class.find_class(extends.component, check_builtin_classes=True)
 
+        if str(c.full_reference()) == str(orig_class.full_reference()):
+            raise Exception("Cannot extend class '{}' with itself".format(c.full_reference()))
+
         if c.type == "__builtin":
             if len(orig_class.extends) > 1:
                 raise Exception(
