@@ -348,7 +348,7 @@ class Model:
                     if converged:
                         break
                 else:
-                    raise Exception("Substitution of expressions exceeded maximum iteration limit.")
+                    logger.warning("Substitution of expressions exceeded maximum iteration limit.")
 
                 if len(self.equations) > 0:
                     self.equations = ca.substitute(self.equations, symbols, values)
@@ -389,7 +389,7 @@ class Model:
                     if converged:
                         break
                 else:
-                    raise Exception("Substitution of expressions exceeded maximum iteration limit.")
+                    logger.warning("Substitution of expressions exceeded maximum iteration limit.")
 
                 if len(self.equations) > 0:
                     self.equations = ca.substitute(self.equations, symbols, values)
@@ -647,7 +647,7 @@ class Model:
                     if converged:
                         break
                 else:
-                    raise Exception("Substitution of expressions exceeded maximum iteration limit.")
+                    logger.warning("Substitution of expressions exceeded maximum iteration limit.")
 
                 if len(self.equations) > 0:
                     self.equations = ca.substitute(self.equations, variables, values)
