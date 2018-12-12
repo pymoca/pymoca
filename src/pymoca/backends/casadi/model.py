@@ -209,7 +209,16 @@ class Model:
                         # a was a scalar, b a 1d array of size [3] and c a 2d array of size
                         # [1,3].
                         modelica_shape = old_var.symbol._modelica_shape
-                        symbol_names = old_var.symbol.name().split('.')
+                        old_sym_name = old_var.symbol.name()
+
+                        # Expanded derivative symbols get their indices inside the parantheses.
+                        # For a symbol called "der(a.x)", the prefix will be "der(", the postfix
+                        # will be ")", with old_sym_name becoming "a.x".
+                        # For a symbol called "a.x", the prefix and postfix will be empty strings.
+                        prefix, old_sym_name, postfix = \
+                            re.match(r'((?:der\()*|\b)(.*?)([\)]*|\b)$', old_sym_name).groups()
+
+                        symbol_names = old_sym_name.split('.')
                         assert len(symbol_names) == len(modelica_shape)
                         component_name_format = ''
                         for i, symbol_name in enumerate(symbol_names):
@@ -221,6 +230,8 @@ class Model:
                                     '[' + \
                                     ','.join('{}' for _ in range(len(modelica_shape[i]))) + \
                                     ']'
+
+                        component_name_format = prefix + component_name_format + postfix
 
                         iterator_shape = tuple([d for var_shape in modelica_shape
                                                 for d in var_shape if d is not None])
