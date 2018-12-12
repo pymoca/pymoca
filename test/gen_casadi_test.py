@@ -2092,7 +2092,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(casadi_model.parameters[0].value.name(), c1.name())
         self.assertEqual(casadi_model.parameters[1].value.name(), c2.name())
 
-    def test_derivative_(self):
+    def test_derivative_initialization(self):
         # The initial equation is encountered first, and should properly
         # initialize the corresponding symbol for the derivative.
         txt = """
