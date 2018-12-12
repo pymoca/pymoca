@@ -2130,6 +2130,28 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_expand_vectors_derivative_naming(self):
+        txt = """
+            model A
+              Real x[2];
+            end A;
+
+            model Test
+              A a[1];
+
+            initial equation
+              der(a[1].x[2]) = 0.0;
+            end Test;
+            """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Test')
+        casadi_model.simplify({'expand_vectors': True})
+
+        der_names = [x.symbol.name() for x in casadi_model.der_states]
+
+        self.assertListEqual(der_names, ["der(a[1].x[1])", "der(a[1].x[2])"])
+
 
 if __name__ == "__main__":
     unittest.main()
