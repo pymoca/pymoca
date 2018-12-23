@@ -75,7 +75,7 @@ def call_antlr4(arg):
     "calls antlr4 on grammar file"
     # pylint: disable=unused-argument, unused-variable
     antlr_path = os.path.join(ROOT_DIR, "java", "antlr-4.7-complete.jar")
-    classpath = ".:{:s}:$CLASSPATH".format(antlr_path)
+    classpath = os.pathsep.join([".", "{:s}".format(antlr_path), "$CLASSPATH"])
     generated = os.path.join(ROOT_DIR, 'src', 'pymoca', 'generated')
     cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
           " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
