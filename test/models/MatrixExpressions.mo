@@ -9,6 +9,7 @@ model MatrixExpressions
     constant Real E[2, 3] = ones(2, 3);
     constant Real I[5, 5] = identity(5);
     constant Real F[3, 3] = diagonal({1, 2, 3});
+    constant Real G[3, 3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 equation
     A*b = c;
     transpose(A)*b = d;
