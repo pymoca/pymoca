@@ -442,6 +442,33 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
 
+    def test_interpolate(self):
+        with open(os.path.join(MODEL_DIR, 'Interpolate.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'Interpolate')
+        ref_model = Model()
+
+        x = ca.MX.sym("x")
+        y = ca.MX.sym("y")
+        z = ca.MX.sym("z")
+        xp = ca.MX.sym("xp", 3)
+        yp = ca.MX.sym("yp", 3)
+        zp = ca.MX.sym("zp", 3, 3)
+
+        ref_model.alg_states = list(map(Variable, [x, y, z]))
+        ref_model.parameters = list(map(Variable, [xp, yp, zp]))
+        parameter_values = [np.array([0, 1, 2]), np.array([0, 1, 4]), np.array([[0, 0, 0], [0, 1, 4], [0, 2, 8]])]
+        for par, val in zip(ref_model.parameters, parameter_values):
+            par.value = val
+
+        ref_model.equations = [
+            y - ca.interpolant('interpolant', 'linear', [parameter_values[0]], parameter_values[1])(x),
+            z - ca.interpolant('interpolant', 'linear', [parameter_values[0], parameter_values[1]], parameter_values[2].ravel(order='F'))(ca.vertcat(x, y)),
+        ]
+
+        self.assert_model_equivalent_numeric(ref_model, casadi_model)
+
     def test_function_call(self):
         with open(os.path.join(MODEL_DIR, 'FunctionCall.mo'), 'r') as f:
             txt = f.read()
