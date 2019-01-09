@@ -583,11 +583,12 @@ class GenCasadiTest(unittest.TestCase):
         E = ca.MX.sym("E", 2, 3)
         I = ca.MX.sym("I", 5, 5)
         F = ca.MX.sym("F", 3, 3)
+        G = ca.MX.sym("G", 3, 3)
 
         ref_model.alg_states = list(map(Variable, [A, b, c, d]))
-        ref_model.constants = list(map(Variable, [C, D, E, I, F]))
+        ref_model.constants = list(map(Variable, [C, D, E, I, F, G]))
         constant_values = [1.7 * ca.DM.ones(2, 3), ca.DM.zeros(3, 2), ca.DM.ones(2, 3), ca.DM.eye(5),
-                                     ca.DM.triplet([0, 1, 2], [0, 1, 2], [1, 2, 3], 3, 3)]
+                                     ca.DM.triplet([0, 1, 2], [0, 1, 2], [1, 2, 3], 3, 3), ca.DM.zeros(3, 3)]
         for const, val in zip(ref_model.constants, constant_values):
             const.value = val
         ref_model.equations = [ca.mtimes(A, b) - c, ca.mtimes(A.T, b) - d, F[1, 2]]

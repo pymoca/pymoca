@@ -961,7 +961,13 @@ class Model:
             attribute_lists = [[] for i in range(len(CASADI_ATTRIBUTES))]
             for variable in variable_list:
                 for attribute_list_index, attribute in enumerate(CASADI_ATTRIBUTES):
-                    value = ca.MX(getattr(variable, attribute))
+                    value = getattr(variable, attribute)
+                    # Try casting to DM first, in case we have a nested list that needs to be interpreted as a matrix.
+                    try:
+                        value = ca.DM(value)
+                    except:
+                        pass
+                    value = ca.MX(value)
                     if value.is_zero():
                         value = zero
                     elif value.is_one():
