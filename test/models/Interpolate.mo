@@ -5,5 +5,5 @@ model Interpolate
     Real x, y, z;
 equation
     y = _pymoca_interp1d(xp, yp, x);
-    z = _pymoca_interp2d(xp, yp, zp, x, y);
+    z = _pymoca_interp2d(xp, yp, zp, x, y, "linear");
 end Interpolate;

@@ -295,7 +295,7 @@ class Generator(TreeListener):
 
             delay_argument = DelayArgument(expr, duration)
             self.model.delay_arguments.append(delay_argument)
-        elif op == '_pymoca_interp1d' and n_operands == 3:
+        elif op == '_pymoca_interp1d' and n_operands >= 3 and n_operands <= 4:
             entered_class = self.entered_classes[-1]
             if isinstance(tree.operands[0], ast.ComponentRef):
                 xp = self.get_mx(entered_class.symbols[tree.operands[0].name].value)
@@ -306,9 +306,14 @@ class Generator(TreeListener):
             else:
                 yp = self.get_mx(tree.operands[1])
             arg = self.get_mx(tree.operands[2])
-            func = ca.interpolant('interpolant', 'linear', [xp], yp)
+            if n_operands == 4:
+                assert isinstance(tree.operands[3], ast.Primary)
+                mode = tree.operands[3].value
+            else:
+                mode = 'linear'
+            func = ca.interpolant('interpolant', mode, [xp], yp)
             src = func(arg)
-        elif op == '_pymoca_interp2d' and n_operands == 5:
+        elif op == '_pymoca_interp2d' and n_operands >= 5 and n_operands <= 6:
             entered_class = self.entered_classes[-1]
             if isinstance(tree.operands[0], ast.ComponentRef):
                 xp = self.get_mx(entered_class.symbols[tree.operands[0].name].value)
@@ -324,7 +329,12 @@ class Generator(TreeListener):
                 zp = self.get_mx(tree.operands[2])
             arg_1 = self.get_mx(tree.operands[3])
             arg_2 = self.get_mx(tree.operands[4])
-            func = ca.interpolant('interpolant', 'linear', [xp, yp], np.array(zp).ravel(order='F'))
+            if n_operands == 6:
+                assert isinstance(tree.operands[5], ast.Primary)
+                mode = tree.operands[5].value
+            else:
+                mode = 'linear'
+            func = ca.interpolant('interpolant', mode, [xp, yp], np.array(zp).ravel(order='F'))
             src = func(ca.vertcat(arg_1, arg_2))
         elif op in OP_MAP and n_operands == 2:
             lhs = ca.MX(self.get_mx(tree.operands[0]))
