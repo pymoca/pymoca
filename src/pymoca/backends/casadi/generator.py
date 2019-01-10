@@ -6,7 +6,7 @@ from collections import namedtuple, deque, OrderedDict
 import casadi as ca
 import numpy as np
 import itertools
-from typing import Union, Dict
+from typing import Union, Dict, Iterable
 
 from pymoca import ast
 from pymoca.tree import TreeWalker, TreeListener, flatten
