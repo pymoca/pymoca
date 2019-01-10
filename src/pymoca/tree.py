@@ -9,7 +9,7 @@ import copy  # TODO
 import logging
 import sys
 from collections import OrderedDict
-from typing import Union
+from typing import Union, Iterable
 import os
 
 import numpy as np
@@ -170,6 +170,9 @@ class TreeWalker:
             return True
         return False
 
+    def order_keys(self, keys: Iterable[str]):
+        return keys
+
     def walk(self, listener: TreeListener, tree: ast.Node) -> None:
         """
         Walks an AST tree recursively
@@ -182,7 +185,7 @@ class TreeWalker:
             getattr(listener, 'enterEvery')(tree)
         if hasattr(listener, 'enter' + name):
             getattr(listener, 'enter' + name)(tree)
-        for child_name in tree.__dict__.keys():
+        for child_name in self.order_keys(tree.__dict__.keys()):
             if self.skip_child(tree, child_name):
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
