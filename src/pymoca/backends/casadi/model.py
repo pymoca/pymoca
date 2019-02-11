@@ -176,6 +176,23 @@ class Model:
 
         return equations
 
+    def _substitute_metadata(self, symbols, values):
+        substitutions = []
+        for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+            for attribute in CASADI_ATTRIBUTES:
+                value = getattr(variable, attribute)
+                if isinstance(value, ca.MX) and not value.is_constant():
+                    substitutions.append((value, variable, attribute))
+
+        if len(substitutions) == 0:
+            return
+
+        expressions, variables, attributes = zip(*substitutions)
+        expressions = ca.substitute(expressions, symbols, values)
+
+        for variable, attribute, value in zip(variables, attributes, expressions):
+            setattr(variable, attribute, value)
+
     def _expand_vectors(self):
         logger.info("Expanding vectors")
 
@@ -306,12 +323,7 @@ class Model:
         assert set(self.delay_states).issubset(input_names)
 
         # Replace values in metadata
-        for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-            for attribute in CASADI_ATTRIBUTES:
-                value = getattr(variable, attribute)
-                if isinstance(value, ca.MX) and not value.is_constant():
-                    [value] = ca.substitute([value], symbols, values)
-                    setattr(variable, attribute, value)
+        self._substitute_metadata(symbols, values)
 
     def simplify(self, options):
         if options.get('expand_vectors', False) and options.get('expand_mx', False):
@@ -369,12 +381,7 @@ class Model:
                     self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
 
                 # Replace parameter expressions in metadata
-                for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                    for attribute in CASADI_ATTRIBUTES:
-                        value = getattr(variable, attribute)
-                        if isinstance(value, ca.MX) and not value.is_constant():
-                            [value] = ca.substitute([value], symbols, values)
-                            setattr(variable, attribute, value)
+                self._substitute_metadata(symbols, values)
 
         if options.get('replace_constant_expressions', False):
             logger.info("Replacing constant expressions")
@@ -410,12 +417,7 @@ class Model:
                     self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
 
                 # Replace constant expressions in metadata
-                for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                    for attribute in CASADI_ATTRIBUTES:
-                        value = getattr(variable, attribute)
-                        if isinstance(value, ca.MX) and not value.is_constant():
-                            [value] = ca.substitute([value], symbols, values)
-                            setattr(variable, attribute, value)
+                self._substitute_metadata(symbols, values)
 
         if options.get('eliminate_constant_assignments', False):
             logger.info("Elimating constant variable assignments")
@@ -483,12 +485,7 @@ class Model:
             self.parameters = unspecified_parameters
 
             # Replace parameter values in metadata
-            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in CASADI_ATTRIBUTES:
-                    value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX) and not value.is_constant():
-                        [value] = ca.substitute([value], symbols, values)
-                        setattr(variable, attribute, value)
+            self._substitute_metadata(symbols, values)
 
         if options.get('replace_constant_values', False):
             logger.info("Replacing constant values")
@@ -505,12 +502,7 @@ class Model:
             self.constants = []
 
             # Replace constant values in metadata
-            for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
-                for attribute in CASADI_ATTRIBUTES:
-                    value = getattr(variable, attribute)
-                    if isinstance(value, ca.MX) and not value.is_constant():
-                        [value] = ca.substitute([value], symbols, values)
-                        setattr(variable, attribute, value)
+            self._substitute_metadata(symbols, values)
 
         if options.get('eliminable_variable_expression', None) is not None:
             logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
