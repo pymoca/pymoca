@@ -991,7 +991,8 @@ def add_state_value_equations(node: ast.Node) -> None:
     non_state_prefixes = {'constant', 'parameter'}
     for sym in node.symbols.values():
         if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
-            if len(non_state_prefixes & set(sym.prefixes)) == 0:
+            is_const_input = 'input' in sym.prefixes and isinstance(sym.fixed, ast.Primary) and sym.fixed.value is True
+            if len(non_state_prefixes & set(sym.prefixes)) == 0 and not is_const_input:
                 node.equations.append(ast.Equation(left=sym, right=sym.value))
                 sym.value = ast.Primary(value=None)
 
