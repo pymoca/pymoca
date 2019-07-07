@@ -40,20 +40,26 @@ class OdeModel:
         self.g = self.y.subs(fg_sol)
         assert len(self.y) == len(self.g)
 
-    def linearize_symbolic(self) -> List[sympy.MutableDenseMatrix]:
-        A = sympy.Matrix([])
-        B = sympy.Matrix([])
-        C = sympy.Matrix([])
-        D = sympy.Matrix([])
-        if len(self.x) > 0:
-            if len(self.f) > 0:
+    def linearize_symbolic(self,
+                            zeros=False) -> List[sympy.MutableDenseMatrix]:
+        nx = len(self.x)
+        nu = len(self.u)
+        ny = len(self.y)
+        nf = len(self.f)
+        ng = len(self.g)
+        A = sympy.Matrix([]) if zeros == False else sympy.Matrix.zeros(nx, nx)
+        B = sympy.Matrix([]) if zeros == False else sympy.Matrix.zeros(nx, nu)
+        C = sympy.Matrix([]) if zeros == False else sympy.Matrix.zeros(ny, nx)
+        D = sympy.Matrix([]) if zeros == False else sympy.Matrix.zeros(ny, nu)
+        if nx > 0:
+            if nf > 0:
                 A = self.f.jacobian(self.x)
-            if len(self.g) > 0:
+            if ng > 0:
                 C = self.g.jacobian(self.x)
-        if len(self.u) > 0:
-            if len(self.f) > 0:
+        if nu > 0:
+            if nf > 0:
                 B = self.f.jacobian(self.u)
-            if len(self.g) > 0:
+            if ng > 0:
                 D = self.g.jacobian(self.u)
         return [A, B, C, D]
 
