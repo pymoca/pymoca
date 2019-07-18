@@ -160,9 +160,9 @@ class {{tree.name}}(OdeModel):
         if op == 'der':
             src = '({var:s}).diff(self.t)'.format(
                 var=self.src[tree.operands[0]])
-        elif op in ['*', '+', '-', '/'] and n_operands == 2:
+        elif op in ['*', '+', '-', '/', '^'] and n_operands == 2:
             src = '{left:s} {op:s} {right:s}'.format(
-                op=op,
+                op=op if op != '^' else '**',
                 left=self.src[tree.operands[0]],
                 right=self.src[tree.operands[1]])
         elif op in ['+', '-'] and n_operands == 1:
