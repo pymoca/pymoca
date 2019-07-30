@@ -90,8 +90,27 @@ def setup_package():
     """
     Setup the package.
     """
-    with open('requirements.txt', 'r') as req_file:
-        install_reqs = req_file.read().split('\n')
+
+    extras_require = {
+        # Backends
+        'casadi': ['casadi >= 3.4.0'],
+        'lxml': [
+            'lxml >= 3.5.0',
+            'scipy >= 0.13.3',
+        ],
+        'sympy': [
+            'sympy >= 0.7.6.1',
+            'scipy >= 0.13.3',
+        ],
+        # Examples
+        'examples': [
+            'jupyterlab',
+            'matplotlib'
+        ],
+        'all': []  # Automatically generated below
+
+    }
+    extras_require['all'] = sorted({r for l in extras_require.values() for r in l})
 
     cmdclass_ = {'antlr': AntlrBuildCommand}
     cmdclass_.update(versioneer.get_cmdclass())
@@ -110,8 +129,12 @@ def setup_package():
         license='BSD',
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
-        install_requires=install_reqs,
+        install_requires=[
+            "antlr4-python3-runtime > 4.5",
+            "numpy >= 1.8.2",
+        ],
         tests_require=['coverage >= 3.7.1', 'nose >= 1.3.1'],
+        extras_require=extras_require,
         test_suite='nose.collector',
         python_requires='>=3.5',
         packages=find_packages("src"),
