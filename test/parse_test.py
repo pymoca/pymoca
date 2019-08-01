@@ -262,6 +262,20 @@ class ParseTest(unittest.TestCase):
         self.assertIn('c.up.Z', flat_tree.classes['ChannelZ'].symbols)
         self.assertIn('c.down.A', flat_tree.classes['ChannelZ'].symbols)
 
+    def test_redeclaration_scope_alternative(self):
+        with open(os.path.join(MODEL_DIR, 'RedeclarationScopeAlternative.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        class_name = 'ChannelZ'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        self.assertIn('c.up.Z', flat_tree.classes['ChannelZ'].symbols)
+        self.assertIn('c.down.A', flat_tree.classes['ChannelZ'].symbols)
+
+
     def test_extends_redeclareable(self):
         with open(os.path.join(MODEL_DIR, 'ExtendsRedeclareable.mo'), 'r') as f:
             txt = f.read()
