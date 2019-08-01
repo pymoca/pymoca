@@ -306,7 +306,14 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
         scope_class = class_mod_argument.scope if class_mod_argument.scope is not None else extended_orig_class
         argument = class_mod_argument.value
         if isinstance(argument, ast.ShortClassDefinition):
+            old_class = extended_orig_class.classes[argument.name]
             extended_orig_class.classes[argument.name] = scope_class.find_class(argument.component)
+
+            # Fix references to symbol types that were already in the instance tree
+            for sym_name, sym in extended_orig_class.symbols.items():
+                if isinstance(sym.type, ast.InstanceClass) and sym.type.name is old_class.name:
+                    c = extended_orig_class.classes[argument.name]
+                    sym.type = build_instance_tree(c, sym.class_modification, c.parent)
         elif isinstance(argument, ast.ComponentClause):
             # Redeclaration of symbols
             # TODO: Do we need to handle scoping of redeclarations of symbols?
