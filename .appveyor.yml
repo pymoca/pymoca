@@ -6,9 +6,11 @@ branches:
 
 environment:
   matrix:
-    # only run 3 tests, these take 3 minutes each
-    - PYTHON: "C:\\Python35"
-      TOX_ENV: "py35"
+    # only run 2 tests, these take 3 minutes each
+    # We skip Python 3.5, as the AppVeyor run fails with something related to
+    # (an old) pip being confused about something and failing.
+    # - PYTHON: "C:\\Python35"
+      # TOX_ENV: "py35"
     - PYTHON: "C:\\Python36-x64"
       TOX_ENV: "py36"
     - PYTHON: "C:\\Python37-x64"
