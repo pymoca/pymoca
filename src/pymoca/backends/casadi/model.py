@@ -837,7 +837,7 @@ class Model:
                     # If any of the aliases has a nondefault start value, apply it to
                     # the canonical state as well
                     alias_state_start = ca.MX(alias_state.start)
-                    if alias_state_start.is_regular() and not alias_state_start.is_zero():
+                    if not alias_state_start.is_constant() or not alias_state_start.is_zero():
                         start = sign * alias_state.start
 
                     # The intersection of all bound ranges applies
