@@ -154,7 +154,7 @@ class ComponentRef(Node):
             return self.name,
 
     @classmethod
-    def from_tuple(cls, components: tuple) -> 'ComponentRef':
+    def from_tuple(cls, components: Union[tuple, list]) -> 'ComponentRef':
         """
         Convert the tuple pointing to a component to
         a component reference.

@@ -686,7 +686,7 @@ class FunctionExpander(TreeListener):
     Listener to extract functions
     """
 
-    def __init__(self, node: ast.Tree, function_set: set):
+    def __init__(self, node: ast.Tree, function_set: OrderedDict):
         self.node = node
         self.function_set = function_set
         super().__init__()
