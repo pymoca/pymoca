@@ -950,6 +950,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, []))
@@ -993,6 +994,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
@@ -1037,6 +1039,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
@@ -1080,6 +1083,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
@@ -1127,6 +1131,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c, cst]))
@@ -1171,6 +1176,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
@@ -1239,6 +1245,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.states[0].min = 1
         ref_model.states[0].max = 2
         ref_model.states[0].nominal = 10
+        ref_model.states[0].start = p3
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [y, _tmp, cst]))
         ref_model.inputs = list(map(Variable, []))
@@ -1385,6 +1392,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
@@ -1444,6 +1452,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.states[0].min = 1
         ref_model.states[0].max = 2
         ref_model.states[0].nominal = 10
+        ref_model.states[0].start = p3
         ref_model.der_states = list(map(Variable, [der_x]))
         ref_model.alg_states = list(map(Variable, [y]))
         ref_model.inputs = list(map(Variable, []))
@@ -1501,6 +1510,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.alg_states[0].min = 1
         ref_model.alg_states[0].max = 2
         ref_model.alg_states[0].nominal = 1
+        ref_model.alg_states[0].start = p3
         ref_model.inputs = list(map(Variable, []))
         ref_model.outputs = []
         ref_model.constants = list(map(Variable, [c]))
