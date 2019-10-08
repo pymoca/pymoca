@@ -5,7 +5,7 @@ model Simplify
     parameter Real p3;
     parameter Real p4 = 2 * p3;
     Real x(min = 0, max = 3, nominal = 10);
-    Real alias(min = 1, max = 2, nominal = 1);
+    Real alias(min = 1, max = 2, nominal = 1, start = p3);
     Real y;
     Real _tmp;
     Real cst;
