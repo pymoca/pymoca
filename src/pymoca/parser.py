@@ -467,7 +467,7 @@ class ASTListener(ModelicaListener):
         )
 
     def exitType_specifier(self, ctx: ModelicaParser.Type_specifierContext):
-        for element in reversed([self.ast[ctx] for ctx in ctx.type_specifier_element()]):
+        for element in reversed([self.ast[x] for x in ctx.type_specifier_element()]):
             if ctx in self.ast:
                 element.child = [self.ast[ctx]]
             self.ast[ctx] = element
@@ -484,7 +484,7 @@ class ASTListener(ModelicaListener):
         )
 
     def exitComponent_reference(self, ctx: ModelicaParser.Component_referenceContext):
-        for element in reversed([self.ast[ctx] for ctx in ctx.component_reference_element()]):
+        for element in reversed([self.ast[x] for x in ctx.component_reference_element()]):
             if ctx in self.ast:
                 element.child = [self.ast[ctx]]
             self.ast[ctx] = element
