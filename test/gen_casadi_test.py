@@ -1679,9 +1679,9 @@ class GenCasadiTest(unittest.TestCase):
                 Real y;
                 Real z[1,1];
             equation
-                x[1] = y
-                w[1] = y
-                z[1,1] = v[2]
+                x[1] = y;
+                w[1] = y;
+                z[1,1] = v[2];
             end Test;
             """
         ast_tree = parser.parse(txt)
@@ -1724,8 +1724,8 @@ class GenCasadiTest(unittest.TestCase):
             model Test
                 C c;
             equation
-                c.b[1].a.x[1] = 1
-                c.b[2].a.x[3] = 2
+                c.b[1].a.x[1] = 1;
+                c.b[2].a.x[3] = 2;
             end Test;
             """
         ast_tree = parser.parse(txt)
@@ -1799,7 +1799,7 @@ class GenCasadiTest(unittest.TestCase):
         txt = """
             model Test
                 Real x[3];
-                Real y[3]
+                Real y[3];
             equation
                 x = {4, 5, 6}; //this should be equivalent to x[:] = {1, 2, 3}
                 y[:] = {3, 2, 1};
