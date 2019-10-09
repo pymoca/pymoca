@@ -72,9 +72,9 @@ class ParseTest(unittest.TestCase):
         # test is fast to succeed when everything works as expected.
         for i in range(50):
             time.sleep(0.1)
-            if not thread.isAlive():
+            if not thread.is_alive():
                 return
-        self.assertFalse(thread.isAlive(), msg='Timeout occurred')
+        self.assertFalse(thread.is_alive(), msg='Timeout occurred')
 
     def test_estimator(self):
         with open(os.path.join(MODEL_DIR, './Estimator.mo'), 'r') as f:
