@@ -1,6 +1,5 @@
 from collections import namedtuple
 from typing import Dict
-import distutils.ccompiler
 import casadi as ca
 import numpy as np
 import copy
@@ -11,7 +10,7 @@ import logging
 import pickle
 import contextlib
 
-from pymoca import parser, tree, ast, __version__
+from pymoca import __version__
 from . import generator
 from .alias_relation import AliasRelation
 from .model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
@@ -84,6 +83,11 @@ class InvalidCacheError(Exception):
     pass
 
 def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]):
+    # Importing the antlr4 (generated modules) is rather slow. Avoid for this
+    # ~100 ms startup overhead for cached models by importing only when
+    # compiling.
+    from pymoca import parser
+
     # Load folders
     tree = None
     for folder in [model_folder] + compiler_options.get('library_folders', []):
@@ -114,6 +118,10 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     return model
 
 def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
+    # Avoid locating compiler when loading from cache by loading
+    # distutils.ccompiler here on-demand.
+    import distutils.ccompiler
+
     # Compile shared libraries
     if os.name == 'posix':
         compiler_flags = ['-O2', '-fPIC']
