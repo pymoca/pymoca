@@ -886,8 +886,12 @@ def expand_connectors(node: ast.Class) -> None:
     for equation in orig_equations:
         if isinstance(equation, ast.ConnectClause):
             # expand connector
-            assert len(equation.left.child) == 0
-            assert len(equation.right.child) == 0
+            if len(equation.left.child) != 0:
+                raise Exception("Could not resolve {} in connect clause ({}*, {}*)".format(
+                    equation.left, equation.left, equation.right))
+            if len(equation.right.child) != 0:
+                raise Exception("Could not resolve {} in connect clause ({}*, {}*)".format(
+                    equation.right, equation.left, equation.right))
 
             sym_left = node.symbols[equation.left.name]
             sym_right = node.symbols[equation.right.name]
