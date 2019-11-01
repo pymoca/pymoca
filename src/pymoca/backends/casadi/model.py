@@ -511,8 +511,8 @@ class Model:
             # circuited MX if-else expressions, we can end up in an infinite
             # loop. With expanded (to SX and back) equations we are safe, as
             # SX does not support short-circuiting.
-            assert options.get('expand_mx', True), \
-                "The current implementation assumes that the option 'expand_mx' is set to True"
+            if not options.get('expand_mx', False):
+                raise Exception("The use of `eliminable_variable_expression` requires `expand_mx` set to True")
 
             p = re.compile(options['eliminable_variable_expression'])
 
