@@ -1150,7 +1150,8 @@ class GenCasadiTest(unittest.TestCase):
     def test_simplify_eliminable_variable_expression(self):
         # Create model, cache it, and load the cache
         compiler_options = \
-            {'eliminable_variable_expression': r'_\w+'}
+            {'eliminable_variable_expression': r'_\w+',
+             'expand_mx': True}
 
         casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
@@ -1437,7 +1438,8 @@ class GenCasadiTest(unittest.TestCase):
              'eliminate_constant_assignments': True,
              'detect_aliases': True,
              'eliminable_variable_expression': r'_\w+',
-             'reduce_affine_expression': True}
+             'reduce_affine_expression': True,
+             'expand_mx': True}
 
         casadi_model = transfer_model(MODEL_DIR, 'Simplify', compiler_options)
 
@@ -1529,7 +1531,8 @@ class GenCasadiTest(unittest.TestCase):
     def test_simplify_differentiated_state(self):
         # Create model, cache it, and load the cache
         compiler_options = \
-            {'eliminable_variable_expression': r'_\w+'}
+            {'eliminable_variable_expression': r'_\w+',
+             'expand_mx': True}
 
         casadi_model = transfer_model(MODEL_DIR, 'SimplifyDifferentiatedState', compiler_options)
 
