@@ -31,6 +31,25 @@ class GenCasadiTest(unittest.TestCase):
                   "parameters"]:
             self.assertEqual(sstr(getattr(A, l)), sstr(getattr(B, l)))
 
+    def assert_model_variables_equivalant(self, A, B):
+        for vgroup in ["states", "der_states", "alg_states", "inputs",
+                       "outputs", "constants", "parameters"]:
+            variables_this = getattr(A, vgroup)
+            variables_that = getattr(B, vgroup)
+
+            for variable_this, variable_that in zip(variables_this, variables_that):
+                self.assertEqual(variable_this.symbol.name(), variable_that.symbol.name())
+
+                for attr in CASADI_ATTRIBUTES:
+                    val_this = getattr(variable_this, attr)
+                    val_that = getattr(variable_that, attr)
+
+                    self.assertEqual(type(val_this), type(val_that), "{}: '{}' ({})".format(
+                        vgroup, variable_this.symbol.name(), attr))
+                    np.testing.assert_equal(val_this, val_that)
+
+        self.assertEqual(A.delay_states, B.delay_states)
+
     def assert_model_equivalent_numeric(self, A, B, tol=1e-9):
         self.assertEqual(len(A.states), len(B.states))
         self.assertEqual(len(A.der_states), len(B.der_states))
@@ -870,6 +889,7 @@ class GenCasadiTest(unittest.TestCase):
 
         # Compare
         self.assert_model_equivalent_numeric(ref_model, cached_model)
+        self.assert_model_variables_equivalant(ref_model, cached_model)
 
     def test_cache_delay_arguments(self):
         # Clear cache
@@ -890,6 +910,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertIsInstance(cached_model, CachedModel)
 
         self.assert_model_equivalent_numeric(ref_model, cached_model)
+        self.assert_model_variables_equivalant(ref_model, cached_model)
 
     def test_codegen(self):
         # Clear cache
@@ -920,6 +941,7 @@ class GenCasadiTest(unittest.TestCase):
 
         # Compare
         self.assert_model_equivalent_numeric(ref_model, cached_model)
+        self.assert_model_variables_equivalant(ref_model, cached_model)
 
     def test_simplify_replace_constant_values(self):
         # Create model, cache it, and load the cache
