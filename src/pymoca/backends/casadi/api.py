@@ -1,4 +1,5 @@
 from collections import namedtuple
+from enum import IntEnum
 from typing import Dict
 import casadi as ca
 import numpy as np
@@ -16,6 +17,12 @@ from .alias_relation import AliasRelation
 from .model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
 
 logger = logging.getLogger("pymoca")
+
+
+class _DepMeta(IntEnum):
+    NOT_MX = 0
+    MX_DEPENDENT = 1
+    MX_INDEPENDENT = 2
 
 
 class CachedModel(Model):
@@ -215,13 +222,18 @@ def save_model(model_folder: str, model_name: str, model: Model,
 
         for k, key in enumerate(['states', 'alg_states', 'inputs', 'parameters', 'constants']):
             metadata_shape = (len(getattr(model, key)), len(CASADI_ATTRIBUTES))
-            m = db[key + "__metadata_dependent"] = np.zeros(metadata_shape, dtype=bool)
+            m = db[key + "__metadata_dependent"] = np.zeros(metadata_shape, dtype=int)
+            if np.prod(m.shape) > 0:
+                assert m[0, 0] == _DepMeta.NOT_MX
+
             for i, v in enumerate(getattr(model, key)):
                 for j, tmp in enumerate(CASADI_ATTRIBUTES):
                     attr = getattr(v, tmp)
-                    if (isinstance(attr, ca.MX) and not attr.is_constant()
-                        and ca.depends_on(attr, parameter_vector)):
-                        m[i, j] = True
+                    if isinstance(attr, ca.MX):
+                        if not attr.is_constant() and ca.depends_on(attr, parameter_vector):
+                            m[i, j] = _DepMeta.MX_DEPENDENT
+                        else:
+                            m[i, j] = _DepMeta.MX_INDEPENDENT
 
         # Delay dependency checking
         if model.delay_states:
@@ -337,17 +349,23 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(parameter_vector)))
         independent_metadata = dict(zip(
             variables_with_metadata,
-            (np.array(x) for x in model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters])))))
+            (ca.MX(x) for x in model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters])))))
 
         for k, key in enumerate(variables_with_metadata):
             m = db[key + "__metadata_dependent"]
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d['name']]
                 for j, tmp in enumerate(CASADI_ATTRIBUTES):
-                    if m[i, j]:
+                    if m[i, j] == _DepMeta.MX_DEPENDENT:
                         setattr(variable, tmp, metadata[key][i, j])
-                    else:
+                    elif m[i, j] == _DepMeta.MX_INDEPENDENT:
                         setattr(variable, tmp, independent_metadata[key][i, j])
+                    else:
+                        # Already handled as part of Variable dict. That way
+                        # we also do not have to worry about making sure the
+                        # type of the cached model is exactly the same, as
+                        # pickling ensures that.
+                        pass
 
         # Evaluate delay arguments:
         if model.delay_states:
@@ -417,14 +435,6 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                     dur = independent_delay_durations_raw[i]
 
                 model.delay_arguments.append(DelayArgument(expr, dur))
-
-        # Try to coerce parameters into their Python types
-        for p in model.parameters:
-            for attr in CASADI_ATTRIBUTES:
-                v = getattr(p, attr)
-                v_mx = ca.MX(v)
-                if v_mx.is_constant() and v_mx.is_regular():
-                    setattr(p, attr, p.python_type(v))
 
     # Done
     return model

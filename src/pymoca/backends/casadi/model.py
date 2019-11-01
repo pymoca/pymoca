@@ -45,12 +45,22 @@ class Variable:
         d['shape'] = (self.symbol.size1(), self.symbol.size2())
         d['python_type'] = self.python_type
         d['aliases'] = self.aliases
+
+        for attr in CASADI_ATTRIBUTES:
+            d[attr] = getattr(self, attr)
+            if isinstance(d[attr], ca.MX):
+                d[attr] = None  # Will be filled using variable_metadata_function
+
         return d
 
     @classmethod
     def from_dict(cls, d):
         variable = cls(ca.MX.sym(d['name'], *d['shape']), d['python_type'])
         variable.aliases = d['aliases']
+
+        for attr in CASADI_ATTRIBUTES:
+            setattr(variable, attr, d[attr])
+
         return variable
 
 
