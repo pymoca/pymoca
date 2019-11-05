@@ -361,6 +361,52 @@ class ParseTest(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Cannot extend class 'A' with itself"):
             flat_tree = tree.flatten(ast_tree, comp_ref)
 
+    def test_unit_type(self):
+        txt = """
+            model A
+              parameter Integer x = 1;
+              parameter Real y = 1.0;
+              parameter Real z = 1;  // Mismatch
+              parameter Integer w = 1.0;  // Mismatch
+            end A;
+        """
+
+        ast_tree = parser.parse(txt)
+
+        class_name = 'A'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        # For the moment, we do not raise errors/warnings or do
+        # auto-conversions in the parser/flattener.
+        self.assertIsInstance(flat_tree.classes['A'].symbols['x'].value.value, int)
+        self.assertIsInstance(flat_tree.classes['A'].symbols['y'].value.value, float)
+        # self.assertIsInstance(flat_tree.classes['A'].symbols['z'].value.value, int)
+        # self.assertIsInstance(flat_tree.classes['A'].symbols['w'].value.value, float)
+
+    def test_unit_type_array(self):
+        txt = """
+            model A
+              parameter Integer x[2, 2] = {{1, 2}, {3, 4}};
+              parameter Real y[2, 2] = {{1.0, 2.0}, {3.0, 4.0}};
+            end A;
+        """
+
+        ast_tree = parser.parse(txt)
+
+        class_name = 'A'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        # For the moment, we leave type conversions to the backends. We only want to
+        # be sure that we read in the correct type in the parser.
+        for i in range(2):
+            for j in range(2):
+                self.assertIsInstance(flat_tree.classes['A'].symbols['x'].value.values[i].values[j].value, int)
+                self.assertIsInstance(flat_tree.classes['A'].symbols['y'].value.values[i].values[j].value, float)
+
 
 if __name__ == "__main__":
     unittest.main()
