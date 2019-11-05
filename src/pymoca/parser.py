@@ -426,7 +426,13 @@ class ASTListener(ModelicaListener):
     # PRIMARY ===========================================================
 
     def exitPrimary_unsigned_number(self, ctx: ModelicaParser.Primary_unsigned_numberContext):
-        self.ast[ctx] = ast.Primary(value=float(ctx.getText()))
+        number_string = ctx.getText()
+        try:
+            val = int(number_string)
+        except ValueError:
+            val = float(number_string)
+
+        self.ast[ctx] = ast.Primary(value=val)
 
     def exitPrimary_string(self, ctx: ModelicaParser.Primary_stringContext):
         val = ctx.getText()
