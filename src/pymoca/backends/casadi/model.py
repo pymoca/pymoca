@@ -271,15 +271,24 @@ class Model:
                         for attribute in CASADI_ATTRIBUTES:
                             # Can't convert 3D arrays to MX, so we convert to nparray instead
                             value = getattr(old_var, attribute)
-                            if not isinstance(value, ca.MX) and not np.isscalar(value):
-                                value = np.array(value)
+                            if not isinstance(value, ca.MX):
+                                if np.isscalar(value):
+                                    # Just assign without indexing
+                                    val = value
+                                else:
+                                    assert isinstance(value, list)
+                                    val = value
+                                    for i in ind:
+                                        val = val[i]
                             else:
-                                value = ca.MX(getattr(old_var, attribute))
+                                if np.prod(value.shape) == 1:
+                                    # Just assign without indexing
+                                    val = value
+                                else:
+                                    val = value[ind]
 
-                            if np.prod(value.shape) == 1:
-                                setattr(component_var, attribute, value)
-                            else:
-                                setattr(component_var, attribute, value[ind])
+                            setattr(component_var, attribute, val)
+
                         expanded_symbols.append(component_var)
 
                     s = old_var.symbol._mx if isinstance(old_var.symbol, _MTensor) else old_var.symbol
