@@ -132,6 +132,15 @@ class Generator(TreeListener):
                             # Coerce to Pyhton type to avoid interpretation
                             # issues.
                             v = python_type(v)
+                        elif isinstance(v, (float, int)) and not isinstance(v, python_type):
+                            # We skip booleans for now, as users likely depend
+                            # on them being integer/float-like.
+                            try:
+                                v = python_type(v)
+                            except (OverflowError, ValueError):
+                                # Cannot convert NaN/infs to integer
+                                pass
+
                         setattr(variable, a, v)
                 variable.prefixes = ast_symbol.prefixes
             variables.append(variable)
