@@ -2215,6 +2215,23 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assertListEqual(der_names, ["der(a[1].x[1])", "der(a[1].x[2])"])
 
+    def test_unit_type_array(self):
+        txt = """
+            model A
+              parameter Integer x[2, 2] = {{1, 2}, {3, 4}};
+              parameter Real y[2, 2] = {{1.0, 2.0}, {3.0, 4.0}};
+            end A;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'A')
+        casadi_model.simplify({'expand_vectors': True})
+
+        for i in range(0, 4):
+            self.assertIsInstance(casadi_model.parameters[i].value, int)
+        for i in range(4, 8):
+            self.assertIsInstance(casadi_model.parameters[i].value, float)
+
 
 if __name__ == "__main__":
     unittest.main()
