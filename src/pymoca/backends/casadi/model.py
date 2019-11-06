@@ -30,7 +30,7 @@ class Variable:
         self.start = 0
         self.min = -np.inf
         self.max = np.inf
-        self.nominal = 1
+        self.nominal = 0
         self.fixed = False
 
     def __str__(self):

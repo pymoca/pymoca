@@ -1287,6 +1287,24 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEqual(casadi_model.states[0].aliases, {'alias'})
 
+    def test_simplify_alias_small_nominal(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'detect_aliases': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'SmallNominal', compiler_options)
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+
+        ref_model.alg_states = list(map(Variable, [x]))
+        ref_model.alg_states[0].nominal = 0.1
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+        self.assertEquals(casadi_model.alg_states[0].aliases, {'alias'})
+
     def test_simplify_detect_negative_alias(self):
         # Create model, cache it, and load the cache
         compiler_options = \
