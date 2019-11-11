@@ -275,11 +275,16 @@ class Model:
                                 if np.isscalar(value):
                                     # Just assign without indexing
                                     val = value
-                                else:
-                                    assert isinstance(value, list)
+                                elif isinstance(value, list):
                                     val = value
                                     for i in ind:
                                         val = val[i]
+                                elif isinstance(value, (ca.DM, np.ndarray)):
+                                    val = value[ind]
+                                    if old_var.python_type in {float, int}:
+                                        val = old_var.python_type(val)
+                                else:
+                                    assert False, "Unexpected type from CasADi generator"
                             else:
                                 if np.prod(value.shape) == 1:
                                     # Just assign without indexing
