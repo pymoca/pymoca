@@ -753,6 +753,30 @@ class GenCasadiTest(unittest.TestCase):
             self.assertEqual(param_symbols[flat_index].name(), "x[{}]".format(",".join((str(x + 1) for x in ind))))
             self.assertEqual(casadi_model.parameters[flat_index].value, target_param_values[ind])
 
+    def test_array_expand(self):
+        casadi_model = transfer_model(MODEL_DIR, 'ArrayExpand', {'expand_vectors': True})
+
+        target_values = {}
+        target_values['x'] = np.array([[ -5.326999,  54.050758,  0.000000],
+                                       [ -1.0,        0.0,       0.0]], dtype=float)
+        target_values['y'] = np.full((2, 2), -999, dtype=int)
+        target_values['z'] = np.full((2, 2), -999.0, dtype=float)
+
+        types = {'x': float, 'y': int, 'z': float}
+
+        param_symbols = {}
+
+        for x in casadi_model.parameters:
+            param_symbols.setdefault(x.symbol.name()[0], []).append(x)
+
+        for v, target_param_values in target_values.items():
+            for ind in np.ndindex(target_param_values.shape):
+                flat_index = np.ravel_multi_index(ind, target_param_values.shape)
+                variable = param_symbols[v][flat_index]
+                val = variable.value
+                self.assertEqual(val, target_param_values[ind], variable.symbol.name())
+                self.assertIsInstance(val, types[v], variable.symbol.name())
+
     def test_attributes(self):
         with open(os.path.join(MODEL_DIR, 'Attributes.mo'), 'r') as f:
             txt = f.read()
