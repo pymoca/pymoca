@@ -36,6 +36,7 @@ class XmlTest(unittest.TestCase):
         sys.stdout.flush()
         time.sleep(0.01)
 
+    @unittest.skipIf(os.environ.get('TRAVIS') == 'true', 'Fails with LLVM error')
     def test_noise(self):
 
         # compile to ModelicaXML
@@ -65,6 +66,7 @@ class XmlTest(unittest.TestCase):
         plt.pause(0.1)
         plt.close()
 
+    @unittest.skipIf(os.environ.get('TRAVIS') == 'true', 'Fails with LLVM error')
     def test_simple_circuit(self):
 
         # compile to ModelicaXML
@@ -94,6 +96,7 @@ class XmlTest(unittest.TestCase):
         plt.pause(0.1)
         plt.close()
 
+    @unittest.skipIf(os.environ.get('TRAVIS') == 'true', 'Fails with LLVM error')
     def test_bouncing_ball(self):
 
         # generate
