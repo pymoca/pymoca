@@ -860,9 +860,26 @@ class Model:
 
                     # If any of the aliases has a nondefault start value, apply it to
                     # the canonical state as well
-                    alias_state_start = ca.MX(alias_state.start)
-                    if not alias_state_start.is_constant() or not alias_state_start.is_zero():
-                        start = sign * alias_state.start
+                    alias_start = ca.MX(alias_state.start)
+                    if not alias_start.is_constant() or not alias_start.is_zero():
+                        start_mx = ca.MX(start)
+                        if not start_mx.is_constant() or not start_mx.is_zero():
+                            # If the state already has a non-default start
+                            # attribute we check for conflicts.
+                            if (start_mx.is_constant() != ca.MX(alias_start).is_constant()
+                                or (start_mx.is_symbolic() and str(start_mx) != str(sign * alias_start))
+                                or start != alias_start):
+
+                                logger.warning(
+                                    "Current start attribute of canonical variable '{}' ({})"
+                                    " conflicts with that of its alias '{}' ({})."
+                                    " Will keep existing value of {}."
+                                    .format(canonical, start, alias, alias_start, start))
+                            else:
+                                # Alias has equal start attribute, so nothing to do
+                                pass
+                        else:
+                            start = sign * alias_state.start
 
                     # The intersection of all bound ranges applies
                     m = ca.fmax(m, alias_state.min if sign == 1 else -alias_state.max)

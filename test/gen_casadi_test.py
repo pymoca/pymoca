@@ -1355,6 +1355,39 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEqual(casadi_model.states[0].aliases, {'-alias'})
 
+    def test_simplify_detect_alias_conflicting_start(self):
+        # Create model, cache it, and load the cache
+        compiler_options = \
+            {'detect_aliases': True}
+
+        with self.assertLogs('pymoca', level='WARNING') as cm:
+            casadi_model = transfer_model(MODEL_DIR, 'ConflictingAliasStart', compiler_options)
+
+        self.assertIn("Current start attribute of canonical variable 'x' (p1) conflicts", str(cm.output))
+        self.assertTrue(str(cm.output).count("Current start attribute of canonical variable 'x' (p1) conflicts") == 2)
+
+        ref_model = Model()
+
+        p1 = ca.MX.sym('p1')
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 1
+        ref_model.states[0].max = 2
+        ref_model.states[0].nominal = 10
+        ref_model.states[0].start = p1
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, []))
+        ref_model.inputs = list(map(Variable, []))
+        ref_model.outputs = []
+        ref_model.parameters = list(map(Variable, [p1]))
+        ref_model.equations = [der_x - x]
+
+        # Compare
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+        self.assertEqual(casadi_model.states[0].aliases, {'-alias_neg', 'alias_pos'})
+
     def test_simplify_expand_vectors(self):
         # Create model, cache it, and load the cache
         compiler_options = \
