@@ -130,7 +130,7 @@ def setup_package():
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
         install_requires=[
-            "antlr4-python3-runtime > 4.5",
+            "antlr4-python3-runtime == 4.7.*",
             "numpy >= 1.8.2",
         ],
         tests_require=['coverage >= 3.7.1', 'nose >= 1.3.1'],
