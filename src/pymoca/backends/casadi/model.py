@@ -17,6 +17,10 @@ SUBSTITUTE_LOOP_LIMIT = 100
 CASADI_ATTRIBUTES = [attr for attr in ast.Symbol.ATTRIBUTES if not attr == 'unit']
 
 
+class _DefaultValue(int):
+    pass
+
+
 class Variable:
     def __init__(self, symbol, python_type=float, aliases=None):
         if aliases is None:
@@ -27,7 +31,7 @@ class Variable:
 
         # Default attribute values
         self.value = np.nan
-        self.start = 0
+        self.start = _DefaultValue(0)
         self.min = -np.inf
         self.max = np.inf
         self.nominal = 0
@@ -860,21 +864,21 @@ class Model:
 
                     # If any of the aliases has a nondefault start value, apply it to
                     # the canonical state as well
-                    alias_start = ca.MX(alias_state.start)
-                    if not alias_start.is_constant() or not alias_start.is_zero():
-                        start_mx = ca.MX(start)
-                        if not start_mx.is_constant() or not start_mx.is_zero():
+                    if not isinstance(alias_state.start, _DefaultValue):
+                        alias_start_mx = ca.MX(alias_state.start)
+                        if not isinstance(start, _DefaultValue):
+                            start_mx = ca.MX(start)
                             # If the state already has a non-default start
                             # attribute we check for conflicts.
-                            if (start_mx.is_constant() != ca.MX(alias_start).is_constant()
-                                or (start_mx.is_symbolic() and str(start_mx) != str(sign * alias_start))
-                                or start != alias_start):
+                            if (start_mx.is_constant() != ca.MX(alias_start_mx).is_constant()
+                                or (start_mx.is_symbolic() and str(start_mx) != str(sign * alias_start_mx))
+                                or start != alias_start_mx):
 
                                 logger.warning(
                                     "Current start attribute of canonical variable '{}' ({})"
                                     " conflicts with that of its alias '{}' ({})."
                                     " Will keep existing value of {}."
-                                    .format(canonical, start, alias, alias_start, start))
+                                    .format(canonical, start, alias, alias_start_mx, start))
                             else:
                                 # Alias has equal start attribute, so nothing to do
                                 pass

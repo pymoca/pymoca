@@ -316,8 +316,7 @@ class Symbol(Node):
         self.outer = False  # type: bool
         self.dimensions = [[Primary(value=None)]]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
         self.comment = ''  # type: str
-        # params start value is 0 by default from Modelica spec
-        self.start = Primary(value=0)  # type: Union[Expression, Primary, ComponentRef, Array]
+        self.start = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.min = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.max = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.nominal = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
