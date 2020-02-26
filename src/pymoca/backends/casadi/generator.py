@@ -15,6 +15,8 @@ from .alias_relation import AliasRelation
 from .model import Model, Variable, DelayArgument
 from .mtensor import _MTensor, _new_mx
 
+from ._options import _merge_default_options
+
 logger = logging.getLogger("pymoca")
 
 # TODO
@@ -100,12 +102,12 @@ class Generator(TreeListener):
         self.for_loops = deque()
         self.functions = {}
         self.entered_classes = deque()
-        self.map_mode = 'inline' if options.get('unroll_loops', True) else 'serial'
-        self.function_mode = (True, False) if options.get('inline_functions', True) else (False, True)
+        self.map_mode = 'inline' if options['unroll_loops'] else 'serial'
+        self.function_mode = (True, False) if options['inline_functions'] else (False, True)
         self.delay_counter = 0
 
         # NOTE: Part of MTensor workaround.
-        self._expand_vectors_enabled = options.get('expand_vectors', False)
+        self._expand_vectors_enabled = options['expand_vectors']
 
     @property
     def current_class(self):
@@ -934,8 +936,9 @@ def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool]=None)
     :param options: dictionary of generator options
     :return: casadi model
     """
-    if options is None:
-        options = {}
+    options = _merge_default_options(options)
+
+
     component_ref = ast.ComponentRef.from_string(model_name)
     ast_walker = GeneratorWalker()
     flat_tree = flatten(ast_tree, component_ref)

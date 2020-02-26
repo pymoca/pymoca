@@ -15,6 +15,7 @@ from pymoca import __version__
 from . import generator
 from .alias_relation import AliasRelation
 from .model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
+from ._options import _merge_default_options, _get_default_options as get_default_options
 
 logger = logging.getLogger("pymoca")
 
@@ -97,7 +98,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
 
     # Load folders
     tree = None
-    for folder in [model_folder] + compiler_options.get('library_folders', []):
+    for folder in [model_folder] + compiler_options['library_folders']:
         for root, dir, files in os.walk(folder, followlinks=True):
             for item in fnmatch.filter(files, "*.mo"):
                 logger.info("Parsing {}".format(item))
@@ -112,12 +113,12 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     logger.info("Generating CasADi model")
 
     model = generator.generate(tree, model_name, compiler_options)
-    if compiler_options.get('check_balanced', True):
+    if compiler_options['check_balanced']:
         model.check_balanced()
 
     model.simplify(compiler_options)
 
-    if compiler_options.get('verbose', False):
+    if compiler_options['verbose']:
         model.check_balanced()
 
     model._post_checks()
@@ -182,11 +183,13 @@ def save_model(model_folder: str, model_name: str, model: Model,
     :param compiler_options: Dictionary of compiler options.
     """
 
+    compiler_options = _merge_default_options(compiler_options)
+
     objects = {'dae_residual': None, 'initial_residual': None, 'variable_metadata': None, 'delay_arguments': None}
     for o in objects.keys():
         f = getattr(model, o + '_function')
 
-        if compiler_options.get('codegen', False):
+        if compiler_options['codegen']:
             objects[o] = _codegen_model(model_folder, f, '{}_{}'.format(model_name, o))
         else:
             objects[o] = f
@@ -274,12 +277,14 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
     :returns: CachedModel instance.
     """
 
+    compiler_options = _merge_default_options(compiler_options)
+
     db_file = os.path.join(model_folder, model_name + ".pymoca_cache")
 
-    if compiler_options.get('mtime_check', True):
+    if compiler_options['mtime_check']:
         # Mtime check
         cache_mtime = os.path.getmtime(db_file)
-        for folder in [model_folder] + compiler_options.get('library_folders', []):
+        for folder in [model_folder] + compiler_options['library_folders']:
             for root, dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
                     filename = os.path.join(root, item)
@@ -313,7 +318,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             raise InvalidCacheError('Cache generated for different compiler options')
 
         # Pickles are platform independent, but dynamic libraries are not
-        if compiler_options.get('codegen', False):
+        if compiler_options['codegen']:
             if db['library_os'] != os.name:
                 raise InvalidCacheError('Cache generated for incompatible OS')
 
@@ -440,13 +445,11 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
     return model
 
 def transfer_model(model_folder: str, model_name: str, compiler_options=None):
-    if compiler_options is None:
-        compiler_options = {}
-    else:
-        compiler_options = copy.copy(compiler_options)
 
-    cache = compiler_options.setdefault('cache', False)
-    codegen = compiler_options.setdefault('codegen', False)
+    compiler_options = _merge_default_options(compiler_options)
+
+    cache = compiler_options['cache']
+    codegen = compiler_options['codegen']
 
     # Compilation takes precedence over caching, and disables it
     if cache and codegen:
@@ -458,7 +461,7 @@ def transfer_model(model_folder: str, model_name: str, compiler_options=None):
         # expanding to SX. We only raise a warning when we have to (re)compile
         # the model though.
         raise_expand_warning = False
-        if cache and not compiler_options.get('expand_mx', False):
+        if cache and not compiler_options['expand_mx']:
             compiler_options['expand_mx'] = True
             raise_expand_warning = True
 

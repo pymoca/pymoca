@@ -7,8 +7,10 @@ import re
 import sys
 
 from pymoca import ast
+
 from .alias_relation import AliasRelation
 from .mtensor import _MTensor
+from ._options import _merge_default_options
 
 logger = logging.getLogger("pymoca")
 
@@ -354,7 +356,9 @@ class Model:
         self._substitute_metadata(symbols, values)
 
     def simplify(self, options):
-        if options.get('expand_vectors', False) and options.get('expand_mx', False):
+        options = _merge_default_options(options)
+
+        if options['expand_vectors'] and options['expand_mx']:
             # If we are _not_ expanding MX to SX, we do the expansion of
             # vectors first, such that we are be able to detect more aliases
             # (e.g individual array elements, or elements in a for loop).
@@ -366,7 +370,7 @@ class Model:
             self.equations = self._expand_simplify_mx(self.equations)
             self.initial_equations = self._expand_simplify_mx(self.initial_equations)
 
-        if options.get('replace_parameter_expressions', False):
+        if options['replace_parameter_expressions']:
             logger.info("Replacing parameter expressions")
 
             simple_parameters, symbols, values = [], [], []
@@ -411,7 +415,7 @@ class Model:
                 # Replace parameter expressions in metadata
                 self._substitute_metadata(symbols, values)
 
-        if options.get('replace_constant_expressions', False):
+        if options['replace_constant_expressions']:
             logger.info("Replacing constant expressions")
 
             simple_constants, symbols, values = [], [], []
@@ -447,7 +451,7 @@ class Model:
                 # Replace constant expressions in metadata
                 self._substitute_metadata(symbols, values)
 
-        if options.get('eliminate_constant_assignments', False):
+        if options['eliminate_constant_assignments']:
             logger.info("Elimating constant variable assignments")
 
             alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
@@ -494,7 +498,7 @@ class Model:
             self.alg_states = list(alg_states.values())
             self.equations = reduced_equations
 
-        if options.get('replace_parameter_values', False):
+        if options['replace_parameter_values']:
             logger.info("Replacing parameter values")
 
             # N.B. Any parameter expression elimination must be done first.
@@ -515,7 +519,7 @@ class Model:
             # Replace parameter values in metadata
             self._substitute_metadata(symbols, values)
 
-        if options.get('replace_constant_values', False):
+        if options['replace_constant_values']:
             logger.info("Replacing constant values")
 
             # N.B. Any parameter expression elimination must be done first.
@@ -532,14 +536,14 @@ class Model:
             # Replace constant values in metadata
             self._substitute_metadata(symbols, values)
 
-        if options.get('eliminable_variable_expression', None) is not None:
+        if options['eliminable_variable_expression'] is not None:
             logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
 
             # Due to CasADi's ca.is_equal not properly matching short-
             # circuited MX if-else expressions, we can end up in an infinite
             # loop. With expanded (to SX and back) equations we are safe, as
             # SX does not support short-circuiting.
-            if not options.get('expand_mx', False):
+            if not options['expand_mx']:
                 raise Exception("The use of `eliminable_variable_expression` requires `expand_mx` set to True")
 
             p = re.compile(options['eliminable_variable_expression'])
@@ -687,11 +691,11 @@ class Model:
                 if len(self.delay_arguments) > 0:
                     self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
-        if options.get('expand_vectors', False) and not options.get('expand_mx', False):
+        if options['expand_vectors'] and not options['expand_mx']:
             # If we are _not_ expanding MX to SX, we do the expansion of vectors here
             self._expand_vectors()
 
-        if options.get('factor_and_simplify_equations', False):
+        if options['factor_and_simplify_equations']:
             # Operations that preserve the equivalence of an equation
             # TODO: There may be more, but this is the most frequent set
             unary_ops = ca.OP_NEG, ca.OP_FABS, ca.OP_SQRT
@@ -726,7 +730,7 @@ class Model:
             # Store changes
             self.equations = simplified_equations
 
-        if options.get('detect_aliases', False):
+        if options['detect_aliases']:
             logger.info("Detecting aliases")
 
             states = OrderedDict([(s.symbol.name(), s) for s in self.states])
@@ -800,7 +804,7 @@ class Model:
                         deps = ca.symvar(eq)
                         assert len(deps) == 2
                         if _make_alias(deps, eq.is_op(ca.OP_ADD)): continue
-                elif options.get('expand_vectors', False) and not options.get('expand_mx', False):
+                elif options['expand_vectors'] and not options['expand_mx']:
                     # Equation might have many "shadow" dependencies due to
                     # vector/array expansion. By using .expand() and SX
                     # symbols for the evaluation, we can figure out what the
@@ -920,7 +924,7 @@ class Model:
             if len(self.delay_arguments) > 0:
                 self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
-        if options.get('reduce_affine_expression', False):
+        if options['reduce_affine_expression']:
             logger.info("Collapsing model into an affine expression")
 
             for equation_list in ['equations', 'initial_equations']:
@@ -958,7 +962,7 @@ class Model:
                     equations = [ca.reshape(ca.mtimes(A, states_vector), equations.shape) + b]
                     setattr(self, equation_list, equations)
 
-        if options.get('expand_mx', False):
+        if options['expand_mx']:
             logger.info("Expanded MX functions will be returned")
             self._expand_mx_func = lambda x: x.expand()
 
