@@ -57,9 +57,6 @@ class XmlGenerator(TreeListener):
             val = getattr(tree, f).value
             if val is None:
                 continue
-            if val == 0 and f == 'start':
-                # this is already default
-                continue
             items.append(
                 E('item', E('real', value=str(val)), name=f))
 
