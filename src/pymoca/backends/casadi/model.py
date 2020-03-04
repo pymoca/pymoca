@@ -16,6 +16,7 @@ logger = logging.getLogger("pymoca")
 
 CASADI_COMPARISON_DEPTH = sys.maxsize
 SUBSTITUTE_LOOP_LIMIT = 100
+SIMPLIFICATION_LOOP_LIMIT = 50
 CASADI_ATTRIBUTES = [attr for attr in ast.Symbol.ATTRIBUTES if not attr == 'unit']
 
 
@@ -357,341 +358,585 @@ class Model:
 
     def simplify(self, options):
         options = _merge_default_options(options)
+        simplify_again = True
+        alg_states_left = 0
+        simplification_iter = 0
 
-        if options['expand_vectors'] and options['expand_mx']:
-            # If we are _not_ expanding MX to SX, we do the expansion of
-            # vectors first, such that we are be able to detect more aliases
-            # (e.g individual array elements, or elements in a for loop).
-            self._expand_vectors()
+        while simplify_again:
+            logger.info("Simplification iteration {}".format(simplification_iter+1))
+            if options['expand_vectors'] and options['expand_mx']:
+                # If we are _not_ expanding MX to SX, we do the expansion of
+                # vectors first, such that we are be able to detect more aliases
+                # (e.g individual array elements, or elements in a for loop).
+                self._expand_vectors()
 
-            # Expand to SX, and back again to MX such that the remaining
-            # simplification steps can be applied. We also do this to make
-            # sure we only ever expose MX to the outside world.
-            self.equations = self._expand_simplify_mx(self.equations)
-            self.initial_equations = self._expand_simplify_mx(self.initial_equations)
+            if options['replace_parameter_expressions']:
+                logger.info("Replacing parameter expressions")
 
-        if options['replace_parameter_expressions']:
-            logger.info("Replacing parameter expressions")
+                # Expand to SX, and back again to MX such that the remaining
+                # simplification steps can be applied. We also do this to make
+                # sure we only ever expose MX to the outside world.
+                self.equations = self._expand_simplify_mx(self.equations)
+                self.initial_equations = self._expand_simplify_mx(self.initial_equations)
 
-            simple_parameters, symbols, values = [], [], []
-            for p in self.parameters:
-                if isinstance(p.value, list):
-                    p.value = np.array(p.value)
+            if options.get('replace_parameter_expressions', False):
+                logger.info("Replacing parameter expressions")
 
-                    if not np.issubdtype(p.value.dtype, np.number):
-                        raise NotImplementedError(
-                            "Only parameters arrays with numeric values can be simplified")
+                simple_parameters, symbols, values = [], [], []
+                for p in self.parameters:
+                    if isinstance(p.value, list):
+                        p.value = np.array(p.value)
 
-                    simple_parameters.append(p)
-                else:
-                    value = ca.MX(p.value)
-                    if value.is_constant():
+                        if not np.issubdtype(p.value.dtype, np.number):
+                            raise NotImplementedError(
+                                "Only parameters arrays with numeric values can be simplified")
+
                         simple_parameters.append(p)
                     else:
-                        symbols.append(p.symbol)
+                        value = ca.MX(p.value)
+                        if value.is_constant():
+                            simple_parameters.append(p)
+                        else:
+                            symbols.append(p.symbol)
+                            values.append(value)
+
+                self.parameters = simple_parameters
+
+                if len(values) > 0:
+                    # Resolve expressions that include other, non-simple parameter
+                    # expressions.
+                    for i in range(SUBSTITUTE_LOOP_LIMIT):
+                        new_values = ca.substitute(values, symbols, values)
+                        converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
+                        values = new_values
+                        if converged:
+                            break
+                    else:
+                        logger.warning("Substitution of expressions exceeded maximum iteration limit.")
+
+                    if len(self.equations) > 0:
+                        self.equations = ca.substitute(self.equations, symbols, values)
+                    if len(self.initial_equations) > 0:
+                        self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                    if len(self.delay_arguments) > 0:
+                        self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
+
+                    # Replace parameter expressions in metadata
+                    self._substitute_metadata(symbols, values)
+
+            if options['replace_constant_expressions']:
+                logger.info("Replacing constant expressions")
+
+                simple_constants, symbols, values = [], [], []
+                for c in self.constants:
+                    value = ca.MX(c.value)
+                    if value.is_constant():
+                        simple_constants.append(c)
+                    else:
+                        symbols.append(c.symbol)
                         values.append(value)
 
-            self.parameters = simple_parameters
+                self.constants = simple_constants
 
-            if len(values) > 0:
-                # Resolve expressions that include other, non-simple parameter
-                # expressions.
-                for i in range(SUBSTITUTE_LOOP_LIMIT):
-                    new_values = ca.substitute(values, symbols, values)
-                    converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
-                    values = new_values
-                    if converged:
-                        break
-                else:
-                    logger.warning("Substitution of expressions exceeded maximum iteration limit.")
-
-                if len(self.equations) > 0:
-                    self.equations = ca.substitute(self.equations, symbols, values)
-                if len(self.initial_equations) > 0:
-                    self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
-                if len(self.delay_arguments) > 0:
-                    self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
-
-                # Replace parameter expressions in metadata
-                self._substitute_metadata(symbols, values)
-
-        if options['replace_constant_expressions']:
-            logger.info("Replacing constant expressions")
-
-            simple_constants, symbols, values = [], [], []
-            for c in self.constants:
-                value = ca.MX(c.value)
-                if value.is_constant():
-                    simple_constants.append(c)
-                else:
-                    symbols.append(c.symbol)
-                    values.append(value)
-
-            self.constants = simple_constants
-
-            if len(values) > 0:
-                # Resolve expressions that include other, non-simple parameter
-                # expressions.
-                for i in range(SUBSTITUTE_LOOP_LIMIT):
-                    new_values = ca.substitute(values, symbols, values)
-                    converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
-                    values = new_values
-                    if converged:
-                        break
-                else:
-                    logger.warning("Substitution of expressions exceeded maximum iteration limit.")
-
-                if len(self.equations) > 0:
-                    self.equations = ca.substitute(self.equations, symbols, values)
-                if len(self.initial_equations) > 0:
-                    self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
-                if len(self.delay_arguments) > 0:
-                    self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
-
-                # Replace constant expressions in metadata
-                self._substitute_metadata(symbols, values)
-
-        if options['eliminate_constant_assignments']:
-            logger.info("Elimating constant variable assignments")
-
-            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
-
-            reduced_equations = []
-            for eq in self.equations:
-                if eq.is_symbolic() and eq.name() in alg_states:
-                    constant = alg_states.pop(eq.name())
-
-                    if eq.name() in self.alias_relation.canonical_variables:
-                        self.alias_relation.remove_canonical_variable(eq.name())
-                        logger.debug('{} removed from canonical variables'.format(eq.name()))
-
-                    constant.value = 0.0
-
-                    self.constants.append(constant)
-
-                    # Skip this equation
-                    continue
-
-                if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
-                    if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and eq.dep(1).is_constant():
-                        variable = eq.dep(0)
-                        value = eq.dep(1)
-                    elif eq.dep(1).is_symbolic() and eq.dep(1).name() in alg_states and eq.dep(0).is_constant():
-                        variable = eq.dep(1)
-                        value = eq.dep(0)
+                if len(values) > 0:
+                    # Resolve expressions that include other, non-simple parameter
+                    # expressions.
+                    for i in range(SUBSTITUTE_LOOP_LIMIT):
+                        new_values = ca.substitute(values, symbols, values)
+                        converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
+                        values = new_values
+                        if converged:
+                            break
                     else:
-                        variable = None
-                        value = None
+                        logger.warning("Substitution of expressions exceeded maximum iteration limit.")
 
-                    if variable is not None:
-                        constant = alg_states.pop(variable.name())
+                    if len(self.equations) > 0:
+                        self.equations = ca.substitute(self.equations, symbols, values)
+                    if len(self.initial_equations) > 0:
+                        self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                    if len(self.delay_arguments) > 0:
+                        self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
 
-                        if variable.name() in self.alias_relation.canonical_variables:
-                            self.alias_relation.remove_canonical_variable(variable.name())
-                            logger.debug('{} removed from canonical variables'.format(variable.name()))
+                    # Replace constant expressions in metadata
+                    self._substitute_metadata(symbols, values)
 
-                        if eq.is_op(ca.OP_SUB):
-                            constant.value = value
-                        else:
-                            constant.value = -value
+            if options['eliminate_constant_assignments']:
+                logger.info("Elimating constant variable assignments")
+
+                alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
+
+                reduced_equations = []
+                for eq in self.equations:
+                    if eq.is_symbolic() and eq.name() in alg_states:
+                        constant = alg_states.pop(eq.name())
+
+                        if eq.name() in self.alias_relation.canonical_variables:
+                            self.alias_relation.remove_canonical_variable(eq.name())
+                            logger.debug('{} removed from canonical variables'.format(eq.name()))
+
+                        constant.value = 0.0
 
                         self.constants.append(constant)
 
                         # Skip this equation
                         continue
 
-                # Keep this equation
-                reduced_equations.append(eq)
-
-            # Eliminate alias variables
-            self.alg_states = list(alg_states.values())
-            self.equations = reduced_equations
-
-        if options['replace_parameter_values']:
-            logger.info("Replacing parameter values")
-
-            # N.B. Any parameter expression elimination must be done first.
-            unspecified_parameters, symbols, values = [], [], []
-            for p in self.parameters:
-                if ca.MX(p.value).is_constant() and ca.MX(p.value).is_regular():
-                    symbols.append(p.symbol)
-                    values.append(p.value)
-                else:
-                    unspecified_parameters.append(p)
-
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, symbols, values)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
-            self.parameters = unspecified_parameters
-
-            # Replace parameter values in metadata
-            self._substitute_metadata(symbols, values)
-
-        if options['replace_constant_values']:
-            logger.info("Replacing constant values")
-
-            # N.B. Any parameter expression elimination must be done first.
-            symbols = self._symbols(self.constants)
-            values = [v.value for v in self.constants]
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, symbols, values)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
-            if len(self.delay_arguments) > 0:
-                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
-            self.constants = []
-
-            # Replace constant values in metadata
-            self._substitute_metadata(symbols, values)
-
-        if options['eliminable_variable_expression'] is not None:
-            logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
-
-            # Due to CasADi's ca.is_equal not properly matching short-
-            # circuited MX if-else expressions, we can end up in an infinite
-            # loop. With expanded (to SX and back) equations we are safe, as
-            # SX does not support short-circuiting.
-            if not options['expand_mx']:
-                raise Exception("The use of `eliminable_variable_expression` requires `expand_mx` set to True")
-
-            p = re.compile(options['eliminable_variable_expression'])
-
-            states = OrderedDict([(s.symbol.name(), s) for s in self.states])
-            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
-
-            all_states = OrderedDict([(s.symbol.name(), s) for s in itertools.chain(self.states, self.alg_states)])
-
-            # NOTE: dictionary keys are the correspondig _state_'s name, not
-            # the names of the derivative states themselves.
-            der_states = OrderedDict(zip(states.keys(), self.der_states))
-
-            def extract_assignment(eq):
-                if eq.is_symbolic() and eq.name() in all_states and p.match(eq.name()):
-                    return eq, 0.0
-
-                if eq.is_op(ca.OP_IF_ELSE_ZERO):
-                    cond = eq.dep(0)
-                    nested_eq = eq.dep(1)
-
-                    variable, value = extract_assignment(nested_eq)
-                    if variable is not None:
-                        return variable, ca.if_else(cond, value, 0)
-
-                if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
-                    # Prefer eliminating alg states
-                    if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and p.match(eq.dep(0).name()):
-                        variable = eq.dep(0)
-                        value = eq.dep(1)
-                    elif eq.dep(1).is_symbolic() and eq.dep(1).name() in alg_states and p.match(eq.dep(1).name()):
-                        variable = eq.dep(1)
-                        value = eq.dep(0)
-                    elif eq.dep(0).is_symbolic() and eq.dep(0).name() in states and p.match(eq.dep(0).name()):
-                        variable = eq.dep(0)
-                        value = eq.dep(1)
-                    elif eq.dep(1).is_symbolic() and eq.dep(1).name() in states and p.match(eq.dep(1).name()):
-                        variable = eq.dep(1)
-                        value = eq.dep(0)
-                    else:
-                        variable = None
-                        value = None
-
-                    if variable is not None:
-                        if eq.is_op(ca.OP_SUB):
-                            return variable, value
+                    if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                        if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and eq.dep(1).is_constant():
+                            variable = eq.dep(0)
+                            value = eq.dep(1)
+                        elif eq.dep(1).is_symbolic() and eq.dep(1).name() in alg_states and eq.dep(0).is_constant():
+                            variable = eq.dep(1)
+                            value = eq.dep(0)
                         else:
-                            return variable, -value
+                            variable = None
+                            value = None
 
-                if eq.n_dep() == 2 \
-                    and eq.is_op(ca.OP_ADD) \
-                    and eq.dep(0).is_op(ca.OP_IF_ELSE_ZERO) \
-                    and eq.dep(1).is_op(ca.OP_IF_ELSE_ZERO):
-                    # Once passed through _expand_simplify_mx, a CasADi if_else
-                    # is converted to a sum of two if_else_zero operations.
+                        if variable is not None:
+                            constant = alg_states.pop(variable.name())
 
-                    cond_1 = eq.dep(0).dep(0)
-                    cond_2 = eq.dep(1).dep(0)
-                    nested_eq_1 = eq.dep(0).dep(1)
-                    nested_eq_2 = eq.dep(1).dep(1)
+                            if variable.name() in self.alias_relation.canonical_variables:
+                                self.alias_relation.remove_canonical_variable(variable.name())
+                                logger.debug('{} removed from canonical variables'.format(variable.name()))
 
-                    variable_1, value_1 = extract_assignment(nested_eq_1)
-                    variable_2, value_2 = extract_assignment(nested_eq_2)
+                            if eq.is_op(ca.OP_SUB):
+                                constant.value = value
+                            else:
+                                constant.value = -value
 
-                    if variable_1 is not None and variable_2 is not None and variable_1.name() == variable_2.name():
-                        return variable_1, ca.if_else(cond_1, value_1, 0) + ca.if_else(cond_2, value_2, 0)
+                            self.constants.append(constant)
 
-                # Nothing found
-                return None, None
+                            # Skip this equation
+                            continue
 
-            variables = []
-            values = []
+                    # Keep this equation
+                    reduced_equations.append(eq)
 
-            def get_derivative(expr):
-                if expr.is_constant():
-                    return 0.0
-                elif expr.is_symbolic():
-                    if expr.name() in states:
-                        return der_states[expr.name()].symbol
-                    elif expr.name() in alg_states:
-                        # This algebraic state must now become a differentiated state.
-                        states[expr.name()] = alg_states.pop(expr.name())
-                        der_sym = ca.MX.sym('der({})'.format(expr.name()))
-                        der_states[expr.name()] = Variable(der_sym, float)
-                        return der_sym
+                # Eliminate alias variables
+                self.alg_states = list(alg_states.values())
+                self.equations = reduced_equations
+
+            if options['replace_parameter_values']:
+                logger.info("Replacing parameter values")
+
+                # N.B. Any parameter expression elimination must be done first.
+                unspecified_parameters, symbols, values = [], [], []
+                for p in self.parameters:
+                    if ca.MX(p.value).is_constant() and ca.MX(p.value).is_regular():
+                        symbols.append(p.symbol)
+                        values.append(p.value)
                     else:
+                        unspecified_parameters.append(p)
+
+                if len(self.equations) > 0:
+                    self.equations = ca.substitute(self.equations, symbols, values)
+                if len(self.initial_equations) > 0:
+                    self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                self.parameters = unspecified_parameters
+
+                # Replace parameter values in metadata
+                self._substitute_metadata(symbols, values)
+
+            if options['replace_constant_values']:
+                logger.info("Replacing constant values")
+
+                # N.B. Any parameter expression elimination must be done first.
+                symbols = self._symbols(self.constants)
+                values = [v.value for v in self.constants]
+                if len(self.equations) > 0:
+                    self.equations = ca.substitute(self.equations, symbols, values)
+                if len(self.initial_equations) > 0:
+                    self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
+                if len(self.delay_arguments) > 0:
+                    self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
+                self.constants = []
+
+                # Replace constant values in metadata
+                self._substitute_metadata(symbols, values)
+
+            if options['eliminable_variable_expression'] is not None:
+                logger.info("Elimating variables that match the regular expression {}".format(options['eliminable_variable_expression']))
+
+                # Due to CasADi's ca.is_equal not properly matching short-
+                # circuited MX if-else expressions, we can end up in an infinite
+                # loop. With expanded (to SX and back) equations we are safe, as
+                # SX does not support short-circuiting.
+                if not options['expand_mx']:
+                    raise Exception("The use of `eliminable_variable_expression` requires `expand_mx` set to True")
+
+                p = re.compile(options['eliminable_variable_expression'])
+
+                states = OrderedDict([(s.symbol.name(), s) for s in self.states])
+                alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
+
+                all_states = OrderedDict([(s.symbol.name(), s) for s in itertools.chain(self.states, self.alg_states)])
+
+                # NOTE: dictionary keys are the correspondig _state_'s name, not
+                # the names of the derivative states themselves.
+                der_states = OrderedDict(zip(states.keys(), self.der_states))
+
+                def extract_assignment(eq):
+                    if eq.is_symbolic() and eq.name() in all_states and p.match(eq.name()):
+                        return eq, 0.0
+
+                    if eq.is_op(ca.OP_IF_ELSE_ZERO):
+                        cond = eq.dep(0)
+                        nested_eq = eq.dep(1)
+
+                        variable, value = extract_assignment(nested_eq)
+                        if variable is not None:
+                            return variable, ca.if_else(cond, value, 0)
+
+                    if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                        # Prefer eliminating alg states
+                        if eq.dep(0).is_symbolic() and eq.dep(0).name() in alg_states and p.match(eq.dep(0).name()):
+                            variable = eq.dep(0)
+                            value = eq.dep(1)
+                        elif eq.dep(1).is_symbolic() and eq.dep(1).name() in alg_states and p.match(eq.dep(1).name()):
+                            variable = eq.dep(1)
+                            value = eq.dep(0)
+                        elif eq.dep(0).is_symbolic() and eq.dep(0).name() in states and p.match(eq.dep(0).name()):
+                            variable = eq.dep(0)
+                            value = eq.dep(1)
+                        elif eq.dep(1).is_symbolic() and eq.dep(1).name() in states and p.match(eq.dep(1).name()):
+                            variable = eq.dep(1)
+                            value = eq.dep(0)
+                        else:
+                            variable = None
+                            value = None
+
+                        if variable is not None:
+                            if eq.is_op(ca.OP_SUB):
+                                return variable, value
+                            else:
+                                return variable, -value
+
+                    if eq.n_dep() == 2 \
+                        and eq.is_op(ca.OP_ADD) \
+                        and eq.dep(0).is_op(ca.OP_IF_ELSE_ZERO) \
+                        and eq.dep(1).is_op(ca.OP_IF_ELSE_ZERO):
+                        # Once passed through _expand_simplify_mx, a CasADi if_else
+                        # is converted to a sum of two if_else_zero operations.
+
+                        cond_1 = eq.dep(0).dep(0)
+                        cond_2 = eq.dep(1).dep(0)
+                        nested_eq_1 = eq.dep(0).dep(1)
+                        nested_eq_2 = eq.dep(1).dep(1)
+
+                        variable_1, value_1 = extract_assignment(nested_eq_1)
+                        variable_2, value_2 = extract_assignment(nested_eq_2)
+
+                        if variable_1 is not None and variable_2 is not None and variable_1.name() == variable_2.name():
+                            return variable_1, ca.if_else(cond_1, value_1, 0) + ca.if_else(cond_2, value_2, 0)
+
+                    # Nothing found
+                    return None, None
+
+                variables = []
+                values = []
+
+                def get_derivative(expr):
+                    if expr.is_constant():
                         return 0.0
-                else:
-                    # Differentiate using CasADi and chain rule
-                    orig_deps = ca.symvar(expr)
-                    deps = ca.vertcat(*orig_deps)
-                    J = ca.Function('J', [deps], [ca.jacobian(expr, deps)])
-                    J_sparsity = J.sparsity_out(0)
-                    der_deps = [get_derivative(dep) if J_sparsity.has_nz(0, j) else ca.DM.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
-                    return ca.mtimes(J(deps), ca.vertcat(*der_deps))
+                    elif expr.is_symbolic():
+                        if expr.name() in states:
+                            return der_states[expr.name()].symbol
+                        elif expr.name() in alg_states:
+                            # This algebraic state must now become a differentiated state.
+                            states[expr.name()] = alg_states.pop(expr.name())
+                            der_sym = ca.MX.sym('der({})'.format(expr.name()))
+                            der_states[expr.name()] = Variable(der_sym, float)
+                            return der_sym
+                        else:
+                            return 0.0
+                    else:
+                        # Differentiate using CasADi and chain rule
+                        orig_deps = ca.symvar(expr)
+                        deps = ca.vertcat(*orig_deps)
+                        J = ca.Function('J', [deps], [ca.jacobian(expr, deps)])
+                        J_sparsity = J.sparsity_out(0)
+                        der_deps = [get_derivative(dep) if J_sparsity.has_nz(0, j) else ca.DM.zeros(dep.size()) for j, dep in enumerate(orig_deps)]
+                        return ca.mtimes(J(deps), ca.vertcat(*der_deps))
 
-            reduced_equations = []
-            for eq in self.equations:
-                variable, value = extract_assignment(eq)
-                if variable is not None:
-                    if variable.name() in states:
-                        # Mark derivative state for replacement too.
-                        derivative = get_derivative(value)
+                reduced_equations = []
+                for eq in self.equations:
+                    variable, value = extract_assignment(eq)
+                    if variable is not None:
+                        if variable.name() in states:
+                            # Mark derivative state for replacement too.
+                            derivative = get_derivative(value)
 
-                        del states[variable.name()]
+                            del states[variable.name()]
 
-                        variables.append(der_states.pop(variable.name()).symbol)
-                        values.append(derivative)
+                            variables.append(der_states.pop(variable.name()).symbol)
+                            values.append(derivative)
 
-                    elif variable.name() in alg_states:
-                        del alg_states[variable.name()]
+                        elif variable.name() in alg_states:
+                            del alg_states[variable.name()]
 
-                    variables.append(variable)
-                    values.append(value)
+                        variables.append(variable)
+                        values.append(value)
 
-                    # Skip this equation
-                    continue
+                        # Skip this equation
+                        continue
 
-                # Keep this equation
-                reduced_equations.append(eq)
+                    # Keep this equation
+                    reduced_equations.append(eq)
 
-            # Eliminate alias variables
-            self.states = list(states.values())
-            self.alg_states = list(alg_states.values())
-            self.der_states = list(der_states.values())
+                # Eliminate alias variables
+                self.states = list(states.values())
+                self.alg_states = list(alg_states.values())
+                self.der_states = list(der_states.values())
 
-            self.equations = reduced_equations
+                self.equations = reduced_equations
 
-            if len(values) > 0:
-                # Resolve expressions that include other, non-simple parameter
-                # expressions.
-                for i in range(SUBSTITUTE_LOOP_LIMIT):
-                    new_values = ca.substitute(values, variables, values)
-                    converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
-                    values = new_values
-                    if converged:
-                        break
-                else:
-                    logger.warning("Substitution of expressions exceeded maximum iteration limit.")
+                if len(values) > 0:
+                    # Resolve expressions that include other, non-simple parameter
+                    # expressions.
+                    for i in range(SUBSTITUTE_LOOP_LIMIT):
+                        new_values = ca.substitute(values, variables, values)
+                        converged = ca.is_equal(ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH)
+                        values = new_values
+                        if converged:
+                            break
+                    else:
+                        logger.warning("Substitution of expressions exceeded maximum iteration limit.")
+
+                    if len(self.equations) > 0:
+                        self.equations = ca.substitute(self.equations, variables, values)
+                    if len(self.initial_equations) > 0:
+                        self.initial_equations = ca.substitute(self.initial_equations, variables, values)
+                    if len(self.delay_arguments) > 0:
+                        self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
+
+            if options['expand_vectors'] and not options['expand_mx']:
+                # If we are _not_ expanding MX to SX, we do the expansion of vectors here
+                self._expand_vectors()
+
+            if options['factor_and_simplify_equations']:
+                # Operations that preserve the equivalence of an equation
+                # TODO: There may be more, but this is the most frequent set
+                unary_ops = ca.OP_NEG, ca.OP_FABS, ca.OP_SQRT
+                binary_ops = ca.OP_MUL, ca.OP_DIV
+
+                # Recursive factor and simplify function
+                def factor_and_simplify(eq):
+                    # These are ops that can simply be dropped
+                    if eq.n_dep() == 1 and eq.op() in unary_ops:
+                        return factor_and_simplify(eq.dep())
+
+                    # These are binary ops and can get a little tricky
+                    # For now, we just drop constant divisors or multipliers
+                    elif eq.n_dep() == 2 and eq.op() in binary_ops:
+                        if eq.dep(1).is_constant():
+                            return factor_and_simplify(eq.dep(0))
+                        elif eq.dep(0).is_constant() and eq.op() == ca.OP_MUL:
+                            return factor_and_simplify(eq.dep(1))
+
+                    # If no hits, return unmodified
+                    return eq
+
+                # Do the simplifications
+                simplified_equations = [factor_and_simplify(eq) for eq in self.equations]
+
+                # Debugging output
+                if logger.getEffectiveLevel() == logging.DEBUG:
+                    changed_equations = [(o,s) for o, s in zip(self.equations, simplified_equations) if o is not s]
+                    for orig, simp in changed_equations:
+                        logger.debug('Equation {} simplified to {}'.format(orig, simp))
+
+                # Store changes
+                self.equations = simplified_equations
+
+            if options['detect_aliases']:
+                logger.info("Detecting aliases")
+
+                states = OrderedDict([(s.symbol.name(), s) for s in self.states])
+                der_states = OrderedDict([(s.symbol.name(), s) for s in self.der_states])
+                alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
+                inputs = OrderedDict([(s.symbol.name(), s) for s in self.inputs])
+                parameters = OrderedDict([(s.symbol.name(), s) for s in self.parameters])
+
+                all_states = OrderedDict()
+                all_states.update(states)
+                all_states.update(der_states)
+                all_states.update(alg_states)
+                all_states.update(inputs)
+                all_states.update(parameters)
+
+                # For now, we only eliminate algebraic states.
+                do_not_eliminate = set(list(der_states) + list(states) + list(inputs) + list(parameters))
+
+                def _make_alias(deps, negative_alias=False):
+                    """
+                    Tries to alias the deps to each other. Returns True if this
+                    was possible and done, False otherwise.
+                    """
+                    if deps[0].name() in alg_states:
+                        alg_state = deps[0]
+                        other_state = deps[1]
+                    elif deps[1].name() in alg_states:
+                        alg_state = deps[1]
+                        other_state = deps[0]
+                    else:
+                        alg_state = None
+                        other_state = None
+
+                    # If both states are algebraic, we need to decide which to eliminate
+                    if deps[0].name() in alg_states and deps[1].name() in alg_states:
+                        # Most of the time it does not matter which one we eliminate.
+                        # The exception is if alg_state has already been aliased to a
+                        # variable in do_not_eliminate. If this is the case, setting the
+                        # states in the default order will cause the new canonical variable
+                        # to be other_state, unseating (and eliminating) the current
+                        # canonical variable (which is in do_not_eliminate).
+                        if self.alias_relation.canonical_signed(alg_state.name())[0] in do_not_eliminate:
+                            # swap the states
+                            other_state, alg_state = alg_state, other_state
+
+                    if alg_state is not None:
+                        # Check to see if we are linking two entries in do_not_eliminate
+                        if self.alias_relation.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
+                           self.alias_relation.canonical_signed(other_state.name())[0] in do_not_eliminate:
+                            # Don't do anything for now, we only eliminate alg_states
+                            pass
+
+                        else:
+                            # Eliminate alg_state by aliasing it to other_state
+                            if negative_alias:
+                                self.alias_relation.add(other_state.name(), '-' + alg_state.name())
+                            else:
+                                self.alias_relation.add(other_state.name(), alg_state.name())
+
+                            # To keep equations balanced, drop this equation
+                            return True
+
+                    return False
+
+                reduced_equations = []
+                for eq in self.equations:
+                    # We do fast checks first, and the slower (but more generic)
+                    # checks after.
+                    if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                            deps = ca.symvar(eq)
+                        if eq.dep(0).is_symbolic() and eq.dep(1).is_symbolic():
+                            assert len(deps) == 2
+                            if _make_alias(deps, eq.is_op(ca.OP_ADD)): continue
+                    elif options['expand_vectors'] and not options['expand_mx']:
+                        # Equation might have many "shadow" dependencies due to
+                        # vector/array expansion. By using .expand() and SX
+                        # symbols for the evaluation, we can figure out what the
+                        # real dependencies are.
+                        s_mx = ca.symvar(eq)
+                        assert all(x.shape == (1, 1) for x in s_mx), "Vector/Matrix SX symbols cannot be mapped"
+                        f = ca.Function('tmp', s_mx, [eq]).expand()
+                        s_sx = [ca.SX.sym(x.name(), *x.shape) for x in s_mx]
+                        eq_sx = f.call(s_sx)[0]
+
+                        # Reduced dependencies
+                        deps_sx = ca.symvar(eq_sx)
+
+                        if len(deps_sx) == 2:
+                            # Map SX dependencies back to MX dependencies
+                            deps_map = {k: v for v, k in enumerate(s_sx)}
+                            deps_mx = [s_mx[deps_map[x]] for x in deps_sx]
+
+                            # Simple add/sub expressions in SX equation
+                            if eq_sx.n_dep() == 2 and (eq_sx.is_op(ca.OP_SUB) or eq_sx.is_op(ca.OP_ADD)):
+                                if eq_sx.dep(0).is_symbolic() and eq_sx.dep(1).is_symbolic():
+                                    if _make_alias(deps_mx, eq_sx.is_op(ca.OP_ADD)): continue
+
+                            # Check with substitute, which is a more expensive operation
+                            if ca.substitute(eq_sx, deps_sx[0], deps_sx[1]).is_zero():
+                                if _make_alias(deps_mx): continue
+
+                            elif ca.substitute(eq_sx, deps_sx[0], -1 * deps_sx[1]).is_zero():
+                                if _make_alias(deps_mx, True): continue
+
+                    # Keep this equation
+                    reduced_equations.append(eq)
+
+                # Eliminate alias variables
+                variables, values = [], []
+                for canonical, aliases in self.alias_relation:
+                    canonical_state = all_states[canonical]
+
+                    python_type = canonical_state.python_type
+                    start = canonical_state.start
+                    m, M = canonical_state.min, canonical_state.max
+                    nominal = canonical_state.nominal
+                    fixed = canonical_state.fixed
+
+                    for alias in aliases:
+                        if alias[0] == '-':
+                            sign = -1
+                            alias = alias[1:]
+                        else:
+                            sign = 1
+
+                        if alias not in self.alias_relation.substituted_aliases:
+
+                            alias_state = all_states[alias]
+
+                            variables.append(alias_state.symbol)
+                            values.append(sign * canonical_state.symbol)
+
+                            # If any of the aliases has a nonstandard type, apply it to
+                            # the canonical state as well
+                            if alias_state.python_type != float:
+                                python_type = alias_state.python_type
+
+                            # If any of the aliases has a nondefault start value, apply it to
+                            # the canonical state as well
+                            if not isinstance(alias_state.start, _DefaultValue):
+                                alias_start_mx = ca.MX(alias_state.start)
+                                if not isinstance(start, _DefaultValue):
+                                    start_mx = ca.MX(start)
+                                    # If the state already has a non-default start
+                                    # attribute we check for conflicts.
+                                    if (start_mx.is_constant() != ca.MX(alias_start_mx).is_constant()
+                                        or (start_mx.is_symbolic() and str(start_mx) != str(sign * alias_start_mx))
+                                        or start != alias_start_mx):
+
+                                        logger.warning(
+                                            "Current start attribute of canonical variable '{}' ({})"
+                                            " conflicts with that of its alias '{}' ({})."
+                                            " Will keep existing value of {}."
+                                            .format(canonical, start, alias, alias_start_mx, start))
+                                    else:
+                                        # Alias has equal start attribute, so nothing to do
+                                        pass
+                                else:
+                                    start = sign * alias_state.start
+
+                            # The intersection of all bound ranges applies
+                            m = ca.fmax(m, alias_state.min if sign == 1 else -alias_state.max)
+                            M = ca.fmin(M, alias_state.max if sign == 1 else -alias_state.min)
+
+                            # Take the largest nominal of all aliases
+                            nominal = ca.fmax(nominal, alias_state.nominal)
+
+                            # If any of the aliases is fixed, the canonical state is as well
+                            fixed = ca.fmax(fixed, alias_state.fixed)
+
+                            del all_states[alias]
+                            self.alias_relation.confirm_substitution(alias)
+
+                    assert isinstance(aliases, set)
+                    canonical_state.aliases = aliases
+                    canonical_state.python_type = python_type
+                    canonical_state.start = start
+                    canonical_state.min = m
+                    canonical_state.max = M
+                    canonical_state.nominal = nominal
+                    canonical_state.fixed = fixed
+
+                self.states = [v for k, v in all_states.items() if k in states]
+                self.der_states = [v for k, v in all_states.items() if k in der_states]
+                self.alg_states = [v for k, v in all_states.items() if k in alg_states]
+                self.inputs = [v for k, v in all_states.items() if k in inputs]
+                self.parameters = [v for k, v in all_states.items() if k in parameters]
+                self.equations = reduced_equations
 
                 if len(self.equations) > 0:
                     self.equations = ca.substitute(self.equations, variables, values)
@@ -700,283 +945,57 @@ class Model:
                 if len(self.delay_arguments) > 0:
                     self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
-        if options['expand_vectors'] and not options['expand_mx']:
-            # If we are _not_ expanding MX to SX, we do the expansion of vectors here
-            self._expand_vectors()
+            if options['reduce_affine_expression']:
+                logger.info("Collapsing model into an affine expression")
 
-        if options['factor_and_simplify_equations']:
-            # Operations that preserve the equivalence of an equation
-            # TODO: There may be more, but this is the most frequent set
-            unary_ops = ca.OP_NEG, ca.OP_FABS, ca.OP_SQRT
-            binary_ops = ca.OP_MUL, ca.OP_DIV
+                for equation_list in ['equations', 'initial_equations']:
+                    equations = getattr(self, equation_list)
+                    if len(equations) > 0:
+                        states = ca.veccat(*self._symbols(itertools.chain(self.states, self.der_states, self.alg_states, self.inputs)))
+                        constants = ca.veccat(*self._symbols(self.constants))
+                        parameters = ca.veccat(*self._symbols(self.parameters))
 
-            # Recursive factor and simplify function
-            def factor_and_simplify(eq):
-                # These are ops that can simply be dropped
-                if eq.n_dep() == 1 and eq.op() in unary_ops:
-                    return factor_and_simplify(eq.dep())
+                        equations = ca.veccat(*equations)
 
-                # These are binary ops and can get a little tricky
-                # For now, we just drop constant divisors or multipliers
-                elif eq.n_dep() == 2 and eq.op() in binary_ops:
-                    if eq.dep(1).is_constant():
-                        return factor_and_simplify(eq.dep(0))
-                    elif eq.dep(0).is_constant() and eq.op() == ca.OP_MUL:
-                        return factor_and_simplify(eq.dep(1))
+                        Af = ca.Function('Af', [states, constants, parameters], [ca.jacobian(equations, states)])
+                        bf = ca.Function('bf', [states, constants, parameters], [equations])
 
-                # If no hits, return unmodified
-                return eq
-
-            # Do the simplifications
-            simplified_equations = [factor_and_simplify(eq) for eq in self.equations]
-
-            # Debugging output
-            if logger.getEffectiveLevel() == logging.DEBUG:
-                changed_equations = [(o,s) for o, s in zip(self.equations, simplified_equations) if o is not s]
-                for orig, simp in changed_equations:
-                    logger.debug('Equation {} simplified to {}'.format(orig, simp))
-
-            # Store changes
-            self.equations = simplified_equations
-
-        if options['detect_aliases']:
-            logger.info("Detecting aliases")
-
-            states = OrderedDict([(s.symbol.name(), s) for s in self.states])
-            der_states = OrderedDict([(s.symbol.name(), s) for s in self.der_states])
-            alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
-            inputs = OrderedDict([(s.symbol.name(), s) for s in self.inputs])
-            parameters = OrderedDict([(s.symbol.name(), s) for s in self.parameters])
-
-            all_states = OrderedDict()
-            all_states.update(states)
-            all_states.update(der_states)
-            all_states.update(alg_states)
-            all_states.update(inputs)
-            all_states.update(parameters)
-
-            # For now, we only eliminate algebraic states.
-            do_not_eliminate = set(list(der_states) + list(states) + list(inputs) + list(parameters))
-
-            def _make_alias(deps, negative_alias=False):
-                """
-                Tries to alias the deps to each other. Returns True if this
-                was possible and done, False otherwise.
-                """
-                if deps[0].name() in alg_states:
-                    alg_state = deps[0]
-                    other_state = deps[1]
-                elif deps[1].name() in alg_states:
-                    alg_state = deps[1]
-                    other_state = deps[0]
-                else:
-                    alg_state = None
-                    other_state = None
-
-                # If both states are algebraic, we need to decide which to eliminate
-                if deps[0].name() in alg_states and deps[1].name() in alg_states:
-                    # Most of the time it does not matter which one we eliminate.
-                    # The exception is if alg_state has already been aliased to a
-                    # variable in do_not_eliminate. If this is the case, setting the
-                    # states in the default order will cause the new canonical variable
-                    # to be other_state, unseating (and eliminating) the current
-                    # canonical variable (which is in do_not_eliminate).
-                    if self.alias_relation.canonical_signed(alg_state.name())[0] in do_not_eliminate:
-                        # swap the states
-                        other_state, alg_state = alg_state, other_state
-
-                if alg_state is not None:
-                    # Check to see if we are linking two entries in do_not_eliminate
-                    if self.alias_relation.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
-                       self.alias_relation.canonical_signed(other_state.name())[0] in do_not_eliminate:
-                        # Don't do anything for now, we only eliminate alg_states
-                        pass
-
-                    else:
-                        # Eliminate alg_state by aliasing it to other_state
-                        if negative_alias:
-                            self.alias_relation.add(other_state.name(), '-' + alg_state.name())
+                        # Work around CasADi issue #172
+                        if len(self.constants) == 0 or not ca.depends_on(equations, constants):
+                            constants = 0
                         else:
-                            self.alias_relation.add(other_state.name(), alg_state.name())
+                            logger.warning('Not all constants have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
+                        if len(self.parameters) == 0 or not ca.depends_on(equations, parameters):
+                            parameters = 0
+                        else:
+                            logger.warning('Not all parameters have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
 
-                        # To keep equations balanced, drop this equation
-                        return True
+                        A = Af(0, constants, parameters)
+                        b = bf(0, constants, parameters)
 
-                return False
+                        # Replace veccat'ed states with brand new state vectors so as to avoid the value copy operations induced by veccat.
+                        self._states_vector = ca.MX.sym('states_vector', sum([s.numel() for s in self._symbols(self.states)]))
+                        self._der_states_vector = ca.MX.sym('der_states_vector', sum([s.numel() for s in self._symbols(self.der_states)]))
+                        self._alg_states_vector = ca.MX.sym('alg_states_vector', sum([s.numel() for s in self._symbols(self.alg_states)]))
+                        self._inputs_vector = ca.MX.sym('inputs_vector', sum([s.numel() for s in self._symbols(self.inputs)]))
 
-            reduced_equations = []
-            for eq in self.equations:
-                # We do fast checks first, and the slower (but more generic)
-                # checks after.
-                if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
-                    if eq.dep(0).is_symbolic() and eq.dep(1).is_symbolic():
-                        deps = ca.symvar(eq)
-                        assert len(deps) == 2
-                        if _make_alias(deps, eq.is_op(ca.OP_ADD)): continue
-                elif options['expand_vectors'] and not options['expand_mx']:
-                    # Equation might have many "shadow" dependencies due to
-                    # vector/array expansion. By using .expand() and SX
-                    # symbols for the evaluation, we can figure out what the
-                    # real dependencies are.
-                    s_mx = ca.symvar(eq)
-                    assert all(x.shape == (1, 1) for x in s_mx), "Vector/Matrix SX symbols cannot be mapped"
-                    f = ca.Function('tmp', s_mx, [eq]).expand()
-                    s_sx = [ca.SX.sym(x.name(), *x.shape) for x in s_mx]
-                    eq_sx = f.call(s_sx)[0]
+                        states_vector = ca.vertcat(self._states_vector, self._der_states_vector, self._alg_states_vector, self._inputs_vector)
+                        equations = [ca.reshape(ca.mtimes(A, states_vector), equations.shape) + b]
+                        setattr(self, equation_list, equations)
 
-                    # Reduced dependencies
-                    deps_sx = ca.symvar(eq_sx)
+            if options['expand_mx']:
+                logger.info("Expanded MX functions will be returned")
+                self._expand_mx_func = lambda x: x.expand()
 
-                    if len(deps_sx) == 2:
-                        # Map SX dependencies back to MX dependencies
-                        deps_map = {k: v for v, k in enumerate(s_sx)}
-                        deps_mx = [s_mx[deps_map[x]] for x in deps_sx]
+            if options.get('iterative_simplification', False) and alg_states_left != len(self.alg_states):
+                if simplification_iter > SIMPLIFICATION_LOOP_LIMIT:
+                    logger.warning("Simplification exceeded maximum iteration limit.")
+                    break
+                alg_states_left = len(self.alg_states)
+                simplification_iter += 1
 
-                        # Simple add/sub expressions in SX equation
-                        if eq_sx.n_dep() == 2 and (eq_sx.is_op(ca.OP_SUB) or eq_sx.is_op(ca.OP_ADD)):
-                            if eq_sx.dep(0).is_symbolic() and eq_sx.dep(1).is_symbolic():
-                                if _make_alias(deps_mx, eq_sx.is_op(ca.OP_ADD)): continue
-
-                        # Check with substitute, which is a more expensive operation
-                        if ca.substitute(eq_sx, deps_sx[0], deps_sx[1]).is_zero():
-                            if _make_alias(deps_mx): continue
-
-                        elif ca.substitute(eq_sx, deps_sx[0], -1 * deps_sx[1]).is_zero():
-                            if _make_alias(deps_mx, True): continue
-
-                # Keep this equation
-                reduced_equations.append(eq)
-
-            # Eliminate alias variables
-            variables, values = [], []
-            for canonical, aliases in self.alias_relation:
-                canonical_state = all_states[canonical]
-
-                python_type = canonical_state.python_type
-                start = canonical_state.start
-                m, M = canonical_state.min, canonical_state.max
-                nominal = canonical_state.nominal
-                fixed = canonical_state.fixed
-
-                for alias in aliases:
-                    if alias[0] == '-':
-                        sign = -1
-                        alias = alias[1:]
-                    else:
-                        sign = 1
-
-                    if alias not in self.alias_relation.substituted_aliases:
-
-                        alias_state = all_states[alias]
-
-                        variables.append(alias_state.symbol)
-                        values.append(sign * canonical_state.symbol)
-
-                        # If any of the aliases has a nonstandard type, apply it to
-                        # the canonical state as well
-                        if alias_state.python_type != float:
-                            python_type = alias_state.python_type
-
-                        # If any of the aliases has a nondefault start value, apply it to
-                        # the canonical state as well
-                        if not isinstance(alias_state.start, _DefaultValue):
-                            alias_start_mx = ca.MX(alias_state.start)
-                            if not isinstance(start, _DefaultValue):
-                                start_mx = ca.MX(start)
-                                # If the state already has a non-default start
-                                # attribute we check for conflicts.
-                                if (start_mx.is_constant() != ca.MX(alias_start_mx).is_constant()
-                                    or (start_mx.is_symbolic() and str(start_mx) != str(sign * alias_start_mx))
-                                    or start != alias_start_mx):
-
-                                    logger.warning(
-                                        "Current start attribute of canonical variable '{}' ({})"
-                                        " conflicts with that of its alias '{}' ({})."
-                                        " Will keep existing value of {}."
-                                        .format(canonical, start, alias, alias_start_mx, start))
-                                else:
-                                    # Alias has equal start attribute, so nothing to do
-                                    pass
-                            else:
-                                start = sign * alias_state.start
-
-                        # The intersection of all bound ranges applies
-                        m = ca.fmax(m, alias_state.min if sign == 1 else -alias_state.max)
-                        M = ca.fmin(M, alias_state.max if sign == 1 else -alias_state.min)
-
-                        # Take the largest nominal of all aliases
-                        nominal = ca.fmax(nominal, alias_state.nominal)
-
-                        # If any of the aliases is fixed, the canonical state is as well
-                        fixed = ca.fmax(fixed, alias_state.fixed)
-
-                        del all_states[alias]
-                        self.alias_relation.confirm_substitution(alias)
-
-                assert isinstance(aliases, set)
-                canonical_state.aliases = aliases
-                canonical_state.python_type = python_type
-                canonical_state.start = start
-                canonical_state.min = m
-                canonical_state.max = M
-                canonical_state.nominal = nominal
-                canonical_state.fixed = fixed
-
-            self.states = [v for k, v in all_states.items() if k in states]
-            self.der_states = [v for k, v in all_states.items() if k in der_states]
-            self.alg_states = [v for k, v in all_states.items() if k in alg_states]
-            self.inputs = [v for k, v in all_states.items() if k in inputs]
-            self.parameters = [v for k, v in all_states.items() if k in parameters]
-            self.equations = reduced_equations
-
-            if len(self.equations) > 0:
-                self.equations = ca.substitute(self.equations, variables, values)
-            if len(self.initial_equations) > 0:
-                self.initial_equations = ca.substitute(self.initial_equations, variables, values)
-            if len(self.delay_arguments) > 0:
-                self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
-
-        if options['reduce_affine_expression']:
-            logger.info("Collapsing model into an affine expression")
-
-            for equation_list in ['equations', 'initial_equations']:
-                equations = getattr(self, equation_list)
-                if len(equations) > 0:
-                    states = ca.veccat(*self._symbols(itertools.chain(self.states, self.der_states, self.alg_states, self.inputs)))
-                    constants = ca.veccat(*self._symbols(self.constants))
-                    parameters = ca.veccat(*self._symbols(self.parameters))
-
-                    equations = ca.veccat(*equations)
-
-                    Af = ca.Function('Af', [states, constants, parameters], [ca.jacobian(equations, states)])
-                    bf = ca.Function('bf', [states, constants, parameters], [equations])
-
-                    # Work around CasADi issue #172
-                    if len(self.constants) == 0 or not ca.depends_on(equations, constants):
-                        constants = 0
-                    else:
-                        logger.warning('Not all constants have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
-                    if len(self.parameters) == 0 or not ca.depends_on(equations, parameters):
-                        parameters = 0
-                    else:
-                        logger.warning('Not all parameters have been eliminated.  As a result, the affine DAE expression will use a symbolic matrix, as opposed to a numerical sparse matrix.')
-
-                    A = Af(0, constants, parameters)
-                    b = bf(0, constants, parameters)
-
-                    # Replace veccat'ed states with brand new state vectors so as to avoid the value copy operations induced by veccat.
-                    self._states_vector = ca.MX.sym('states_vector', sum([s.numel() for s in self._symbols(self.states)]))
-                    self._der_states_vector = ca.MX.sym('der_states_vector', sum([s.numel() for s in self._symbols(self.der_states)]))
-                    self._alg_states_vector = ca.MX.sym('alg_states_vector', sum([s.numel() for s in self._symbols(self.alg_states)]))
-                    self._inputs_vector = ca.MX.sym('inputs_vector', sum([s.numel() for s in self._symbols(self.inputs)]))
-
-                    states_vector = ca.vertcat(self._states_vector, self._der_states_vector, self._alg_states_vector, self._inputs_vector)
-                    equations = [ca.reshape(ca.mtimes(A, states_vector), equations.shape) + b]
-                    setattr(self, equation_list, equations)
-
-        if options['expand_mx']:
-            logger.info("Expanded MX functions will be returned")
-            self._expand_mx_func = lambda x: x.expand()
+            else:
+                simplify_again = False
 
         logger.info("Finished model simplification")
 
