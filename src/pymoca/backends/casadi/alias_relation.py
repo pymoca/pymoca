@@ -8,6 +8,7 @@ class AliasRelation:
         self._aliases = {}
         self._canonical_variables_map = OrderedDict()
         self._canonical_variables = set()
+        self._substituted_aliases = set()
 
     def add(self, a, b):
         # Construct aliases (a set of equivalent variables)
@@ -61,6 +62,9 @@ class AliasRelation:
             else:
                 return a, 1
 
+    def confirm_substitution(self, a):
+        self._substituted_aliases.add(a)
+
     @property
     def canonical_variables(self):
         return self._canonical_variables
@@ -71,3 +75,7 @@ class AliasRelation:
             aliases = self.aliases(canonical_variable).copy()
             aliases.discard(canonical_variable)
             yield canonical_variable, aliases
+
+    @property
+    def substituted_aliases(self):
+        return self._substituted_aliases

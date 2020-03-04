@@ -865,50 +865,53 @@ class Model:
                     else:
                         sign = 1
 
-                    alias_state = all_states[alias]
+                    if alias not in self.alias_relation.substituted_aliases:
 
-                    variables.append(alias_state.symbol)
-                    values.append(sign * canonical_state.symbol)
+                        alias_state = all_states[alias]
 
-                    # If any of the aliases has a nonstandard type, apply it to
-                    # the canonical state as well
-                    if alias_state.python_type != float:
-                        python_type = alias_state.python_type
+                        variables.append(alias_state.symbol)
+                        values.append(sign * canonical_state.symbol)
 
-                    # If any of the aliases has a nondefault start value, apply it to
-                    # the canonical state as well
-                    if not isinstance(alias_state.start, _DefaultValue):
-                        alias_start_mx = ca.MX(alias_state.start)
-                        if not isinstance(start, _DefaultValue):
-                            start_mx = ca.MX(start)
-                            # If the state already has a non-default start
-                            # attribute we check for conflicts.
-                            if (start_mx.is_constant() != ca.MX(alias_start_mx).is_constant()
-                                or (start_mx.is_symbolic() and str(start_mx) != str(sign * alias_start_mx))
-                                or start != alias_start_mx):
+                        # If any of the aliases has a nonstandard type, apply it to
+                        # the canonical state as well
+                        if alias_state.python_type != float:
+                            python_type = alias_state.python_type
 
-                                logger.warning(
-                                    "Current start attribute of canonical variable '{}' ({})"
-                                    " conflicts with that of its alias '{}' ({})."
-                                    " Will keep existing value of {}."
-                                    .format(canonical, start, alias, alias_start_mx, start))
+                        # If any of the aliases has a nondefault start value, apply it to
+                        # the canonical state as well
+                        if not isinstance(alias_state.start, _DefaultValue):
+                            alias_start_mx = ca.MX(alias_state.start)
+                            if not isinstance(start, _DefaultValue):
+                                start_mx = ca.MX(start)
+                                # If the state already has a non-default start
+                                # attribute we check for conflicts.
+                                if (start_mx.is_constant() != ca.MX(alias_start_mx).is_constant()
+                                    or (start_mx.is_symbolic() and str(start_mx) != str(sign * alias_start_mx))
+                                    or start != alias_start_mx):
+
+                                    logger.warning(
+                                        "Current start attribute of canonical variable '{}' ({})"
+                                        " conflicts with that of its alias '{}' ({})."
+                                        " Will keep existing value of {}."
+                                        .format(canonical, start, alias, alias_start_mx, start))
+                                else:
+                                    # Alias has equal start attribute, so nothing to do
+                                    pass
                             else:
-                                # Alias has equal start attribute, so nothing to do
-                                pass
-                        else:
-                            start = sign * alias_state.start
+                                start = sign * alias_state.start
 
-                    # The intersection of all bound ranges applies
-                    m = ca.fmax(m, alias_state.min if sign == 1 else -alias_state.max)
-                    M = ca.fmin(M, alias_state.max if sign == 1 else -alias_state.min)
+                        # The intersection of all bound ranges applies
+                        m = ca.fmax(m, alias_state.min if sign == 1 else -alias_state.max)
+                        M = ca.fmin(M, alias_state.max if sign == 1 else -alias_state.min)
 
-                    # Take the largest nominal of all aliases
-                    nominal = ca.fmax(nominal, alias_state.nominal)
+                        # Take the largest nominal of all aliases
+                        nominal = ca.fmax(nominal, alias_state.nominal)
 
-                    # If any of the aliases is fixed, the canonical state is as well
-                    fixed = ca.fmax(fixed, alias_state.fixed)
+                        # If any of the aliases is fixed, the canonical state is as well
+                        fixed = ca.fmax(fixed, alias_state.fixed)
 
-                    del all_states[alias]
+                        del all_states[alias]
+                        self.alias_relation.confirm_substitution(alias)
 
                 assert isinstance(aliases, set)
                 canonical_state.aliases = aliases
