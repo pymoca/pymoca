@@ -33,6 +33,9 @@ class AliasRelation:
             self._canonical_variables_map[v] = (canonical_a, sign_a)
             self._canonical_variables_map[self.__toggle_sign(v)] = (canonical_a, -sign_a)
 
+    def remove_canonical_variable(self, a):
+        self._canonical_variables.remove(a)
+
     def __toggle_sign(self, v):
         if self.__is_negative(v):
             return v[1:]

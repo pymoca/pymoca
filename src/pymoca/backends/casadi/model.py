@@ -460,6 +460,11 @@ class Model:
             for eq in self.equations:
                 if eq.is_symbolic() and eq.name() in alg_states:
                     constant = alg_states.pop(eq.name())
+
+                    if eq.name() in self.alias_relation.canonical_variables:
+                        self.alias_relation.remove_canonical_variable(eq.name())
+                        logger.debug('{} removed from canonical variables'.format(eq.name()))
+
                     constant.value = 0.0
 
                     self.constants.append(constant)
@@ -480,6 +485,10 @@ class Model:
 
                     if variable is not None:
                         constant = alg_states.pop(variable.name())
+
+                        if variable.name() in self.alias_relation.canonical_variables:
+                            self.alias_relation.remove_canonical_variable(variable.name())
+                            logger.debug('{} removed from canonical variables'.format(variable.name()))
 
                         if eq.is_op(ca.OP_SUB):
                             constant.value = value
