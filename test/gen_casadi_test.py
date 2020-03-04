@@ -1648,6 +1648,18 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_iterative_simplification(self):
+        compiler_options = {'eliminate_constant_assignments': True,
+                            'factor_and_simplify_equations': True,
+                            'replace_constant_expressions': True,
+                            'replace_constant_values': True,
+                            'detect_aliases': True,
+                            'iterative_simplification': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'IterativeSimplification', compiler_options)
+
+        self.assertEqual(1, len(casadi_model.equations))
+
     def test_state_annotator(self):
         with open(os.path.join(MODEL_DIR, 'StateAnnotator.mo'), 'r') as f:
             txt = f.read()
