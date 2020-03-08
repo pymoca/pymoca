@@ -363,15 +363,15 @@ class Model:
         simplification_iter = 0
 
         while simplify_again:
-            logger.info("Simplification iteration {}".format(simplification_iter+1))
-            if options['expand_vectors'] and options['expand_mx']:
+            if options['iterative_simplification']:
+                logger.info("Simplification iteration {}".format(simplification_iter+1))
+                
+            if options['expand_vectors'] and options['expand_mx'] \
+                    and simplification_iter == 0:  # Expand vectors only on the first simplification iteration
                 # If we are _not_ expanding MX to SX, we do the expansion of
                 # vectors first, such that we are be able to detect more aliases
                 # (e.g individual array elements, or elements in a for loop).
                 self._expand_vectors()
-
-            if options['replace_parameter_expressions']:
-                logger.info("Replacing parameter expressions")
 
                 # Expand to SX, and back again to MX such that the remaining
                 # simplification steps can be applied. We also do this to make
@@ -379,7 +379,7 @@ class Model:
                 self.equations = self._expand_simplify_mx(self.equations)
                 self.initial_equations = self._expand_simplify_mx(self.initial_equations)
 
-            if options.get('replace_parameter_expressions', False):
+            if options['replace_parameter_expressions']:
                 logger.info("Replacing parameter expressions")
 
                 simple_parameters, symbols, values = [], [], []
@@ -709,7 +709,8 @@ class Model:
                     if len(self.delay_arguments) > 0:
                         self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
 
-            if options['expand_vectors'] and not options['expand_mx']:
+            if options['expand_vectors'] and not options['expand_mx'] \
+                    and simplification_iter == 0:  # Expand vectors only on the first simplification iteration
                 # If we are _not_ expanding MX to SX, we do the expansion of vectors here
                 self._expand_vectors()
 
@@ -818,8 +819,8 @@ class Model:
                     # We do fast checks first, and the slower (but more generic)
                     # checks after.
                     if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
-                            deps = ca.symvar(eq)
                         if eq.dep(0).is_symbolic() and eq.dep(1).is_symbolic():
+                            deps = ca.symvar(eq)
                             assert len(deps) == 2
                             if _make_alias(deps, eq.is_op(ca.OP_ADD)): continue
                     elif options['expand_vectors'] and not options['expand_mx']:
@@ -987,7 +988,7 @@ class Model:
                 logger.info("Expanded MX functions will be returned")
                 self._expand_mx_func = lambda x: x.expand()
 
-            if options.get('iterative_simplification', False) and alg_states_left != len(self.alg_states):
+            if options['iterative_simplification'] and alg_states_left != len(self.alg_states):
                 if simplification_iter > SIMPLIFICATION_LOOP_LIMIT:
                     logger.warning("Simplification exceeded maximum iteration limit.")
                     break
