@@ -16,6 +16,7 @@ logger = logging.getLogger("pymoca")
 
 CASADI_COMPARISON_DEPTH = sys.maxsize
 SUBSTITUTE_LOOP_LIMIT = 100
+SIMPLIFICATION_LOOP_LIMIT = 50
 CASADI_ATTRIBUTES = [attr for attr in ast.Symbol.ATTRIBUTES if not attr == 'unit']
 
 
@@ -358,6 +359,25 @@ class Model:
     def simplify(self, options):
         options = _merge_default_options(options)
 
+        alg_states_left = 0
+
+        for simplification_iter in range(SIMPLIFICATION_LOOP_LIMIT):
+            if options.get('iterative_simplification', False):
+                logger.info("Simplification iteration {}".format(simplification_iter + 1))
+
+            self._simplify_once(options)
+
+            if options.get('iterative_simplification', False) and alg_states_left != len(self.alg_states):
+                alg_states_left = len(self.alg_states)
+                simplification_iter += 1
+            else:
+                break
+        else:
+            logger.warning("Simplification exceeded maximum iteration limit.")
+
+        logger.info("Finished model simplification")
+
+    def _simplify_once(self, options):
         if options['expand_vectors'] and options['expand_mx']:
             # If we are _not_ expanding MX to SX, we do the expansion of
             # vectors first, such that we are be able to detect more aliases

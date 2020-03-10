@@ -2343,6 +2343,35 @@ class GenCasadiTest(unittest.TestCase):
         for i in range(4, 8):
             self.assertIsInstance(casadi_model.parameters[i].value, float)
 
+    def test_iterative_simplification(self):
+        compiler_options = {'eliminate_constant_assignments': True,
+                            'factor_and_simplify_equations': True,
+                            'replace_constant_expressions': True,
+                            'replace_constant_values': True,
+                            'detect_aliases': True,
+                            'iterative_simplification': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'IterativeSimplification', compiler_options)
+
+        self.assertEqual(1, len(casadi_model.equations))
+
+        casadi_model.simplify(compiler_options)
+
+    def test_iterative_simplification_large(self):
+        compiler_options = {'eliminate_constant_assignments': True,
+                            'factor_and_simplify_equations': True,
+                            'replace_constant_expressions': True,
+                            'replace_constant_values': True,
+                            'replace_parameter_expressions': True,
+                            'replace_parameter_values': True,
+                            'detect_aliases': True,
+                            'iterative_simplification': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'IterativeSimplificationLarge', compiler_options)
+
+        self.assertEqual(12, len(casadi_model.alg_states))
+
+        casadi_model.simplify(compiler_options)
 
 if __name__ == "__main__":
     unittest.main()
