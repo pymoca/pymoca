@@ -68,3 +68,26 @@ class AliasRelation:
             aliases = self.aliases(canonical_variable).copy()
             aliases.discard(canonical_variable)
             yield canonical_variable, aliases
+
+    def remove(self, a):
+        if a not in self._canonical_variables:
+            return
+
+        to_remove = self._aliases[a] | self._aliases[self.__toggle_sign(a)]
+
+        for b in to_remove:
+            del self._aliases[b]
+            del self._canonical_variables_map[b]
+
+        self._canonical_variables.remove(a)
+
+    def copy(self):
+        copy = AliasRelation()
+
+        copy._canonical_variables = self._canonical_variables.copy()
+        copy._canonical_variables_map = self._canonical_variables_map.copy()
+
+        for k, v in self._aliases.items():
+            copy._aliases[k] = v.copy()
+
+        return copy

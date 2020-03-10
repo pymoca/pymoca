@@ -531,6 +531,15 @@ class Model:
                 self.initial_equations = ca.substitute(self.initial_equations, symbols, values)
             if len(self.delay_arguments) > 0:
                 self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, symbols, values)
+
+            # Also remove the aliases of any of the constants from the alias relation
+            for constant in self.constants:
+                if constant.aliases:
+                    # Note that we will only get here if simplify is called multiple times on the
+                    # same model, as alias detection is done _after_ replacing constant values.
+                    # Otherwise a variable will not have any aliases yet.
+                    self.alias_relation.remove(constant.symbol.name())
+
             self.constants = []
 
             # Replace constant values in metadata
@@ -749,6 +758,12 @@ class Model:
             # For now, we only eliminate algebraic states.
             do_not_eliminate = set(list(der_states) + list(states) + list(inputs) + list(parameters))
 
+            # When doing a `detect_aliases` pass multiple times, we have to avoid
+            # handling aliases we already handled before as their states no longer
+            # exist. To know which alias is new and which is old, we make a copy here
+            # of the alias relation.
+            old_alias_relation = self.alias_relation.copy()
+
             def _make_alias(deps, negative_alias=False):
                 """
                 Tries to alias the deps to each other. Returns True if this
@@ -850,6 +865,10 @@ class Model:
                 fixed = canonical_state.fixed
 
                 for alias in aliases:
+                    if alias in old_alias_relation.aliases(canonical):
+                        # We already handled this alias in a previous pass of `detect_aliases`
+                        continue
+
                     if alias[0] == '-':
                         sign = -1
                         alias = alias[1:]
