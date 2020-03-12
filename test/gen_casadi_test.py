@@ -1388,6 +1388,54 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEqual(casadi_model.states[0].aliases, {'-alias_neg', 'alias_pos'})
 
+    def test_constant_aliases(self):
+        txt = """
+            model ConstantAlias
+
+              Real x;
+              Real z;
+              constant Real c = 0;
+
+              equation
+
+              der(x) = c;
+              z = c;
+
+            end ConstantAlias;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ConstantAlias')
+        casadi_model.simplify({'detect_aliases': True})
+
+        c = casadi_model.constants[0]
+        self.assertSetEqual(c.aliases, {'z'})
+        self.assertEqual(len(casadi_model.alg_states), 0)
+
+    def test_parameter_aliases(self):
+        txt = """
+            model ParameterAlias
+
+              Real x;
+              Real z;
+              parameter Real c = 0;
+
+              equation
+
+              der(x) = c;
+              z = c;
+
+            end ParameterAlias;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ParameterAlias')
+        casadi_model.simplify({'detect_aliases': True})
+
+        p = casadi_model.parameters[0]
+        self.assertSetEqual(p.aliases, {'z'})
+        self.assertEqual(len(casadi_model.alg_states), 0)
+
     def test_simplify_expand_vectors(self):
         # Create model, cache it, and load the cache
         compiler_options = \
