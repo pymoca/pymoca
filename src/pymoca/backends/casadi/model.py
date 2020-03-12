@@ -767,6 +767,7 @@ class Model:
             alg_states = OrderedDict([(s.symbol.name(), s) for s in self.alg_states])
             inputs = OrderedDict([(s.symbol.name(), s) for s in self.inputs])
             parameters = OrderedDict([(s.symbol.name(), s) for s in self.parameters])
+            constants = OrderedDict([(s.symbol.name(), s) for s in self.constants])
 
             all_states = OrderedDict()
             all_states.update(states)
@@ -774,9 +775,11 @@ class Model:
             all_states.update(alg_states)
             all_states.update(inputs)
             all_states.update(parameters)
+            all_states.update(constants)
 
             # For now, we only eliminate algebraic states.
-            do_not_eliminate = set(list(der_states) + list(states) + list(inputs) + list(parameters))
+            do_not_eliminate = set(list(der_states) + list(states) + list(inputs)
+                                   + list(parameters) + list(constants))
 
             # When doing a `detect_aliases` pass multiple times, we have to avoid
             # handling aliases we already handled before as their states no longer
