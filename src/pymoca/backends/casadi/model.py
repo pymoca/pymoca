@@ -728,7 +728,6 @@ class Model:
             # Operations that preserve the equivalence of an equation
             # TODO: There may be more, but this is the most frequent set
             unary_ops = ca.OP_NEG, ca.OP_FABS, ca.OP_SQRT
-            binary_ops = ca.OP_MUL, ca.OP_DIV
 
             # Recursive factor and simplify function
             def factor_and_simplify(eq):
@@ -736,14 +735,28 @@ class Model:
                 if eq.n_dep() == 1 and eq.op() in unary_ops:
                     return factor_and_simplify(eq.dep())
 
-                # These are binary ops and can get a little tricky
-                # For now, we just drop constant divisors or multipliers
-                elif eq.n_dep() == 2 and eq.op() in binary_ops:
-                    if eq.dep(1).is_constant():
-                        return factor_and_simplify(eq.dep(0))
-                    elif eq.dep(0).is_constant() and eq.op() == ca.OP_MUL:
-                        return factor_and_simplify(eq.dep(1))
+                elif eq.n_dep() == 2:
+                    # Drop constant divisors or multipliers
+                    if eq.op() in (ca.OP_MUL, ca.OP_DIV):
+                        if eq.dep(1).is_constant():
+                            return factor_and_simplify(eq.dep(0))
+                        elif eq.dep(0).is_constant() and eq.op() == ca.OP_MUL:
+                            return factor_and_simplify(eq.dep(1))
 
+                    # Simplify +/- chains such as (-x)+(z*3) = 0 --> x-(z*3) = 0
+                    elif eq.op() in (ca.OP_SUB, ca.OP_ADD):
+                        if eq.dep(0).is_op(ca.OP_NEG):
+                            if eq.op() == ca.OP_SUB:
+                                return factor_and_simplify(eq.dep(0).dep(0) + eq.dep(1))
+                            if eq.op() == ca.OP_ADD:
+                                return factor_and_simplify(eq.dep(0).dep(0) - eq.dep(1))
+
+                        elif eq.dep(1).is_op(ca.OP_NEG):
+                            if eq.dep(0).is_op(ca.OP_NEG):
+                                if eq.op() == ca.OP_SUB:
+                                    return factor_and_simplify(eq.dep(0) + eq.dep(1).dep(0))
+                                if eq.op() == ca.OP_ADD:
+                                    return factor_and_simplify(eq.dep(0) - eq.dep(1).dep(0))
                 # If no hits, return unmodified
                 return eq
 
