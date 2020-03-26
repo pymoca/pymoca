@@ -2458,6 +2458,28 @@ class GenCasadiTest(unittest.TestCase):
 
         casadi_model.simplify(compiler_options)
 
+    def test_simplified_variables(self):
+        compiler_options = {'eliminate_constant_assignments': True,
+                            'factor_and_simplify_equations': True,
+                            'replace_constant_expressions': True,
+                            'replace_constant_values': True,
+                            'replace_parameter_expressions': True,
+                            'replace_parameter_values': True,
+                            'detect_aliases': True,
+                            'iterative_simplification': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'SimplifiedVariables', compiler_options)
+
+        self.assertEqual(7, len(casadi_model.simplified_variables))
+
+        for var in casadi_model.simplified_variables:
+            if var.symbol.name() == 'z':
+                self.assertEqual(float(var.value), 10)
+            if var.symbol.name() == 'y':
+                self.assertEqual(float(var.value), -9)
+            if var.symbol.name() == 'x':
+                self.assertEqual(float(var.value), -27)
+
 
 if __name__ == "__main__":
     unittest.main()
