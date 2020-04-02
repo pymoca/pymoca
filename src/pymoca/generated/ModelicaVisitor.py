@@ -254,6 +254,16 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by ModelicaParser#constraint_block.
+    def visitConstraint_block(self, ctx:ModelicaParser.Constraint_blockContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#constraint_section.
+    def visitConstraint_section(self, ctx:ModelicaParser.Constraint_sectionContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by ModelicaParser#equation_simple.
     def visitEquation_simple(self, ctx:ModelicaParser.Equation_simpleContext):
         return self.visitChildren(ctx)
@@ -331,6 +341,16 @@ class ModelicaVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by ModelicaParser#statement.
     def visitStatement(self, ctx:ModelicaParser.StatementContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#constraint_inequality.
+    def visitConstraint_inequality(self, ctx:ModelicaParser.Constraint_inequalityContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#constraint.
+    def visitConstraint(self, ctx:ModelicaParser.ConstraintContext):
         return self.visitChildren(ctx)
 
 

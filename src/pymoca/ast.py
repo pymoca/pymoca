@@ -213,6 +213,15 @@ class IfExpression(Node):
         super().__init__(**kwargs)
 
 
+class Constraint(Node):
+    def __init__(self, **kwargs):
+        self.left = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.right = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.comment = ''  # type: str
+        self.operand = ''
+        super().__init__(**kwargs)
+
+
 class Equation(Node):
     def __init__(self, **kwargs):
         self.left = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
@@ -304,7 +313,7 @@ class Symbol(Node):
     """
     A mathematical variable or state of the model
     """
-    ATTRIBUTES = ['value', 'min', 'max', 'start', 'fixed', 'nominal', 'unit']
+    ATTRIBUTES = ['value', 'min', 'max', 'start', 'fixed', 'nominal', 'unit', 'free', 'initialGuess']
 
     def __init__(self, **kwargs):
         self.name = ''  # type: str
@@ -323,6 +332,8 @@ class Symbol(Node):
         self.value = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.fixed = Primary(value=False)  # type: Primary
         self.unit = Primary(value="")  # type: Primary
+        self.free = Primary(value=False) # type: Primary
+        self.initialGuess = Primary(value=None) # type: Union[Expression, Primary, ComponentRef, Array]
         self.id = 0  # type: int
         self.order = 0  # type: int
         self.visibility = Visibility.PRIVATE  # type: Visibility
@@ -347,6 +358,13 @@ class EquationSection(Node):
     def __init__(self, **kwargs):
         self.initial = False  # type: bool
         self.equations = []  # type: List[Union[Equation, IfEquation, ForEquation, ConnectClause]]
+        super().__init__(**kwargs)
+
+
+class ConstraintSection(Node):
+    def __init__(self, **kwargs):
+        self.initial = False  # type: bool
+        self.constraints = []  # type: List[Union[Constraint]]
         super().__init__(**kwargs)
 
 
@@ -438,9 +456,11 @@ class Class(Node):
         self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
+        self.constraints = [] # type: List[Constraint]
         self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.annotation = []  # type: Union[NoneType, ClassModification]
+        self.optimization_attributes = None  # type: Union[NoneType, ClassModification]
         self.parent = None  # type: Class
 
         super().__init__(**kwargs)

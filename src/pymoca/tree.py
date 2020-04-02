@@ -58,6 +58,8 @@ class TreeListener:
     def enterComponentRef(self, tree: ast.ComponentRef) -> None: pass
 
     def enterConnectClause(self, tree: ast.ConnectClause) -> None: pass
+    
+    def enterConstraint(self, tree: ast.Equation) -> None: pass
 
     def enterElementModification(self, tree: ast.ElementModification) -> None: pass
 
@@ -114,11 +116,13 @@ class TreeListener:
     def exitComponentRef(self, tree: ast.ComponentRef) -> None: pass
 
     def exitConnectClause(self, tree: ast.ConnectClause) -> None: pass
+    
+    def exitConstraint(self, tree: ast.Equation) -> None: pass
 
     def exitElementModification(self, tree: ast.ElementModification) -> None: pass
 
     def exitEquation(self, tree: ast.Equation) -> None: pass
-
+    
     def exitExpression(self, tree: ast.Expression) -> None: pass
 
     def exitExtendsClause(self, tree: ast.ExtendsClause) -> None: pass
@@ -243,6 +247,7 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
         extended_orig_class.symbols.update(c.symbols)
         extended_orig_class.equations += c.equations
         extended_orig_class.initial_equations += c.initial_equations
+        extended_orig_class.constraints += c.constraints
         extended_orig_class.statements += c.statements
         extended_orig_class.initial_statements += c.initial_statements
         if isinstance(c.annotation, ast.ClassModification):
@@ -261,6 +266,7 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
+    extended_orig_class.constraints+= orig_class.constraints
     extended_orig_class.initial_equations += orig_class.initial_equations
     extended_orig_class.statements += orig_class.statements
     extended_orig_class.initial_statements += orig_class.initial_statements
@@ -467,6 +473,9 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
 
             sym.class_modification = None
 
+    if orig_class.optimization_attributes is not None:
+        extended_orig_class.optimization_attributes = orig_class.optimization_attributes
+
     return extended_orig_class
 
 
@@ -477,7 +486,10 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
         name=class_.name,
         type=class_.type,
         annotation=class_.annotation,
+        optimization_attributes=class_.optimization_attributes,
     )
+
+    # TODO: handle optimization attributes
 
     # append period to non empty instance_name
     if instance_name != '':
@@ -532,6 +544,7 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
             flat_class.classes.update(flat_sub_class.classes)
             flat_class.symbols.update(flat_sub_class.symbols)
             flat_class.equations += flat_sub_class.equations
+            flat_class.constraints += flat_sub_class.constraints
             flat_class.initial_equations += flat_sub_class.initial_equations
             flat_class.statements += flat_sub_class.statements
             flat_class.initial_statements += flat_sub_class.initial_statements
@@ -574,6 +587,15 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
                 flat_equation.__left_inner = len(equation.left.child) > 0
             if not hasattr(flat_equation, '__right_inner'):
                 flat_equation.__right_inner = len(equation.right.child) > 0
+
+    # for all constraints in original class
+    for constraint in class_.constraints:
+        # Equation returned has function calls replaced with their full scope
+        # equivalent, and it pulls out all references into the pulled_functions.
+        fs_constraint = fully_scope_function_calls(class_, constraint, pulled_functions)
+
+        flat_constraint = flatten_component_refs(flat_class, fs_constraint, instance_prefix)
+        flat_class.constraints.append(flat_constraint)
 
     # Create fully scoped equivalents
     fs_initial_equations = \

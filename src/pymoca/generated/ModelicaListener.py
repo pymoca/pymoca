@@ -449,6 +449,24 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ModelicaParser#constraint_block.
+    def enterConstraint_block(self, ctx:ModelicaParser.Constraint_blockContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#constraint_block.
+    def exitConstraint_block(self, ctx:ModelicaParser.Constraint_blockContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#constraint_section.
+    def enterConstraint_section(self, ctx:ModelicaParser.Constraint_sectionContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#constraint_section.
+    def exitConstraint_section(self, ctx:ModelicaParser.Constraint_sectionContext):
+        pass
+
+
     # Enter a parse tree produced by ModelicaParser#equation_simple.
     def enterEquation_simple(self, ctx:ModelicaParser.Equation_simpleContext):
         pass
@@ -590,6 +608,24 @@ class ModelicaListener(ParseTreeListener):
 
     # Exit a parse tree produced by ModelicaParser#statement.
     def exitStatement(self, ctx:ModelicaParser.StatementContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#constraint_inequality.
+    def enterConstraint_inequality(self, ctx:ModelicaParser.Constraint_inequalityContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#constraint_inequality.
+    def exitConstraint_inequality(self, ctx:ModelicaParser.Constraint_inequalityContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#constraint.
+    def enterConstraint(self, ctx:ModelicaParser.ConstraintContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#constraint.
+    def exitConstraint(self, ctx:ModelicaParser.ConstraintContext):
         pass
 
 

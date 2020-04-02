@@ -97,7 +97,7 @@ class Generator(TreeListener):
         self.model = Model()
         self.root = root
         c = self.root.classes[class_name]
-        self.nodes = {c: {'time': self.model.time}}
+        self.nodes = {c: {'time': self.model.time, 'finalTime': self.model.finalTime}}
         self.derivative = {}
         self.for_loops = deque()
         self.functions = {}
@@ -198,6 +198,12 @@ class Generator(TreeListener):
 
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty([self.get_mx(e) for e in tree.initial_equations])
+
+        # TODO: check if it is valid (like not empty equation)
+        self.model.constraints = [self.get_mx(e) for e in tree.constraints]
+
+        if tree.type == 'optimization':
+            self.model.optimization_attributes = {argument.value.component.name: self.src[argument.value.modifications[0]] for argument in tree.optimization_attributes.arguments}
 
         if len(tree.statements) + len(tree.initial_statements) > 0:
             raise NotImplementedError('Statements are currently supported inside functions only')
@@ -370,8 +376,15 @@ class Generator(TreeListener):
                     lhs_op = getattr(lhs, op)
                     src = lhs_op(rhs)
             else:
-                func = self.get_function(op)
-                src = ca.vertcat(*func.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
+                try: # Check if there is a component named as the operation. In that case we are dealing with a time access
+                    # Should we check for symbol as well?
+                    v = self.get_mx(ast.ComponentRef(name=op))
+                    t = self.get_mx(tree.operands[0])
+                    src = self.get_symbol_time_access(v, t)
+
+                except KeyError:
+                    func = self.get_function(op)
+                    src = ca.vertcat(*func.call([self.get_mx(operand) for operand in tree.operands], *self.function_mode))
 
         self.src[tree] = src
 
@@ -388,6 +401,21 @@ class Generator(TreeListener):
             src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
+        
+    def exitConstraint(self, tree):
+        logger.debug('exitConstraint')
+
+        src_left = self.get_mx(tree.left)
+        src_right = self.get_mx(tree.right)
+
+        # Always return bigger equal constraints
+        if tree.operand == '>=':
+            self.src[tree] = src_left - src_right
+        elif tree.operand == '<=':
+            self.src[tree] = src_right - src_left
+        else:
+            raise Exception('Operand {} is not supported in constraints'.format(tree.operand))
+
 
     def exitEquation(self, tree):
         logger.debug('exitEquation')
@@ -855,10 +883,16 @@ class Generator(TreeListener):
             else:
                 return s[indices[0], indices[1]]
 
+    def get_symbol_time_access(self, v, t):
+        return _new_mx('{}({})'.format(v.name(), str(t)), v.size())
+
+
     def get_component(self, tree):
         # Check special symbols
         if tree.name == 'time':
             return self.model.time
+        elif tree.name == 'finalTime':
+            return self.model.finalTime
         else:
             for f in reversed(self.for_loops):
                 if f.name == tree.name:
