@@ -1436,6 +1436,43 @@ class GenCasadiTest(unittest.TestCase):
         self.assertSetEqual(p.aliases, {'z'})
         self.assertEqual(len(casadi_model.alg_states), 0)
 
+    def test_deleted_canonical_variable(self):
+        txt = """
+            model DeletedCanonicalVariable
+              Real A(min=1.0, max=4.0);
+              Real B(min=2.0, max=5.0, nominal=10.0);
+              Real x(min=3.0, max=6.0);
+              constant Real c = 0;
+            equation
+              der(x) = 1;
+              A = B;
+              x = B + c;
+            end DeletedCanonicalVariable;
+        """
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DeletedCanonicalVariable')
+
+        # A is aliased to B and A is deleted
+        casadi_model.simplify({'detect_aliases': True})
+
+        # B is aliased to x, the canonical variable of A is then x
+        casadi_model.simplify({'replace_constant_values': True})
+        casadi_model.simplify({'detect_aliases': True})
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.states[0].min = 3.0
+        ref_model.states[0].max = 4.0
+        ref_model.states[0].nominal = 10.0
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.equations = [der_x - 1]
+
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
     def test_simplify_expand_vectors(self):
         # Create model, cache it, and load the cache
         compiler_options = \
@@ -2420,6 +2457,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(12, len(casadi_model.alg_states))
 
         casadi_model.simplify(compiler_options)
+
 
 if __name__ == "__main__":
     unittest.main()

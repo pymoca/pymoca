@@ -888,7 +888,8 @@ class Model:
                 fixed = canonical_state.fixed
 
                 for alias in aliases:
-                    if alias in old_alias_relation.aliases(canonical):
+                    if len(old_alias_relation.aliases(alias)) > 1 and \
+                            alias not in old_alias_relation.canonical_variables:
                         # We already handled this alias in a previous pass of `detect_aliases`
                         continue
 
