@@ -486,7 +486,6 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
         name=class_.name,
         type=class_.type,
         annotation=class_.annotation,
-        optimization_attributes=class_.optimization_attributes,
     )
 
     # TODO: handle optimization attributes
@@ -596,6 +595,13 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
 
         flat_constraint = flatten_component_refs(flat_class, fs_constraint, instance_prefix)
         flat_class.constraints.append(flat_constraint)
+
+    if hasattr(class_.optimization_attributes, 'arguments'):
+        flat_class.optimization_attributes = class_.optimization_attributes
+        for idx, optimization_attribute in enumerate(flat_class.optimization_attributes.arguments):
+            fs_optimization_attribute = fully_scope_function_calls(class_, optimization_attribute, pulled_functions)
+            flat_optimization_attribute = flatten_component_refs(flat_class, fs_optimization_attribute, instance_prefix)
+            flat_class.optimization_attributes.arguments[idx] = flat_optimization_attribute
 
     # Create fully scoped equivalents
     fs_initial_equations = \
