@@ -71,6 +71,32 @@ class Variable:
         return variable
 
 
+class StringVariable:
+    def __init__(self, name):
+        self.name = name
+        self.value = None
+        self.start = ""
+        self.fixed = False
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return '{}:str'.format(self.name)
+
+    def to_dict(self):
+        return {k: getattr(self, k) for k in ["name", "value", "start", "fixed"]}
+
+    @classmethod
+    def from_dict(cls, d):
+        variable = cls(d['name'])
+        variable.value = d['value']
+        variable.start = d['start']
+        variable.fixed = d['fixed']
+
+        return variable
+
+
 DelayArgument = namedtuple('DelayArgument', ['expr', 'duration'])
 
 
@@ -85,6 +111,8 @@ class Model:
         self.outputs = []
         self.constants = []
         self.parameters = []
+        self.string_constants = []
+        self.string_parameters = []
         self.equations = []
         self.initial_equations = []
         self.time = ca.MX.sym('time')
@@ -104,6 +132,8 @@ class Model:
         r += "outputs: " + str(self.outputs) + "\n"
         r += "constants: " + str(self.constants) + "\n"
         r += "parameters: " + str(self.parameters) + "\n"
+        r += "string_constants: " + str(self.string_constants) + "\n"
+        r += "string_parameters: " + str(self.string_parameters) + "\n"
         r += "equations: " + str(self.equations) + "\n"
         r += "initial equations: " + str(self.initial_equations) + "\n"
         return r

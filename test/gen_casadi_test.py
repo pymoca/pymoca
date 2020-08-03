@@ -14,7 +14,7 @@ import numpy as np
 
 import pymoca.backends.casadi.generator as gen_casadi
 from pymoca.backends.casadi.alias_relation import AliasRelation
-from pymoca.backends.casadi.model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
+from pymoca.backends.casadi.model import CASADI_ATTRIBUTES, Model, Variable, StringVariable, DelayArgument
 from pymoca.backends.casadi.api import transfer_model, CachedModel
 from pymoca import parser, ast
 
@@ -28,7 +28,7 @@ class GenCasadiTest(unittest.TestCase):
         def sstr(a): return set([str(e) for e in a])
 
         for l in ["alg_states", "states", "der_states", "inputs", "outputs", "constants",
-                  "parameters"]:
+                  "parameters", "string_parameters"]:
             self.assertEqual(sstr(getattr(A, l)), sstr(getattr(B, l)))
 
     def assert_model_variables_equivalant(self, A, B):
@@ -50,6 +50,15 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assertEqual(A.delay_states, B.delay_states)
 
+    def assert_model_string_parameters_constants_equivalent(self, A, B):
+        self.assertEqual(len(A.string_constants), len(B.string_constants))
+        for variable_this, variable_that in zip(A.string_constants, B.string_constants):
+            self.assertDictEqual(variable_this.to_dict(), variable_that.to_dict())
+
+        self.assertEqual(len(A.string_parameters), len(B.string_parameters))
+        for variable_this, variable_that in zip(A.string_parameters, B.string_parameters):
+            self.assertDictEqual(variable_this.to_dict(), variable_that.to_dict())
+
     def assert_model_equivalent_numeric(self, A, B, tol=1e-9):
         self.assertEqual(len(A.states), len(B.states))
         self.assertEqual(len(A.der_states), len(B.der_states))
@@ -58,6 +67,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(len(A.outputs), len(B.outputs))
         self.assertEqual(len(A.constants), len(B.constants))
         self.assertEqual(len(A.parameters), len(B.parameters))
+        self.assertEqual(len(A.string_parameters), len(B.string_parameters))
         self.assertEqual(len(A.delay_states), len(B.delay_states))
 
         if not isinstance(A, CachedModel) and not isinstance(B, CachedModel):
@@ -830,7 +840,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         self.assertTrue(True)
 
-    def test_variable_metadata_function(self):
+    def test_cache_metadata(self):
         # Clear cache
         db_file = os.path.join(MODEL_DIR, 'ParameterAttributes.pymoca_cache')
         try:
@@ -862,6 +872,10 @@ class GenCasadiTest(unittest.TestCase):
 
         variables_with_metadata = ['states', 'alg_states', 'inputs', 'parameters', 'constants']
 
+        # First check if string parameters have the same value
+        self.assert_model_string_parameters_constants_equivalent(ref_model, cached_model)
+
+        # Check all numeric symbols
         for model, metadata in [(ref_model, orig_metadata), (cached_model, cached_metadata)]:
             for variable_list in variables_with_metadata:
                 attribute_lists = [[] for i in range(len(CASADI_ATTRIBUTES))]
@@ -1007,9 +1021,14 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - 3 - _tmp - cst, _tmp - 0.1 * x, cst - 4]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_replace_parameter_expressions(self):
@@ -1051,9 +1070,14 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [2.0, np.nan]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - 3 * p1 - 3 * p3, alias - x, y - x - c - _tmp - cst, _tmp - 0.1 * x, cst - 4]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_replace_parameter_values(self):
@@ -1096,9 +1120,14 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [4, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - 2 - p2 - p3 - p4, alias - x, y - x - c - _tmp - cst, _tmp - 0.1 * x, cst - 4]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_replace_parameter_values_and_expressions(self):
@@ -1140,11 +1169,16 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [np.nan]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - 6 - 3 * p3, alias - x, y - x - c - _tmp - cst, _tmp - 0.1 * x, cst - 4]
 
         print(casadi_model)
         print(ref_model)
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_eliminate_constant_assignments(self):
@@ -1188,9 +1222,14 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - c - _tmp - cst, _tmp - 0.1 * x]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_eliminable_variable_expression(self):
@@ -1234,9 +1273,14 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - c - 0.1 * x - cst, cst - 4]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_eliminable_variable_expression_if_else(self):
@@ -1305,9 +1349,14 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, y - x - c - _tmp - cst, _tmp - 0.1 * x, cst - 4]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
         self.assertEqual(casadi_model.states[0].aliases, {'alias'})
 
@@ -1586,6 +1635,10 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
 
         A = ca.MX(5, 6)
         A[0, 0] = -1.0
@@ -1607,6 +1660,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [ca.mtimes(A, x) + b]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_all(self):
@@ -1649,6 +1703,10 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [np.nan]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
 
         A = ca.MX(2, 3)
         A[0, 0] = -1.0
@@ -1662,6 +1720,7 @@ class GenCasadiTest(unittest.TestCase):
         ref_model.equations = [ca.mtimes(A, x) + b]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_expand_mx(self):
@@ -1705,9 +1764,14 @@ class GenCasadiTest(unittest.TestCase):
         parameter_values = [2.0, 2 * p1, np.nan, 2 * p3]
         for par, v in zip(ref_model.parameters, parameter_values):
             par.value = v
+        ref_model.string_constants = list(map(StringVariable, ["string_constant"]))
+        ref_model.string_constants[0].value = "test_c"
+        ref_model.string_parameters = list(map(StringVariable, ["string_parameter"]))
+        ref_model.string_parameters[0].value = "test_p"
         ref_model.equations = [der_x - x - p1 - p2 - p3 - p4, alias - x, y - x - c - _tmp - cst, _tmp - 0.1 * x, cst - 4]
 
         # Compare
+        self.assert_model_string_parameters_constants_equivalent(casadi_model, ref_model)
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
     def test_simplify_differentiated_state(self):
