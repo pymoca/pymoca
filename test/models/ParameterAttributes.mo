@@ -1,4 +1,6 @@
 model ParameterAttributes
+	parameter String string_parameter = "test_p";
+	constant String string_constant = "test_c";
 	parameter Real min_ = 3.0;
     parameter Real max_;
 	Real a(min=min_, max=10.0);

@@ -12,7 +12,7 @@ from pymoca import ast
 from pymoca.tree import TreeWalker, TreeListener, flatten
 
 from .alias_relation import AliasRelation
-from .model import Model, Variable, DelayArgument
+from .model import Model, Variable, StringVariable, DelayArgument
 from .mtensor import _MTensor, _new_mx
 
 from ._options import _merge_default_options
@@ -124,27 +124,37 @@ class Generator(TreeListener):
                 mx_symbol = self.get_derivative(mx_symbol)
                 mx_symbol._modelica_shape = modelica_shape
             python_type = self.get_python_type(ast_symbol)
-            variable = Variable(mx_symbol, python_type)
-            if not differentiate:
-                for a in ast.Symbol.ATTRIBUTES:
+            if python_type == str:
+                variable = StringVariable(mx_symbol.name())
+
+                for a in ['value', 'start', 'fixed']:
                     v = self.get_mx(getattr(ast_symbol, a))
                     if v is not None:
-                        if isinstance(v, ca.DM) and all(x == (None,) for x in modelica_shape):
-                            # Scalar numeric type that behaves like an array.
-                            # Coerce to Pyhton type to avoid interpretation
-                            # issues.
-                            v = python_type(v)
-                        elif isinstance(v, (float, int)) and not isinstance(v, python_type):
-                            # We skip booleans for now, as users likely depend
-                            # on them being integer/float-like.
-                            try:
-                                v = python_type(v)
-                            except (OverflowError, ValueError):
-                                # Cannot convert NaN/infs to integer
-                                pass
-
                         setattr(variable, a, v)
+
                 variable.prefixes = ast_symbol.prefixes
+            else:
+                variable = Variable(mx_symbol, python_type)
+                if not differentiate:
+                    for a in ast.Symbol.ATTRIBUTES:
+                        v = self.get_mx(getattr(ast_symbol, a))
+                        if v is not None:
+                            if isinstance(v, ca.DM) and all(x == (None,) for x in modelica_shape):
+                                # Scalar numeric type that behaves like an array.
+                                # Coerce to Python type to avoid interpretation
+                                # issues.
+                                v = python_type(v)
+                            elif isinstance(v, (float, int)) and not isinstance(v, python_type):
+                                # We skip booleans for now, as users likely depend
+                                # on them being integer/float-like.
+                                try:
+                                    v = python_type(v)
+                                except (OverflowError, ValueError):
+                                    # Cannot convert NaN/infs to integer
+                                    pass
+
+                            setattr(variable, a, v)
+                    variable.prefixes = ast_symbol.prefixes
             variables.append(variable)
         return variables
 
@@ -183,8 +193,12 @@ class Generator(TreeListener):
         self.model.states = self._ast_symbols_to_variables(ode_states)
         self.model.der_states = self._ast_symbols_to_variables(ode_states, differentiate=True)
         self.model.alg_states = self._ast_symbols_to_variables(alg_states)
-        self.model.constants = self._ast_symbols_to_variables(constants)
-        self.model.parameters = self._ast_symbols_to_variables(parameters)
+        all_constants = self._ast_symbols_to_variables(constants)
+        self.model.constants = [c for c in all_constants if isinstance(c, Variable)]
+        self.model.string_constants = [c for c in all_constants if isinstance(c, StringVariable)]
+        all_parameters = self._ast_symbols_to_variables(parameters)
+        self.model.parameters = [p for p in all_parameters if isinstance(p, Variable)]
+        self.model.string_parameters = [p for p in all_parameters if isinstance(p, StringVariable)]
 
         # We extend the input list, as it is already populated with delayed states.
         self.model.inputs.extend(self._ast_symbols_to_variables(inputs))
@@ -652,6 +666,8 @@ class Generator(TreeListener):
             return bool
         elif tree.type.name == 'Integer':
             return int
+        elif tree.type.name == 'String':
+            return str
         else:
             return float
 

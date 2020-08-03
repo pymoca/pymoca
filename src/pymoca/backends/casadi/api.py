@@ -36,6 +36,8 @@ class CachedModel(Model):
         self.outputs = []
         self.constants = []
         self.parameters = []
+        self.string_constants = []
+        self.string_parameters = []
         self.time = ca.MX.sym('time')
         self.delay_states = []
         self.delay_arguments = []
@@ -57,6 +59,8 @@ class CachedModel(Model):
         r += "outputs: " + str(self.outputs) + "\n"
         r += "constants: " + str(self.constants) + "\n"
         r += "parameters: " + str(self.parameters) + "\n"
+        r += "string_constants: " + str(self.string_constants) + "\n"
+        r += "string_parameters: " + str(self.string_parameters) + "\n"
         return r
 
     @property
@@ -212,6 +216,8 @@ def save_model(model_folder: str, model_name: str, model: Model,
         # Describe variables per category
         for key in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
             db[key] = [e.to_dict() for e in getattr(model, key)]
+        db['string_constants'] = model.string_constants
+        db['string_parameters'] = model.string_parameters
 
 
         # Caching using CasADi functions will lead to constants seemingly
@@ -348,6 +354,8 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         model.outputs = db['outputs']
         model.delay_states = db['delay_states']
         model.alias_relation = db['alias_relation']
+        model.string_constants = db['string_constants']
+        model.string_parameters = db['string_parameters']
 
         # Evaluate variable metadata:
         parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])

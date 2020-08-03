@@ -1,4 +1,6 @@
 model Simplify
+    parameter String string_parameter = "test_p";
+    constant String string_constant = "test_c";
     constant Real c = 3.0;
     parameter Real p1 = 2.0;
     parameter Real p2 = 2 * p1;
