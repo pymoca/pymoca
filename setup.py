@@ -110,7 +110,7 @@ def setup_package():
         'all': []  # Automatically generated below
 
     }
-    extras_require['all'] = sorted({r for l in extras_require.values() for r in l})
+    extras_require['all'] = sorted({r for lst in extras_require.values() for r in lst})
 
     cmdclass_ = {'antlr': AntlrBuildCommand}
     cmdclass_.update(versioneer.get_cmdclass())

@@ -261,14 +261,14 @@ class ModelListener:
             dae.pre_c = ca.vertcat(dae.pre_c, self.pre_cond(k))
             dae.f_c = ca.vertcat(dae.f_c, c_dict[k])
 
-        for l, r in [('f_c', 'c'), ('c', 'pre_c'), ('dx', 'x'), ('f_m', 'm')]:
-            vl = getattr(dae, l)
-            vr = getattr(dae, r)
+        for left, right in [('f_c', 'c'), ('c', 'pre_c'), ('dx', 'x'), ('f_m', 'm')]:
+            vl = getattr(dae, left)
+            vr = getattr(dae, right)
             if vl.shape != vr.shape:
                 raise ValueError(
                     '{:s} and {:s} must have the same shape:'
                     '\n{:s}: {:s}\t{:s}: {:s}'.format(
-                        l, r, l, str(dae.f_m), r, str(dae.m)))
+                        left, right, left, str(dae.f_m), right, str(dae.m)))
 
         dae.ng = ca.vertcat(*self.scope['ng'])
         dae.nu = ca.vertcat(*self.scope['nu'])
@@ -378,16 +378,16 @@ class ModelListener:
 
 
 # noinspection PyProtectedMember
-def walk(e: etree._Element, l: ModelListener) -> None:
+def walk(e: etree._Element, listener: ModelListener) -> None:
     tag = e.tag
-    l.call('enter_every_before', e)
-    l.call('enter_' + tag, e)
-    l.call('enter_every_after', e)
+    listener.call('enter_every_before', e)
+    listener.call('enter_' + tag, e)
+    listener.call('enter_every_after', e)
     for c in e.getchildren():
-        walk(c, l)
-    l.call('exit_every_before', e)
-    l.call('exit_' + tag, e)
-    l.call('exit_every_after', e)
+        walk(c, listener)
+    listener.call('exit_every_before', e)
+    listener.call('exit_' + tag, e)
+    listener.call('exit_every_after', e)
 
 
 def parse(model_txt: str, verbose: bool = False) -> HybridDae:
