@@ -1594,6 +1594,60 @@ class GenCasadiTest(unittest.TestCase):
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_derivative_aliases(self):
+        txt = """
+            model DerivativeAlias
+              Real x;
+              Real z;
+            equation
+              der(x) = z;
+            end DerivativeAlias;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DerivativeAlias')
+        casadi_model.simplify({'detect_aliases': True})
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+
+        self.assertSetEqual(casadi_model.der_states[0].aliases, {'z'})
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_no_derivative_aliases(self):
+        txt = """
+            model NoDerivativeAlias
+              Real x;
+              Real z;
+            equation
+              der(x) = z;
+            end NoDerivativeAlias;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'NoDerivativeAlias')
+        casadi_model.simplify({'detect_aliases': True,
+                               'allow_derivative_aliases': False})
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x')
+        der_x = ca.MX.sym('der(x)')
+        z = ca.MX.sym('z')
+
+        ref_model.states = list(map(Variable, [x]))
+        ref_model.der_states = list(map(Variable, [der_x]))
+        ref_model.alg_states = list(map(Variable, [z]))
+        ref_model.equations = [der_x - z]
+
+        self.assertSetEqual(casadi_model.der_states[0].aliases, set())
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
     def test_simplify_reduce_affine_expression(self):
         # Create model, cache it, and load the cache
         compiler_options = \

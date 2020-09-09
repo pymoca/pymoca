@@ -25,6 +25,7 @@ def _get_default_options():
         'eliminable_variable_expression': None,
         'factor_and_simplify_equations': False,
         'detect_aliases': False,
+        'allow_derivative_aliases': True,
         'reduce_affine_expression': False,
     }
 
