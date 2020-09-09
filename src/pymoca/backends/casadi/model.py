@@ -844,6 +844,12 @@ class Model:
                         # swap the states
                         other_state, alg_state = alg_state, other_state
 
+                # If either state is a derivative state, and aliasing of those
+                # is not allowed, skip aliasing them
+                if (not options['allow_derivative_aliases']
+                        and (alg_state.name() in der_states or other_state.name() in der_states)):
+                    return False
+
                 if alg_state is not None:
                     # Check to see if we are linking two entries in do_not_eliminate
                     if self.alias_relation.canonical_signed(alg_state.name())[0] in do_not_eliminate and \
