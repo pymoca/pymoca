@@ -409,7 +409,7 @@ class Model:
 
     def _simplify_once(self, options):
         if options['expand_vectors'] and options['expand_mx']:
-            # If we are _not_ expanding MX to SX, we do the expansion of
+            # If we are expanding MX to SX, we do the expansion of
             # vectors first, such that we are be able to detect more aliases
             # (e.g individual array elements, or elements in a for loop).
             self._expand_vectors()
