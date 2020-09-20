@@ -1648,6 +1648,75 @@ class GenCasadiTest(unittest.TestCase):
         self.assertSetEqual(casadi_model.der_states[0].aliases, set())
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
 
+    def test_divide_constant_parameter_aliases(self):
+        txt = """
+            model DivideConstantParameterAlias
+              Real x;
+              Real y;
+              Real z;
+              parameter Real a;
+              constant Real b;
+            equation
+              (x - y) / (a + b) = 0;
+              (x + z) / a = 0;
+            end DivideConstantParameterAlias;
+        """
+
+        # There are no vectors, so even with expand_vectors and expand_mx the
+        # alias detection should find the exact same aliases.
+        for expand_vectors in [False, True]:
+            for expand_mx in [False, True]:
+                ast_tree = parser.parse(txt)
+                casadi_model = gen_casadi.generate(ast_tree, 'DivideConstantParameterAlias')
+                casadi_model.simplify({'detect_aliases': True,
+                                       'expand_vectors': expand_vectors,
+                                       'expand_mx': expand_mx})
+
+                ref_model = Model()
+
+                x = ca.MX.sym('x')
+                a = ca.MX.sym('a')
+                b = ca.MX.sym('b')
+
+                ref_model.alg_states = list(map(Variable, [x]))
+                ref_model.parameters = list(map(Variable, [a]))
+                ref_model.constants = list(map(Variable, [b]))
+
+                self.assertSetEqual(casadi_model.alias_relation.aliases('x'), {'x', 'y', '-z'})
+                self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
+    def test_divide_constant_parameter_vector_aliases(self):
+        txt = """
+            model DivideConstantParameterVectorAlias
+              Real x[3];
+              Real y[3];
+              Real z[3];
+              parameter Real a;
+              constant Real b;
+            equation
+              (x - y) / (a + b) = 0;
+              (x + z) / a = 0;
+            end DivideConstantParameterVectorAlias;
+        """
+
+        # If we have vectors but do not expand them, we should still find aliases
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'DivideConstantParameterVectorAlias')
+        casadi_model.simplify({'detect_aliases': True})
+
+        ref_model = Model()
+
+        x = ca.MX.sym('x', 3)
+        a = ca.MX.sym('a')
+        b = ca.MX.sym('b')
+
+        ref_model.alg_states = list(map(Variable, [x]))
+        ref_model.parameters = list(map(Variable, [a]))
+        ref_model.constants = list(map(Variable, [b]))
+
+        self.assertSetEqual(casadi_model.alias_relation.aliases('x'), {'x', 'y', '-z'})
+        self.assert_model_equivalent_numeric(casadi_model, ref_model)
+
     def test_simplify_reduce_affine_expression(self):
         # Create model, cache it, and load the cache
         compiler_options = \
