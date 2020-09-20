@@ -870,16 +870,36 @@ class Model:
 
                 return False
 
-            reduced_equations = []
-            for eq in self.equations:
+            def _detect_alias(eq):
                 # We do fast checks first, and the slower (but more generic)
                 # checks after.
-                if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
-                    if eq.dep(0).is_symbolic() and eq.dep(1).is_symbolic():
-                        deps = ca.symvar(eq)
-                        assert len(deps) == 2
-                        if _make_alias(deps, eq.is_op(ca.OP_ADD)): continue
-                elif options['expand_vectors'] and not options['expand_mx']:
+                deps = ca.symvar(eq)
+
+                if len(deps) == 2:
+                    if eq.n_dep() == 2 and (eq.is_op(ca.OP_SUB) or eq.is_op(ca.OP_ADD)):
+                        if eq.dep(0).is_symbolic() and eq.dep(1).is_symbolic():
+                            return deps, eq.is_op(ca.OP_ADD)
+
+                deps_names = [x.name() for x in deps]
+                non_param_deps = [sym for name, sym in zip(deps_names, deps)
+                                  if name not in parameters and name not in constants]
+
+                for d in [deps, non_param_deps]:
+                    if not len(d) == 2:
+                        continue
+
+                    # Check with substitute, which is a more expensive operation
+                    if ca.substitute(eq, d[0], d[1]).is_zero():
+                        return d, False
+
+                    elif ca.substitute(eq, d[0], -1 * d[1]).is_zero():
+                        return d, True
+
+                return [], False
+
+            reduced_equations = []
+            for eq in self.equations:
+                if options['expand_vectors'] and not options['expand_mx']:
                     # Equation might have many "shadow" dependencies due to
                     # vector/array expansion. By using .expand() and SX
                     # symbols for the evaluation, we can figure out what the
@@ -890,28 +910,20 @@ class Model:
                     s_sx = [ca.SX.sym(x.name(), *x.shape) for x in s_mx]
                     eq_sx = f.call(s_sx)[0]
 
-                    # Reduced dependencies
-                    deps_sx = ca.symvar(eq_sx)
+                    symbols, negative_alias = _detect_alias(eq_sx)
 
-                    if len(deps_sx) == 2:
-                        # Map SX dependencies back to MX dependencies
-                        deps_map = {k: v for v, k in enumerate(s_sx)}
-                        deps_mx = [s_mx[deps_map[x]] for x in deps_sx]
+                    if symbols:
+                        deps_map = dict(zip(s_sx, s_mx))
+                        symbols = [deps_map[s] for s in symbols]
+                else:
+                    # We can just use the MX equation directly
+                    symbols, negative_alias = _detect_alias(eq)
 
-                        # Simple add/sub expressions in SX equation
-                        if eq_sx.n_dep() == 2 and (eq_sx.is_op(ca.OP_SUB) or eq_sx.is_op(ca.OP_ADD)):
-                            if eq_sx.dep(0).is_symbolic() and eq_sx.dep(1).is_symbolic():
-                                if _make_alias(deps_mx, eq_sx.is_op(ca.OP_ADD)): continue
-
-                        # Check with substitute, which is a more expensive operation
-                        if ca.substitute(eq_sx, deps_sx[0], deps_sx[1]).is_zero():
-                            if _make_alias(deps_mx): continue
-
-                        elif ca.substitute(eq_sx, deps_sx[0], -1 * deps_sx[1]).is_zero():
-                            if _make_alias(deps_mx, True): continue
-
-                # Keep this equation
-                reduced_equations.append(eq)
+                if symbols and _make_alias(symbols, negative_alias):
+                    continue
+                else:
+                    # Keep this equation
+                    reduced_equations.append(eq)
 
             # Eliminate alias variables
             variables, values = [], []
