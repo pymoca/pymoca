@@ -103,7 +103,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
             for item in fnmatch.filter(files, "*.mo"):
                 logger.info("Parsing {}".format(item))
 
-                with open(os.path.join(root, item), 'r') as f:
+                with open(os.path.join(root, item), 'r', encoding="utf-8") as f:
                     if tree is None:
                         tree = parser.parse(f.read())
                     else:
