@@ -2,8 +2,10 @@
 branch = True
 source = pymoca
 omit =
-	src/pymoca/_version.py
-	src/pymoca/generated/*
+    */pymoca/_version.py
+    */pymoca/versioneer.py
+    */pymoca/generated/*
+    */pymoca/test/*
 
 [report]
 show_missing = true
@@ -14,4 +16,4 @@ exclude_lines =
 [paths]
 source =
     src/pymoca
-    .tox/*/lib/python*/site-packages/pymoca
+    */site-packages/pymoca
