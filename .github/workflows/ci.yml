@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'master'
+      - 'maintenance/*'
+    tags:
+      - '[0-9].*'
+  schedule:
+    # Every Wednesday at 6:06 UTC
+    - cron: "6 6 * * 3"
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - run: pip install tox
+      - run: tox -e flake8
+
+  test:
+    needs: style
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: [3.5, 3.8, 3.9]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - run: |
+        python -m pip install --upgrade pip
+        pip install tox
+    - run: tox -e py
+
+  coverage:
+    needs: test
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.ref, 'refs/tags') }}
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - run: |
+        python -m pip install --upgrade pip
+        pip install tox
+    - run: tox -e coverage
+    - uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage.xml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+    - env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        python setup.py sdist bdist_wheel
+        twine upload dist/*
