@@ -12,6 +12,11 @@ class AliasRelation:
     def add(self, a, b):
         # Construct aliases (a set of equivalent variables)
         aliases = self.aliases(a)
+        if b in aliases:
+            # Already aliases, nothing more to do
+            assert a in self.aliases(b)
+            return
+
         inverted_aliases = self.aliases(self.__toggle_sign(a))
 
         aliases |= self.aliases(b)
