@@ -1488,6 +1488,35 @@ class GenCasadiTest(unittest.TestCase):
         self.assertSetEqual(p.aliases, {'z'})
         self.assertEqual(len(casadi_model.alg_states), 0)
 
+    def test_resolve_parameters(self):
+        txt = """
+            model ResolveParameters
+
+              parameter Real x = 1.0;
+              parameter Real z = x;
+
+            end ResolveParameters;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ResolveParameters')
+
+        parameter_names = {p.symbol.name() for p in casadi_model.parameters}
+        self.assertSetEqual(parameter_names, {'x', 'z'})
+        z = next(p for p in casadi_model.parameters if p.symbol.name() == "z")
+        self.assertIsInstance(z.value, ca.MX)
+        self.assertFalse(z.value.is_constant())
+        self.assertEqual(z.value.name(), "x")
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ResolveParameters')
+        casadi_model.simplify({'resolve_parameter_values': True})
+
+        parameter_names = {p.symbol.name() for p in casadi_model.parameters}
+        self.assertSetEqual(parameter_names, {'x', 'z'})
+        z = next(p for p in casadi_model.parameters if p.symbol.name() == "z")
+        self.assertEqual(z.value, 1.0)
+
     def test_deleted_canonical_variable(self):
         txt = """
             model DeletedCanonicalVariable

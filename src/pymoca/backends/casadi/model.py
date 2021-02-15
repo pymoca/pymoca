@@ -420,6 +420,44 @@ class Model:
             self.equations = self._expand_simplify_mx(self.equations)
             self.initial_equations = self._expand_simplify_mx(self.initial_equations)
 
+        if options['resolve_parameter_values']:
+            # Resolve all numeric parameter values that are set (i.e. value
+            # not equal to NaN). Inline the values, but keep the parameter
+            # Variables around. Note that the associated parameter MX symbols
+            # then do not appear in any min/max/nominal/value metadata (e.g.
+            # those of other parameters).
+            current_parameters_and_constants = {*self.parameters, *self.constants}
+
+            for i in range(SUBSTITUTE_LOOP_LIMIT):
+                symbols, values = [], []
+                next_parameters_and_constants = []
+
+                for p in current_parameters_and_constants:
+                    if isinstance(p.value, list):
+                        p.value = np.array(p.value)
+
+                        if not np.issubdtype(p.value.dtype, np.number):
+                            raise NotImplementedError(
+                                "Only parameters arrays with numeric values can be simplified")
+
+                        if not np.any(np.isnan(p.value)):
+                            symbols.append(p.symbol)
+                            values.append(value)
+                    else:
+                        value = ca.MX(p.value)
+                        if value.is_constant() and value.is_regular():
+                            symbols.append(p.symbol)
+                            values.append(value)
+                        else:
+                            next_parameters_and_constants.append(p)
+
+                if not values:
+                    break
+
+                self._substitute_metadata(symbols, values)
+
+                current_parameters_and_constants = next_parameters_and_constants
+
         if options['replace_parameter_expressions']:
             logger.info("Replacing parameter expressions")
 
