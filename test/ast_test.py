@@ -1,3 +1,4 @@
+import inspect
 import unittest
 
 from pymoca import ast
@@ -40,3 +41,31 @@ class TestASTManipulation(unittest.TestCase):
 
         self.ast.remove_equation(e)
         self.assertNotIn(e, self.ast.equations)
+
+
+class TestASTReprAndStr(unittest.TestCase):
+    def test_all_repr_and_str_len(self):
+        for attr_string in dir(ast):
+            attr = getattr(ast, attr_string)
+            if inspect.isclass(attr) and issubclass(attr, ast.Node):
+                class_instance = attr()
+                self.assertNotEqual(len(repr(class_instance)), 0)
+                if isinstance(class_instance, ast.ComponentRef):
+                    self.assertEqual(len(str(class_instance)), 0)
+                else:
+                    self.assertNotEqual(len(str(class_instance)), 0)
+
+    def test_component_ref(self):
+        cref = ast.ComponentRef.from_string('A0.B1.C2')
+
+        cref_tuple = cref.to_tuple()
+        self.assertEqual(cref_tuple[0], 'A0')
+        self.assertEqual(cref_tuple[1], 'B1')
+        self.assertEqual(cref_tuple[2], 'C2')
+
+        cref_d3 = ast.ComponentRef.from_string('D3')
+        self.assertEqual(str(cref_d3), 'D3')
+
+        cref_cat = cref.from_tuple(cref_tuple + cref_d3.to_tuple())
+        self.assertEqual(str(cref_cat), 'A0.B1.C2.D3')
+        self.assertEqual(repr(cref_cat), "'A0'['B1'['C2'['D3']]]")
