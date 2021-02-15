@@ -1379,7 +1379,7 @@ class GenCasadiTest(unittest.TestCase):
 
         # Compare
         self.assert_model_equivalent_numeric(casadi_model, ref_model)
-        self.assertEquals(casadi_model.alg_states[0].aliases, {'alias'})
+        self.assertEqual(casadi_model.alg_states[0].aliases, {'alias'})
 
     def test_simplify_detect_negative_alias(self):
         # Create model, cache it, and load the cache
