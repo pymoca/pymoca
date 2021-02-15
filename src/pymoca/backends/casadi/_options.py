@@ -17,6 +17,7 @@ def _get_default_options():
         'unroll_loops': True,
         'inline_functions': True,
         'expand_vectors': False,
+        'resolve_parameter_values': False,
         'replace_parameter_expressions': False,
         'replace_constant_expressions': False,
         'eliminate_constant_assignments': False,
