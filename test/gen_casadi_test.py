@@ -724,7 +724,10 @@ class GenCasadiTest(unittest.TestCase):
             ref_model = Model()
 
             def _array_mx(name, n):
-                return np.array([ca.MX.sym("{}[{}]".format(name, i+1)) for i in range(n)])
+                arr = np.empty(n, dtype=object)
+                for i in range(n):
+                    arr[i] = ca.MX.sym("{}[{}]".format(name, i+1))
+                return arr
 
             x = _array_mx("x", 3)
             y = _array_mx("y", 3)
