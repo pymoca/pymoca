@@ -362,7 +362,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(parameter_vector)))
         independent_metadata = dict(zip(
             variables_with_metadata,
-            (ca.MX(x) for x in model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters])))))
+            (x for x in model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters])))))
 
         for k, key in enumerate(variables_with_metadata):
             m = db[key + "__metadata_dependent"]
@@ -372,7 +372,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                     if m[i, j] == _DepMeta.MX_DEPENDENT:
                         setattr(variable, tmp, metadata[key][i, j])
                     elif m[i, j] == _DepMeta.MX_INDEPENDENT:
-                        setattr(variable, tmp, independent_metadata[key][i, j])
+                        setattr(variable, tmp, ca.MX(independent_metadata[key][i, j]))
                     else:
                         # Already handled as part of Variable dict. That way
                         # we also do not have to worry about making sure the
