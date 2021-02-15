@@ -54,7 +54,7 @@ class ForLoop:
         start = e.start.value
         step = e.step.value
         stop = self.generator.get_integer(e.stop)
-        self.values = np.arange(start, stop + step, step, dtype=np.int)
+        self.values = np.arange(start, stop + step, step, dtype=int)
         self.index_variable = _new_mx(i.name)
         self.name = i.name
         self.indexed_symbols = OrderedDict()
@@ -62,10 +62,10 @@ class ForLoop:
     def register_indexed_symbol(self, e, index_function, transpose, tree, index_expr=None):
         if isinstance(index_expr, ca.MX) and index_expr is not self.index_variable:
             F = ca.Function('index_expr', [self.index_variable], [index_expr])
-            # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=np.int)
+            # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=int)
             Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
             res = Fmap.call([self.values])
-            indices = np.array(res[0].T, dtype=np.int)
+            indices = np.array(res[0].T, dtype=int)
         else:
             indices = self.values
         self.indexed_symbols[e] = ForLoopIndexedSymbol(tree, transpose, index_function(indices - 1))
