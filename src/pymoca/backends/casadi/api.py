@@ -305,7 +305,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         try:
             db = pickle.load(f)
         except RuntimeError as e:
-            if "DeserializingStream" in str(e):
+            if "DeserializingStream" in str(e) or "deserialization" in str(e).lower():
                 raise InvalidCacheError('Cache generated for incompatible CasADi version')
             else:
                 raise
