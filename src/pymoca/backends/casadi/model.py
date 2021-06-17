@@ -238,6 +238,17 @@ class Model:
         expressions = ca.substitute(expressions, symbols, values)
 
         for variable, attribute, value in zip(variables, attributes, expressions):
+            if variable.python_type in {int, float}:
+                if isinstance(value, ca.MX) and value.is_constant() and value.shape == (1, 1):
+                    if attribute in {"value", "start", "min", "max", "nominal"}:
+                        # Inf is common/the default for min/max. Because
+                        # integers cannot represent this value, we cast them
+                        # to floats instead.
+                        if value.is_regular():
+                            value = variable.python_type(float(value))
+                        else:
+                            value = float(value)
+
             setattr(variable, attribute, value)
 
     def _expand_vectors(self):
