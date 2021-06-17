@@ -1517,6 +1517,49 @@ class GenCasadiTest(unittest.TestCase):
         z = next(p for p in casadi_model.parameters if p.symbol.name() == "z")
         self.assertEqual(z.value, 1.0)
 
+    def test_resolve_parameters_expression_result_type(self):
+        txt = """
+            model ResolveParametersExprType
+
+              parameter Real diameter = 1.0;
+              parameter Real area = 0.25 * 3.14159265 * diameter ^ 2;
+
+              parameter Integer n = 2;
+              parameter Integer n_squared = n ^ 2;
+            end ResolveParametersExprType;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ResolveParametersExprType')
+
+        parameter_names = {p.symbol.name() for p in casadi_model.parameters}
+        self.assertSetEqual(parameter_names, {'diameter', 'area', 'n', 'n_squared'})
+
+        area = next(p for p in casadi_model.parameters if p.symbol.name() == "area")
+        self.assertIsInstance(area.value, ca.MX)
+        self.assertFalse(area.value.is_constant())
+
+        n_squared = next(p for p in casadi_model.parameters if p.symbol.name() == "n_squared")
+        self.assertIsInstance(n_squared.value, ca.MX)
+        self.assertFalse(n_squared.value.is_constant())
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'ResolveParametersExprType')
+        casadi_model.simplify({'resolve_parameter_values': True})
+
+        parameter_names = {p.symbol.name() for p in casadi_model.parameters}
+        self.assertSetEqual(parameter_names, {'diameter', 'area', 'n', 'n_squared'})
+
+        area = next(p for p in casadi_model.parameters if p.symbol.name() == "area")
+        self.assertNotIsInstance(area.value, ca.MX)
+        self.assertIsInstance(area.value, float)
+        self.assertEqual(area.value, 0.25 * 3.14159265)
+
+        n_squared = next(p for p in casadi_model.parameters if p.symbol.name() == "n_squared")
+        self.assertNotIsInstance(n_squared.value, ca.MX)
+        self.assertIsInstance(n_squared.value, int)
+        self.assertEqual(n_squared.value, 4)
+
     def test_deleted_canonical_variable(self):
         txt = """
             model DeletedCanonicalVariable
