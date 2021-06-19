@@ -40,11 +40,13 @@ class_type:
         | 'package'
         | ('pure' | 'impure')? 'operator'? 'function'
         | 'operator'
+        | 'optimization'
     ;
 
 // B.2.2.3 ------------------------------------------------
 class_specifier :
-    IDENT string_comment composition 'end' IDENT                    # class_spec_comp
+    IDENT class_modification? string_comment 
+        composition 'end' IDENT                                     # class_spec_comp
     | IDENT '=' base_prefix component_reference
         class_modification? comment                                 # class_spec_base
     | IDENT '=' 'enumeration' '(' (enum_list? | ':') ')' comment    # class_spec_enum
@@ -76,6 +78,7 @@ composition :
         | 'protected' epro=element_list
         | equation_section
         | algorithm_section
+        | constraint_section
     )*
     ( 'external' language_specification?
         external_function_call?
@@ -280,6 +283,15 @@ algorithm_section :
     INITIAL? 'algorithm' statement_block
     ;
 
+// B.2.6.2A ------------------------------------------------
+constraint_block :
+    (constraint ';')*
+    ;
+
+constraint_section :
+    INITIAL? 'constraint' constraint_block
+    ;
+
 // B.2.6.3 ------------------------------------------------
 equation_options :
     simple_expression '=' expression    # equation_simple
@@ -312,6 +324,17 @@ statement_options :
 // B.2.6.6 ------------------------------------------------
 statement :
     statement_options
+    comment
+    ;
+
+// B.2.6.5A ------------------------------------------------
+constraint_options :
+    simple_expression op=('<='|'>=') simple_expression                  # constraint_inequality
+    ;
+
+// B.2.6.6A ------------------------------------------------
+constraint :
+    constraint_options
     comment
     ;
 
@@ -461,6 +484,10 @@ component_reference :
     component_reference_element ('.' component_reference_element)*
     ;
 
+//component_reference_time :
+//    component_reference '(' TIME ')'
+//    ;
+
 // B.2.7.7 ------------------------------------------------
 function_call_args :
     '(' function_arguments? ')'
@@ -541,6 +568,7 @@ COMMENT :
     ('/' '/' .*? '\n' | '/*' .*? '*/') -> channel(HIDDEN)
     ;
 WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
+
 
 //=========================================================
 // Fragments

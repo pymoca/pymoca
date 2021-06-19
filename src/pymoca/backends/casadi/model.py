@@ -39,6 +39,8 @@ class Variable:
         self.max = np.inf
         self.nominal = 0
         self.fixed = False
+        self.initialGuess = 0
+        self.free = False
 
     def __str__(self):
         return self.symbol.name()
@@ -114,12 +116,15 @@ class Model:
         self.string_constants = []
         self.string_parameters = []
         self.equations = []
+        self.constraints = []
         self.initial_equations = []
         self.time = ca.MX.sym('time')
+        self.finalTime = ca.MX.sym('finalTime')
         self.delay_states = []
         self.delay_arguments = []
         self.alias_relation = AliasRelation()
         self._expand_mx_func = lambda x: x
+        self.optimization_attributes = {}
 
     def __str__(self):
         r = ""
@@ -136,6 +141,8 @@ class Model:
         r += "string_parameters: " + str(self.string_parameters) + "\n"
         r += "equations: " + str(self.equations) + "\n"
         r += "initial equations: " + str(self.initial_equations) + "\n"
+        r += "constraints: " + str(self.constraints) + "\n"
+        r += "optimization_attributes: " + str(self.optimization_attributes) + "\n"
         return r
 
     def check_balanced(self):

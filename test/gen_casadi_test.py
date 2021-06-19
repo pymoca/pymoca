@@ -2720,6 +2720,53 @@ class GenCasadiTest(unittest.TestCase):
 
         casadi_model.simplify(compiler_options)
 
+    def test_optimica_parsing_vdp_flat(self):
+        txt = """
+            package HelloWorldOptimica
+                optimization VDPoptimized (objectiveIntegral = x1^2 + u^2 + x2^2, startTime = 0, finalTime = 10)
+                    // The states
+                    Real x1(start = 0, fixed = true);
+                    Real x2(start = 1, fixed = true);
+                    Real z;
+                    // The control signal
+                  Modelica.Blocks.Interfaces.RealInput u(min = -0.75, max = 1);
+                equation
+                    z = (1 - x2^2) * x1;
+                    der(x1) = z - x2 + u;
+                    der(x2) = x1;
+                end VDPoptimized;
+            end HelloWorldOptimica;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'HelloWorldOptimica.VDPoptimized')
+
+    def test_optimica_parsing_vdp(self):
+        txt = """
+            package HelloWorldOptimica
+                model VDP
+                    // The states
+                    Real x1(start = 0, fixed = true);
+                    Real x2(start = 1, fixed = true);
+                    Real z;
+                    // The control signal
+                  Modelica.Blocks.Interfaces.RealInput u(min = -0.75, max = 1);
+                equation
+                    z = (1 - x2^2) * x1;
+                    der(x1) = z - x2 + u;
+                    der(x2) = x1;
+                end VDP;
+            
+                optimization VDPoptimized (objectiveIntegral = vdp.x1^2 + vdp.u^2 + vdp.x2^2, startTime = 0, finalTime = 10)
+                    VDP vdp;
+                end VDPoptimized; 
+            end HelloWorldOptimica;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'HelloWorldOptimica.VDPoptimized')
+
+
 
 if __name__ == "__main__":
     unittest.main()

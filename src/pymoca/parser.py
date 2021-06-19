@@ -23,6 +23,8 @@ from .generated.ModelicaParser import ModelicaParser
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
+# OPTIMIZATION_ATTRIBUTES = ['objective', 'finalTime']
+
 class ModelicaFile:
     def __init__(self, **kwargs):
         self.within = []  # type: List[ComponentRef]
@@ -40,6 +42,7 @@ class ASTListener(ModelicaListener):
         self.comp_clause = None  # type: ast.ComponentClause
         self.eq_sect = None  # type: ast.EquationSection
         self.alg_sect = None  # type: ast.AlgorithmSection
+        self.con_sect = None # type: ast.ConstraintSection
         self.symbol_node = None  # type: ast.Symbol
         self.eq_comment = None  # type: str
         self.sym_count = 0  # type: int
@@ -97,6 +100,18 @@ class ASTListener(ModelicaListener):
         class_node = self.class_node
         class_node.name = ctx.IDENT()[0].getText()
         class_node.comment = self.ast[ctx.string_comment()]
+        
+        # if ctx.class_modification() is not None:
+        #     class_modification = self.ast[ctx.class_modification()]
+        # else:
+        #     class_modification = ast.ClassModification()
+
+        if class_node.type == 'optimization' and ctx.class_modification() is not None:
+            class_node.optimization_attributes = self.ast[ctx.class_modification()]
+            # for opt_atr in OPTIMIZATION_ATTRIBUTES:
+            #     class_node.symbols[opt_atr] = ast.Symbol(name=opt_atr, value=ast.Primary(value=0))
+
+        # class_node.attributes = class_modification
 
     def exitClass_spec_base(self, ctx: ModelicaParser.Class_spec_baseContext):
         class_node = self.class_node
@@ -141,6 +156,13 @@ class ASTListener(ModelicaListener):
                     self.class_node.initial_equations += eqlist.equations
                 else:
                     self.class_node.equations += eqlist.equations
+                    
+        for constlist in [self.ast[e] for e in ctx.constraint_section()]:
+            if constlist is not None:
+                if constlist.initial:
+                    raise NotImplementedError('Initial constraints are not handled. Created a regulare constraint with access at time 0')
+                else:
+                    self.class_node.constraints += constlist.constraints
 
         for alglist in [self.ast[e] for e in ctx.algorithm_section()]:
             if alglist is not None:
@@ -191,6 +213,9 @@ class ASTListener(ModelicaListener):
     def exitStatement_block(self, ctx):
         self.ast[ctx] = [self.ast[e] for e in ctx.statement()]
 
+    def exitConstraint_block(self, ctx: ModelicaParser.Constraint_blockContext):
+        self.ast[ctx] = [self.ast[e] for e in ctx.constraint()]
+
     def enterAlgorithm_section(self, ctx: ModelicaParser.Algorithm_sectionContext):
         alg_sect = ast.AlgorithmSection(
             initial=ctx.INITIAL() is not None
@@ -205,6 +230,19 @@ class ASTListener(ModelicaListener):
         else:
             alg_sect.statements.extend(self.ast[ctx.statement_block()])
 
+    def enterConstraint_section(self, ctx:ModelicaParser.Constraint_sectionContext):
+        const_sect = ast.ConstraintSection(
+            initial=ctx.INITIAL() is not None
+        )
+        self.ast[ctx] = const_sect
+        self.const_sect = const_sect
+
+    def exitConstraint_section(self, ctx:ModelicaParser.Constraint_sectionContext):
+        const_sect = self.ast[ctx]
+        if const_sect.initial:
+            const_sect.constraints.extend(self.ast[ctx.constraint_block()])
+        else:
+            const_sect.constraints.extend(self.ast[ctx.constraint_block()])
     # EQUATION ===========================================================
 
     def enterEquation(self, ctx: ModelicaParser.EquationContext):
@@ -331,6 +369,24 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ForStatement(
             indices=self.ast[ctx.for_indices()],
             statements=self.ast[ctx.statement_block()])
+
+    # CONSTRAINT ==========================================================
+
+    def enterConstraint(self, ctx:ModelicaParser.ConstraintContext):
+        pass
+
+    def exitConstraint(self, ctx:ModelicaParser.ConstraintContext):
+        self.ast[ctx] = self.ast[ctx.constraint_options()]
+        try:
+            self.ast[ctx].comment = self.ast[ctx.comment()]
+        except AttributeError:
+            pass
+    
+    def exitConstraint_inequality(self, ctx:ModelicaParser.Constraint_inequalityContext):
+        self.ast[ctx] = ast.Constraint(
+            left=self.ast[ctx.simple_expression()[0]],
+            right=self.ast[ctx.simple_expression()[1]],
+            operand=ctx.op.text)
 
     # EXPRESSIONS ===========================================================
 
