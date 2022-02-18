@@ -2,7 +2,7 @@ from __future__ import print_function, absolute_import, division, print_function
 
 import copy
 import os
-from typing import List
+from typing import List, Dict, Union
 
 import jinja2
 
@@ -200,12 +200,15 @@ class {{tree.name}}(OdeModel):
             right=self.src[tree.right])
 
 
-def generate(ast_tree: ast.Tree, model_name: str):
+def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, Union[bool, str]]=None) -> str:
+
     """
     :param ast_tree: AST to generate from
     :param model_name: class to generate
+    :param options: options to pass to generator
     :return: sympy source code for model
     """
+    _ = options  # Unused
     component_ref = ast.ComponentRef.from_string(model_name)
     ast_tree_new = copy.deepcopy(ast_tree)
     ast_walker = TreeWalker()

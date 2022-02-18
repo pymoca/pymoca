@@ -7,7 +7,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 import copy
 import json
 from enum import Enum
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Type
 from collections import OrderedDict
 
 
@@ -104,7 +104,7 @@ class Node:
 
 class Primary(Node):
     def __init__(self, **kwargs):
-        self.value = None  # type: Union[bool, float, int, str, type(None)]
+        self.value = None  # type: Union[bool, float, int, str, Type[None]]
         super().__init__(**kwargs)
 
     def __repr__(self):
@@ -472,7 +472,7 @@ class ImportFromClause(Node):
 
 class ElementModification(Node):
     def __init__(self, **kwargs):
-        self.component = ComponentRef()  # type: Union[ComponentRef]
+        self.component = ComponentRef()  # type: ComponentRef
         self.modifications = []  # type: List[Union[Primary, Expression, ClassModification, Array, ComponentRef]]
         super().__init__(**kwargs)
 
@@ -565,7 +565,7 @@ class Class(Node):
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
         self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
-        self.annotation = []  # type: Union[NoneType, ClassModification]
+        self.annotation = []  # type: Union[Type[None], ClassModification]
         self.parent = None  # type: Class
 
         super().__init__(**kwargs)

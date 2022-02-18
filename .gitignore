@@ -65,13 +65,18 @@ pymoca/version.py
 
 # IDE
 .idea/
+.vscode/
 
 # virtual environments
 venv/
 venv3/
 
-Untitled.ipynb
+# testing
+pytest.ini
 .pytest_cache/
+
+Untitled.ipynb
 jit_tmp.c
 tmp*.o
 *.orig
+*.pymoca_cache
