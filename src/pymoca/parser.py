@@ -6,7 +6,7 @@ from __future__ import print_function, absolute_import, division, unicode_litera
 
 import antlr4
 import antlr4.Parser
-from typing import Dict
+from typing import Dict, List, Union
 from collections import deque, OrderedDict
 import copy
 
@@ -25,8 +25,8 @@ from .generated.ModelicaParser import ModelicaParser
 
 class ModelicaFile:
     def __init__(self, **kwargs):
-        self.within = []  # type: List[ComponentRef]
-        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
+        self.within = []  # type: List[ast.ComponentRef]
+        self.classes = OrderedDict()  # type: OrderedDict[str, ast.Class]
         super().__init__(**kwargs)
 
 
@@ -35,7 +35,6 @@ class ASTListener(ModelicaListener):
     def __init__(self):
         self.file_node = None  # type: ModelicaFile
         self.ast = {}  # type: Dict[ast.Node]
-        self.ast_result = None  # type: ast.Node
         self.class_nodes = deque([ast.Class()])  # type: deque[ast.Class]
         self.comp_clause = None  # type: ast.ComponentClause
         self.eq_sect = None  # type: ast.EquationSection
@@ -65,7 +64,7 @@ class ASTListener(ModelicaListener):
 
         for class_node in [self.ast[e] for e in ctx.stored_definition_class()]:
             self.ast[ctx].classes[class_node.name] = class_node
-        self.ast_result = self.ast[ctx]
+        self.file_node = self.ast[ctx]
 
     # CLASS ===========================================================
 
@@ -758,15 +757,34 @@ def file_to_tree(f: ModelicaFile) -> ast.Tree:
 
     return root
 
-def parse(text):
+class ModelicaParserErrorListener(antlr4.error.ErrorListener.ErrorListener):
+    def __init__(self):
+        self._error = False
+        super().__init__()
+
+    @property
+    def error(self):
+        return self._error
+
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        self._error = True
+        super().syntaxError(recognizer, offendingSymbol, line, column, msg, e)
+
+
+def parse(text: str) -> Union[ast.Tree, None]:
+    """Parse Modelica code given in text"""
     input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
     stream = antlr4.CommonTokenStream(lexer)
     parser = ModelicaParser(stream)
     # parser.buildParseTrees = False
+    listener = ModelicaParserErrorListener()
+    parser.addErrorListener(listener)
     parse_tree = parser.stored_definition()
+    if listener.error:
+        return None
     ast_listener = ASTListener()
     parse_walker = antlr4.ParseTreeWalker()
     parse_walker.walk(ast_listener, parse_tree)
-    modelica_file = ast_listener.ast_result
+    modelica_file = ast_listener.file_node
     return file_to_tree(modelica_file)
