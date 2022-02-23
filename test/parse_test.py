@@ -293,8 +293,8 @@ class ParseTest(unittest.TestCase):
         with open(os.path.join(MODEL_DIR, 'RedeclareNestedClass.mo.fail_parse'), 'r') as f:
             txt = f.read()
 
-        with self.assertRaises(Exception):
-            ast_tree = parser.parse(txt)
+        ast_tree = parser.parse(txt)
+        self.assertIsNone(ast_tree)
 
     def test_extends_order(self):
         with open(os.path.join(MODEL_DIR, 'ExtendsOrder.mo'), 'r') as f:
