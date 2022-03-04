@@ -200,21 +200,20 @@ class ComponentRef(Node):
         components = s.split('.')
         return cls.from_tuple(components)
 
-    @classmethod
-    def concatenate(cls, *args: List['ComponentRef']) -> 'ComponentRef':
+    def concatenate(self, arg: 'ComponentRef') -> 'ComponentRef':
         """
         Helper function to append two component references to eachother, e.g.
         a "within" component ref and an "object type" component ref.
         :return: New component reference, with other appended to self.
         """
 
-        a = copy.deepcopy(args[0])
+        a = copy.deepcopy(self)
         n = a
-        for b in args[1:]:
-            while n.child:
-                n = n.child[0]
-            b = copy.deepcopy(b)  # Not strictly necessary
-            n.child = [b]
+        b = arg
+        while n.child:
+            n = n.child[0]
+        b = copy.deepcopy(b)  # Not strictly necessary
+        n.child = [b]
         return a
 
 
@@ -448,26 +447,23 @@ class AlgorithmSection(Node):
             type(self).__name__, self.initial, self.statements)
 
 
-class ImportAsClause(Node):
+class ImportClause(Node):
     def __init__(self, **kwargs):
-        self.component = ComponentRef()  # type: ComponentRef
-        self.name = ''  # type: str
+        self.components = []  # type: List[ComponentRef]
+        self.short_name = ''  # type: str
+        self.unqualified = False # type: bool
+        # Comments are rare, so ignore
         super().__init__(**kwargs)
 
-    def __repr__(self):
-        return ('{}(component={}, name={!r})'.format(
-            type(self).__name__, self.component, self.name))
-
-
-class ImportFromClause(Node):
-    def __init__(self, **kwargs):
-        self.component = ComponentRef()  # type: ComponentRef
-        self.symbols = []  # type: List[str]
-        super().__init__(**kwargs)
+    def __str__(self):
+        star = ''
+        if self.unqualified:
+            star = '.*'
+        return 'import {!r}{!r}{!r}'.format(self.short_name, self.components, star)
 
     def __repr__(self):
-        return ('{}(component={}, symbols={!r})'.format(
-            type(self).__name__, self.component, self.symbols))
+        return '{}(components={}, short_name={!r}), unqualfied={!r}'.format(
+            type(self).__name__, self.components, self.short_name, self.unqualified)
 
 
 class ElementModification(Node):
@@ -551,7 +547,7 @@ class ExtendsClause(Node):
 class Class(Node):
     def __init__(self, **kwargs):
         self.name = None  # type: str
-        self.imports = []  # type: List[Union[ImportAsClause, ImportFromClause]]
+        self.imports = OrderedDict()  # type: OrderedDict[str, Union[ImportClause, ComponentRef]]
         self.extends = []  # type: List[ExtendsClause]
         self.encapsulated = False  # type: bool
         self.partial = False  # type: bool
@@ -570,7 +566,17 @@ class Class(Node):
 
         super().__init__(**kwargs)
 
-    def _find_class(self, component_ref: ComponentRef, search_parent=True) -> 'Class':
+    def _find_class(self, component_ref: ComponentRef, search_parent=True, search_imports=True) -> 'Class':
+        """ Recursively search for component_ref in self and linked classes
+
+        Implement lookup rules per spec chapter 5, see also chapter 13.
+        This is more succinctly outlined in
+        https://mbe.modelica.university/components/packages/lookup/
+        """
+        # TODO: Get rid of exception-based algorithm or make imports have separate exception?
+        # TODO: Move import logic to separate function?
+        # TODO: Implement library path lookup from section 13.2.2 of spec
+        # TODO: Try @functools.lru_cache if profile shows this is hotspot
         try:
             if not component_ref.child:
                 return self.classes[component_ref.name]
@@ -578,12 +584,50 @@ class Class(Node):
                 # Avoid infinite recursion by passing search_parent = False
                 return self.classes[component_ref.name]._find_class(component_ref.child[0], False)
         except (KeyError, ClassNotFoundError):
-            if search_parent and self.parent is not None:
-                return self.parent._find_class(component_ref)
-            else:
-                raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
+            try:
+                if search_imports:
+                    if component_ref.name in self.imports:
+                        # First search qualified imports (most common case)
+                        import_ : Union[ImportClause, ComponentRef] = self.imports[component_ref.name]
+                        if isinstance(import_, ImportClause):
+                            # Expand short name
+                            if component_ref.child:
+                                import_ = import_.components[0].concatenate(component_ref.child[0])
+                            else:
+                                import_ = import_.components[0]
+                        elif component_ref.child:
+                            import_ = import_.concatenate(component_ref.child[0])
+                        return self._find_class(import_)
+                    else:
+                        # Next search packages for unqualified imports (slow, but assuming not common)
+                        if '*' in self.imports:
+                            c = None
+                            for package_ref in self.imports['*'].components:
+                                imported_comp_ref = package_ref.concatenate(ComponentRef(name=component_ref.name))
+                                # Search within the package
+                                try:
+                                    # Avoid infinite recursion with search_imports = False
+                                    c = self._find_class(imported_comp_ref, search_imports=False)
+                                except(KeyError, ClassNotFoundError):
+                                    pass
+                            if c is not None:
+                                # Store result for next lookup
+                                self.imports[component_ref.name] = imported_comp_ref
+                                return c
+                            else:
+                                raise ClassNotFoundError
+                        else:
+                            raise ClassNotFoundError
+                else:
+                    raise ClassNotFoundError
+            except (KeyError, ClassNotFoundError):
+                if search_parent and self.parent is not None and not self.encapsulated:
+                    return self.parent._find_class(component_ref)
+                else:
+                    raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
 
-    def find_class(self, component_ref: ComponentRef, copy=True, check_builtin_classes=False) -> 'Class':
+    def find_class(self, component_ref: ComponentRef, copy=True,
+                   check_builtin_classes=False, search_imports=True) -> 'Class':
         # TODO: Remove workaround for Modelica / Modelica.SIUnits
         if component_ref.name in ["Real", "Integer", "String", "Boolean", "Modelica", "SI"]:
             if check_builtin_classes:
@@ -603,7 +647,7 @@ class Class(Node):
             else:
                 raise FoundElementaryClassError()
 
-        c = self._find_class(component_ref)
+        c = self._find_class(component_ref, search_imports)
 
         if copy:
             c = c.copy_including_children()

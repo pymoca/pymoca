@@ -1,5 +1,5 @@
 grammar Modelica;
-
+// TODO: Update to MLS 3.5 (this appears to be 3.3.0)
 //=========================================================
 //  B.2.1 Stored Definition - Within
 //=========================================================
@@ -121,7 +121,7 @@ replaceable_element:
 // B.2.2.12 ------------------------------------------------
 import_clause :
     'import' ( IDENT '=' component_reference
-        | component_reference ('.' ( '*' | '{' import_list '}' ) )? ) comment
+        | component_reference ('.*' | '.{' import_list '}' )? ) comment
     ;
 
 // B.2.2.13 ------------------------------------------------

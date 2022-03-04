@@ -958,7 +958,6 @@ def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool]=None)
     component_ref = ast.ComponentRef.from_string(model_name)
     ast_walker = GeneratorWalker()
     flat_tree = flatten(ast_tree, component_ref)
-    component_ref_tuple = component_ref.to_tuple()
-    casadi_gen = Generator(flat_tree, component_ref_tuple[-1], options)
+    casadi_gen = Generator(flat_tree, model_name, options)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model

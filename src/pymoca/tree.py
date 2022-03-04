@@ -81,9 +81,7 @@ class TreeListener:
 
     def enterIfStatement(self, tree: ast.IfStatement) -> None: pass
 
-    def enterImportAsClause(self, tree: ast.ImportAsClause) -> None: pass
-
-    def enterImportFromClause(self, tree: ast.ImportFromClause) -> None: pass
+    def enterImportClause(self, tree: ast.ImportClause) -> None: pass
 
     def enterPrimary(self, tree: ast.Primary) -> None: pass
 
@@ -137,9 +135,7 @@ class TreeListener:
 
     def exitIfStatement(self, tree: ast.IfStatement) -> None: pass
 
-    def exitImportAsClause(self, tree: ast.ImportAsClause) -> None: pass
-
-    def exitImportFromClause(self, tree: ast.ImportFromClause) -> None: pass
+    def exitImportClause(self, tree: ast.ImportClause) -> None: pass
 
     def exitPrimary(self, tree: ast.Primary) -> None: pass
 
@@ -239,6 +235,7 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
 
         c = flatten_extends(c, extends.class_modification, parent=c.parent)
 
+        extended_orig_class.imports.update(c.imports)
         extended_orig_class.classes.update(c.classes)
         extended_orig_class.symbols.update(c.symbols)
         extended_orig_class.equations += c.equations
@@ -258,6 +255,7 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
             if sym.visibility > extends.visibility:
                 sym.visibility = extends.visibility
 
+    extended_orig_class.imports.update(orig_class.imports)
     extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
     extended_orig_class.equations += orig_class.equations
@@ -1089,7 +1087,9 @@ def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
 
     # Put class in root
     root = ast.Tree()
-    root.classes[orig_class.name] = flat_class
+    flat_name = str(orig_class.full_reference())
+    flat_class.name = flat_name
+    root.classes[flat_name] = flat_class
 
     # pull functions to the top level,
     # putting them prior to the model class so that they are visited
