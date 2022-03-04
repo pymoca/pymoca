@@ -527,17 +527,42 @@ class ASTListener(ModelicaListener):
     def exitElement(self, ctx: ModelicaParser.ElementContext):
         self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
 
-    def exitImport_list(self, ctx: ModelicaParser.Import_listContext):
-        self.ast[ctx] = [ctx.IDENT()] + self.ast[ctx.import_list()]
-
+    # TODO: Clean this up (inheritance or different import clause classes?)
     def exitImport_clause(self, ctx: ModelicaParser.Import_clauseContext):
-        component = self.ast[ctx.component_reference()]
+        import_clause = ast.ImportClause()
+        self.ast[ctx] = import_clause
+        import_clause.components = [self.ast[ctx.component_reference()]]
         if ctx.IDENT() is not None:
-            self.ast[ctx] = ast.ImportAsClause(component=component, name=ctx.IDENT().getText())
+            import_clause.short_name = ctx.IDENT().getText()
         else:
-            symbols = self.ast[ctx.import_list()]
-            self.ast[ctx] = ast.ImportFromClause(component=component, symbols=symbols)
-        self.class_node.imports += [self.ast[ctx]]
+            import_list = ctx.import_list()
+            if import_list is not None:
+                package_name = import_clause.components.pop()
+                # Append list of names to package_name to get fully qualified name(s)
+                # Skip the comma separators in import_list.children
+                for ident in import_list.children[::2]:
+                    qualified_name = package_name.concatenate(package_name.from_string(ident.getText()))
+                    import_clause.components.append(qualified_name)
+            elif ctx.getChildCount() > 3:
+                import_clause.unqualified = True
+        if import_clause.short_name:
+            # import_clause instead of comp_ref signifies short_name
+            self.class_node.imports[import_clause.short_name] = import_clause
+        elif import_clause.unqualified:
+            # Postpone processing this uncommon case until actually needed
+            # In this case import_clause.components contains list of packages of all unqualified imports
+            if '*' not in self.class_node.imports:
+                self.class_node.imports['*'] = import_clause
+            else:
+                self.class_node.imports['*'].components.append(import_clause.components[0])
+        else:
+            # Simple case, fast lookup
+            for comp in import_clause.components:
+                name = comp.to_tuple()[-1]
+                # Check for name clashes
+                if name in self.class_node.imports:
+                    raise IOError(name, 'already imported')
+                self.class_node.imports[name] = comp
 
     def enterExtends_clause(self, ctx: ModelicaParser.Extends_clauseContext):
         self.in_extends_clause = True
