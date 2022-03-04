@@ -14,7 +14,10 @@ from pymoca import parser
 from pymoca import tree
 from pymoca import ast
 
-MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'models')
+MY_DIR = os.path.dirname(os.path.realpath(__file__))
+MODEL_DIR = os.path.join(MY_DIR, 'models')
+COMPLIANCE_DIR = os.path.join(MY_DIR, 'libraries', 'Modelica-Compliance', 'ModelicaCompliance')
+IMPORTS_DIR = os.path.join(COMPLIANCE_DIR, 'Scoping', 'NameLookup', 'Imports')
 
 
 class ParseTest(unittest.TestCase):
@@ -184,11 +187,9 @@ class ParseTest(unittest.TestCase):
 
         flat_tree = tree.flatten(ast_tree, comp_ref)
 
-        # NOTE: We currently do not flatten the component ref in the final
-        # tree's keys, so we use it once again to lookup the flattened class.
-        self.assertIn('elem.tc.i', flat_tree.classes['Test'].symbols.keys())
-        self.assertIn('elem.tc.a', flat_tree.classes['Test'].symbols.keys())
-        self.assertIn('b',         flat_tree.classes['Test'].symbols.keys())
+        self.assertIn('elem.tc.i', flat_tree.classes['Level1.Level2.Level3.Test'].symbols.keys())
+        self.assertIn('elem.tc.a', flat_tree.classes['Level1.Level2.Level3.Test'].symbols.keys())
+        self.assertIn('b',         flat_tree.classes['Level1.Level2.Level3.Test'].symbols.keys())
 
     def test_function_pull(self):
         with open(os.path.join(MODEL_DIR, 'FunctionPull.mo'), 'r') as f:
@@ -207,7 +208,7 @@ class ParseTest(unittest.TestCase):
         self.assertNotIn('Level1.Level2.Level3.TestPackage.not_called', flat_tree.classes)
 
         # Check if the classes in the flattened tree have the right type
-        self.assertEqual(flat_tree.classes['Function5'].type, 'model')
+        self.assertEqual(flat_tree.classes['Level1.Level2.Level3.Function5'].type, 'model')
 
         self.assertEqual(flat_tree.classes['Level1.Level2.Level3.f'].type, 'function')
         self.assertEqual(flat_tree.classes['Level1.Level2.Level3.TestPackage.times2'].type, 'function')
@@ -306,7 +307,7 @@ class ParseTest(unittest.TestCase):
 
         flat_tree = tree.flatten(ast_tree, comp_ref)
 
-        self.assertEqual(flat_tree.classes['M'].symbols['at.m'].value.value, 0.0)
+        self.assertEqual(flat_tree.classes['P.M'].symbols['at.m'].value.value, 0.0)
 
     def test_constant_references(self):
         with open(os.path.join(MODEL_DIR, 'ConstantReferences.mo'), 'r') as f:
@@ -406,6 +407,109 @@ class ParseTest(unittest.TestCase):
             for j in range(2):
                 self.assertIsInstance(flat_tree.classes['A'].symbols['x'].value.values[i].values[j].value, int)
                 self.assertIsInstance(flat_tree.classes['A'].symbols['y'].value.values[i].values[j].value, float)
+
+    def parse_file(self, pathname):
+        'Parse given full path name and return parsed ast.Tree'
+        with open(pathname, 'r') as mo_file:
+            txt = mo_file.read()
+        return parser.parse(txt)
+
+    def parse_model_files(self, *pathnames):
+        'Parse given files from MODEL_DIR and return parsed ast.Tree'
+        tree = None
+        for path in pathnames:
+            file_tree = self.parse_file(os.path.join(MODEL_DIR, path))
+            if tree:
+                tree.extend(file_tree)
+            else:
+                tree = file_tree
+        return tree
+
+    def test_import(self):
+        library_tree = self.parse_model_files('TreeLookup.mo', 'Import.mo')
+
+        comp_ref = ast.ComponentRef.from_string('A')
+        flat_tree = tree.flatten(library_tree, comp_ref)
+        expected_symbols = ['b.pcb.tc.a', 'b.pcb.tc.i', 'b.tb.b',
+                            'b.tb.elem.tc.a', 'b.tb.elem.tc.i',
+                            'pca.tc.a', 'pca.tc.i',
+                            'ta.b', 'ta.elem.tc.a', 'ta.elem.tc.i',
+                            'tce_mod.a', 'tce_mod.i', 'tce_mod.tcet.b',
+                            'tce_mod.tcet.elem.tc.a', 'tce_mod.tcet.elem.tc.i']
+        expected_symbols.sort()
+        actual_symbols = sorted(flat_tree.classes['A'].symbols.keys())
+        self.assertListEqual(expected_symbols, actual_symbols)
+        for eqn in flat_tree.classes['A'].equations:
+            if eqn.left == 'tce_mod.tect.b':
+                self.assertEqual(eqn.right.value, 4)
+            elif eqn.left == 'b.tb.b':
+                self.assertEqual(eqn.right.value, 3)
+
+    # Import tests from the Modelica Compliance library (only the shouldPass=true cases)
+    def parse_imports_file(self, pathname):
+        'Parse given path relative to IMPORTS_DIR and return parsed ast.Tree'
+        arg_ast = self.parse_file(os.path.join(IMPORTS_DIR, pathname))
+        icon_ast = self.parse_file(os.path.join(COMPLIANCE_DIR, 'Icons.mo'))
+        icon_ast.extend(arg_ast)
+        return icon_ast
+
+    def test_import_encapsulated(self):
+        library_ast = self.parse_imports_file('EncapsulatedImport.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.EncapsulatedImport'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('a.m.x', flat_ast.classes[model_name].symbols)
+
+    def test_import_scope_type(self):
+        library_ast = self.parse_imports_file('ImportScopeType.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.ImportScopeType'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('a', flat_ast.classes[model_name].symbols)
+        self.assertIn('b', flat_ast.classes[model_name].symbols)
+        self.assertIn('m.y', flat_ast.classes[model_name].symbols)
+
+    def test_import_qualified(self):
+        library_ast = self.parse_imports_file('QualifiedImport.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.QualifiedImport'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('b.a.x', flat_ast.classes[model_name].symbols)
+
+    def test_import_renaming(self):
+        library_ast = self.parse_imports_file('RenamingImport.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.RenamingImport'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('b.a.x', flat_ast.classes[model_name].symbols)
+
+    def test_import_renaming_single_definition(self):
+        library_ast = self.parse_imports_file('RenamingSingleDefinitionImport.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.RenamingSingleDefinitionImport'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('b.a.x', flat_ast.classes[model_name].symbols)
+
+    def test_import_single_definition(self):
+        library_ast = self.parse_imports_file('SingleDefinitionImport.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.SingleDefinitionImport'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('b.a.x', flat_ast.classes[model_name].symbols)
+
+    def test_import_unqualified(self):
+        library_ast = self.parse_imports_file('UnqualifiedImport.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.UnqualifiedImport'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('b.a.x', flat_ast.classes[model_name].symbols)
+
+    def test_import_unqualified_nonconflict(self):
+        library_ast = self.parse_imports_file('UnqualifiedImportNonConflict.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.UnqualifiedImportNonConflict'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        self.assertIn('a.y', flat_ast.classes[model_name].symbols)
 
 
 if __name__ == "__main__":
