@@ -125,14 +125,12 @@ class ModelListener:
 
     def noise_gaussian(self, mean, std):
         """Create a gaussian noise variable"""
-        assert std > 0
         ng = self.sym.sym('ng_{:d}'.format(len(self.scope['ng'])))
         self.scope['ng'].append(ng)
         return mean + std*ng
 
     def noise_uniform(self, lower_bound, upper_bound):
         """Create a uniform noise variable"""
-        assert upper_bound > lower_bound
         nu = self.sym.sym('nu_{:d}'.format(len(self.scope['nu'])))
         self.scope['nu'].append(nu)
         return lower_bound + nu*(upper_bound - lower_bound)
