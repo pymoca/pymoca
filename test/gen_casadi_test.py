@@ -31,6 +31,12 @@ class GenCasadiTest(unittest.TestCase):
                   "parameters", "string_parameters"]:
             self.assertEqual(sstr(getattr(A, l)), sstr(getattr(B, l)))
 
+    def assert_model_equations_equivalent(self, A, B):
+        def sstr(a): return set([str(e) for e in a])
+
+        for l in ["equations", "initial_equations"]:
+            self.assertEqual(sstr(getattr(A, l)), sstr(getattr(B, l)))
+
     def assert_model_variables_equivalant(self, A, B):
         for vgroup in ["states", "der_states", "alg_states", "inputs",
                        "outputs", "constants", "parameters"]:
@@ -2719,7 +2725,38 @@ class GenCasadiTest(unittest.TestCase):
         self.assertEqual(12, len(casadi_model.alg_states))
 
         casadi_model.simplify(compiler_options)
+        
+    def test_factor_and_simplify_binary_ops(self):
+        # The initial equation is encountered first, and should properly
+        # initialize the corresponding symbol for the derivative.
+        txt = """
+                model FactorAndSimplify
+                    Real y;
+                    Real x;
+                    Real z;
+                equation
+                    (-x) - y = 0;
+                    3*y = 0;
+                    z/9 = 0;
+                end FactorAndSimplify;
+            """
 
+        ast_tree = parser.parse(txt)
 
+        casadi_model = gen_casadi.generate(ast_tree, 'FactorAndSimplify')
+        casadi_model.simplify({'factor_and_simplify_equations': True})
+
+        ref_model = Model()
+
+        y = ca.MX.sym('y')
+        x = ca.MX.sym('x')
+        z = ca.MX.sym('z')
+
+        ref_model.alg_states = [Variable(y), Variable(x), Variable(z)]
+        ref_model.equations = [x + y, z, y]
+
+        self.assert_model_equations_equivalent(ref_model, casadi_model)
+        
+        
 if __name__ == "__main__":
     unittest.main()
