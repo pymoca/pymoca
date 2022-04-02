@@ -179,10 +179,7 @@ class ASTListener(ModelicaListener):
 
     def exitEquation_section(self, ctx: ModelicaParser.Equation_sectionContext):
         eq_sect = self.ast[ctx]
-        if eq_sect.initial:
-            eq_sect.equations.extend(self.ast[ctx.equation_block()])
-        else:
-            eq_sect.equations.extend(self.ast[ctx.equation_block()])
+        eq_sect.equations.extend(self.ast[ctx.equation_block()])
 
     def exitEquation_block(self, ctx: ModelicaParser.Equation_blockContext):
         self.ast[ctx] = [self.ast[e] for e in ctx.equation()]
@@ -199,10 +196,7 @@ class ASTListener(ModelicaListener):
 
     def exitAlgorithm_section(self, ctx: ModelicaParser.Algorithm_sectionContext):
         alg_sect = self.ast[ctx]
-        if alg_sect.initial:
-            alg_sect.statements.extend(self.ast[ctx.statement_block()])
-        else:
-            alg_sect.statements.extend(self.ast[ctx.statement_block()])
+        alg_sect.statements.extend(self.ast[ctx.statement_block()])
 
     # EQUATION ===========================================================
 
