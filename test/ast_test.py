@@ -42,6 +42,12 @@ class TestASTManipulation(unittest.TestCase):
         self.ast.remove_equation(e)
         self.assertNotIn(e, self.ast.equations)
 
+        self.ast.add_initial_equation(e)
+        self.assertIn(e, self.ast.initial_equations)
+
+        self.ast.remove_initial_equation(e)
+        self.assertNotIn(e, self.ast.initial_equations)
+
 
 class TestASTReprAndStr(unittest.TestCase):
     def test_all_repr_and_str_len(self):

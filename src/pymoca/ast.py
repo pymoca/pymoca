@@ -773,6 +773,22 @@ class Class(Node):
         """
         self.equations.remove(e)
 
+    def add_initial_equation(self, e: Equation) -> None:
+        """
+        Add an initial equation to this class.
+
+        :param e: Equation to add.
+        """
+        self.initial_equations.append(e)
+
+    def remove_initial_equation(self, e: Equation) -> None:
+        """
+        Removes an initial equation from this class.
+
+        :param e: Equation to remove.
+        """
+        self.initial_equations.remove(e)
+
     def __deepcopy__(self, memo):
         # Avoid copying the entire tree
         if self.parent is not None and self.parent not in memo:
