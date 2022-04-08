@@ -606,5 +606,16 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(symbols['flange.phi'].displayUnit.value, 'deg')
         self.assertEqual(symbols['flange.phi'].quantity.value, 'Angle')
 
+    def test_class_comment(self):
+        """Test that class comment/description is retained after flattening"""
+        library_tree = self.parse_model_files('Aircraft.mo')
+        comp_ref = ast.ComponentRef.from_string('Aircraft')
+        flat_tree = tree.flatten(library_tree, comp_ref)
+        aircraft = flat_tree.classes['Aircraft']
+        self.assertEqual(aircraft.comment, 'the aircraft')
+        self.assertEqual(aircraft.symbols['accel.a_x'].comment, 'true acceleration')
+        self.assertEqual(aircraft.symbols['accel.ma_x'].comment, 'measured acceleration')
+        self.assertEqual(aircraft.symbols['body.g'].comment, '')
+
 if __name__ == "__main__":
     unittest.main()

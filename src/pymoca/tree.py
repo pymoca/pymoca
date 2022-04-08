@@ -214,6 +214,7 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     extended_orig_class = ast.InstanceClass(
         name=orig_class.name,
         type=orig_class.type,
+        comment=orig_class.comment,
         annotation=ast.ClassModification(),
         parent=parent
     )
@@ -475,6 +476,7 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
     flat_class = ast.Class(
         name=class_.name,
         type=class_.type,
+        comment=class_.comment,
         annotation=class_.annotation,
     )
 
