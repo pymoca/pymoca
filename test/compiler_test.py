@@ -112,7 +112,7 @@ class CompilerTest(unittest.TestCase):
             '-vv -Ospam=eggs',  # Flatten only, -O ignored
             '-v -tcasadi',  # -v = logging.INFO
             '-vv --target=casadi',  # -vv = logging.DEBUG
-            '-t=casadi -Ocache=True -Ocheck_balanced=False',
+            '-t=casadi -Ocache=False -Ocodegen=False -Ocheck_balanced=True',
         ]
         for args in arg_examples:
             self.run_compiler_add_model_dir(args)
