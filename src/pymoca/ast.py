@@ -593,7 +593,7 @@ class Class(Node):
                 if search_imports:
                     if component_ref.name in self.imports:
                         # First search qualified imports (most common case)
-                        import_ : Union[ImportClause, ComponentRef] = self.imports[component_ref.name]
+                        import_ = self.imports[component_ref.name] # type: Union[ImportClause, ComponentRef]
                         if isinstance(import_, ImportClause):
                             # Expand short name
                             if component_ref.child:
