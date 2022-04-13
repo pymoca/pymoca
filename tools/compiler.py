@@ -126,7 +126,7 @@ def translate(library_ast: pymoca.ast.Tree, model: str,
         try:
             result = sympy_gen.generate(library_ast, model, options)
             outfile = outdir.joinpath(model + '.py')
-            with open(outfile, 'w') as file:
+            with outfile.open('w') as file:
                 file.write(result)
         except (IOError, OSError):
             if log.level is logging.DEBUG:
@@ -217,8 +217,8 @@ def main(argv: List[str]) -> int:
         return errors
 
     tic = time.perf_counter()
-    error_files : List[Path] = []
-    modelica_files : List[Path] = []
+    error_files = [] # type: List[Path]
+    modelica_files = [] # type: List[Path]
     if args.target == 'sympy' or not args.target:
 
         library_ast = pymoca.ast.Tree(name='ModelicaTree')
