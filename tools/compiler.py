@@ -203,7 +203,7 @@ def main(argv: List[str]) -> int:
             optsplit = opt.split('=')
             if len(optsplit) == 2:
                 # Convert True/False values, otherwise string value as-is
-                value_lower = optsplit[1].lower
+                value_lower = optsplit[1].lower()
                 if value_lower == 'true':
                     optsplit[1] = True
                 elif value_lower == 'false':
