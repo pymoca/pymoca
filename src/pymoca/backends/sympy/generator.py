@@ -179,11 +179,12 @@ class {{tree.name}}(OdeModel):
         self.src[tree] = "{:s}".format(val)
 
     def exitComponentRef(self, tree: ast.ComponentRef):
-
         # prevent name clash with builtins
         name = tree.name.replace('.', '__')
         while name in BUILTINS:
             name = name + '_'
+        if name == 'time':
+            name = 'self.t'
         self.src[tree] = name
 
     def exitSymbol(self, tree: ast.Symbol):
@@ -191,7 +192,6 @@ class {{tree.name}}(OdeModel):
         name = tree.name.replace('.', '__')
         while name in BUILTINS:
             name = name + '_'
-
         self.src[tree] = name
 
     def exitEquation(self, tree: ast.Equation):

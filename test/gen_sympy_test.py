@@ -142,6 +142,32 @@ class GenSympyTest(unittest.TestCase):
         # res = e.simulate()
         self.flush()
 
+    def test_time_builtin(self):
+        """Tests Modelica `time` used in a model"""
+        with open(os.path.join(MODEL_DIR, 'SpringSystem.mo'), 'r') as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        forced_spring_model = '''
+        model ForcedSpringSystem "SpringSystem with time-varying input force"
+            SpringSystem sys;
+        equation
+            sys.u = 100.0*sin(2*time);
+        end ForcedSpringSystem;
+        '''
+        system_ast = parser.parse(forced_spring_model)
+        ast_tree.extend(system_ast)
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='ForcedSpringSystem'))
+        print(flat_tree)
+        text = gen_sympy.generate(ast_tree, 'ForcedSpringSystem')
+        with open(os.path.join(GENERATED_DIR, 'ForcedSpringSystem.py'), 'w') as f:
+            f.write(text)
+        from test.generated.ForcedSpringSystem import ForcedSpringSystem as ForcedSpringSystem
+        e = ForcedSpringSystem()
+        e.linearize_symbolic()
+        e.linearize()
+        # noinspection PyUnusedLocal
+        res = e.simulate(x0=[1.0, 1.0])
+        self.flush()
 
 if __name__ == "__main__":
     unittest.main()
