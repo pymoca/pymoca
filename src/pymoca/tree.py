@@ -235,7 +235,8 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
 
         c = flatten_extends(c, extends.class_modification, parent=c.parent)
 
-        extended_orig_class.imports.update(c.imports)
+        # Imports are not inherited (spec 3.5 sections 5.3.1 and 7.1)
+        # extended_orig_class.imports.update(c.imports)
         extended_orig_class.classes.update(c.classes)
         extended_orig_class.symbols.update(c.symbols)
         extended_orig_class.equations += c.equations
