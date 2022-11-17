@@ -445,7 +445,7 @@ class ParseTest(unittest.TestCase):
             elif eqn.left == 'b.tb.b':
                 self.assertEqual(eqn.right.value, 3)
 
-    # Import tests from the Modelica Compliance library (only the shouldPass=true cases)
+    # Import tests from the Modelica Compliance library (mostly the shouldPass=true cases)
     def parse_imports_file(self, pathname):
         'Parse given path relative to IMPORTS_DIR and return parsed ast.Tree'
         arg_ast = self.parse_file(os.path.join(IMPORTS_DIR, pathname))
@@ -510,6 +510,13 @@ class ParseTest(unittest.TestCase):
         flat_class = ast.ComponentRef.from_string(model_name)
         flat_ast = tree.flatten(library_ast, flat_class)
         self.assertIn('a.y', flat_ast.classes[model_name].symbols)
+
+    def test_import_not_inherited(self):
+        library_ast = self.parse_imports_file('ExtendImport.mo')
+        model_name = 'ModelicaCompliance.Scoping.NameLookup.Imports.ExtendImport'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        with self.assertRaises(ast.ClassNotFoundError):
+            flat_ast = tree.flatten(library_ast, flat_class)
 
 
 if __name__ == "__main__":
