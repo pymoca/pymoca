@@ -4,3 +4,11 @@
 [submodule "test/libraries/Modelica-Compliance"]
 	path = test/libraries/Modelica-Compliance
 	url = https://github.com/modelica/Modelica-Compliance
+[submodule "test/libraries/MSL-4.0.x"]
+	path = test/libraries/MSL-4.0.x
+	url = https://github.com/modelica/ModelicaStandardLibrary.git
+	branch = maint/4.0.x
+[submodule "test/libraries/MSL-3.2.3"]
+	path = test/libraries/MSL-3.2.3
+	url = https://github.com/modelica/ModelicaStandardLibrary.git
+	branch = maint/3.2.3
