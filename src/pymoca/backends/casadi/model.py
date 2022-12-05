@@ -17,7 +17,7 @@ logger = logging.getLogger("pymoca")
 CASADI_COMPARISON_DEPTH = sys.maxsize
 SUBSTITUTE_LOOP_LIMIT = 100
 SIMPLIFICATION_LOOP_LIMIT = 50
-CASADI_ATTRIBUTES = [attr for attr in ast.Symbol.ATTRIBUTES if not attr == 'unit']
+CASADI_ATTRIBUTES = ('value', 'min', 'max', 'start', 'fixed', 'nominal')
 
 
 class _DefaultValue(int):
