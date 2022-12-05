@@ -545,6 +545,8 @@ class ExtendsClause(Node):
             type(self).__name__, self.component, self.class_modification, self.visibility)
 
 class Class(Node):
+    BUILTIN = ("Real", "Integer", "String", "Boolean")
+
     def __init__(self, **kwargs):
         self.name = None  # type: str
         self.imports = OrderedDict()  # type: OrderedDict[str, Union[ImportClause, ComponentRef]]
@@ -628,12 +630,9 @@ class Class(Node):
 
     def find_class(self, component_ref: ComponentRef, copy=True,
                    check_builtin_classes=False, search_imports=True) -> 'Class':
-        # TODO: Remove workaround for Modelica / Modelica.SIUnits
-        if component_ref.name in ["Real", "Integer", "String", "Boolean", "Modelica", "SI"]:
+        if component_ref.name in self.BUILTIN:
             if check_builtin_classes:
                 type_ = component_ref.name
-                if component_ref.name in ["Modelica", "SI"]:
-                    type_ = "Real"
 
                 c = Class(name=type_)
                 c.type = "__builtin"
