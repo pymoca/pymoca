@@ -12,7 +12,7 @@ model Attributes
 	input Real i1(fixed = true);
 	input Real i2(fixed = false);
 	input Real i3;
-	output Modelica.SIunits.Temperature i4;
+	output Real i4;
 	constant Real cst = 1;
 	parameter Real prm = 2;
 	Real test_state = real; // Generates an additional equation.
