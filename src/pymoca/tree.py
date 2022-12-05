@@ -503,7 +503,10 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
             # Elementary type
             flat_sym.dimensions = flat_sym.dimensions
             flat_class.symbols[flat_sym.name] = flat_sym
-        elif sym.type.type == "__builtin":
+        elif sym.type.type == "__builtin" or (sym.type.type == "type"
+                                              and "__value" in sym.type.symbols
+                                              and sym.type.symbols["__value"].type.name
+                                                                    in ast.Class.BUILTIN):
             # Class inherited from elementary type (e.g. "type Voltage =
             # Real"). No flattening to be done, just copying over all
             # attributes and modifications to the class's "__value" symbol.
