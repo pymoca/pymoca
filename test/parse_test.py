@@ -18,7 +18,8 @@ MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(MY_DIR, 'models')
 COMPLIANCE_DIR = os.path.join(MY_DIR, 'libraries', 'Modelica-Compliance', 'ModelicaCompliance')
 IMPORTS_DIR = os.path.join(COMPLIANCE_DIR, 'Scoping', 'NameLookup', 'Imports')
-
+MSL3_DIR = os.path.join(MY_DIR, 'libraries', 'MSL-3.2.3')
+MSL4_DIR = os.path.join(MY_DIR, 'libraries', 'MSL-4.0.x')
 
 class ParseTest(unittest.TestCase):
     """
@@ -425,6 +426,23 @@ class ParseTest(unittest.TestCase):
                 tree = file_tree
         return tree
 
+    def parse_dir_files(self, directory, *pathnames):
+        """Parse given file paths relative to dir and return parsed ast.Tree
+
+        Dir is os-specific and paths are unix-style but are transformed to os specific.
+        """
+        tree = None
+        for pathname in pathnames:
+            split_path = pathname.split('/')
+            full_path = os.path.join(directory, *split_path)
+            file_tree = self.parse_file(full_path)
+            self.assertIsNotNone(file_tree, 'Parse failed: ' + full_path)
+            if tree:
+                tree.extend(file_tree)
+            else:
+                tree = file_tree
+        return tree
+
     def test_import(self):
         library_tree = self.parse_model_files('TreeLookup.mo', 'Import.mo')
 
@@ -518,6 +536,75 @@ class ParseTest(unittest.TestCase):
         with self.assertRaises(ast.ClassNotFoundError):
             flat_ast = tree.flatten(library_ast, flat_class)
 
+    # Tests using the Modelica Standard Library
+    def test_msl_opamp_units(self):
+        """Test import from Modelica Standard Library 4.0.0 using SI.Units
+
+        This is the simplest case found that works around current pymoca issues
+        flattening MSL examples.
+        """
+        library_tree = self.parse_dir_files(MSL4_DIR,
+            'Modelica/Icons.mo',
+            'Modelica/Units.mo',
+            'Modelica/Electrical/package.mo', # to pick up SI import
+            'Modelica/Electrical/Analog/Interfaces/PositivePin.mo',
+            'Modelica/Electrical/Analog/Interfaces/NegativePin.mo',
+            'Modelica/Electrical/Analog/Basic/OpAmp.mo',
+        )
+        model_name = 'Modelica.Electrical.Analog.Basic.OpAmp'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_tree = tree.flatten(library_tree, flat_class)
+        symbols = flat_tree.classes[model_name].symbols
+        self.assertIn('in_p.i', symbols)
+        self.assertEqual(symbols['in_p.i'].unit.value, 'A')
+        self.assertEqual(symbols['in_p.i'].quantity.value, 'ElectricCurrent')
+        self.assertIn('vin', symbols)
+        self.assertEqual(symbols['vin'].unit.value, 'V')
+        self.assertEqual(symbols['vin'].quantity.value, 'ElectricPotential')
+
+    def test_msl3_twopin_units(self):
+        """Test import from Modelica Standard Library 3.2.3 using SIunits
+
+        This is a simple case that works around current pymoca issues
+        flattening MSL examples.
+        """
+        library_tree = self.parse_dir_files(MSL3_DIR,
+            'Modelica/Icons.mo',
+            'Modelica/SIunits.mo',
+            'Modelica/Electrical/Analog/package.mo', # to pick up SI import
+            'Modelica/Electrical/Analog/Interfaces.mo',
+        )
+        model_name = 'Modelica.Electrical.Analog.Interfaces.TwoPort'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_tree = tree.flatten(library_tree, flat_class)
+        symbols = flat_tree.classes[model_name].symbols
+        self.assertIn('p1.i', symbols)
+        self.assertEqual(symbols['p1.i'].unit.value, 'A')
+        self.assertEqual(symbols['p1.i'].quantity.value, 'ElectricCurrent')
+        self.assertIn('v1', symbols)
+        self.assertEqual(symbols['v1'].unit.value, 'V')
+        self.assertEqual(symbols['v1'].quantity.value, 'ElectricPotential')
+
+    def test_msl_flange_units(self):
+        """Test displayUnit attribute imported from MSL 4.0.0 SI.Units
+
+        """
+        library_tree = self.parse_dir_files(MSL4_DIR,
+            'Modelica/Icons.mo',
+            'Modelica/Units.mo',
+            'Modelica/Mechanics/package.mo', # to pick up SI import
+            'Modelica/Mechanics/Rotational/Interfaces/Flange.mo',
+            'Modelica/Mechanics/Rotational/Interfaces/Flange_a.mo',
+            'Modelica/Mechanics/Rotational/Interfaces/PartialAbsoluteSensor.mo',
+        )
+        model_name = 'Modelica.Mechanics.Rotational.Interfaces.PartialAbsoluteSensor'
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_tree = tree.flatten(library_tree, flat_class)
+        symbols = flat_tree.classes[model_name].symbols
+        self.assertIn('flange.phi', symbols)
+        self.assertEqual(symbols['flange.phi'].unit.value, 'rad')
+        self.assertEqual(symbols['flange.phi'].displayUnit.value, 'deg')
+        self.assertEqual(symbols['flange.phi'].quantity.value, 'Angle')
 
 if __name__ == "__main__":
     unittest.main()
