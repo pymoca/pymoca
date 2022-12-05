@@ -373,9 +373,10 @@ class Symbol(Node):
     """
     A mathematical variable or state of the model
     """
-    ATTRIBUTES = ['value', 'min', 'max', 'start', 'fixed', 'nominal', 'unit']
+    ATTRIBUTES = ['value', 'min', 'max', 'start', 'fixed', 'nominal', 'unit', 'quantity', 'displayUnit']
 
     def __init__(self, **kwargs):
+        # pylint: disable=invalid-name
         self.name = ''  # type: str
         self.type = ComponentRef()  # type: Union[ComponentRef, InstanceClass]
         self.prefixes = []  # type: List[str]
@@ -391,7 +392,9 @@ class Symbol(Node):
         self.nominal = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.value = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.fixed = Primary(value=False)  # type: Primary
-        self.unit = Primary(value="")  # type: Primary
+        self.unit = Primary(value=None)  # type: Primary
+        self.quantity = Primary(value=None)  # type: Primary
+        self.displayUnit = Primary(value=None)  # type: Primary
         self.id = 0  # type: int
         self.order = 0  # type: int
         self.visibility = Visibility.PRIVATE  # type: Visibility
