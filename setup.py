@@ -10,7 +10,6 @@ from __future__ import print_function
 
 import os
 import subprocess
-import sys
 
 from setuptools import Command, find_packages, setup
 
@@ -44,13 +43,6 @@ Topic :: Software Development :: Embedded Systems
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # pylint: disable=no-init, too-few-public-methods
-
-
-PYTHON_VERSION = '.'.join([str(i) for i in sys.version_info[:3]])
-PYTHON_VERSION_REQUIRED = '3.5.0'
-if PYTHON_VERSION < PYTHON_VERSION_REQUIRED:
-    sys.exit("Sorry, only Python >= {:s} is supported".format(
-        PYTHON_VERSION_REQUIRED))
 
 
 class AntlrBuildCommand(Command):
@@ -135,7 +127,7 @@ def setup_package():
         ],
         tests_require=['coverage >= 3.7.1', 'pytest', 'pytest-runner'],
         extras_require=extras_require,
-        python_requires='>=3.5',
+        python_requires='>=3.7',
         packages=find_packages("src"),
         package_dir={"": "src"},
         include_package_data=True,
