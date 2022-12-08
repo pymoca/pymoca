@@ -33,12 +33,14 @@ class XmlGenerator(TreeListener):
             op_name = tree.operator
         if len(tree.operands) == 1:
             self.xml[tree] = E(
-                'operator', name=op_name,
-                *[self.xml[c] for c in tree.operands])
+                'operator',
+                *[self.xml[c] for c in tree.operands],
+                name=op_name)
         else:
             self.xml[tree] = E(
-                'apply', builtin=op_name,
-                *[self.xml[c] for c in tree.operands])
+                'apply',
+                *[self.xml[c] for c in tree.operands],
+                builtin=op_name)
 
     def exitPrimary(self, tree: ast.Primary):
         self.xml[tree] = E('real', value=str(tree.value))
@@ -97,8 +99,8 @@ class XmlGenerator(TreeListener):
     def exitFunction(self, tree: ast.Function):
         self.xml[tree] = E(
             'apply',
-            builtin=tree.name,
-            *[self.xml[arg] for arg in tree.arguments]
+            *[self.xml[arg] for arg in tree.arguments],
+            builtin=tree.name
         )
 
     def exitWhenEquation(self, tree: ast.WhenEquation):
