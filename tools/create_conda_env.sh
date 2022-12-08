@@ -12,7 +12,7 @@ conda update -q conda
 # Useful for debugging any issues with conda
 conda info -a
 conda config --add channels conda-forge
-conda create -n pymoca python=3.5 || echo "environment already created"
+conda create -n pymoca python=3.7 || echo "environment already created"
 conda install -n pymoca gcc jinja2 matplotlib numpy scipy sympy
 source activate pymoca
 # Note: casadi installed using pip since conda version currently
