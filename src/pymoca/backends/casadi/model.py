@@ -119,6 +119,7 @@ class Model:
         self.delay_states = []
         self.delay_arguments = []
         self.alias_relation = AliasRelation()
+        self.simplified_variables = []
         self._expand_mx_func = lambda x: x
 
     def __str__(self):
@@ -225,7 +226,7 @@ class Model:
 
     def _substitute_metadata(self, symbols, values):
         substitutions = []
-        for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants):
+        for variable in itertools.chain(self.states, self.alg_states, self.inputs, self.parameters, self.constants, self.simplified_variables):
             for attribute in CASADI_ATTRIBUTES:
                 value = getattr(variable, attribute)
                 if isinstance(value, ca.MX) and not value.is_constant():
@@ -487,6 +488,7 @@ class Model:
                     if value.is_constant():
                         simple_parameters.append(p)
                     else:
+                        self._save_simplified_variable(p)
                         symbols.append(p.symbol)
                         values.append(value)
 
@@ -523,6 +525,7 @@ class Model:
                 if value.is_constant():
                     simple_constants.append(c)
                 else:
+                    self._save_simplified_variable(c)
                     symbols.append(c.symbol)
                     values.append(value)
 
@@ -606,6 +609,7 @@ class Model:
                 if ca.MX(p.value).is_constant() and ca.MX(p.value).is_regular():
                     symbols.append(p.symbol)
                     values.append(p.value)
+                    self._save_simplified_variable(p)
                 else:
                     unspecified_parameters.append(p)
 
@@ -624,6 +628,7 @@ class Model:
             # N.B. Any parameter expression elimination must be done first.
             symbols = self._symbols(self.constants)
             values = [v.value for v in self.constants]
+            self.simplified_variables += self.constants
             if len(self.equations) > 0:
                 self.equations = ca.substitute(self.equations, symbols, values)
             if len(self.initial_equations) > 0:
@@ -756,12 +761,14 @@ class Model:
                         # Mark derivative state for replacement too.
                         derivative = get_derivative(value)
 
+                        self._save_simplified_variable(states[variable.name()], value)
                         del states[variable.name()]
 
                         variables.append(der_states.pop(variable.name()).symbol)
                         values.append(derivative)
 
                     elif variable.name() in alg_states:
+                        self._save_simplified_variable(alg_states[variable.name()], value)
                         del alg_states[variable.name()]
 
                     variables.append(variable)
@@ -798,6 +805,8 @@ class Model:
                     self.initial_equations = ca.substitute(self.initial_equations, variables, values)
                 if len(self.delay_arguments) > 0:
                     self.delay_arguments = self._substitute_delay_arguments(self.delay_arguments, variables, values)
+
+            self._substitute_metadata(variables, values)
 
         if options['expand_vectors'] and not options['expand_mx']:
             # If we are _not_ expanding MX to SX, we do the expansion of vectors here
@@ -1040,6 +1049,8 @@ class Model:
                     # If any of the aliases is fixed, the canonical state is as well
                     fixed = ca.fmax(fixed, alias_state.fixed)
 
+                    self._save_simplified_variable(alias_state, canonical_state.symbol * sign)
+                    self._substitute_metadata([alias_state.symbol], [canonical_state.symbol*sign])
                     del all_states[alias]
 
                 assert isinstance(aliases, set)
@@ -1108,6 +1119,11 @@ class Model:
             self._expand_mx_func = lambda x: x.expand()
 
         logger.info("Finished model simplification")
+
+    def _save_simplified_variable(self, var, value = None):
+        if value is not None:
+            var.value = value
+        self.simplified_variables.append(var)
 
     @property
     def dae_residual_function(self):
