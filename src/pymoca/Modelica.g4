@@ -419,7 +419,7 @@ simple_expression :
 
 // B.2.7.3 ------------------------------------------------
 expr :
-    op='-' expr                                             # expr_neg
+    op=('+' | '-') expr                                     # expr_signed
     | primary op=('^' | '.^') primary                       # expr_exp
     | expr op=('*' | '/' | '.*' | './') expr                # expr_mul
     | expr  op=('+' | '-' | '.+' | '.-') expr               # expr_add
