@@ -93,6 +93,7 @@ def setup_package():
         'sympy': [
             'sympy >= 0.7.6.1',
             'scipy >= 0.13.3',
+            'jinja2 >= 2.10.1',
         ],
         # Examples
         'examples': [
