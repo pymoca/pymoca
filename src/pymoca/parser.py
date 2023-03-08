@@ -395,7 +395,7 @@ class ASTListener(ModelicaListener):
             operands=[self.ast[e] for e in ctx.expr()]
         )
 
-    def exitExpr_neg(self, ctx: ModelicaParser.Expr_negContext):
+    def exitExpr_signed(self, ctx: ModelicaParser.Expr_signedContext):
         self.ast[ctx] = ast.Expression(
             operator=ctx.op.text,
             operands=[self.ast[ctx.expr()]]

@@ -409,6 +409,42 @@ class ParseTest(unittest.TestCase):
                 self.assertIsInstance(flat_tree.classes['A'].symbols['x'].value.values[i].values[j].value, int)
                 self.assertIsInstance(flat_tree.classes['A'].symbols['y'].value.values[i].values[j].value, float)
 
+    def test_signed_expression(self):
+        """Test that both + and - prefix operators work in expressions"""
+        txt = """
+            model A
+              parameter Integer iplus = +1;
+              parameter Integer ineg = -iplus;
+              parameter Real rplus = +1.0;
+              parameter Real rneg = -1.0;
+              parameter Real rboth = -1.0 - +1.0;
+              parameter Boolean option = true;
+              parameter Integer itest = if option then +2 else -2;
+            end A;
+        """
+
+        ast_tree = parser.parse(txt)
+
+        class_name = 'A'
+        comp_ref = ast.ComponentRef.from_string(class_name)
+
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        # Test that parses into correct expressions.
+        symbols = flat_tree.classes['A'].symbols
+        for sym in 'iplus', 'rplus':
+            self.assertEqual(symbols[sym].value.operator, '+')
+            self.assertEqual(len(symbols[sym].value.operands), 1)
+        for sym in 'ineg', 'rneg':
+            self.assertEqual(symbols[sym].value.operator, '-')
+            self.assertEqual(len(symbols[sym].value.operands), 1)
+        self.assertEqual(symbols['rboth'].value.operands[1].operator, '+')
+        self.assertEqual(len(symbols['rboth'].value.operands[1].operands), 1)
+        self.assertEqual(symbols['itest'].value.expressions[0].operator, '+')
+        self.assertEqual(symbols['itest'].value.expressions[1].operator, '-')
+        self.assertEqual(len(symbols['itest'].value.expressions[0].operands), 1)
+        self.assertEqual(len(symbols['itest'].value.expressions[1].operands), 1)
+
     def parse_file(self, pathname):
         'Parse given full path name and return parsed ast.Tree'
         with open(pathname, 'r') as mo_file:

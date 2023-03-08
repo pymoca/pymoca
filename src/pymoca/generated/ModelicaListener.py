@@ -710,21 +710,21 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by ModelicaParser#expr_neg.
-    def enterExpr_neg(self, ctx:ModelicaParser.Expr_negContext):
-        pass
-
-    # Exit a parse tree produced by ModelicaParser#expr_neg.
-    def exitExpr_neg(self, ctx:ModelicaParser.Expr_negContext):
-        pass
-
-
     # Enter a parse tree produced by ModelicaParser#expr_add.
     def enterExpr_add(self, ctx:ModelicaParser.Expr_addContext):
         pass
 
     # Exit a parse tree produced by ModelicaParser#expr_add.
     def exitExpr_add(self, ctx:ModelicaParser.Expr_addContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#expr_signed.
+    def enterExpr_signed(self, ctx:ModelicaParser.Expr_signedContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#expr_signed.
+    def exitExpr_signed(self, ctx:ModelicaParser.Expr_signedContext):
         pass
 
 

@@ -399,13 +399,13 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by ModelicaParser#expr_neg.
-    def visitExpr_neg(self, ctx:ModelicaParser.Expr_negContext):
+    # Visit a parse tree produced by ModelicaParser#expr_add.
+    def visitExpr_add(self, ctx:ModelicaParser.Expr_addContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by ModelicaParser#expr_add.
-    def visitExpr_add(self, ctx:ModelicaParser.Expr_addContext):
+    # Visit a parse tree produced by ModelicaParser#expr_signed.
+    def visitExpr_signed(self, ctx:ModelicaParser.Expr_signedContext):
         return self.visitChildren(ctx)
 
 
