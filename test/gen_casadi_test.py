@@ -2721,5 +2721,35 @@ class GenCasadiTest(unittest.TestCase):
         casadi_model.simplify(compiler_options)
 
 
+    def test_signed_expression(self):
+        """Test that both + and - prefix operators work in expressions"""
+        txt = """
+            model A
+              parameter Integer iplus = +1;
+              parameter Integer ineg = -iplus;
+              parameter Real rplus = +1.0;
+              parameter Real rneg = -1.0;
+              parameter Real rboth = -1.0 - +1.0;
+            end A;
+        """
+
+        ast_tree = parser.parse(txt)
+
+        casadi_model = gen_casadi.generate(ast_tree, 'A')
+        print(casadi_model)
+
+        iplus, ineg, rplus, rneg, rboth = casadi_model.parameters
+
+        self.assertEqual(iplus.value, 1.0)
+        self.assertEqual(rplus.value, 1.0)
+        self.assertEqual(rneg.value, -1.0)
+        self.assertEqual(rboth.value, -2.0)
+
+        compiler_options = {'resolve_parameter_values': True}
+
+        casadi_model.simplify(compiler_options)
+        self.assertEqual(ineg.value, -1.0)
+
+
 if __name__ == "__main__":
     unittest.main()
