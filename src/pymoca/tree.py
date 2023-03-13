@@ -161,7 +161,7 @@ class TreeWalker:
         endless recursion by skipping references to e.g. parent nodes.
         :return: True if child needs to be skipped, False otherwise.
         """
-        if isinstance(tree, ast.Class) and child_name == 'parent' or \
+        if isinstance(tree, (ast.Class, ast.Symbol)) and child_name == 'parent' or \
                 isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
             return True
         return False
@@ -366,7 +366,11 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
 
         try:
             if not isinstance(sym.type, ast.InstanceClass):
-                c = extended_orig_class.find_class(sym.type)
+                try:
+                    c = extended_orig_class.find_class(sym.type)
+                except ast.ClassNotFoundError:
+                    # If not found in local scope, search in original scope
+                    c = sym.parent.find_class(sym.type)
             else:
                 c = sym.type
         except ast.FoundElementaryClassError:

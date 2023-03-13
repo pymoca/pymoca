@@ -399,6 +399,7 @@ class Symbol(Node):
         self.order = 0  # type: int
         self.visibility = Visibility.PRIVATE  # type: Visibility
         self.class_modification = None  # type: ClassModification
+        self.parent = None # type: Class
         super().__init__(**kwargs)
 
     def __str__(self):
