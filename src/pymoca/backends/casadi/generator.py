@@ -243,6 +243,8 @@ class Generator(TreeListener):
             src = self.get_derivative(v)
         elif op == '-' and n_operands == 1:
             src = -self.get_mx(tree.operands[0])
+        elif op == '+' and n_operands == 1:
+            src = self.get_mx(tree.operands[0])
         elif op == 'not' and n_operands == 1:
             src = ca.if_else(self.get_mx(tree.operands[0]), 0, 1, True)
         elif op == 'mtimes':
