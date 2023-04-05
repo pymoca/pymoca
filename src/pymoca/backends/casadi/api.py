@@ -148,7 +148,7 @@ def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
     cg = ca.CodeGenerator(library_name)
     cg.add(f, True) # Nondifferentiated function
     cg.add(f.forward(1), True) # Jacobian-times-vector product
-    cg.add(f.reverse(1), True) # vector-times-Jacobian product
+    # cg.add(f.reverse(1), True) # vector-times-Jacobian product
     cg.add(f.reverse(1).forward(1), True) # Hessian-times-vector product
     cg.generate(model_folder + '/')
 
