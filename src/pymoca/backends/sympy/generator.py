@@ -138,9 +138,6 @@ class {{tree.name}}(OdeModel):
             {% endfor -%}}
 
         # outputs
-        {% if outputs_str|length > 0 -%}
-        {{ outputs_str }} = mech.dynamicsymbols('{{ outputs_str|replace('__', '.') }}')
-        {% endif -%}
         self.y = sympy.Matrix([{{ outputs_str }}])
 
         # equations
