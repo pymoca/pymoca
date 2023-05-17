@@ -34,7 +34,7 @@ class OdeModel:
         if n_states + n_vars != n_eqs:
             raise RuntimeError('# states: {:d} + # variables: {:d} != # equations {:d}'.format(
                 n_states, n_vars, n_eqs))
-        lhs = list(self.x.diff(self.t)) + list(self.v) + list(self.y)
+        lhs = list(self.x.diff(self.t)) + list(self.v)
         fg_sol = sympy.solve(self.eqs, lhs, dict=True)[0]
         self.f = self.x.diff(self.t).subs(fg_sol)
         assert len(self.x) == len(self.f)
