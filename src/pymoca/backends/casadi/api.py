@@ -1,3 +1,4 @@
+import itertools
 from collections import namedtuple
 from enum import IntEnum
 from typing import Dict
@@ -260,6 +261,8 @@ def save_model(model_folder: str, model_name: str, model: Model,
 
             duration_dependencies = []
             for dur in durations:
+                if not isinstance(dur, ca.MX):
+                    dur = ca.MX(dur)  # Probably a constant, will have no dependencies
                 duration_dependencies.append(
                     [symbol_to_index[var] for var in ca.symvar(dur) if ca.depends_on(dur, var)])
             db['__delay_duration_dependent'] = duration_dependencies
@@ -414,7 +417,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             # Get rid of false dependency symbols not used in any delay
             # durations. This significantly reduces the work the (slow)
             # substitute() calls have to do later on.
-            actual_deps = sorted(set(np.array(duration_dependencies).ravel()))
+            actual_deps = sorted(set(itertools.chain(*duration_dependencies)))
 
             actual_dep_symbols = [np.nan] * len(all_symbols)
             for i in actual_deps:
