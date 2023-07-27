@@ -666,16 +666,18 @@ class GenCasadiTest(unittest.TestCase):
 
         x = ca.MX.sym("x")
         x_delayed = ca.MX.sym("_pymoca_delay_0")
+        x_delayed_constant = ca.MX.sym("_pymoca_delay_1")
         y = ca.MX.sym("y")
+        z = ca.MX.sym("z")
         hour = ca.MX.sym("hour")
 
-        ref_model.alg_states = list(map(Variable, [x, y]))
+        ref_model.alg_states = list(map(Variable, [x, y, z]))
         ref_model.parameters = list(map(Variable, [hour]))
-        ref_model.inputs = list(map(Variable, [x_delayed]))
+        ref_model.inputs = list(map(Variable, [x_delayed, x_delayed_constant]))
         ref_model.parameters[0].value = 3600
-        ref_model.equations = [y - x_delayed]
-        ref_model.delay_states = [x_delayed]
-        ref_model.delay_arguments = [DelayArgument(x, 6 * hour)]
+        ref_model.equations = [y - x_delayed, z - x_delayed_constant]
+        ref_model.delay_states = [x_delayed, x_delayed_constant]
+        ref_model.delay_arguments = [DelayArgument(x, 6 * hour), DelayArgument(x, 3600.0)]
 
         self.assert_model_equivalent_numeric(ref_model, casadi_model)
         self.assert_model_equivalent_numeric(ref_model, casadi_model_expanded)
