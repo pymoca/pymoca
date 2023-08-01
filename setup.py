@@ -128,7 +128,7 @@ def setup_package():
         ],
         tests_require=['coverage >= 3.7.1', 'pytest', 'pytest-runner'],
         extras_require=extras_require,
-        python_requires='>=3.7',
+        python_requires='>=3.8',
         packages=find_packages("src"),
         package_dir={"": "src"},
         include_package_data=True,
