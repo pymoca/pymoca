@@ -85,3 +85,6 @@ jobs:
       run: |
         python setup.py sdist bdist_wheel
         twine upload dist/*
+    - uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*
