@@ -88,3 +88,5 @@ jobs:
     - uses: softprops/action-gh-release@v1
       with:
         files: dist/*
+        generate_release_notes: true
+        draft: true
