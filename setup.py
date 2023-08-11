@@ -85,7 +85,7 @@ def setup_package():
 
     extras_require = {
         # Backends
-        'casadi': ['casadi >= 3.4.0'],
+        'casadi': ['casadi >= 3.6.0'],
         'lxml': [
             'lxml >= 3.5.0',
             'scipy >= 0.13.3',

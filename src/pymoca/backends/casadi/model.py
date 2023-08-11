@@ -187,7 +187,7 @@ class Model:
         symbols_mx = ca.symvar(ca.veccat(*equations))
         assert all(x.shape == (1, 1) for x in symbols_mx), "Vector/Matrix SX symbols cannot be mapped"
 
-        f_mx = ca.Function('tmp_mx', symbols_mx, equations).expand()
+        f_mx = ca.Function('tmp_mx', symbols_mx, equations, {"cse": True}).expand()
         symbols_sx = [ca.SX.sym(x.name(), *x.shape) for x in symbols_mx]
         sx_equations = f_mx.call(symbols_sx)
 
@@ -1077,8 +1077,8 @@ class Model:
 
                     equations = ca.veccat(*equations)
 
-                    Af = ca.Function('Af', [states, constants, parameters], [ca.jacobian(equations, states)])
-                    bf = ca.Function('bf', [states, constants, parameters], [equations])
+                    Af = ca.Function('Af', [states, constants, parameters], [ca.jacobian(equations, states)], {"cse": True})
+                    bf = ca.Function('bf', [states, constants, parameters], [equations], {"cse": True})
 
                     # Work around CasADi issue #172
                     if len(self.constants) == 0 or not ca.depends_on(equations, constants):
@@ -1114,11 +1114,11 @@ class Model:
         if hasattr(self, '_states_vector'):
             return self._expand_mx_func(ca.Function('dae_residual', [self.time, self._states_vector, self._der_states_vector,
                                                 self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else []))
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [], {"cse": True}))
         else:
             return self._expand_mx_func(ca.Function('dae_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
                                                 ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else []))
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.equations)] if len(self.equations) > 0 else [], {"cse": True}))
 
     # noinspection PyUnusedLocal
     @property
@@ -1126,11 +1126,11 @@ class Model:
         if hasattr(self, '_states_vector'):
             return self._expand_mx_func(ca.Function('initial_residual', [self.time, self._states_vector, self._der_states_vector,
                                                 self._alg_states_vector, self._inputs_vector, ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else []))
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [], {"cse": True}))
         else:
             return self._expand_mx_func(ca.Function('initial_residual', [self.time, ca.veccat(*self._symbols(self.states)), ca.veccat(*self._symbols(self.der_states)),
                                                 ca.veccat(*self._symbols(self.alg_states)), ca.veccat(*self._symbols(self.inputs)), ca.veccat(*self._symbols(self.constants)),
-                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else []))
+                                                ca.veccat(*self._symbols(self.parameters))], [ca.veccat(*self.initial_equations)] if len(self.initial_equations) > 0 else [], {"cse": True}))
 
     # noinspection PyPep8Naming
     @property
@@ -1158,7 +1158,7 @@ class Model:
                     attribute_lists[attribute_list_index].append(value)
             expr = ca.horzcat(*[ca.veccat(*attribute_list) for attribute_list in attribute_lists])
             if len(self.parameters) > 0 and isinstance(expr, ca.MX):
-                f = ca.Function('f', [in_var], [expr])
+                f = ca.Function('f', [in_var], [expr], {"cse": True})
                 # NOTE: This is not a complete list of operations that can be
                 # handled in an affine expression. That said, it should
                 # capture the most common ways variable attributes are
@@ -1177,8 +1177,8 @@ class Model:
             in_var_ = ca.MX.sym('in_var', in_var.shape)
             out_ = []
             for o in out:
-                Af = ca.Function('Af', [in_var], [ca.jacobian(o, in_var)])
-                bf = ca.Function('bf', [in_var], [o])
+                Af = ca.Function('Af', [in_var], [ca.jacobian(o, in_var)], {"cse": True})
+                bf = ca.Function('bf', [in_var], [o], {"cse": True})
 
                 A = Af(0)
                 A = ca.sparsify(A)
@@ -1191,7 +1191,7 @@ class Model:
             out = out_
             in_var = in_var_
 
-        return self._expand_mx_func(ca.Function('variable_metadata', [in_var], out))
+        return self._expand_mx_func(ca.Function('variable_metadata', [in_var], out, {"cse": True}))
 
     # noinspection PyPep8Naming
     @property
@@ -1213,7 +1213,7 @@ class Model:
                  self._inputs_vector,
                  ca.veccat(*self._symbols(self.constants)),
                  ca.veccat(*self._symbols(self.parameters))],
-                out_arguments))
+                out_arguments, {"cse": True}))
         else:
             return self._expand_mx_func(ca.Function(
                 'delay_arguments',
@@ -1224,5 +1224,4 @@ class Model:
                  ca.veccat(*self._symbols(self.inputs)),
                  ca.veccat(*self._symbols(self.constants)),
                  ca.veccat(*self._symbols(self.parameters))],
-                out_arguments))
-
+                out_arguments, {"cse": True}))
