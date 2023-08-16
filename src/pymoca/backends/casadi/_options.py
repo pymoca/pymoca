@@ -7,27 +7,27 @@ def _get_default_options():
 
     """
     return {
-        'library_folders': [],
-        'verbose': False,
-        'check_balanced': True,
-        'mtime_check': True,
-        'cache': False,
-        'codegen': False,
-        'expand_mx': False,
-        'unroll_loops': True,
-        'inline_functions': True,
-        'expand_vectors': False,
-        'resolve_parameter_values': False,
-        'replace_parameter_expressions': False,
-        'replace_constant_expressions': False,
-        'eliminate_constant_assignments': False,
-        'replace_parameter_values': False,
-        'replace_constant_values': False,
-        'eliminable_variable_expression': None,
-        'factor_and_simplify_equations': False,
-        'detect_aliases': False,
-        'allow_derivative_aliases': True,
-        'reduce_affine_expression': False,
+        "library_folders": [],
+        "verbose": False,
+        "check_balanced": True,
+        "mtime_check": True,
+        "cache": False,
+        "codegen": False,
+        "expand_mx": False,
+        "unroll_loops": True,
+        "inline_functions": True,
+        "expand_vectors": False,
+        "resolve_parameter_values": False,
+        "replace_parameter_expressions": False,
+        "replace_constant_expressions": False,
+        "eliminate_constant_assignments": False,
+        "replace_parameter_values": False,
+        "replace_constant_values": False,
+        "eliminable_variable_expression": None,
+        "factor_and_simplify_equations": False,
+        "detect_aliases": False,
+        "allow_derivative_aliases": True,
+        "reduce_affine_expression": False,
     }
 
 
@@ -39,4 +39,4 @@ def _merge_default_options(options):
         default_options.update(options)
         return default_options
     else:
-        raise TypeError('options must be of type dict')
+        raise TypeError("options must be of type dict")

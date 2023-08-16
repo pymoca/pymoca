@@ -60,7 +60,7 @@ class AntlrBuildCommand(Command):
 
     def run(self):
         "Run the build command"
-        call_antlr4('Modelica.g4')
+        call_antlr4("Modelica.g4")
 
 
 def call_antlr4(arg):
@@ -68,14 +68,16 @@ def call_antlr4(arg):
     # pylint: disable=unused-argument, unused-variable
     antlr_path = os.path.join(ROOT_DIR, "java", "antlr-4.7-complete.jar")
     classpath = os.pathsep.join([".", "{:s}".format(antlr_path), "$CLASSPATH"])
-    generated = os.path.join(ROOT_DIR, 'src', 'pymoca', 'generated')
-    cmd = "java -Xmx500M -cp \"{classpath:s}\" org.antlr.v4.Tool {arg:s}" \
-          " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
+    generated = os.path.join(ROOT_DIR, "src", "pymoca", "generated")
+    cmd = (
+        'java -Xmx500M -cp "{classpath:s}" org.antlr.v4.Tool {arg:s}'
+        " -o {generated:s} -visitor -Dlanguage=Python3".format(**locals())
+    )
     print(cmd)
-    proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, 'src', 'pymoca'))
+    proc = subprocess.Popen(cmd.split(), cwd=os.path.join(ROOT_DIR, "src", "pymoca"))
     proc.communicate()
-    with open(os.path.join(generated, '__init__.py'), 'w') as fid:
-        fid.write('')
+    with open(os.path.join(generated, "__init__.py"), "w") as fid:
+        fid.write("")
 
 
 def setup_package():
@@ -85,56 +87,52 @@ def setup_package():
 
     extras_require = {
         # Backends
-        'casadi': ['casadi >= 3.4.0'],
-        'lxml': [
-            'lxml >= 3.5.0',
-            'scipy >= 0.13.3',
+        "casadi": ["casadi >= 3.4.0"],
+        "lxml": [
+            "lxml >= 3.5.0",
+            "scipy >= 0.13.3",
         ],
-        'sympy': [
-            'sympy >= 0.7.6.1',
-            'scipy >= 0.13.3',
-            'jinja2 >= 2.10.1',
+        "sympy": [
+            "sympy >= 0.7.6.1",
+            "scipy >= 0.13.3",
+            "jinja2 >= 2.10.1",
         ],
         # Examples
-        'examples': [
-            'jupyterlab',
-            'matplotlib'
-        ],
-        'all': []  # Automatically generated below
-
+        "examples": ["jupyterlab", "matplotlib"],
+        "all": [],  # Automatically generated below
     }
-    extras_require['all'] = sorted({r for lst in extras_require.values() for r in lst})
+    extras_require["all"] = sorted({r for lst in extras_require.values() for r in lst})
 
-    cmdclass_ = {'antlr': AntlrBuildCommand}
+    cmdclass_ = {"antlr": AntlrBuildCommand}
     cmdclass_.update(versioneer.get_cmdclass())
 
     setup(
         version=versioneer.get_version(),
-        name='pymoca',
+        name="pymoca",
         maintainer="James Goppert",
         maintainer_email="james.goppert@gmail.com",
         description=DOCLINES[0],
         long_description="\n".join(DOCLINES[2:]),
-        url='https://github.com/pymoca/pymoca',
-        author='James Goppert',
-        author_email='james.goppert@gmail.com',
-        download_url='https://github.com/pymoca/pymoca',
-        license='BSD',
-        classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
+        url="https://github.com/pymoca/pymoca",
+        author="James Goppert",
+        author_email="james.goppert@gmail.com",
+        download_url="https://github.com/pymoca/pymoca",
+        license="BSD",
+        classifiers=[_f for _f in CLASSIFIERS.split("\n") if _f],
         platforms=["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
         install_requires=[
             "antlr4-python3-runtime == 4.7.*",
             "numpy >= 1.8.2",
         ],
-        tests_require=['coverage >= 3.7.1', 'pytest', 'pytest-runner'],
+        tests_require=["coverage >= 3.7.1", "pytest", "pytest-runner"],
         extras_require=extras_require,
-        python_requires='>=3.8',
+        python_requires=">=3.8",
         packages=find_packages("src"),
         package_dir={"": "src"},
         include_package_data=True,
-        cmdclass=cmdclass_
+        cmdclass=cmdclass_,
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     setup_package()

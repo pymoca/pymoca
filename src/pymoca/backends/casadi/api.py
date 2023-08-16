@@ -28,7 +28,6 @@ class _DepMeta(IntEnum):
 
 
 class CachedModel(Model):
-
     def __init__(self):
         self.states = []
         self.der_states = []
@@ -39,7 +38,7 @@ class CachedModel(Model):
         self.parameters = []
         self.string_constants = []
         self.string_parameters = []
-        self.time = ca.MX.sym('time')
+        self.time = ca.MX.sym("time")
         self.delay_states = []
         self.delay_arguments = []
         self.alias_relation = AliasRelation()
@@ -82,11 +81,15 @@ class CachedModel(Model):
 
     @property
     def equations(self):
-        raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
+        raise NotImplementedError(
+            "Cannot access individual equations on cached model.  Use residual function instead."
+        )
 
     @property
     def initial_equations(self):
-        raise NotImplementedError("Cannot access individual equations on cached model.  Use residual function instead.")
+        raise NotImplementedError(
+            "Cannot access individual equations on cached model.  Use residual function instead."
+        )
 
     def simplify(self, options):
         raise NotImplementedError("Cannot simplify cached model")
@@ -94,6 +97,7 @@ class CachedModel(Model):
 
 class InvalidCacheError(Exception):
     pass
+
 
 def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]):
     # Importing the antlr4 (generated modules) is rather slow. Avoid for this
@@ -103,12 +107,12 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
 
     # Load folders
     tree = None
-    for folder in [model_folder] + compiler_options['library_folders']:
+    for folder in [model_folder] + compiler_options["library_folders"]:
         for root, dir, files in os.walk(folder, followlinks=True):
             for item in fnmatch.filter(files, "*.mo"):
                 logger.info("Parsing {}".format(item))
 
-                with open(os.path.join(root, item), 'r', encoding="utf-8") as f:
+                with open(os.path.join(root, item), "r", encoding="utf-8") as f:
                     if tree is None:
                         tree = parser.parse(f.read())
                     else:
@@ -118,17 +122,18 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     logger.info("Generating CasADi model")
 
     model = generator.generate(tree, model_name, compiler_options)
-    if compiler_options['check_balanced']:
+    if compiler_options["check_balanced"]:
         model.check_balanced()
 
     model.simplify(compiler_options)
 
-    if compiler_options['verbose']:
+    if compiler_options["verbose"]:
         model.check_balanced()
 
     model._post_checks()
 
     return model
+
 
 def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
     # Avoid locating compiler when loading from cache by loading
@@ -136,26 +141,26 @@ def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
     import distutils.ccompiler
 
     # Compile shared libraries
-    if os.name == 'posix':
-        compiler_flags = ['-O2', '-fPIC']
-        linker_flags = ['-fPIC']
+    if os.name == "posix":
+        compiler_flags = ["-O2", "-fPIC"]
+        linker_flags = ["-fPIC"]
     else:
-        compiler_flags = ['/O2', '/wd4101']  # Shut up unused local variable warnings.
-        linker_flags = ['/DLL']
+        compiler_flags = ["/O2", "/wd4101"]  # Shut up unused local variable warnings.
+        linker_flags = ["/DLL"]
 
     # Generate C code
     logger.debug("Generating {}".format(library_name))
 
     cg = ca.CodeGenerator(library_name)
-    cg.add(f, True) # Nondifferentiated function
-    cg.add(f.forward(1), True) # Jacobian-times-vector product
-    cg.add(f.reverse(1), True) # vector-times-Jacobian product
-    cg.add(f.reverse(1).forward(1), True) # Hessian-times-vector product
-    cg.generate(model_folder + '/')
+    cg.add(f, True)  # Nondifferentiated function
+    cg.add(f.forward(1), True)  # Jacobian-times-vector product
+    cg.add(f.reverse(1), True)  # vector-times-Jacobian product
+    cg.add(f.reverse(1).forward(1), True)  # Hessian-times-vector product
+    cg.generate(model_folder + "/")
 
     compiler = distutils.ccompiler.new_compiler()
 
-    file_name = os.path.relpath(os.path.join(model_folder, library_name + '.c'))
+    file_name = os.path.relpath(os.path.join(model_folder, library_name + ".c"))
     object_name = compiler.object_filenames([file_name])[0]
     library = os.path.join(model_folder, library_name + compiler.shared_lib_extension)
     try:
@@ -177,8 +182,10 @@ def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
             os.remove(object_name)
     return library
 
-def save_model(model_folder: str, model_name: str, model: Model,
-               compiler_options: Dict[str, str]) -> None:
+
+def save_model(
+    model_folder: str, model_name: str, model: Model, compiler_options: Dict[str, str]
+) -> None:
     """
     Saves a CasADi model to disk.
 
@@ -190,36 +197,40 @@ def save_model(model_folder: str, model_name: str, model: Model,
 
     compiler_options = _merge_default_options(compiler_options)
 
-    objects = {'dae_residual': None, 'initial_residual': None, 'variable_metadata': None, 'delay_arguments': None}
+    objects = {
+        "dae_residual": None,
+        "initial_residual": None,
+        "variable_metadata": None,
+        "delay_arguments": None,
+    }
     for o in objects.keys():
-        f = getattr(model, o + '_function')
+        f = getattr(model, o + "_function")
 
-        if compiler_options['codegen']:
-            objects[o] = _codegen_model(model_folder, f, '{}_{}'.format(model_name, o))
+        if compiler_options["codegen"]:
+            objects[o] = _codegen_model(model_folder, f, "{}_{}".format(model_name, o))
         else:
             objects[o] = f
 
     # Output metadata
     db_file = os.path.join(model_folder, model_name + ".pymoca_cache")
-    with open(db_file, 'wb') as f:
+    with open(db_file, "wb") as f:
         db = {}
 
         # Store version
-        db['version'] = __version__
+        db["version"] = __version__
 
         # Include references to the shared libraries (codegen) or pickled functions (cache)
         db.update(objects)
 
-        db['library_os'] = os.name
+        db["library_os"] = os.name
 
-        db['options'] = compiler_options
+        db["options"] = compiler_options
 
         # Describe variables per category
-        for key in ['states', 'der_states', 'alg_states', 'inputs', 'parameters', 'constants']:
+        for key in ["states", "der_states", "alg_states", "inputs", "parameters", "constants"]:
             db[key] = [e.to_dict() for e in getattr(model, key)]
-        db['string_constants'] = model.string_constants
-        db['string_parameters'] = model.string_parameters
-
+        db["string_constants"] = model.string_constants
+        db["string_parameters"] = model.string_parameters
 
         # Caching using CasADi functions will lead to constants seemingly
         # depending on MX variables. Figuring out that they do not is slow,
@@ -230,7 +241,7 @@ def save_model(model_folder: str, model_name: str, model: Model,
         # Metadata dependency checking
         parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
 
-        for k, key in enumerate(['states', 'alg_states', 'inputs', 'parameters', 'constants']):
+        for k, key in enumerate(["states", "alg_states", "inputs", "parameters", "constants"]):
             metadata_shape = (len(getattr(model, key)), len(CASADI_ATTRIBUTES))
             m = db[key + "__metadata_dependent"] = np.zeros(metadata_shape, dtype=int)
             if np.prod(m.shape) > 0:
@@ -247,14 +258,15 @@ def save_model(model_folder: str, model_name: str, model: Model,
 
         # Delay dependency checking
         if model.delay_states:
-
-            all_symbols = [model.time,
-                           *model._symbols(model.states),
-                           *model._symbols(model.der_states),
-                           *model._symbols(model.alg_states),
-                           *model._symbols(model.inputs),
-                           *model._symbols(model.constants),
-                           *model._symbols(model.parameters)]
+            all_symbols = [
+                model.time,
+                *model._symbols(model.states),
+                *model._symbols(model.der_states),
+                *model._symbols(model.alg_states),
+                *model._symbols(model.inputs),
+                *model._symbols(model.constants),
+                *model._symbols(model.parameters),
+            ]
             symbol_to_index = {x: i for i, x in enumerate(all_symbols)}
 
             expressions, durations = zip(*model.delay_arguments)
@@ -264,16 +276,18 @@ def save_model(model_folder: str, model_name: str, model: Model,
                 if not isinstance(dur, ca.MX):
                     dur = ca.MX(dur)  # Probably a constant, will have no dependencies
                 duration_dependencies.append(
-                    [symbol_to_index[var] for var in ca.symvar(dur) if ca.depends_on(dur, var)])
-            db['__delay_duration_dependent'] = duration_dependencies
+                    [symbol_to_index[var] for var in ca.symvar(dur) if ca.depends_on(dur, var)]
+                )
+            db["__delay_duration_dependent"] = duration_dependencies
 
-        db['outputs'] = model.outputs
+        db["outputs"] = model.outputs
 
-        db['delay_states'] = model.delay_states
+        db["delay_states"] = model.delay_states
 
-        db['alias_relation'] = model.alias_relation
+        db["alias_relation"] = model.alias_relation
 
         pickle.dump(db, f, protocol=-1)
+
 
 def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]) -> CachedModel:
     """
@@ -290,10 +304,10 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
 
     db_file = os.path.join(model_folder, model_name + ".pymoca_cache")
 
-    if compiler_options['mtime_check']:
+    if compiler_options["mtime_check"]:
         # Mtime check
         cache_mtime = os.path.getmtime(db_file)
-        for folder in [model_folder] + compiler_options['library_folders']:
+        for folder in [model_folder] + compiler_options["library_folders"]:
             for root, dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
                     filename = os.path.join(root, item)
@@ -304,35 +318,35 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
     model = CachedModel()
 
     # Load metadata
-    with open(db_file, 'rb') as f:
+    with open(db_file, "rb") as f:
         try:
             db = pickle.load(f)
         except RuntimeError as e:
             if "DeserializingStream" in str(e) or "deserialization" in str(e).lower():
-                raise InvalidCacheError('Cache generated for incompatible CasADi version')
+                raise InvalidCacheError("Cache generated for incompatible CasADi version")
             else:
                 raise
 
-        if db['version'] != __version__:
-            raise InvalidCacheError('Cache generated for a different version of pymoca')
+        if db["version"] != __version__:
+            raise InvalidCacheError("Cache generated for a different version of pymoca")
 
         # Check compiler options. We ignore the library folders, as they have
         # already been checked, and checking them will impede platform
         # portability of the cache.
-        exclude_options = ['library_folders']
-        old_opts = {k: v for k, v in db['options'].items() if k not in exclude_options}
+        exclude_options = ["library_folders"]
+        old_opts = {k: v for k, v in db["options"].items() if k not in exclude_options}
         new_opts = {k: v for k, v in compiler_options.items() if k not in exclude_options}
 
         if old_opts != new_opts:
-            raise InvalidCacheError('Cache generated for different compiler options')
+            raise InvalidCacheError("Cache generated for different compiler options")
 
         # Pickles are platform independent, but dynamic libraries are not
-        if compiler_options['codegen']:
-            if db['library_os'] != os.name:
-                raise InvalidCacheError('Cache generated for incompatible OS')
+        if compiler_options["codegen"]:
+            if db["library_os"] != os.name:
+                raise InvalidCacheError("Cache generated for incompatible OS")
 
         # Include references to the shared libraries
-        for o in ['dae_residual', 'initial_residual', 'variable_metadata', 'delay_arguments']:
+        for o in ["dae_residual", "initial_residual", "variable_metadata", "delay_arguments"]:
             if isinstance(db[o], str):
                 # Path to codegen'd library
                 f = ca.external(o, db[o])
@@ -341,10 +355,10 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                 assert isinstance(db[o], ca.Function)
                 f = db[o]
 
-            setattr(model, '_' + o + '_function', f)
+            setattr(model, "_" + o + "_function", f)
 
         # Load variables per category
-        variables_with_metadata = ['states', 'alg_states', 'inputs', 'parameters', 'constants']
+        variables_with_metadata = ["states", "alg_states", "inputs", "parameters", "constants"]
         variable_dict = {}
         for key in variables_with_metadata:
             variables = getattr(model, key)
@@ -353,24 +367,34 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                 variables.append(variable)
                 variable_dict[variable.symbol.name()] = variable
 
-        model.der_states = [Variable.from_dict(d) for d in db['der_states']]
-        model.outputs = db['outputs']
-        model.delay_states = db['delay_states']
-        model.alias_relation = db['alias_relation']
-        model.string_constants = db['string_constants']
-        model.string_parameters = db['string_parameters']
+        model.der_states = [Variable.from_dict(d) for d in db["der_states"]]
+        model.outputs = db["outputs"]
+        model.delay_states = db["delay_states"]
+        model.alias_relation = db["alias_relation"]
+        model.string_constants = db["string_constants"]
+        model.string_parameters = db["string_parameters"]
 
         # Evaluate variable metadata:
         parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
-        metadata = dict(zip(variables_with_metadata, model.variable_metadata_function(parameter_vector)))
-        independent_metadata = dict(zip(
-            variables_with_metadata,
-            (x for x in model.variable_metadata_function(ca.veccat(*[np.nan for v in model.parameters])))))
+        metadata = dict(
+            zip(variables_with_metadata, model.variable_metadata_function(parameter_vector))
+        )
+        independent_metadata = dict(
+            zip(
+                variables_with_metadata,
+                (
+                    x
+                    for x in model.variable_metadata_function(
+                        ca.veccat(*[np.nan for v in model.parameters])
+                    )
+                ),
+            )
+        )
 
         for k, key in enumerate(variables_with_metadata):
             m = db[key + "__metadata_dependent"]
             for i, d in enumerate(db[key]):
-                variable = variable_dict[d['name']]
+                variable = variable_dict[d["name"]]
                 for j, tmp in enumerate(CASADI_ATTRIBUTES):
                     if m[i, j] == _DepMeta.MX_DEPENDENT:
                         setattr(variable, tmp, metadata[key][i, j])
@@ -385,13 +409,15 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
 
         # Evaluate delay arguments:
         if model.delay_states:
-            args = [model.time,
-                    ca.veccat(*model._symbols(model.states)),
-                    ca.veccat(*model._symbols(model.der_states)),
-                    ca.veccat(*model._symbols(model.alg_states)),
-                    ca.veccat(*model._symbols(model.inputs)),
-                    ca.veccat(*model._symbols(model.constants)),
-                    ca.veccat(*model._symbols(model.parameters))]
+            args = [
+                model.time,
+                ca.veccat(*model._symbols(model.states)),
+                ca.veccat(*model._symbols(model.der_states)),
+                ca.veccat(*model._symbols(model.alg_states)),
+                ca.veccat(*model._symbols(model.inputs)),
+                ca.veccat(*model._symbols(model.constants)),
+                ca.veccat(*model._symbols(model.parameters)),
+            ]
             delay_arguments_raw = model.delay_arguments_function(*args)
 
             nan_args = [ca.repmat(np.nan, *arg.size()) for arg in args]
@@ -401,18 +427,25 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             delay_durations_raw = delay_arguments_raw[1::2]
             independent_delay_durations_raw = independent_delay_arguments_raw[1::2]
 
-            assert 1 == len({len(delay_expressions_raw), len(delay_durations_raw),
-                len(independent_delay_durations_raw)})
+            assert 1 == len(
+                {
+                    len(delay_expressions_raw),
+                    len(delay_durations_raw),
+                    len(independent_delay_durations_raw),
+                }
+            )
 
-            all_symbols = [model.time,
-                           *model._symbols(model.states),
-                           *model._symbols(model.der_states),
-                           *model._symbols(model.alg_states),
-                           *model._symbols(model.inputs),
-                           *model._symbols(model.constants),
-                           *model._symbols(model.parameters)]
+            all_symbols = [
+                model.time,
+                *model._symbols(model.states),
+                *model._symbols(model.der_states),
+                *model._symbols(model.alg_states),
+                *model._symbols(model.inputs),
+                *model._symbols(model.constants),
+                *model._symbols(model.parameters),
+            ]
 
-            duration_dependencies = db['__delay_duration_dependent']
+            duration_dependencies = db["__delay_duration_dependent"]
 
             # Get rid of false dependency symbols not used in any delay
             # durations. This significantly reduces the work the (slow)
@@ -424,10 +457,8 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
                 actual_dep_symbols[i] = all_symbols[i]
 
             delay_durations_simplified = ca.Function(
-                'replace_false_deps',
-                all_symbols,
-                delay_durations_raw).call(
-                    actual_dep_symbols)
+                "replace_false_deps", all_symbols, delay_durations_raw
+            ).call(actual_dep_symbols)
 
             # Get rid of remaining hidden dependencies in the delay durations
             for i, expr in enumerate(delay_expressions_raw):
@@ -441,9 +472,8 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
 
                         if false_deps:
                             [dur] = ca.substitute(
-                                [dur],
-                                list(false_deps),
-                                [np.nan] * len(false_deps))
+                                [dur], list(false_deps), [np.nan] * len(false_deps)
+                            )
                     else:
                         # Already removed all false dependencies
                         pass
@@ -455,25 +485,27 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
     # Done
     return model
 
-def transfer_model(model_folder: str, model_name: str, compiler_options=None):
 
+def transfer_model(model_folder: str, model_name: str, compiler_options=None):
     compiler_options = _merge_default_options(compiler_options)
 
-    cache = compiler_options['cache']
-    codegen = compiler_options['codegen']
+    cache = compiler_options["cache"]
+    codegen = compiler_options["codegen"]
 
     # Compilation takes precedence over caching, and disables it
     if cache and codegen:
-        logger.warning("Both 'cache' and 'codegen' specified. Code generation will take precedence.")
-        cache = compiler_options['cache'] = False
+        logger.warning(
+            "Both 'cache' and 'codegen' specified. Code generation will take precedence."
+        )
+        cache = compiler_options["cache"] = False
 
     if cache or codegen:
         # Until CasADi supports pickling MXFunctions, caching implies
         # expanding to SX. We only raise a warning when we have to (re)compile
         # the model though.
         raise_expand_warning = False
-        if cache and not compiler_options['expand_mx']:
-            compiler_options['expand_mx'] = True
+        if cache and not compiler_options["expand_mx"]:
+            compiler_options["expand_mx"] = True
             raise_expand_warning = True
 
         try:
@@ -486,5 +518,3 @@ def transfer_model(model_folder: str, model_name: str, compiler_options=None):
             return model
     else:
         return _compile_model(model_folder, model_name, compiler_options)
-
-

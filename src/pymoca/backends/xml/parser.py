@@ -3,6 +3,7 @@ from collections import OrderedDict
 from typing import Union
 
 import casadi as ca
+
 # noinspection PyPackageRequirements
 
 from lxml import etree
@@ -10,26 +11,22 @@ from lxml import etree
 from .model import HybridDae
 
 FILE_PATH = os.path.dirname(os.path.abspath(__file__))
-SCHEMA_DIR = os.path.join(FILE_PATH, 'ModelicaXML', 'schemas')
+SCHEMA_DIR = os.path.join(FILE_PATH, "ModelicaXML", "schemas")
 
 
 class XMLParser:
-
     def __init__(self, schema_dir, schema_file):
         orig_path = os.path.abspath(os.curdir)
         os.chdir(schema_dir)
-        with open(schema_file, 'r') as f:
-            schema = etree.XMLSchema(etree.XML(f.read().encode('utf-8')))
+        with open(schema_file, "r") as f:
+            schema = etree.XMLSchema(etree.XML(f.read().encode("utf-8")))
         os.chdir(orig_path)
-        self._parser = etree.XMLParser(
-            schema=schema,
-            remove_comments=True,
-            remove_blank_text=False)
+        self._parser = etree.XMLParser(schema=schema, remove_comments=True, remove_blank_text=False)
 
     def parse(self, txt: str):
         if not isinstance(txt, str):
-            raise ValueError('txt must be a str')
-        xml_file = txt.encode('utf-8')
+            raise ValueError("txt must be a str")
+        xml_file = txt.encode("utf-8")
         return etree.fromstring(xml_file, self._parser)
 
 
@@ -38,7 +35,7 @@ Sym = Union[ca.MX, ca.SX]
 
 # noinspection PyProtectedMember,PyPep8Naming
 class ModelListener:
-    """ Converts ModelicaXML file to Hybrid DAE"""
+    """Converts ModelicaXML file to Hybrid DAE"""
 
     def __init__(self, sym: Sym = ca.SX, verbose=False):
         self.depth = 0
@@ -51,30 +48,30 @@ class ModelListener:
         # self.op_map[n_operations][operator](*args)
         self.op_map = {
             1: {
-                'der': self.der,
-                '-': lambda x: -1 * x,
-                'abs': ca.fabs,
-                'sin': ca.sin,
-                'cos': ca.cos,
-                'tan': ca.tan,
+                "der": self.der,
+                "-": lambda x: -1 * x,
+                "abs": ca.fabs,
+                "sin": ca.sin,
+                "cos": ca.cos,
+                "tan": ca.tan,
             },
             2: {
-                '+': lambda x, y: x + y,
-                '-': lambda x, y: x - y,
-                '*': lambda x, y: x * y,
-                '/': lambda x, y: x / y,
-                '^': lambda x, y: ca.power(x, y),
-                '>': lambda x, y: x > y,
-                '<': lambda x, y: x < y,
-                '<=': lambda x, y: x <= y,
-                '>=': lambda x, y: x >= y,
-                'reinit': self.reinit,
-                'sample': self.sample,
-                'and': ca.logic_and,
-                'or': ca.logic_or,
-                'not': ca.logic_not,
-                'noise_gaussian': lambda mean, std: self.noise_gaussian(mean, std),
-                'noise_uniform': lambda lower, upper: self.noise_uniform(lower, upper),
+                "+": lambda x, y: x + y,
+                "-": lambda x, y: x - y,
+                "*": lambda x, y: x * y,
+                "/": lambda x, y: x / y,
+                "^": lambda x, y: ca.power(x, y),
+                ">": lambda x, y: x > y,
+                "<": lambda x, y: x < y,
+                "<=": lambda x, y: x <= y,
+                ">=": lambda x, y: x >= y,
+                "reinit": self.reinit,
+                "sample": self.sample,
+                "and": ca.logic_and,
+                "or": ca.logic_or,
+                "not": ca.logic_not,
+                "noise_gaussian": lambda mean, std: self.noise_gaussian(mean, std),
+                "noise_uniform": lambda lower, upper: self.noise_uniform(lower, upper),
             },
         }
 
@@ -93,22 +90,22 @@ class ModelListener:
 
     def der(self, x: Sym):
         """Get the derivative of the variable, create it if it doesn't exist."""
-        name = 'der({:s})'.format(x.name())
-        if name not in self.scope['dvar'].keys():
-            self.scope['dvar'][name] = self.sym.sym(name, *x.shape)
-            self.scope['states'].append(x.name())
-        return self.scope['dvar'][name]
+        name = "der({:s})".format(x.name())
+        if name not in self.scope["dvar"].keys():
+            self.scope["dvar"][name] = self.sym.sym(name, *x.shape)
+            self.scope["states"].append(x.name())
+        return self.scope["dvar"][name]
 
     def cond(self, expr):
-        c = self.sym.sym('c_{:d}'.format(len(self.scope['c'])))
-        self.scope['c'][c] = expr
+        c = self.sym.sym("c_{:d}".format(len(self.scope["c"])))
+        self.scope["c"][c] = expr
         return c
 
     def pre_cond(self, x: Sym):
-        name = 'pre({:s})'.format(x.name())
-        if name not in self.scope['pre_c'].keys():
-            self.scope['pre_c'][name] = self.sym.sym(name, *x.shape)
-        return self.scope['pre_c'][name]
+        name = "pre({:s})".format(x.name())
+        if name not in self.scope["pre_c"].keys():
+            self.scope["pre_c"][name] = self.sym.sym(name, *x.shape)
+        return self.scope["pre_c"][name]
 
     def edge(self, c):
         """rising edge"""
@@ -116,26 +113,26 @@ class ModelListener:
 
     @staticmethod
     def reinit(x_old, x_new):
-        return 'reinit', x_old, x_new
+        return "reinit", x_old, x_new
 
     @staticmethod
     def sample(t_start, period):
-        print('sample', t_start, period)
-        return 'sample', t_start, period
+        print("sample", t_start, period)
+        return "sample", t_start, period
 
     def noise_gaussian(self, mean, std):
         """Create a gaussian noise variable"""
         assert std > 0
-        ng = self.sym.sym('ng_{:d}'.format(len(self.scope['ng'])))
-        self.scope['ng'].append(ng)
-        return mean + std*ng
+        ng = self.sym.sym("ng_{:d}".format(len(self.scope["ng"])))
+        self.scope["ng"].append(ng)
+        return mean + std * ng
 
     def noise_uniform(self, lower_bound, upper_bound):
         """Create a uniform noise variable"""
         assert upper_bound > lower_bound
-        nu = self.sym.sym('nu_{:d}'.format(len(self.scope['nu'])))
-        self.scope['nu'].append(nu)
-        return lower_bound + nu*(upper_bound - lower_bound)
+        nu = self.sym.sym("nu_{:d}".format(len(self.scope["nu"])))
+        self.scope["nu"].append(nu)
+        return lower_bound + nu * (upper_bound - lower_bound)
 
     # ------------------------------------------------------------------------
     # Helpers
@@ -150,15 +147,15 @@ class ModelListener:
 
     def get_var(self, name):
         """Get the variable in the current scope"""
-        if name == 'time':
-            return self.scope['time']
+        if name == "time":
+            return self.scope["time"]
         else:
-            return self.scope['var'][name]
+            return self.scope["var"][name]
 
     def log(self, *args, **kwargs):
         """Convenience function for printing indenting debug output."""
         if self.verbose:
-            print('   ' * self.depth, *args, **kwargs)
+            print("   " * self.depth, *args, **kwargs)
 
     # ------------------------------------------------------------------------
     # Listener Methods
@@ -169,7 +166,7 @@ class ModelListener:
         self.model[tree] = None
 
         # print name to log
-        self.log(tree.tag, '{')
+        self.log(tree.tag, "{")
 
         # increment depth
         self.depth += 1
@@ -182,66 +179,68 @@ class ModelListener:
 
         # print model
         if self.model[tree] is not None:
-            self.log('model:', self.model[tree])
+            self.log("model:", self.model[tree])
 
         # print name to log
-        self.log('}', tree.tag)
+        self.log("}", tree.tag)
 
     # noinspection PyUnusedLocal
     def enter_classDefinition(self, tree: etree._Element):
         # we don't know if variables are states
         # yet, we need to wait until equations are parsed
-        self.scope_stack.append({
-            'time': self.sym.sym('time'),
-            'sample_times': [],
-            'var': OrderedDict(),  # variables
-            'states': [],  # list of which variables are states (based on der call)
-            'dvar': OrderedDict(),  # derivative of variables
-            'eqs': [],  # equations
-            'when_eqs': [],  # when equations
-            'c': {},  # conditions
-            'pre_c': {},  # pre conditions
-            'p': [],  # parameters and constants
-            'prop': {},  # properties for variables
-            'ng': [],  # gaussian
-            'nu': [],  # uniform
-        })
+        self.scope_stack.append(
+            {
+                "time": self.sym.sym("time"),
+                "sample_times": [],
+                "var": OrderedDict(),  # variables
+                "states": [],  # list of which variables are states (based on der call)
+                "dvar": OrderedDict(),  # derivative of variables
+                "eqs": [],  # equations
+                "when_eqs": [],  # when equations
+                "c": {},  # conditions
+                "pre_c": {},  # pre conditions
+                "p": [],  # parameters and constants
+                "prop": {},  # properties for variables
+                "ng": [],  # gaussian
+                "nu": [],  # uniform
+            }
+        )
 
     def exit_classDefinition(self, tree: etree._Element):  # noqa: too-complex
         dae = HybridDae()
-        dae.t = self.scope['time']
+        dae.t = self.scope["time"]
         self.model[tree] = dae
 
         # handle component declarations
-        for var_name, v in self.scope['var'].items():
-            variability = self.scope['prop'][var_name]['variability']
-            if variability == 'continuous':
-                if var_name in self.scope['states']:
+        for var_name, v in self.scope["var"].items():
+            variability = self.scope["prop"][var_name]["variability"]
+            if variability == "continuous":
+                if var_name in self.scope["states"]:
                     dae.x = ca.vertcat(dae.x, v)
                     dae.dx = ca.vertcat(dae.dx, self.der(v))
                 else:
                     dae.y = ca.vertcat(dae.y, v)
-            elif variability == 'discrete':
+            elif variability == "discrete":
                 dae.m = ca.vertcat(dae.m, v)
-            elif variability == 'parameter':
+            elif variability == "parameter":
                 dae.p = ca.vertcat(dae.p, v)
-            elif variability == 'constant':
+            elif variability == "constant":
                 dae.p = ca.vertcat(dae.p, v)
             else:
-                raise ValueError('unknown variability', variability)
+                raise ValueError("unknown variability", variability)
 
-        for eq in self.scope['eqs']:
+        for eq in self.scope["eqs"]:
             if isinstance(eq, self.sym):
                 dae.f_x = ca.vertcat(dae.f_x, eq)
 
         # build reinit expression and discrete equations
         dae.f_i = dae.x
         dae.f_m = dae.m
-        for eq in self.scope['when_eqs']:
-            w = eq['cond']
-            for then_eq in eq['then']:
+        for eq in self.scope["when_eqs"]:
+            w = eq["cond"]
+            for then_eq in eq["then"]:
                 if isinstance(then_eq, tuple):
-                    if then_eq[0] == 'reinit':
+                    if then_eq[0] == "reinit":
                         sub_var = then_eq[1]
                         sub_expr = ca.if_else(self.edge(w), then_eq[2], sub_var)
                         dae.f_i = ca.substitute(dae.f_i, sub_var, sub_expr)
@@ -253,59 +252,61 @@ class ModelListener:
                     sub_expr = ca.if_else(self.edge(w), then_eq.dep(1), sub_var)
                     dae.f_m = ca.substitute(dae.f_m, sub_var, sub_expr)
 
-        dae.t = self.scope['time']
-        dae.prop.update(self.scope['prop'])
-        c_dict = self.scope['c']
+        dae.t = self.scope["time"]
+        dae.prop.update(self.scope["prop"])
+        c_dict = self.scope["c"]
         for k in c_dict.keys():
             dae.c = ca.vertcat(dae.c, k)
             dae.pre_c = ca.vertcat(dae.pre_c, self.pre_cond(k))
             dae.f_c = ca.vertcat(dae.f_c, c_dict[k])
 
-        for left, right in [('f_c', 'c'), ('c', 'pre_c'), ('dx', 'x'), ('f_m', 'm')]:
+        for left, right in [("f_c", "c"), ("c", "pre_c"), ("dx", "x"), ("f_m", "m")]:
             vl = getattr(dae, left)
             vr = getattr(dae, right)
             if vl.shape != vr.shape:
                 raise ValueError(
-                    '{:s} and {:s} must have the same shape:'
-                    '\n{:s}: {:s}\t{:s}: {:s}'.format(
-                        left, right, left, str(dae.f_m), right, str(dae.m)))
+                    "{:s} and {:s} must have the same shape:"
+                    "\n{:s}: {:s}\t{:s}: {:s}".format(
+                        left, right, left, str(dae.f_m), right, str(dae.m)
+                    )
+                )
 
-        dae.ng = ca.vertcat(*self.scope['ng'])
-        dae.nu = ca.vertcat(*self.scope['nu'])
+        dae.ng = ca.vertcat(*self.scope["ng"])
+        dae.nu = ca.vertcat(*self.scope["nu"])
 
         n_eq = dae.f_x.shape[0] + dae.f_m.shape[0]
         n_var = dae.x.shape[0] + dae.m.shape[0] + dae.y.shape[0]
         if n_eq != n_var:
             raise ValueError(
-                'must have equal number of equations '
-                '{:d} and unknowns {:d}\n:{:s}'.format(
-                    n_eq, n_var, str(dae)))
+                "must have equal number of equations "
+                "{:d} and unknowns {:d}\n:{:s}".format(n_eq, n_var, str(dae))
+            )
         self.scope_stack.pop()
 
     def enter_component(self, tree: etree._Element):
         self.model[tree] = {
-            'start': None,
-            'fixed': None,
-            'value': None,
-            'variability': self.get_attr(tree, 'variability', 'continuous'),
-            'visibility': self.get_attr(tree, 'visibility', 'public'),
+            "start": None,
+            "fixed": None,
+            "value": None,
+            "variability": self.get_attr(tree, "variability", "continuous"),
+            "visibility": self.get_attr(tree, "visibility", "public"),
         }
         self.scope_stack.append(self.model[tree])
 
     def exit_component(self, tree: etree._Element):
         var_scope = self.scope_stack.pop()
-        name = tree.attrib['name']
+        name = tree.attrib["name"]
         shape = (1, 1)
         sym = self.sym.sym(name, *shape)
-        self.scope['prop'][name] = var_scope
-        self.scope['var'][name] = sym
+        self.scope["prop"][name] = var_scope
+        self.scope["var"][name] = sym
 
     def exit_local(self, tree: etree._Element):
-        name = tree.attrib['name']
+        name = tree.attrib["name"]
         self.model[tree] = self.get_var(name)
 
     def exit_operator(self, tree: etree._Element):
-        op = tree.attrib['name']
+        op = tree.attrib["name"]
         self.model[tree] = self.op_map[len(tree)][op](*[self.model[e] for e in tree])
 
     def exit_if(self, tree: etree._Element):
@@ -319,7 +320,7 @@ class ModelListener:
         self.model[tree] = ca.if_else(c, then_eq[0], else_eq[0])
 
     def exit_apply(self, tree: etree._Element):
-        op = tree.attrib['builtin']
+        op = tree.attrib["builtin"]
         self.model[tree] = self.op_map[len(tree)][op](*[self.model[e] for e in tree])
 
     def exit_equal(self, tree: etree._Element):
@@ -328,7 +329,7 @@ class ModelListener:
 
     def exit_equation(self, tree: etree._Element):
         self.model[tree] = [self.model[c] for c in tree]
-        self.scope['eqs'].extend(self.model[tree])
+        self.scope["eqs"].extend(self.model[tree])
 
     def exit_modifier(self, tree: etree._Element):
         props = {}
@@ -339,9 +340,7 @@ class ModelListener:
 
     def exit_item(self, tree: etree._Element):
         assert len(tree) == 1
-        self.model[tree] = {
-            tree.attrib['name']: self.model[tree[0]]
-        }
+        self.model[tree] = {tree.attrib["name"]: self.model[tree[0]]}
 
     def exit_real(self, tree: etree._Element):
         self.model[tree] = float(tree.attrib["value"])
@@ -360,11 +359,8 @@ class ModelListener:
         assert len(tree) == 2
         cond = self.model[tree[0]]
         then = self.model[tree[1]]
-        self.model[tree] = {
-            'cond': self.cond(cond),
-            'then': then
-        }
-        self.scope['when_eqs'].append(self.model[tree])
+        self.model[tree] = {"cond": self.cond(cond), "then": then}
+        self.scope["when_eqs"].append(self.model[tree])
 
     def exit_cond(self, tree: etree._Element):
         assert len(tree) == 1
@@ -380,18 +376,18 @@ class ModelListener:
 # noinspection PyProtectedMember
 def walk(e: etree._Element, listener: ModelListener) -> None:
     tag = e.tag
-    listener.call('enter_every_before', e)
-    listener.call('enter_' + tag, e)
-    listener.call('enter_every_after', e)
+    listener.call("enter_every_before", e)
+    listener.call("enter_" + tag, e)
+    listener.call("enter_every_after", e)
     for c in e.getchildren():
         walk(c, listener)
-    listener.call('exit_every_before', e)
-    listener.call('exit_' + tag, e)
-    listener.call('exit_every_after', e)
+    listener.call("exit_every_before", e)
+    listener.call("exit_" + tag, e)
+    listener.call("exit_every_after", e)
 
 
 def parse(model_txt: str, verbose: bool = False) -> HybridDae:
-    parser = XMLParser(SCHEMA_DIR, 'Modelica.xsd')
+    parser = XMLParser(SCHEMA_DIR, "Modelica.xsd")
     root = parser.parse(model_txt)
     listener = ModelListener(verbose=verbose)
     walk(root, listener)
@@ -399,6 +395,6 @@ def parse(model_txt: str, verbose: bool = False) -> HybridDae:
 
 
 def parse_file(file_path: str, verbose: bool = False) -> HybridDae:
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         txt = f.read()
     return parse(txt, verbose)

@@ -15,8 +15,8 @@ from pymoca.backends.xml import parser as xml_parser
 from pymoca.backends.xml.analysis import plt
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-MODEL_DIR = os.path.join(TEST_DIR, 'models')
-GENERATED_DIR = os.path.join(TEST_DIR, 'generated')
+MODEL_DIR = os.path.join(TEST_DIR, "models")
+GENERATED_DIR = os.path.join(TEST_DIR, "generated")
 
 
 class XmlTest(unittest.TestCase):
@@ -36,17 +36,16 @@ class XmlTest(unittest.TestCase):
         sys.stdout.flush()
         time.sleep(0.01)
 
-    @unittest.skipIf(os.environ.get('GITHUB_ACTIONS') == 'true', 'Fails with InvocationError')
+    @unittest.skipIf(os.environ.get("GITHUB_ACTIONS") == "true", "Fails with InvocationError")
     def test_noise(self):
-
         # compile to ModelicaXML
-        with open(os.path.join(MODEL_DIR, 'Noise.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "Noise.mo"), "r") as f:
             txt = f.read()
         ast_tree = mo_parser.parse(txt)
-        model_xml = generator.generate(ast_tree, 'Noise')
+        model_xml = generator.generate(ast_tree, "Noise")
 
         # save xml model to disk
-        with open(os.path.join(GENERATED_DIR, 'Noise.xml'), 'w') as f:
+        with open(os.path.join(GENERATED_DIR, "Noise.xml"), "w") as f:
             f.write(model_xml)
 
         # load xml model
@@ -58,25 +57,24 @@ class XmlTest(unittest.TestCase):
         print(model_ode)
 
         # simulate
-        data = sim_scipy.sim(model_ode, {'tf': 1, 'dt': 0.001, 'verbose': True})
+        data = sim_scipy.sim(model_ode, {"tf": 1, "dt": 0.001, "verbose": True})
 
         # plot
-        analysis.plot(data, fields=['x', 'm'])
+        analysis.plot(data, fields=["x", "m"])
         plt.draw()
         plt.pause(0.1)
         plt.close()
 
-    @unittest.skipIf(os.environ.get('GITHUB_ACTIONS') == 'true', 'Fails with InvocationError')
+    @unittest.skipIf(os.environ.get("GITHUB_ACTIONS") == "true", "Fails with InvocationError")
     def test_simple_circuit(self):
-
         # compile to ModelicaXML
-        with open(os.path.join(MODEL_DIR, 'SimpleCircuit.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "SimpleCircuit.mo"), "r") as f:
             txt = f.read()
         ast_tree = mo_parser.parse(txt)
-        model_xml = generator.generate(ast_tree, 'SimpleCircuit')
+        model_xml = generator.generate(ast_tree, "SimpleCircuit")
 
         # save xml model to disk
-        with open(os.path.join(GENERATED_DIR, 'SimpleCircuit.xml'), 'w') as f:
+        with open(os.path.join(GENERATED_DIR, "SimpleCircuit.xml"), "w") as f:
             f.write(model_xml)
 
         # load xml model
@@ -88,39 +86,37 @@ class XmlTest(unittest.TestCase):
         print(model_ode)
 
         # simulate
-        data = sim_scipy.sim(model_ode, {'tf': 1, 'dt': 0.001, 'verbose': True})
+        data = sim_scipy.sim(model_ode, {"tf": 1, "dt": 0.001, "verbose": True})
 
         # plot
-        analysis.plot(data, fields=['x', 'c', 'm'])
+        analysis.plot(data, fields=["x", "c", "m"])
         plt.draw()
         plt.pause(0.1)
         plt.close()
 
-    @unittest.skipIf(os.environ.get('GITHUB_ACTIONS') == 'true', 'Fails with InvocationError')
+    @unittest.skipIf(os.environ.get("GITHUB_ACTIONS") == "true", "Fails with InvocationError")
     def test_bouncing_ball(self):
-
         # generate
-        with open(os.path.join(MODEL_DIR, 'BouncingBall.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "BouncingBall.mo"), "r") as f:
             txt = f.read()
         ast_tree = mo_parser.parse(txt)
-        generator.generate(ast_tree, 'BouncingBall')
+        generator.generate(ast_tree, "BouncingBall")
 
         # parse
-        example_file = os.path.join(
-            MODEL_DIR, 'bouncing-ball.xml')
+        example_file = os.path.join(MODEL_DIR, "bouncing-ball.xml")
         model = xml_parser.parse_file(example_file, verbose=False)
         print(model)
 
         # convert to ode
         model_ode = model.to_ode()  # type: model.HybridOde
-        model_ode.prop['x']['start'] = 1
+        model_ode.prop["x"]["start"] = 1
         print(model_ode)
 
         # simulate
-        data = sim_scipy.sim(model_ode, {'tf': 3.5, 'dt': 0.01, 'verbose': True})
+        data = sim_scipy.sim(model_ode, {"tf": 3.5, "dt": 0.01, "verbose": True})
 
         # plot
-        analysis.plot(data, linewidth=0.5, marker='.', markersize=0.5)
+        analysis.plot(data, linewidth=0.5, marker=".", markersize=0.5)
         plt.draw()
         plt.pause(0.1)
         plt.close()
@@ -128,7 +124,7 @@ class XmlTest(unittest.TestCase):
         # simulate in soft real-time
         do_realtime = False
         if do_realtime:
-            print('\nsoft-realtime simulation')
+            print("\nsoft-realtime simulation")
             time_start = time.time()
 
             def realtime_callback(t, x, y, m, p, c):
@@ -139,8 +135,9 @@ class XmlTest(unittest.TestCase):
                 elif lag < 0:
                     time.sleep(-lag)
 
-            data = sim_scipy.sim(model_ode, {'tf': 3.5, 'dt': 0.01, 'verbose': True},
-                                 user_callback=realtime_callback)
+            data = sim_scipy.sim(
+                model_ode, {"tf": 3.5, "dt": 0.01, "verbose": True}, user_callback=realtime_callback
+            )
 
         # plt.gca().set_ylim(-2, 2)
         self.flush()

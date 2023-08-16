@@ -9,7 +9,7 @@ class TestASTManipulation(unittest.TestCase):
         self.ast = ast.Tree()
 
     def test_add_class(self):
-        c = ast.Class(name='TestClass')
+        c = ast.Class(name="TestClass")
         self.ast.add_class(c)
 
         self.assertEqual(c.parent, self.ast)
@@ -19,10 +19,7 @@ class TestASTManipulation(unittest.TestCase):
         self.assertNotIn(c.name, self.ast.classes)
 
     def test_add_symbol(self):
-        s = ast.Symbol(
-            name='TestSymbol',
-            type=ast.ComponentRef.from_tuple('Real')
-        )
+        s = ast.Symbol(name="TestSymbol", type=ast.ComponentRef.from_tuple("Real"))
         self.ast.add_symbol(s)
 
         self.assertIn(s.name, self.ast.symbols)
@@ -32,8 +29,7 @@ class TestASTManipulation(unittest.TestCase):
 
     def test_add_equation(self):
         e = ast.Equation(
-            left=ast.ComponentRef.from_tuple('a'),
-            right=ast.ComponentRef.from_tuple('b')
+            left=ast.ComponentRef.from_tuple("a"), right=ast.ComponentRef.from_tuple("b")
         )
         self.ast.add_equation(e)
 
@@ -62,16 +58,16 @@ class TestASTReprAndStr(unittest.TestCase):
                     self.assertNotEqual(len(str(class_instance)), 0)
 
     def test_component_ref(self):
-        cref = ast.ComponentRef.from_string('A0.B1.C2')
+        cref = ast.ComponentRef.from_string("A0.B1.C2")
 
         cref_tuple = cref.to_tuple()
-        self.assertEqual(cref_tuple[0], 'A0')
-        self.assertEqual(cref_tuple[1], 'B1')
-        self.assertEqual(cref_tuple[2], 'C2')
+        self.assertEqual(cref_tuple[0], "A0")
+        self.assertEqual(cref_tuple[1], "B1")
+        self.assertEqual(cref_tuple[2], "C2")
 
-        cref_d3 = ast.ComponentRef.from_string('D3')
-        self.assertEqual(str(cref_d3), 'D3')
+        cref_d3 = ast.ComponentRef.from_string("D3")
+        self.assertEqual(str(cref_d3), "D3")
 
         cref_cat = cref.from_tuple(cref_tuple + cref_d3.to_tuple())
-        self.assertEqual(str(cref_cat), 'A0.B1.C2.D3')
+        self.assertEqual(str(cref_cat), "A0.B1.C2.D3")
         self.assertEqual(repr(cref_cat), "'A0'['B1'['C2'['D3']]]")
