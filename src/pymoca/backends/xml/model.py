@@ -9,7 +9,6 @@ SYM = Union[ca.SX, ca.MX]
 
 
 class CasadiModel:
-
     def __init__(self, sym, *args, **kwargs):
         self.sym = sym
 
@@ -18,21 +17,20 @@ class CasadiModel:
             if k in self.__dict__.keys():
                 setattr(self, k, v)
             else:
-                raise ValueError('unknown argument', k)
+                raise ValueError("unknown argument", k)
 
         # Use just-in-time compilation to speed up the evaluation
-        if ca.Importer.has_plugin('clang'):
+        if ca.Importer.has_plugin("clang"):
             with_jit = True
-            compiler = 'clang'
-        elif ca.Importer.has_plugin('shell'):
+            compiler = "clang"
+        elif ca.Importer.has_plugin("shell"):
             with_jit = True
-            compiler = 'shell'
+            compiler = "shell"
         else:
-            print("WARNING; running without jit. "
-                  "This may result in very slow evaluation times")
+            print("WARNING; running without jit. " "This may result in very slow evaluation times")
             with_jit = False
-            compiler = ''
-        self.func_opt = {'jit': with_jit, 'compiler': compiler}
+            compiler = ""
+        self.func_opt = {"jit": with_jit, "compiler": compiler}
 
     def __repr__(self):
         s = "\n"
@@ -70,50 +68,68 @@ class HybridOde(CasadiModel):
     def create_function_f_c(self):
         """condition function"""
         return ca.Function(
-            'f_c',
+            "f_c",
             [self.t, self.x, self.y, self.m, self.p, self.ng, self.nu],
             [self.f_c],
-            ['t', 'x', 'y', 'm', 'p', 'ng', 'nu'], ['c'], self.func_opt)
+            ["t", "x", "y", "m", "p", "ng", "nu"],
+            ["c"],
+            self.func_opt,
+        )
 
     def create_function_f_i(self):
         """state reinitialization (reset) function"""
         return ca.Function(
-            'f_i',
+            "f_i",
             [self.t, self.x, self.y, self.m, self.p, self.c, self.pre_c, self.ng, self.nu],
             [self.f_i],
-            ['t', 'x', 'y', 'm', 'p', 'c', 'pre_c', 'ng', 'nu'], ['x_n'], self.func_opt)
+            ["t", "x", "y", "m", "p", "c", "pre_c", "ng", "nu"],
+            ["x_n"],
+            self.func_opt,
+        )
 
     def create_function_f_x_rhs(self):
         """ODE rhs for continuous state integration"""
         return ca.Function(
-            'f_x_rhs',
+            "f_x_rhs",
             [self.t, self.x, self.y, self.m, self.p, self.c, self.ng, self.nu],
             [self.f_x_rhs],
-            ['t', 'x', 'y', 'm', 'p', 'c', 'ng', 'nu'], ['x_rhs'], self.func_opt)
+            ["t", "x", "y", "m", "p", "c", "ng", "nu"],
+            ["x_rhs"],
+            self.func_opt,
+        )
 
     def create_function_f_m(self):
         """Discrete state dynamics"""
         return ca.Function(
-            'f_m',
+            "f_m",
             [self.t, self.x, self.y, self.m, self.p, self.c, self.pre_c, self.ng, self.nu],
             [self.f_m],
-            ['t', 'x', 'y', 'm', 'p', 'c', 'pre_c', 'ng', 'nu'], ['m'], self.func_opt)
+            ["t", "x", "y", "m", "p", "c", "pre_c", "ng", "nu"],
+            ["m"],
+            self.func_opt,
+        )
 
     def create_function_f_J(self):
         """Jacobian for state integration"""
         return ca.Function(
-            'J',
+            "J",
             [self.t, self.x, self.y, self.m, self.p, self.c, self.ng, self.nu],
             [ca.jacobian(self.f_x_rhs, self.x)],
-            ['t', 'x', 'y', 'm', 'p', 'c', 'ng', 'nu'], ['J'], self.func_opt)
+            ["t", "x", "y", "m", "p", "c", "ng", "nu"],
+            ["J"],
+            self.func_opt,
+        )
 
     def create_function_f_y(self):
         """output function"""
         return ca.Function(
-            'y',
+            "y",
             [self.t, self.x, self.m, self.p, self.c, self.ng, self.nu],
             [self.y_rhs],
-            ['t', 'x', 'm', 'p', 'c', 'ng', 'nu'], ['y'], self.func_opt)
+            ["t", "x", "m", "p", "c", "ng", "nu"],
+            ["y"],
+            self.func_opt,
+        )
 
 
 class HybridDae(CasadiModel):
@@ -130,7 +146,7 @@ class HybridDae(CasadiModel):
         self.m = sym(0, 1)  # discrete states
         self.ng = sym(0, 1)  # gaussian noise
         self.nu = sym(0, 1)  # uniform noise
-        self.p = sym(0, 1)   # parameters and constants
+        self.p = sym(0, 1)  # parameters and constants
         self.pre_m = sym(0, 1)  # discrete pre states
         self.pre_c = sym(0, 1)  # pre conditions
         self.prop = {}  # properties
@@ -143,8 +159,8 @@ class HybridDae(CasadiModel):
     def to_ode(self) -> HybridOde:
         """Convert to a HybridOde"""
         res_split = split_dae_alg(self.f_x, self.dx)
-        alg = res_split['alg']
-        dae = res_split['dae']
+        alg = res_split["alg"]
+        dae = res_split["dae"]
 
         x_rhs = tangent_approx(dae, self.dx, assert_linear=True)
         y_rhs = tangent_approx(alg, self.y, assert_linear=True)
@@ -180,10 +196,7 @@ def split_dae_alg(eqs: SYM, dx: SYM) -> Dict[str, SYM]:
             dae.append(eq)
         else:
             alg.append(eq)
-    return {
-        'dae': ca.vertcat(*dae),
-        'alg': ca.vertcat(*alg)
-    }
+    return {"dae": ca.vertcat(*dae), "alg": ca.vertcat(*alg)}
 
 
 def permute(x: SYM, perm: List[int]) -> SYM:
@@ -202,14 +215,14 @@ def blt(f: List[SYM], x: List[SYM]) -> Dict[str, Any]:
     J = ca.jacobian(f, x)
     nblock, rowperm, colperm, rowblock, colblock, coarserow, coarsecol = J.sparsity().btf()
     return {
-        'J': J,
-        'nblock': nblock,
-        'rowperm': rowperm,
-        'colperm': colperm,
-        'rowblock': rowblock,
-        'colblock': colblock,
-        'coarserow': coarserow,
-        'coarsecol': coarsecol
+        "J": J,
+        "nblock": nblock,
+        "rowperm": rowperm,
+        "colperm": colperm,
+        "rowblock": rowblock,
+        "colblock": colblock,
+        "coarserow": coarserow,
+        "coarsecol": coarsecol,
     }
 
 
@@ -230,6 +243,6 @@ def tangent_approx(f: SYM, x: SYM, a: SYM = None, assert_linear: bool = False) -
     f_a = ca.substitute(f, x, a)  # f(a)
     J = ca.jacobian(f, x)
     if assert_linear and ca.depends_on(J, x):
-        raise AssertionError('not linear')
+        raise AssertionError("not linear")
     # solve is smart enough to to convert to blt if necessary
     return ca.solve(J, -f_a)

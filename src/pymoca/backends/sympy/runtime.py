@@ -12,7 +12,7 @@ import sympy
 # noinspection PyPep8Naming
 class OdeModel:
     def __init__(self):
-        self.t = sympy.symbols('t')
+        self.t = sympy.symbols("t")
         self.x = sympy.Matrix([])
         self.u = sympy.Matrix([])
         self.y = sympy.Matrix([])
@@ -32,8 +32,11 @@ class OdeModel:
         n_vars = len(self.v)
         n_eqs = len(self.eqs)
         if n_states + n_vars != n_eqs:
-            raise RuntimeError('# states: {:d} + # variables: {:d} != # equations {:d}'.format(
-                n_states, n_vars, n_eqs))
+            raise RuntimeError(
+                "# states: {:d} + # variables: {:d} != # equations {:d}".format(
+                    n_states, n_vars, n_eqs
+                )
+            )
         lhs = list(self.x.diff(self.t)) + list(self.v)
         fg_sol = sympy.solve(self.eqs, lhs, dict=True)[0]
         self.f = self.x.diff(self.t).subs(fg_sol)
@@ -41,8 +44,7 @@ class OdeModel:
         self.g = self.y.subs(fg_sol)
         assert len(self.y) == len(self.g)
 
-    def linearize_symbolic(self,
-                            zeros=False) -> List[sympy.MutableDenseMatrix]:
+    def linearize_symbolic(self, zeros=False) -> List[sympy.MutableDenseMatrix]:
         nx = len(self.x)
         nu = len(self.u)
         ny = len(self.y)
@@ -64,7 +66,7 @@ class OdeModel:
                 D = self.g.jacobian(self.u)
         return [A, B, C, D]
 
-    def linearize(self, x0: np.array=None, u0: np.array=None) -> List[np.array]:
+    def linearize(self, x0: np.array = None, u0: np.array = None) -> List[np.array]:
         """
         Numerical linearization
         :param x0: initial state
@@ -92,12 +94,18 @@ class OdeModel:
             ss_eval += [np.matrix(ss[i].subs(ss_subs)).astype(float)]
         return ss_eval
 
-    def simulate(self, x0: List[float] = None, u0: float = None, t0: float = 0, tf: float = 10,
-                 dt: float = 0.01) -> dict:
-        x_sym = sympy.DeferredVector('x')
+    def simulate(
+        self,
+        x0: List[float] = None,
+        u0: float = None,
+        t0: float = 0,
+        tf: float = 10,
+        dt: float = 0.01,
+    ) -> dict:
+        x_sym = sympy.DeferredVector("x")
         # noinspection PyUnusedLocal
-        y_sym = sympy.DeferredVector('y')
-        u_sym = sympy.DeferredVector('u')
+        y_sym = sympy.DeferredVector("y")
+        u_sym = sympy.DeferredVector("u")
         ss_subs = {self.x[i]: x_sym[i] for i in range(len(self.x))}
         ss_subs.update({self.u[i]: u_sym[i] for i in range(len(self.u))})
         ss_subs.update(self.p0)
@@ -114,7 +122,7 @@ class OdeModel:
             jac_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.jacobian(self.x).subs(ss_subs))
             res = np.array(jac_lam(0, np.zeros(len(self.x)), np.zeros(len(self.u))), dtype=float)
             if len(res.shape) == 2 and res.shape[0] != len(self.x):
-                raise IOError("jacobian doesn't return correct size", res['f'])
+                raise IOError("jacobian doesn't return correct size", res["f"])
         else:
             jac_lam = None
 
@@ -134,10 +142,10 @@ class OdeModel:
         ode.set_initial_value(x0, t0)
         y0 = g_lam(0, x0, u0)
         data = {
-            't': [t0],
-            'x': [x0],
-            'y': [y0],
-            'u': [u0],
+            "t": [t0],
+            "x": [x0],
+            "y": [y0],
+            "u": [u0],
         }
         while ode.t + dt <= tf:
             ode.set_f_params(u0)
@@ -148,10 +156,10 @@ class OdeModel:
                 ode.t += dt
             x = ode.y
             y = g_lam(ode.t, x, u0)
-            data['t'] += [ode.t]
-            data['x'] += [x]
-            data['y'] += [y]
-            data['u'] += [u0]
+            data["t"] += [ode.t]
+            data["x"] += [x]
+            data["y"] += [y]
+            data["u"] += [u0]
         data = {key: np.array(data[key]) for key in data.keys()}
         return data
 

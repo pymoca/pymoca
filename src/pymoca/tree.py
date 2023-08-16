@@ -16,7 +16,7 @@ import numpy as np
 
 from . import ast
 
-CLASS_SEPARATOR = '.'
+CLASS_SEPARATOR = "."
 
 logger = logging.getLogger("pymoca")
 
@@ -45,109 +45,159 @@ class TreeListener:
     # enter ast listeners (sorted alphabetically)
     # -------------------------------------------------------------------------
 
-    def enterArray(self, tree: ast.Array) -> None: pass
+    def enterArray(self, tree: ast.Array) -> None:
+        pass
 
-    def enterAssignmentStatement(self, tree: ast.AssignmentStatement) -> None: pass
+    def enterAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
+        pass
 
-    def enterClass(self, tree: ast.Class) -> None: pass
+    def enterClass(self, tree: ast.Class) -> None:
+        pass
 
-    def enterClassModification(self, tree: ast.ClassModification) -> None: pass
+    def enterClassModification(self, tree: ast.ClassModification) -> None:
+        pass
 
-    def enterComponentClause(self, tree: ast.ComponentClause) -> None: pass
+    def enterComponentClause(self, tree: ast.ComponentClause) -> None:
+        pass
 
-    def enterComponentRef(self, tree: ast.ComponentRef) -> None: pass
+    def enterComponentRef(self, tree: ast.ComponentRef) -> None:
+        pass
 
-    def enterConnectClause(self, tree: ast.ConnectClause) -> None: pass
+    def enterConnectClause(self, tree: ast.ConnectClause) -> None:
+        pass
 
-    def enterElementModification(self, tree: ast.ElementModification) -> None: pass
+    def enterElementModification(self, tree: ast.ElementModification) -> None:
+        pass
 
-    def enterEquation(self, tree: ast.Equation) -> None: pass
+    def enterEquation(self, tree: ast.Equation) -> None:
+        pass
 
-    def enterExpression(self, tree: ast.Expression) -> None: pass
+    def enterExpression(self, tree: ast.Expression) -> None:
+        pass
 
-    def enterExtendsClause(self, tree: ast.ExtendsClause) -> None: pass
+    def enterExtendsClause(self, tree: ast.ExtendsClause) -> None:
+        pass
 
-    def enterForEquation(self, tree: ast.ForEquation) -> None: pass
+    def enterForEquation(self, tree: ast.ForEquation) -> None:
+        pass
 
-    def enterForIndex(self, tree: ast.ForIndex) -> None: pass
+    def enterForIndex(self, tree: ast.ForIndex) -> None:
+        pass
 
-    def enterForStatement(self, tree: ast.ForStatement) -> None: pass
+    def enterForStatement(self, tree: ast.ForStatement) -> None:
+        pass
 
-    def enterFunction(self, tree: ast.Function) -> None: pass
+    def enterFunction(self, tree: ast.Function) -> None:
+        pass
 
-    def enterIfEquation(self, tree: ast.IfEquation) -> None: pass
+    def enterIfEquation(self, tree: ast.IfEquation) -> None:
+        pass
 
-    def enterIfExpression(self, tree: ast.IfExpression) -> None: pass
+    def enterIfExpression(self, tree: ast.IfExpression) -> None:
+        pass
 
-    def enterIfStatement(self, tree: ast.IfStatement) -> None: pass
+    def enterIfStatement(self, tree: ast.IfStatement) -> None:
+        pass
 
-    def enterImportClause(self, tree: ast.ImportClause) -> None: pass
+    def enterImportClause(self, tree: ast.ImportClause) -> None:
+        pass
 
-    def enterPrimary(self, tree: ast.Primary) -> None: pass
+    def enterPrimary(self, tree: ast.Primary) -> None:
+        pass
 
-    def enterSlice(self, tree: ast.Slice) -> None: pass
+    def enterSlice(self, tree: ast.Slice) -> None:
+        pass
 
-    def enterSymbol(self, tree: ast.Symbol) -> None: pass
+    def enterSymbol(self, tree: ast.Symbol) -> None:
+        pass
 
-    def enterTree(self, tree: ast.Tree) -> None: pass
+    def enterTree(self, tree: ast.Tree) -> None:
+        pass
 
-    def enterWhenEquation(self, tree: ast.WhenEquation) -> None: pass
+    def enterWhenEquation(self, tree: ast.WhenEquation) -> None:
+        pass
 
-    def enterWhenStatement(self, tree: ast.WhenStatement) -> None: pass
+    def enterWhenStatement(self, tree: ast.WhenStatement) -> None:
+        pass
 
     # -------------------------------------------------------------------------
     # exit ast listeners (sorted alphabetically)
     # -------------------------------------------------------------------------
 
-    def exitArray(self, tree: ast.Array) -> None: pass
+    def exitArray(self, tree: ast.Array) -> None:
+        pass
 
-    def exitAssignmentStatement(self, tree: ast.AssignmentStatement) -> None: pass
+    def exitAssignmentStatement(self, tree: ast.AssignmentStatement) -> None:
+        pass
 
-    def exitClass(self, tree: ast.Class) -> None: pass
+    def exitClass(self, tree: ast.Class) -> None:
+        pass
 
-    def exitClassModification(self, tree: ast.ClassModification) -> None: pass
+    def exitClassModification(self, tree: ast.ClassModification) -> None:
+        pass
 
-    def exitComponentClause(self, tree: ast.ComponentClause) -> None: pass
+    def exitComponentClause(self, tree: ast.ComponentClause) -> None:
+        pass
 
-    def exitComponentRef(self, tree: ast.ComponentRef) -> None: pass
+    def exitComponentRef(self, tree: ast.ComponentRef) -> None:
+        pass
 
-    def exitConnectClause(self, tree: ast.ConnectClause) -> None: pass
+    def exitConnectClause(self, tree: ast.ConnectClause) -> None:
+        pass
 
-    def exitElementModification(self, tree: ast.ElementModification) -> None: pass
+    def exitElementModification(self, tree: ast.ElementModification) -> None:
+        pass
 
-    def exitEquation(self, tree: ast.Equation) -> None: pass
+    def exitEquation(self, tree: ast.Equation) -> None:
+        pass
 
-    def exitExpression(self, tree: ast.Expression) -> None: pass
+    def exitExpression(self, tree: ast.Expression) -> None:
+        pass
 
-    def exitExtendsClause(self, tree: ast.ExtendsClause) -> None: pass
+    def exitExtendsClause(self, tree: ast.ExtendsClause) -> None:
+        pass
 
-    def exitForEquation(self, tree: ast.ForEquation) -> None: pass
+    def exitForEquation(self, tree: ast.ForEquation) -> None:
+        pass
 
-    def exitForIndex(self, tree: ast.ForIndex) -> None: pass
+    def exitForIndex(self, tree: ast.ForIndex) -> None:
+        pass
 
-    def exitForStatement(self, tree: ast.ForStatement) -> None: pass
+    def exitForStatement(self, tree: ast.ForStatement) -> None:
+        pass
 
-    def exitFunction(self, tree: ast.Function) -> None: pass
+    def exitFunction(self, tree: ast.Function) -> None:
+        pass
 
-    def exitIfEquation(self, tree: ast.IfEquation) -> None: pass
+    def exitIfEquation(self, tree: ast.IfEquation) -> None:
+        pass
 
-    def exitIfExpression(self, tree: ast.IfExpression) -> None: pass
+    def exitIfExpression(self, tree: ast.IfExpression) -> None:
+        pass
 
-    def exitIfStatement(self, tree: ast.IfStatement) -> None: pass
+    def exitIfStatement(self, tree: ast.IfStatement) -> None:
+        pass
 
-    def exitImportClause(self, tree: ast.ImportClause) -> None: pass
+    def exitImportClause(self, tree: ast.ImportClause) -> None:
+        pass
 
-    def exitPrimary(self, tree: ast.Primary) -> None: pass
+    def exitPrimary(self, tree: ast.Primary) -> None:
+        pass
 
-    def exitSlice(self, tree: ast.Slice) -> None: pass
+    def exitSlice(self, tree: ast.Slice) -> None:
+        pass
 
-    def exitSymbol(self, tree: ast.Symbol) -> None: pass
+    def exitSymbol(self, tree: ast.Symbol) -> None:
+        pass
 
-    def exitTree(self, tree: ast.Tree) -> None: pass
+    def exitTree(self, tree: ast.Tree) -> None:
+        pass
 
-    def exitWhenEquation(self, tree: ast.WhenEquation) -> None: pass
+    def exitWhenEquation(self, tree: ast.WhenEquation) -> None:
+        pass
 
-    def exitWhenStatement(self, tree: ast.WhenStatement) -> None: pass
+    def exitWhenStatement(self, tree: ast.WhenStatement) -> None:
+        pass
 
 
 class TreeWalker:
@@ -161,8 +211,10 @@ class TreeWalker:
         endless recursion by skipping references to e.g. parent nodes.
         :return: True if child needs to be skipped, False otherwise.
         """
-        if (isinstance(tree, ast.Class) and child_name == 'parent') or \
-                (isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__')):
+        if (isinstance(tree, ast.Class) and child_name == "parent") or (
+            isinstance(tree, ast.ClassModificationArgument)
+            and child_name in ("scope", "__deepcopy__")
+        ):
             return True
         return False
 
@@ -177,18 +229,18 @@ class TreeWalker:
         :return: None
         """
         name = tree.__class__.__name__
-        if hasattr(listener, 'enterEvery'):
-            getattr(listener, 'enterEvery')(tree)
-        if hasattr(listener, 'enter' + name):
-            getattr(listener, 'enter' + name)(tree)
+        if hasattr(listener, "enterEvery"):
+            getattr(listener, "enterEvery")(tree)
+        if hasattr(listener, "enter" + name):
+            getattr(listener, "enter" + name)(tree)
         for child_name in self.order_keys(tree.__dict__.keys()):
             if self.skip_child(tree, child_name):
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
-        if hasattr(listener, 'exitEvery'):
-            getattr(listener, 'exitEvery')(tree)
-        if hasattr(listener, 'exit' + name):
-            getattr(listener, 'exit' + name)(tree)
+        if hasattr(listener, "exitEvery"):
+            getattr(listener, "exitEvery")(tree)
+        if hasattr(listener, "exit" + name):
+            getattr(listener, "exit" + name)(tree)
 
     def handle_walk(self, listener: TreeListener, tree: Union[ast.Node, dict, list]) -> None:
         """
@@ -209,14 +261,15 @@ class TreeWalker:
             pass
 
 
-def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None,
-                    parent=None) -> ast.InstanceClass:
+def flatten_extends(
+    orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None, parent=None
+) -> ast.InstanceClass:
     extended_orig_class = ast.InstanceClass(
         name=orig_class.name,
         type=orig_class.type,
         comment=orig_class.comment,
         annotation=ast.ClassModification(),
-        parent=parent
+        parent=parent,
     )
 
     if isinstance(orig_class, ast.InstanceClass):
@@ -231,7 +284,8 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
         if c.type == "__builtin":
             if len(orig_class.extends) > 1:
                 raise Exception(
-                    "When extending a built-in class (Real, Integer, ...) you cannot extend other classes as well")
+                    "When extending a built-in class (Real, Integer, ...) you cannot extend other classes as well"
+                )
             extended_orig_class.type = c.type
 
         c = flatten_extends(c, extends.class_modification, parent=c.parent)
@@ -250,7 +304,9 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
 
         # Note that all extends clauses are handled before any modifications
         # are applied.
-        extended_orig_class.modification_environment.arguments.extend(c.modification_environment.arguments)
+        extended_orig_class.modification_environment.arguments.extend(
+            c.modification_environment.arguments
+        )
 
         # set visibility
         for sym in extended_orig_class.symbols.values():
@@ -269,15 +325,20 @@ def flatten_extends(orig_class: Union[ast.Class, ast.InstanceClass], modificatio
     extended_orig_class.functions.update(orig_class.functions)
 
     if modification_environment is not None:
-        extended_orig_class.modification_environment.arguments.extend(modification_environment.arguments)
+        extended_orig_class.modification_environment.arguments.extend(
+            modification_environment.arguments
+        )
 
     # If the current class is inheriting an elementary type, we shift modifications from the class to its __value symbol
     if extended_orig_class.type == "__builtin":
-        if extended_orig_class.symbols['__value'].class_modification is not None:
-            extended_orig_class.symbols['__value'].class_modification.arguments.extend(
-                extended_orig_class.modification_environment.arguments)
+        if extended_orig_class.symbols["__value"].class_modification is not None:
+            extended_orig_class.symbols["__value"].class_modification.arguments.extend(
+                extended_orig_class.modification_environment.arguments
+            )
         else:
-            extended_orig_class.symbols['__value'].class_modification = extended_orig_class.modification_environment
+            extended_orig_class.symbols[
+                "__value"
+            ].class_modification = extended_orig_class.modification_environment
 
         extended_orig_class.modification_environment = ast.ClassModification()
 
@@ -295,15 +356,20 @@ def extends_builtin(class_: ast.Class) -> bool:
     return ret
 
 
-def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None,
-                        parent=None) -> ast.InstanceClass:
+def build_instance_tree(
+    orig_class: Union[ast.Class, ast.InstanceClass], modification_environment=None, parent=None
+) -> ast.InstanceClass:
     extended_orig_class = flatten_extends(orig_class, modification_environment, parent)
 
     # Redeclarations take effect
     for class_mod_argument in extended_orig_class.modification_environment.arguments:
         if not class_mod_argument.redeclare:
             continue
-        scope_class = class_mod_argument.scope if class_mod_argument.scope is not None else extended_orig_class
+        scope_class = (
+            class_mod_argument.scope
+            if class_mod_argument.scope is not None
+            else extended_orig_class
+        )
         argument = class_mod_argument.value
         if isinstance(argument, ast.ShortClassDefinition):
             old_class = extended_orig_class.classes[argument.name]
@@ -323,7 +389,8 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
             raise Exception("Unknown redeclaration type")
 
     extended_orig_class.modification_environment.arguments = [
-        x for x in extended_orig_class.modification_environment.arguments if not x.redeclare]
+        x for x in extended_orig_class.modification_environment.arguments if not x.redeclare
+    ]
 
     # Only ast.ElementModification type modifications left in the class's
     # modification environment. No more ComponentClause or
@@ -338,27 +405,36 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
     for class_name, c in extended_orig_class.classes.items():
         sub_class_modification = ast.ClassModification()
 
-        sub_class_arguments = [x for x in extended_orig_class.modification_environment.arguments
-                               if isinstance(x.value, ast.ElementModification) and x.value.component.name == class_name]
+        sub_class_arguments = [
+            x
+            for x in extended_orig_class.modification_environment.arguments
+            if isinstance(x.value, ast.ElementModification) and x.value.component.name == class_name
+        ]
 
         # Remove from current class's modification environment
         extended_orig_class.modification_environment.arguments = [
-            x for x in extended_orig_class.modification_environment.arguments if x not in sub_class_arguments]
+            x
+            for x in extended_orig_class.modification_environment.arguments
+            if x not in sub_class_arguments
+        ]
 
         for main_mod in sub_class_arguments:
             for elem_class_mod in main_mod.value.modifications:
                 for arg in elem_class_mod.arguments:
                     sub_class_modification.arguments.append(arg)
 
-        extended_orig_class.classes[class_name] = build_instance_tree(c, sub_class_modification, extended_orig_class)
+        extended_orig_class.classes[class_name] = build_instance_tree(
+            c, sub_class_modification, extended_orig_class
+        )
 
     # Check that all symbol modifications to be applied on this class exist
     for arg in extended_orig_class.modification_environment.arguments:
         if not arg.value.component.name in extended_orig_class.symbols:
-            raise ModificationTargetNotFound("Trying to modify symbol {}, which does not exist in class {}".format(
-                arg.value.component.name,
-                extended_orig_class.full_reference()
-            ))
+            raise ModificationTargetNotFound(
+                "Trying to modify symbol {}, which does not exist in class {}".format(
+                    arg.value.component.name, extended_orig_class.full_reference()
+                )
+            )
 
     # Merge/pass along modifications for symbols, including redeclares
     for sym_name, sym in extended_orig_class.symbols.items():
@@ -371,12 +447,19 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
                 c = sym.type
         except ast.FoundElementaryClassError:
             # Symbol is elementary type. Check if we need to move any modifications to the symbol.
-            sym_arguments = [x for x in extended_orig_class.modification_environment.arguments
-                             if isinstance(x.value, ast.ElementModification) and x.value.component.name == sym_name]
+            sym_arguments = [
+                x
+                for x in extended_orig_class.modification_environment.arguments
+                if isinstance(x.value, ast.ElementModification)
+                and x.value.component.name == sym_name
+            ]
 
             # Remove from current class's modification environment
             extended_orig_class.modification_environment.arguments = [
-                x for x in extended_orig_class.modification_environment.arguments if x not in sym_arguments]
+                x
+                for x in extended_orig_class.modification_environment.arguments
+                if x not in sym_arguments
+            ]
 
             sym_mod = ast.ClassModification()
 
@@ -411,12 +494,19 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
                 sym.class_modification = sym_mod
         else:
             # Symbol is not elementary type. Check if we need to move any modifications along.
-            sym_arguments = [x for x in extended_orig_class.modification_environment.arguments
-                             if isinstance(x.value, ast.ElementModification) and x.value.component.name == sym_name]
+            sym_arguments = [
+                x
+                for x in extended_orig_class.modification_environment.arguments
+                if isinstance(x.value, ast.ElementModification)
+                and x.value.component.name == sym_name
+            ]
 
             # Remove from current class's modification environment
             extended_orig_class.modification_environment.arguments = [
-                x for x in extended_orig_class.modification_environment.arguments if x not in sym_arguments]
+                x
+                for x in extended_orig_class.modification_environment.arguments
+                if x not in sym_arguments
+            ]
 
             # Fix component references to be one level deeper. E.g. applying a
             # modification "a.x = 3.0" on a symbol "a", will mean we pass
@@ -470,7 +560,7 @@ def build_instance_tree(orig_class: Union[ast.Class, ast.InstanceClass], modific
     return extended_orig_class
 
 
-def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
+def flatten_symbols(class_: ast.InstanceClass, instance_name="") -> ast.Class:
     # Recursive symbol flattening
 
     flat_class = ast.Class(
@@ -481,18 +571,17 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
     )
 
     # append period to non empty instance_name
-    if instance_name != '':
+    if instance_name != "":
         instance_prefix = instance_name + CLASS_SEPARATOR
     else:
         instance_prefix = instance_name
 
     # for all symbols in the original class
     for sym_name, sym in class_.symbols.items():
-
         sym.name = instance_prefix + sym_name
         if instance_prefix:
             # Strip 'input' and 'output' prefixes from nested symbols.
-            strip_keywords = ['input', 'output']
+            strip_keywords = ["input", "output"]
             for strip_keyword in strip_keywords:
                 try:
                     sym.prefixes.remove(strip_keyword)
@@ -505,10 +594,11 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
             # Elementary type
             flat_sym.dimensions = flat_sym.dimensions
             flat_class.symbols[flat_sym.name] = flat_sym
-        elif sym.type.type == "__builtin" or (sym.type.type == "type"
-                                              and "__value" in sym.type.symbols
-                                              and sym.type.symbols["__value"].type.name
-                                                                    in ast.Class.BUILTIN):
+        elif sym.type.type == "__builtin" or (
+            sym.type.type == "type"
+            and "__value" in sym.type.symbols
+            and sym.type.symbols["__value"].type.name in ast.Class.BUILTIN
+        ):
             # Class inherited from elementary type (e.g. "type Voltage =
             # Real"). No flattening to be done, just copying over all
             # attributes and modifications to the class's "__value" symbol.
@@ -516,12 +606,18 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
             flat_class.symbols[flat_sym.name] = flat_sym
 
             if flat_sym.class_modification is not None:
-                flat_sym.class_modification.arguments.extend(sym.type.symbols['__value'].class_modification.arguments)
+                flat_sym.class_modification.arguments.extend(
+                    sym.type.symbols["__value"].class_modification.arguments
+                )
             else:
-                flat_sym.class_modification = sym.type.symbols['__value'].class_modification
+                flat_sym.class_modification = sym.type.symbols["__value"].class_modification
 
             for att in flat_sym.ATTRIBUTES + ["type"]:
-                setattr(flat_class.symbols[flat_sym.name], att, getattr(sym.type.symbols['__value'], att))
+                setattr(
+                    flat_class.symbols[flat_sym.name],
+                    att,
+                    getattr(sym.type.symbols["__value"], att),
+                )
 
             continue
         else:
@@ -543,7 +639,7 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
 
             # we keep connectors in the class hierarchy, as we may refer to them further
             # up using connect() clauses
-            if sym.type.type == 'connector':
+            if sym.type.type == "connector":
                 # We flatten sym.type here to avoid later deepcopy()
                 # statements copying the entire instance tree due to
                 # references to parent and/or root.
@@ -574,25 +670,31 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name='') -> ast.Class:
         flat_class.equations.append(flat_equation)
         if isinstance(flat_equation, ast.ConnectClause):
             # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
-            if not hasattr(flat_equation, '__left_inner'):
+            if not hasattr(flat_equation, "__left_inner"):
                 flat_equation.__left_inner = len(equation.left.child) > 0
-            if not hasattr(flat_equation, '__right_inner'):
+            if not hasattr(flat_equation, "__right_inner"):
                 flat_equation.__right_inner = len(equation.right.child) > 0
 
     # Create fully scoped equivalents
-    fs_initial_equations = \
-        [fully_scope_function_calls(class_, e, pulled_functions) for e in class_.initial_equations]
-    fs_statements = \
-        [fully_scope_function_calls(class_, e, pulled_functions) for e in class_.statements]
-    fs_initial_statements = \
-        [fully_scope_function_calls(class_, e, pulled_functions) for e in class_.initial_statements]
+    fs_initial_equations = [
+        fully_scope_function_calls(class_, e, pulled_functions) for e in class_.initial_equations
+    ]
+    fs_statements = [
+        fully_scope_function_calls(class_, e, pulled_functions) for e in class_.statements
+    ]
+    fs_initial_statements = [
+        fully_scope_function_calls(class_, e, pulled_functions) for e in class_.initial_statements
+    ]
 
-    flat_class.initial_equations += \
-        [flatten_component_refs(flat_class, e, instance_prefix) for e in fs_initial_equations]
-    flat_class.statements += \
-        [flatten_component_refs(flat_class, e, instance_prefix) for e in fs_statements]
-    flat_class.initial_statements += \
-        [flatten_component_refs(flat_class, e, instance_prefix) for e in fs_initial_statements]
+    flat_class.initial_equations += [
+        flatten_component_refs(flat_class, e, instance_prefix) for e in fs_initial_equations
+    ]
+    flat_class.statements += [
+        flatten_component_refs(flat_class, e, instance_prefix) for e in fs_statements
+    ]
+    flat_class.initial_statements += [
+        flatten_component_refs(flat_class, e, instance_prefix) for e in fs_initial_statements
+    ]
 
     for f, c in pulled_functions.items():
         pulled_functions[f] = flatten_class(c)
@@ -666,9 +768,10 @@ class ComponentRefFlattener(TreeListener):
 
 
 def flatten_component_refs(
-        container: ast.Class,
-        expression: ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol],
-        instance_prefix: str) -> ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol]:
+    container: ast.Class,
+    expression: ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol],
+    instance_prefix: str,
+) -> ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol]:
     """
     Flattens component refs in a tree
     :param container: class
@@ -710,7 +813,9 @@ class FunctionExpander(TreeListener):
 
 
 # noinspection PyUnusedLocal
-def fully_scope_function_calls(node: ast.Tree, expression: ast.Expression, function_set: OrderedDict) -> ast.Expression:
+def fully_scope_function_calls(
+    node: ast.Tree, expression: ast.Expression, function_set: OrderedDict
+) -> ast.Expression:
     """
     Turns the function references in this expression into fully scoped
     references (e.g. relative to absolute). The component references of all
@@ -737,20 +842,31 @@ def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
 
     # We assume that we do not screw up the order of applying modifications
     # when "moving up" with the scope.
-    apply_args = [x for x in sym.class_modification.arguments
-                  if x.scope is None or x.scope.full_reference().to_tuple() == scope.full_reference().to_tuple()]
-    skip_args = [x for x in sym.class_modification.arguments
-                 if x.scope is not None and x.scope.full_reference().to_tuple() != scope.full_reference().to_tuple()]
+    apply_args = [
+        x
+        for x in sym.class_modification.arguments
+        if x.scope is None
+        or x.scope.full_reference().to_tuple() == scope.full_reference().to_tuple()
+    ]
+    skip_args = [
+        x
+        for x in sym.class_modification.arguments
+        if x.scope is not None
+        and x.scope.full_reference().to_tuple() != scope.full_reference().to_tuple()
+    ]
 
     for class_mod_argument in apply_args:
         argument = class_mod_argument.value
 
-        assert isinstance(argument, ast.ElementModification), \
-            "Found redeclaration modification which should already have been handled."
+        assert isinstance(
+            argument, ast.ElementModification
+        ), "Found redeclaration modification which should already have been handled."
 
         # TODO: Strip all non-symbol stuff.
         if argument.component.name not in ast.Symbol.ATTRIBUTES:
-            raise Exception("Trying to set unknown symbol property {}".format(argument.component.name))
+            raise Exception(
+                "Trying to set unknown symbol property {}".format(argument.component.name)
+            )
 
         setattr(sym, argument.component.name, argument.modifications[0])
 
@@ -772,8 +888,9 @@ class SymbolModificationApplier(TreeListener):
 
     def exitSymbol(self, tree: ast.Symbol):
         if not isinstance(tree.type, ast.ComponentRef):
-            assert tree.class_modification is None, \
-                "Found symbol modification on non-elementary type in instance tree."
+            assert (
+                tree.class_modification is None
+            ), "Found symbol modification on non-elementary type in instance tree."
         elif tree.class_modification is not None:
             if tree.class_modification.arguments:
                 modify_symbol(tree, self.scope)
@@ -786,8 +903,9 @@ class SymbolModificationApplier(TreeListener):
     #     assert isinstance(tree.value, ast.ElementModification), "Found unhandled redeclaration in instance tree."
 
     def exitInstanceClass(self, tree: ast.InstanceClass):
-        assert tree.modification_environment is None or not tree.modification_environment.arguments, \
-            "Found unhandled modification on instance class."
+        assert (
+            tree.modification_environment is None or not tree.modification_environment.arguments
+        ), "Found unhandled modification on instance class."
 
 
 def apply_symbol_modifications(node: ast.Node, scope: ast.InstanceClass) -> None:
@@ -826,7 +944,12 @@ class ConstantReferenceApplier(TreeListener):
         if tree.child:
             try:
                 self.extra_symbols[-1][str(tree)] = self.classes[-1].find_constant_symbol(tree)
-            except (KeyError, ast.ClassNotFoundError, ast.FoundElementaryClassError, ast.ConstantSymbolNotFoundError):
+            except (
+                KeyError,
+                ast.ClassNotFoundError,
+                ast.FoundElementaryClassError,
+                ast.ConstantSymbolNotFoundError,
+            ):
                 pass
 
     def exitComponentRef(self, tree: ast.ComponentRef):
@@ -879,7 +1002,7 @@ def expand_connectors(node: ast.Class) -> None:
     # keep track of which flow variables have been connected to, and which ones haven't
     disconnected_flow_variables = OrderedDict()
     for sym in node.symbols.values():
-        if 'flow' in sym.prefixes:
+        if "flow" in sym.prefixes:
             disconnected_flow_variables[sym.name] = sym
 
     # add flow equations
@@ -891,31 +1014,44 @@ def expand_connectors(node: ast.Class) -> None:
         if isinstance(equation, ast.ConnectClause):
             # expand connector
             if len(equation.left.child) != 0:
-                raise Exception("Could not resolve {} in connect clause ({}*, {}*)".format(
-                    equation.left, equation.left, equation.right))
+                raise Exception(
+                    "Could not resolve {} in connect clause ({}*, {}*)".format(
+                        equation.left, equation.left, equation.right
+                    )
+                )
             if len(equation.right.child) != 0:
-                raise Exception("Could not resolve {} in connect clause ({}*, {}*)".format(
-                    equation.right, equation.left, equation.right))
+                raise Exception(
+                    "Could not resolve {} in connect clause ({}*, {}*)".format(
+                        equation.right, equation.left, equation.right
+                    )
+                )
 
             sym_left = node.symbols[equation.left.name]
             sym_right = node.symbols[equation.right.name]
 
             try:
-                class_left = getattr(sym_left, '__connector_type', None)
+                class_left = getattr(sym_left, "__connector_type", None)
                 if class_left is None:
                     # We may be connecting classes which are not connectors, such as Reals.
                     class_left = node.find_class(sym_left.type)
                 # noinspection PyUnusedLocal
-                class_right = getattr(sym_right, '__connector_type', None)
+                class_right = getattr(sym_right, "__connector_type", None)
                 if class_right is None:
                     # We may be connecting classes which are not connectors, such as Reals.
                     class_right = node.find_class(sym_right.type)
             except ast.FoundElementaryClassError:
-                primary_types = ['Real']
+                primary_types = ["Real"]
                 # TODO
-                if sym_left.type.name not in primary_types or sym_right.type.name not in primary_types:
-                    logger.warning("Connector class {} or {} not defined.  "
-                                   "Assuming it to be an elementary type.".format(sym_left.type, sym_right.type))
+                if (
+                    sym_left.type.name not in primary_types
+                    or sym_right.type.name not in primary_types
+                ):
+                    logger.warning(
+                        "Connector class {} or {} not defined.  "
+                        "Assuming it to be an elementary type.".format(
+                            sym_left.type, sym_right.type
+                        )
+                    )
                 connect_equation = ast.Equation(left=equation.left, right=equation.right)
                 node.equations.append(connect_equation)
             else:
@@ -926,25 +1062,42 @@ def expand_connectors(node: ast.Class) -> None:
                 for connector_variable in flat_class_left.symbols.values():
                     left_name = equation.left.name + CLASS_SEPARATOR + connector_variable.name
                     right_name = equation.right.name + CLASS_SEPARATOR + connector_variable.name
-                    left = ast.ComponentRef(name=left_name,
-                                            indices=equation.left.indices
-                                                    + connector_variable.type.indices)
-                    right = ast.ComponentRef(name=right_name,
-                                             indices=equation.right.indices
-                                                     + connector_variable.type.indices)
-                    if len(connector_variable.prefixes) == 0 or connector_variable.prefixes[0] in ['input', 'output']:
+                    left = ast.ComponentRef(
+                        name=left_name,
+                        indices=equation.left.indices + connector_variable.type.indices,
+                    )
+                    right = ast.ComponentRef(
+                        name=right_name,
+                        indices=equation.right.indices + connector_variable.type.indices,
+                    )
+                    if len(connector_variable.prefixes) == 0 or connector_variable.prefixes[0] in [
+                        "input",
+                        "output",
+                    ]:
                         connect_equation = ast.Equation(left=left, right=right)
                         node.equations.append(connect_equation)
-                    elif connector_variable.prefixes == ['flow']:
+                    elif connector_variable.prefixes == ["flow"]:
                         # TODO generic way to get a tuple representation of a component ref, including indices.
-                        left_key = (left_name,
-                                    tuple(i.value for index_array in left.indices
-                                          for i in index_array if i is not None),
-                                    equation.__left_inner)
-                        right_key = (right_name,
-                                     tuple(i.value for index_array in right.indices
-                                           for i in index_array if i is not None),
-                                     equation.__right_inner)
+                        left_key = (
+                            left_name,
+                            tuple(
+                                i.value
+                                for index_array in left.indices
+                                for i in index_array
+                                if i is not None
+                            ),
+                            equation.__left_inner,
+                        )
+                        right_key = (
+                            right_name,
+                            tuple(
+                                i.value
+                                for index_array in right.indices
+                                for i in index_array
+                                if i is not None
+                            ),
+                            equation.__right_inner,
+                        )
 
                         left_connected_variables = flow_connections.get(left_key, OrderedDict())
                         right_connected_variables = flow_connections.get(right_key, OrderedDict())
@@ -963,12 +1116,15 @@ def expand_connectors(node: ast.Class) -> None:
                         # do not always know the length of vectors a priori.
                         disconnected_flow_variables.pop(left_name, None)
                         disconnected_flow_variables.pop(right_name, None)
-                    elif connector_variable.prefixes[0] in ['constant', 'parameter']:
+                    elif connector_variable.prefixes[0] in ["constant", "parameter"]:
                         # Skip constants and parameters in connectors.
                         pass
                     else:
                         raise Exception(
-                            "Unsupported connector variable prefixes {}".format(connector_variable.prefixes))
+                            "Unsupported connector variable prefixes {}".format(
+                                connector_variable.prefixes
+                            )
+                        )
         else:
             node.equations.append(equation)
 
@@ -980,11 +1136,15 @@ def expand_connectors(node: ast.Class) -> None:
                 # All outer variables. Don't include unnecessary minus expressions.
                 operands = [op_spec[0] for op_spec in operand_specs]
             else:
-                operands = [op_spec[0] if op_spec[1] else ast.Expression(operator='-', operands=[op_spec[0]]) for
-                            op_spec in operand_specs]
+                operands = [
+                    op_spec[0]
+                    if op_spec[1]
+                    else ast.Expression(operator="-", operands=[op_spec[0]])
+                    for op_spec in operand_specs
+                ]
             expr = operands[-1]
             for op in reversed(operands[:-1]):
-                expr = ast.Expression(operator='+', operands=[op, expr])
+                expr = ast.Expression(operator="+", operands=[op, expr])
             connect_equation = ast.Equation(left=expr, right=ast.Primary(value=0))
             node.equations.append(connect_equation)
             processed.append(connected_variables)
@@ -996,14 +1156,14 @@ def expand_connectors(node: ast.Class) -> None:
 
     # strip connector symbols
     for i, sym in list(node.symbols.items()):
-        if hasattr(sym, '__connector_type'):
+        if hasattr(sym, "__connector_type"):
             del node.symbols[i]
 
 
 def add_state_value_equations(node: ast.Node) -> None:
     # we do this here, instead of in flatten_class, because symbol values
     # inside flattened classes may be modified later by modify_class().
-    non_state_prefixes = {'constant', 'parameter'}
+    non_state_prefixes = {"constant", "parameter"}
     for sym in node.symbols.values():
         if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
             if len(non_state_prefixes & set(sym.prefixes)) == 0:
@@ -1035,11 +1195,11 @@ class StateAnnotator(TreeListener):
         When entering an expression, check if it is a derivative, if it is
         put state prefix on contained symbols
         """
-        if tree.operator == 'der':
+        if tree.operator == "der":
             self.in_der += 1
 
     def exitExpression(self, tree: ast.Expression):
-        if tree.operator == 'der':
+        if tree.operator == "der":
             self.in_der -= 1
 
     def exitComponentRef(self, tree: ast.Expression):
@@ -1052,8 +1212,8 @@ class StateAnnotator(TreeListener):
                 # Ignore index variables, parameters, and so forth.
                 pass
             else:
-                if 'state' not in s.prefixes:
-                    s.prefixes.append('state')
+                if "state" not in s.prefixes:
+                    s.prefixes.append("state")
 
 
 def annotate_states(node: ast.Node) -> None:

@@ -15,8 +15,8 @@ from pymoca import tree
 from pymoca import ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
-MODEL_DIR = os.path.join(TEST_DIR, 'models')
-GENERATED_DIR = os.path.join(TEST_DIR, 'generated')
+MODEL_DIR = os.path.join(TEST_DIR, "models")
+GENERATED_DIR = os.path.join(TEST_DIR, "generated")
 
 
 class GenSympyTest(unittest.TestCase):
@@ -37,13 +37,14 @@ class GenSympyTest(unittest.TestCase):
         time.sleep(0.01)
 
     def test_estimator(self):
-        with open(os.path.join(MODEL_DIR, 'Estimator.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "Estimator.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Estimator')
-        with open(os.path.join(GENERATED_DIR, 'Estimator.py'), 'w') as f:
+        text = gen_sympy.generate(ast_tree, "Estimator")
+        with open(os.path.join(GENERATED_DIR, "Estimator.py"), "w") as f:
             f.write(text)
         from test.generated.Estimator import Estimator as Estimator
+
         e = Estimator()
         e.linearize_symbolic()
         e.linearize()
@@ -52,15 +53,16 @@ class GenSympyTest(unittest.TestCase):
         self.flush()
 
     def test_spring(self):
-        with open(os.path.join(MODEL_DIR, 'SpringSystem.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "SpringSystem.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='SpringSystem'))
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="SpringSystem"))
         print(flat_tree)
-        text = gen_sympy.generate(ast_tree, 'SpringSystem')
-        with open(os.path.join(GENERATED_DIR, 'Spring.py'), 'w') as f:
+        text = gen_sympy.generate(ast_tree, "SpringSystem")
+        with open(os.path.join(GENERATED_DIR, "Spring.py"), "w") as f:
             f.write(text)
         from test.generated.Spring import SpringSystem as SpringSystem
+
         e = SpringSystem()
         e.linearize_symbolic()
         e.linearize()
@@ -69,14 +71,15 @@ class GenSympyTest(unittest.TestCase):
         self.flush()
 
     def test_aircraft(self):
-        with open(os.path.join(MODEL_DIR, 'Aircraft.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "Aircraft.mo"), "r") as f:
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Aircraft')
-        with open(os.path.join(GENERATED_DIR, 'Aircraft.py'), 'w') as f:
+        text = gen_sympy.generate(ast_tree, "Aircraft")
+        with open(os.path.join(GENERATED_DIR, "Aircraft.py"), "w") as f:
             f.write(text)
         from test.generated.Aircraft import Aircraft as Aircraft
+
         e = Aircraft()
         e.linearize_symbolic()
         e.linearize()
@@ -85,14 +88,15 @@ class GenSympyTest(unittest.TestCase):
         self.flush()
 
     def test_quad(self):
-        with open(os.path.join(MODEL_DIR, 'Quad.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "Quad.mo"), "r") as f:
             txt = f.read()
         # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
-        text = gen_sympy.generate(ast_tree, 'Quad')
-        with open(os.path.join(GENERATED_DIR, 'Quad.py'), 'w') as f:
+        text = gen_sympy.generate(ast_tree, "Quad")
+        with open(os.path.join(GENERATED_DIR, "Quad.py"), "w") as f:
             f.write(text)
         from test.generated.Quad import Quad as Quad
+
         e = Quad()
         e.linearize_symbolic()
         e.linearize()
@@ -102,13 +106,13 @@ class GenSympyTest(unittest.TestCase):
 
     @unittest.skip
     def test_connector(self):
-        with open(os.path.join(MODEL_DIR, 'Connector.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "Connector.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
         # print(ast_tree)
 
         # noinspection PyUnusedLocal
-        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='Aircraft'))
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="Aircraft"))
         # print(flat_tree)
 
         # noinspection PyUnusedLocal
@@ -116,7 +120,7 @@ class GenSympyTest(unittest.TestCase):
         # noinspection PyUnusedLocal
         classes = ast_tree.classes
         # noinspection PyUnusedLocal
-        root = ast_tree.classes['Aircraft']
+        root = ast_tree.classes["Aircraft"]
 
         # instantiator = tree.Instantiator(classes=classes)
         # walker.walk(instantiator, root)
@@ -144,30 +148,32 @@ class GenSympyTest(unittest.TestCase):
 
     def test_time_builtin(self):
         """Tests Modelica `time` used in a model"""
-        with open(os.path.join(MODEL_DIR, 'SpringSystem.mo'), 'r') as f:
+        with open(os.path.join(MODEL_DIR, "SpringSystem.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        forced_spring_model = '''
+        forced_spring_model = """
         model ForcedSpringSystem "SpringSystem with time-varying input force"
             SpringSystem sys;
         equation
             sys.u = 100.0*sin(2*time);
         end ForcedSpringSystem;
-        '''
+        """
         system_ast = parser.parse(forced_spring_model)
         ast_tree.extend(system_ast)
-        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name='ForcedSpringSystem'))
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="ForcedSpringSystem"))
         print(flat_tree)
-        text = gen_sympy.generate(ast_tree, 'ForcedSpringSystem')
-        with open(os.path.join(GENERATED_DIR, 'ForcedSpringSystem.py'), 'w') as f:
+        text = gen_sympy.generate(ast_tree, "ForcedSpringSystem")
+        with open(os.path.join(GENERATED_DIR, "ForcedSpringSystem.py"), "w") as f:
             f.write(text)
         from test.generated.ForcedSpringSystem import ForcedSpringSystem as ForcedSpringSystem
+
         e = ForcedSpringSystem()
         e.linearize_symbolic()
         e.linearize()
         # noinspection PyUnusedLocal
         res = e.simulate(x0=[1.0, 1.0])
         self.flush()
+
 
 if __name__ == "__main__":
     unittest.main()

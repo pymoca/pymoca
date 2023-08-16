@@ -42,11 +42,11 @@ class AliasRelation:
         if self.__is_negative(v):
             return v[1:]
         else:
-            return '-' + v
+            return "-" + v
 
     @staticmethod
     def __is_negative(v):
-        return True if v[0] == '-' else False
+        return True if v[0] == "-" else False
 
     def aliases(self, a):
         if a in self._aliases:

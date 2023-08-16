@@ -11,10 +11,13 @@ from collections import deque, OrderedDict
 import copy
 
 from . import ast
+
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaLexer import ModelicaLexer
+
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaListener import ModelicaListener
+
 # noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaParser import ModelicaParser
 
@@ -22,6 +25,7 @@ from .generated.ModelicaParser import ModelicaParser
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
+
 
 class ModelicaFile:
     def __init__(self, **kwargs):
@@ -51,7 +55,6 @@ class ASTListener(ModelicaListener):
     # FILE ===========================================================
 
     def enterStored_definition(self, ctx: ModelicaParser.Stored_definitionContext):
-
         file_node = ModelicaFile()
         self.ast[ctx] = file_node
         self.file_node = file_node
@@ -88,9 +91,11 @@ class ASTListener(ModelicaListener):
         self.class_node.classes[class_node.name] = class_node
 
     def exitShort_class_definition(self, ctx):
-        self.ast[ctx] = ast.ShortClassDefinition(name=ctx.IDENT().getText(),
-                                                 type=ctx.class_prefixes().class_type().getText(),
-                                                 component=self.ast[ctx.component_reference()],)
+        self.ast[ctx] = ast.ShortClassDefinition(
+            name=ctx.IDENT().getText(),
+            type=ctx.class_prefixes().class_type().getText(),
+            component=self.ast[ctx.component_reference()],
+        )
 
     def exitClass_spec_comp(self, ctx: ModelicaParser.Class_spec_compContext):
         class_node = self.class_node
@@ -106,8 +111,9 @@ class ASTListener(ModelicaListener):
             class_modification = self.ast[ctx.class_modification()]
         else:
             class_modification = ast.ClassModification()
-        extends_clause = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
-                                          class_modification=class_modification)
+        extends_clause = ast.ExtendsClause(
+            component=self.ast[ctx.component_reference()], class_modification=class_modification
+        )
         class_node.extends.append(extends_clause)
 
     def exitComposition(self, ctx: ModelicaParser.CompositionContext):
@@ -171,9 +177,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.ClassModification(arguments=arguments)
 
     def enterEquation_section(self, ctx: ModelicaParser.Equation_sectionContext):
-        eq_sect = ast.EquationSection(
-            initial=ctx.INITIAL() is not None
-        )
+        eq_sect = ast.EquationSection(initial=ctx.INITIAL() is not None)
         self.ast[ctx] = eq_sect
         self.eq_sect = eq_sect
 
@@ -188,9 +192,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = [self.ast[e] for e in ctx.statement()]
 
     def enterAlgorithm_section(self, ctx: ModelicaParser.Algorithm_sectionContext):
-        alg_sect = ast.AlgorithmSection(
-            initial=ctx.INITIAL() is not None
-        )
+        alg_sect = ast.AlgorithmSection(initial=ctx.INITIAL() is not None)
         self.ast[ctx] = alg_sect
         self.alg_sect = alg_sect
 
@@ -213,7 +215,8 @@ class ASTListener(ModelicaListener):
     def exitEquation_simple(self, ctx: ModelicaParser.Equation_simpleContext):
         self.ast[ctx] = ast.Equation(
             left=self.ast[ctx.simple_expression()],
-            right=self.ast[ctx.expression()],)
+            right=self.ast[ctx.expression()],
+        )
 
     def exitEquation_if(self, ctx: ModelicaParser.Equation_ifContext):
         self.ast[ctx] = self.ast[ctx.if_equation()]
@@ -232,28 +235,26 @@ class ASTListener(ModelicaListener):
         conditions = [self.ast[c] for c in ctx.conditions]
         if len(conditions) == len(blocks) - 1:
             conditions.append(True)
-        self.ast[ctx] = ast.IfEquation(
-            conditions=conditions,
-            blocks=blocks)
+        self.ast[ctx] = ast.IfEquation(conditions=conditions, blocks=blocks)
 
     def exitWhen_equation(self, ctx: ModelicaParser.When_equationContext):
         blocks = [self.ast[b] for b in ctx.blocks]
         conditions = [self.ast[c] for c in ctx.conditions]
         if len(conditions) == len(blocks) - 1:
             conditions.append(True)
-        self.ast[ctx] = ast.WhenEquation(
-            conditions=conditions,
-            blocks=blocks)
+        self.ast[ctx] = ast.WhenEquation(conditions=conditions, blocks=blocks)
 
     def exitFor_equation(self, ctx: ModelicaParser.For_equationContext):
         self.ast[ctx] = ast.ForEquation(
             indices=self.ast[ctx.for_indices()],
-            equations=self.ast[ctx.equation_block()],)
+            equations=self.ast[ctx.equation_block()],
+        )
 
     def exitConnect_clause(self, ctx: ModelicaParser.Connect_clauseContext):
         self.ast[ctx] = ast.ConnectClause(
             left=self.ast[ctx.component_reference()[0]],
-            right=self.ast[ctx.component_reference()[1]])
+            right=self.ast[ctx.component_reference()[1]],
+        )
 
     # STATEMENT ==========================================================
 
@@ -275,23 +276,28 @@ class ASTListener(ModelicaListener):
         except AttributeError:
             pass
 
-    def exitStatement_component_reference(self, ctx: ModelicaParser.Statement_component_referenceContext):
+    def exitStatement_component_reference(
+        self, ctx: ModelicaParser.Statement_component_referenceContext
+    ):
         self.ast[ctx] = ast.AssignmentStatement(
             left=[self.ast[ctx.component_reference()]],
-            right=self.ast[ctx.expression()],)
+            right=self.ast[ctx.expression()],
+        )
 
-    def exitStatement_component_function(self, ctx: ModelicaParser.Statement_component_functionContext):
+    def exitStatement_component_function(
+        self, ctx: ModelicaParser.Statement_component_functionContext
+    ):
         all_comp_refs = [self.ast[x] for x in ctx.component_reference()]
 
         right = ast.Expression(
             operator=all_comp_refs[-1],
-            operands=[self.ast[x.expression()]
-                      for x in ctx.function_call_args().function_arguments().function_argument()]
+            operands=[
+                self.ast[x.expression()]
+                for x in ctx.function_call_args().function_arguments().function_argument()
+            ],
         )
 
-        self.ast[ctx] = ast.AssignmentStatement(
-            left=all_comp_refs[:-1],
-            right=right)
+        self.ast[ctx] = ast.AssignmentStatement(left=all_comp_refs[:-1], right=right)
 
     def exitStatement_if(self, ctx: ModelicaParser.Statement_ifContext):
         self.ast[ctx] = self.ast[ctx.if_statement()]
@@ -307,23 +313,20 @@ class ASTListener(ModelicaListener):
         conditions = [self.ast[c] for c in ctx.conditions]
         if len(conditions) == len(blocks) - 1:
             conditions.append(True)
-        self.ast[ctx] = ast.IfStatement(
-            conditions=conditions,
-            blocks=blocks)
+        self.ast[ctx] = ast.IfStatement(conditions=conditions, blocks=blocks)
 
     def exitWhen_statement(self, ctx: ModelicaParser.When_statementContext):
         blocks = [self.ast[b] for b in ctx.blocks]
         conditions = [self.ast[c] for c in ctx.conditions]
         if len(conditions) == len(blocks) - 1:
             conditions.append(True)
-        self.ast[ctx] = ast.WhenStatement(
-            conditions=conditions,
-            blocks=blocks)
+        self.ast[ctx] = ast.WhenStatement(conditions=conditions, blocks=blocks)
 
     def exitFor_statement(self, ctx: ModelicaParser.For_statementContext):
         self.ast[ctx] = ast.ForStatement(
             indices=self.ast[ctx.for_indices()],
-            statements=self.ast[ctx.statement_block()],)
+            statements=self.ast[ctx.statement_block()],
+        )
 
     # EXPRESSIONS ===========================================================
 
@@ -333,7 +336,9 @@ class ASTListener(ModelicaListener):
                 step = self.ast[ctx.expr()[2]]
             else:
                 step = ast.Primary(value=1)
-            self.ast[ctx] = ast.Slice(start=self.ast[ctx.expr()[0]], stop=self.ast[ctx.expr()[1]], step=step)
+            self.ast[ctx] = ast.Slice(
+                start=self.ast[ctx.expr()[0]], stop=self.ast[ctx.expr()[1]], step=step
+            )
         else:
             self.ast[ctx] = self.ast[ctx.expr()[0]]
 
@@ -346,9 +351,7 @@ class ASTListener(ModelicaListener):
         conditions = all_expr[:-1:2]
         expressions = all_expr[1::2] + all_expr[-1:]
 
-        self.ast[ctx] = ast.IfExpression(
-            conditions=conditions,
-            expressions=expressions)
+        self.ast[ctx] = ast.IfExpression(conditions=conditions, expressions=expressions)
 
     def exitExpr_primary(self, ctx: ModelicaParser.Expr_primaryContext):
         self.ast[ctx] = self.ast[ctx.primary()]
@@ -378,28 +381,22 @@ class ASTListener(ModelicaListener):
         )
 
     def exitExpr_not(self, ctx: ModelicaParser.Expr_notContext):
-        self.ast[ctx] = ast.Expression(
-            operator='not',
-            operands=[self.ast[ctx.expr()]]
-        )
+        self.ast[ctx] = ast.Expression(operator="not", operands=[self.ast[ctx.expr()]])
 
     def exitExpr_and(self, ctx: ModelicaParser.Expr_andContext):
         self.ast[ctx] = ast.Expression(
-            operator='and',
+            operator="and",
             operands=[self.ast[e] for e in ctx.expr()],
         )
 
     def exitExpr_or(self, ctx: ModelicaParser.Expr_orContext):
         self.ast[ctx] = ast.Expression(
-            operator='or',
+            operator="or",
             operands=[self.ast[e] for e in ctx.expr()],
         )
 
     def exitExpr_signed(self, ctx: ModelicaParser.Expr_signedContext):
-        self.ast[ctx] = ast.Expression(
-            operator=ctx.op.text,
-            operands=[self.ast[ctx.expr()]]
-        )
+        self.ast[ctx] = ast.Expression(operator=ctx.op.text, operands=[self.ast[ctx.expr()]])
 
     def exitSubscript(self, ctx: ModelicaParser.SubscriptContext):
         if ctx.expression() is not None:
@@ -411,7 +408,9 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = [self.ast[s] for s in ctx.subscript()]
 
     def exitFor_index(self, ctx):
-        self.ast[ctx] = ast.ForIndex(name=ctx.IDENT().getText(), expression=self.ast[ctx.expression()])
+        self.ast[ctx] = ast.ForIndex(
+            name=ctx.IDENT().getText(), expression=self.ast[ctx.expression()]
+        )
 
     def exitFor_indices(self, ctx: ModelicaParser.For_indicesContext):
         self.ast[ctx] = [self.ast[s] for s in ctx.for_index()]
@@ -443,15 +442,19 @@ class ASTListener(ModelicaListener):
         #       E.g. self.ast[x] below, instead of self.ast[x.expression].
         self.ast[ctx] = ast.Expression(
             operator=self.ast[ctx.component_reference()],
-            operands=[self.ast[x.expression()]
-                      for x in ctx.function_call_args().function_arguments().function_argument()]
+            operands=[
+                self.ast[x.expression()]
+                for x in ctx.function_call_args().function_arguments().function_argument()
+            ],
         )
 
     def exitPrimary_derivative(self, ctx: ModelicaParser.Primary_derivativeContext):
         self.ast[ctx] = ast.Expression(
-            operator='der',
-            operands=[self.ast[x.expression()]
-                      for x in ctx.function_call_args().function_arguments().function_argument()]
+            operator="der",
+            operands=[
+                self.ast[x.expression()]
+                for x in ctx.function_call_args().function_arguments().function_argument()
+            ],
         )
         # TODO 'state' is not a standard prefix;  disable this for now as it does not work
         # when differentiating states defined in superclasses.
@@ -459,11 +462,7 @@ class ASTListener(ModelicaListener):
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
     def exitType_specifier_element(self, ctx: ModelicaParser.Type_specifier_elementContext):
-        self.ast[ctx] = ast.ComponentRef(
-            name=ctx.IDENT().getText(),
-            indices=[[None]],
-            child=[]
-        )
+        self.ast[ctx] = ast.ComponentRef(name=ctx.IDENT().getText(), indices=[[None]], child=[])
 
     def exitType_specifier(self, ctx: ModelicaParser.Type_specifierContext):
         for element in reversed([self.ast[x] for x in ctx.type_specifier_element()]):
@@ -471,16 +470,14 @@ class ASTListener(ModelicaListener):
                 element.child = [self.ast[ctx]]
             self.ast[ctx] = element
 
-    def exitComponent_reference_element(self, ctx: ModelicaParser.Component_reference_elementContext):
+    def exitComponent_reference_element(
+        self, ctx: ModelicaParser.Component_reference_elementContext
+    ):
         if ctx.array_subscripts() is not None:
             indices = [[self.ast[x] for x in ctx.array_subscripts().subscript()]]
         else:
             indices = [[None]]
-        self.ast[ctx] = ast.ComponentRef(
-            name=ctx.IDENT().getText(),
-            indices=indices,
-            child=[]
-        )
+        self.ast[ctx] = ast.ComponentRef(name=ctx.IDENT().getText(), indices=indices, child=[])
 
     def exitComponent_reference(self, ctx: ModelicaParser.Component_referenceContext):
         for element in reversed([self.ast[x] for x in ctx.component_reference_element()]):
@@ -488,10 +485,14 @@ class ASTListener(ModelicaListener):
                 element.child = [self.ast[ctx]]
             self.ast[ctx] = element
 
-    def exitPrimary_component_reference(self, ctx: ModelicaParser.Primary_component_referenceContext):
+    def exitPrimary_component_reference(
+        self, ctx: ModelicaParser.Primary_component_referenceContext
+    ):
         self.ast[ctx] = self.ast[ctx.component_reference()]
 
-    def exitPrimary_output_expression_list(self, ctx: ModelicaParser.Primary_output_expression_listContext):
+    def exitPrimary_output_expression_list(
+        self, ctx: ModelicaParser.Primary_output_expression_listContext
+    ):
         self.ast[ctx] = [self.ast[x] for x in ctx.output_expression_list().expression()]
         # Collapse lists containing a single expression
         if len(self.ast[ctx]) == 1:
@@ -506,8 +507,10 @@ class ASTListener(ModelicaListener):
     def exitEquation_function(self, ctx: ModelicaParser.Equation_functionContext):
         self.ast[ctx] = ast.Function(
             name=ctx.name().getText(),
-            arguments=[self.ast[x.expression()]
-                for x in ctx.function_call_args().function_arguments().function_argument()]
+            arguments=[
+                self.ast[x.expression()]
+                for x in ctx.function_call_args().function_arguments().function_argument()
+            ],
         )
 
     def exitEquation_when(self, ctx: ModelicaParser.Equation_whenContext):
@@ -535,7 +538,9 @@ class ASTListener(ModelicaListener):
                 # Append list of names to package_name to get fully qualified name(s)
                 # Skip the comma separators in import_list.children
                 for ident in import_list.children[::2]:
-                    qualified_name = package_name.concatenate(package_name.from_string(ident.getText()))
+                    qualified_name = package_name.concatenate(
+                        package_name.from_string(ident.getText())
+                    )
                     import_clause.components.append(qualified_name)
             elif ctx.getChildCount() > 3:
                 import_clause.unqualified = True
@@ -545,17 +550,17 @@ class ASTListener(ModelicaListener):
         elif import_clause.unqualified:
             # Postpone processing this uncommon case until actually needed
             # In this case import_clause.components contains list of packages of all unqualified imports
-            if '*' not in self.class_node.imports:
-                self.class_node.imports['*'] = import_clause
+            if "*" not in self.class_node.imports:
+                self.class_node.imports["*"] = import_clause
             else:
-                self.class_node.imports['*'].components.append(import_clause.components[0])
+                self.class_node.imports["*"].components.append(import_clause.components[0])
         else:
             # Simple case, fast lookup
             for comp in import_clause.components:
                 name = comp.to_tuple()[-1]
                 # Check for name clashes
                 if name in self.class_node.imports:
-                    raise IOError(name, 'already imported')
+                    raise IOError(name, "already imported")
                 self.class_node.imports[name] = comp
 
     def enterExtends_clause(self, ctx: ModelicaParser.Extends_clauseContext):
@@ -566,8 +571,9 @@ class ASTListener(ModelicaListener):
             class_modification = self.ast[ctx.class_modification()]
         else:
             class_modification = ast.ClassModification()
-        self.ast[ctx] = ast.ExtendsClause(component=self.ast[ctx.component_reference()],
-                                          class_modification=class_modification)
+        self.ast[ctx] = ast.ExtendsClause(
+            component=self.ast[ctx.component_reference()], class_modification=class_modification
+        )
         self.class_node.extends += [self.ast[ctx]]
 
         self.in_extends_clause = False
@@ -585,8 +591,8 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] = self.ast[ctx.class_elem]
 
     def enterComponent_clause(self, ctx: ModelicaParser.Component_clauseContext):
-        prefixes = ctx.type_prefix().getText().split(' ')
-        if prefixes[0] == '':
+        prefixes = ctx.type_prefix().getText().split(" ")
+        if prefixes[0] == "":
             prefixes = []
         self.ast[ctx] = ast.ComponentClause(
             prefixes=prefixes,
@@ -594,8 +600,8 @@ class ASTListener(ModelicaListener):
         self.comp_clause = self.ast[ctx]
 
     def enterComponent_clause1(self, ctx: ModelicaParser.Component_clause1Context):
-        prefixes = ctx.type_prefix().getText().split(' ')
-        if prefixes[0] == '':
+        prefixes = ctx.type_prefix().getText().split(" ")
+        if prefixes[0] == "":
             prefixes = []
         self.ast[ctx] = ast.ComponentClause(
             prefixes=prefixes,
@@ -680,7 +686,7 @@ class ASTListener(ModelicaListener):
         # Declarations can also occur in extends clauses, in which case we do not have to add it to the class's symbols.
         if not self.in_extends_clause:
             if sym.name in self.class_node.symbols:
-                raise IOError(sym.name, 'already defined')
+                raise IOError(sym.name, "already defined")
             self.class_node.symbols[sym.name] = sym
 
     def exitDeclaration(self, ctx: ModelicaParser.DeclarationContext):
@@ -731,7 +737,9 @@ class ASTListener(ModelicaListener):
         else:
             self.ast[ctx] = self.ast[ctx.short_class_definition()]
 
-    def exitElement_modification_or_replaceable(self, ctx: ModelicaParser.Element_modification_or_replaceableContext):
+    def exitElement_modification_or_replaceable(
+        self, ctx: ModelicaParser.Element_modification_or_replaceableContext
+    ):
         if ctx.element_modification() is not None:
             self.ast[ctx] = self.ast[ctx.element_modification()]
         else:
@@ -775,6 +783,7 @@ def file_to_tree(f: ModelicaFile) -> ast.Tree:
     root.update_parent_refs()
 
     return root
+
 
 class ModelicaParserErrorListener(antlr4.error.ErrorListener.ErrorListener):
     def __init__(self):

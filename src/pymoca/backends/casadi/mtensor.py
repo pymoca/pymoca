@@ -34,4 +34,11 @@ class _MTensor:
 
     def __getitem__(self, k):
         assert len(k) == len(self._shape)
-        return self._mx[np.ravel_multi_index(tuple(k,), self._shape)]
+        return self._mx[
+            np.ravel_multi_index(
+                tuple(
+                    k,
+                ),
+                self._shape,
+            )
+        ]

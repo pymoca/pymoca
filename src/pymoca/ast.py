@@ -14,17 +14,19 @@ from collections import OrderedDict
 class ClassNotFoundError(Exception):
     pass
 
+
 class ConstantSymbolNotFoundError(Exception):
     pass
+
 
 class FoundElementaryClassError(Exception):
     pass
 
 
 class Visibility(Enum):
-    PRIVATE = 0, 'private'
-    PROTECTED = 1, 'protected'
-    PUBLIC = 2, 'public'
+    PRIVATE = 0, "private"
+    PROTECTED = 1, "protected"
+    PUBLIC = 2, "public"
 
     def __new__(cls, value, name):
         member = object.__new__(cls)
@@ -42,7 +44,7 @@ class Visibility(Enum):
         return self.value < other.value
 
 
-nan = float('nan')
+nan = float("nan")
 
 """
 AST Node Type Hierarchy
@@ -72,15 +74,15 @@ class Node:
     def set_args(self, **kwargs):
         for key in kwargs.keys():
             if key not in self.__dict__.keys():
-                raise KeyError('{:s} not valid arg'.format(key))
+                raise KeyError("{:s} not valid arg".format(key))
             self.__dict__[key] = kwargs[key]
 
     def __repr__(self):
-        return '{!r}'.format(self.__dict__)
+        return "{!r}".format(self.__dict__)
 
     def __str__(self):
         d = self.to_json(self)
-        d['_type'] = self.__class__.__name__
+        d["_type"] = self.__class__.__name__
         return json.dumps(d, indent=2, sort_keys=True)
 
     @classmethod
@@ -92,14 +94,16 @@ class Node:
         elif isinstance(var, Node):
             # Avoid infinite recursion by not handling attributes that may go
             # back up in the tree again.
-            res = {key: cls.to_json(var.__dict__[key]) for key in var.__dict__.keys()
-                   if key not in ('parent', 'scope', '__deepcopy__')}
+            res = {
+                key: cls.to_json(var.__dict__[key])
+                for key in var.__dict__.keys()
+                if key not in ("parent", "scope", "__deepcopy__")
+            }
         elif isinstance(var, Visibility):
             res = str(var)
         else:
             res = var
         return res
-
 
 
 class Primary(Node):
@@ -108,10 +112,10 @@ class Primary(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(value={!r})'.format(type(self).__name__, self.value)
+        return "{}(value={!r})".format(type(self).__name__, self.value)
 
     def __str__(self):
-        return '{} value {}'.format(type(self).__name__, self.value)
+        return "{} value {}".format(type(self).__name__, self.value)
 
 
 class Array(Node):
@@ -120,10 +124,10 @@ class Array(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(values={!r})'.format(type(self).__name__, self.values)
+        return "{}(values={!r})".format(type(self).__name__, self.values)
 
     def __str__(self):
-        return '{} {}'.format(type(self).__name__, self.values)
+        return "{} {}".format(type(self).__name__, self.values)
 
 
 class Slice(Node):
@@ -134,17 +138,19 @@ class Slice(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(start={!r}, stop={!r}, step={!r})'.format(
-            type(self).__name__, self.start, self.stop, self.step)
+        return "{}(start={!r}, stop={!r}, step={!r})".format(
+            type(self).__name__, self.start, self.stop, self.step
+        )
 
     def __str__(self):
-        return '{} start: {}, stop: {}, step: {}'.format(
-            type(self).__name__, self.start, self.stop, self.step)
+        return "{} start: {}, stop: {}, step: {}".format(
+            type(self).__name__, self.start, self.stop, self.step
+        )
 
 
 class ComponentRef(Node):
     def __init__(self, **kwargs):
-        self.name = ''  # type: str
+        self.name = ""  # type: str
         self.indices = [[None]]  # type: List[List[Union[Expression, Slice, Primary, ComponentRef]]]
         self.child = []  # type: List[ComponentRef]
         super().__init__(**kwargs)
@@ -152,9 +158,9 @@ class ComponentRef(Node):
     def __repr__(self) -> str:
         # TODO: indices
         if self.child:
-            return '{!r}{!r}'.format(self.name, self.child)
+            return "{!r}{!r}".format(self.name, self.child)
         else:
-            return '{!r}'.format(self.name)
+            return "{!r}".format(self.name)
 
     def __str__(self) -> str:
         return ".".join(self.to_tuple())
@@ -168,12 +174,12 @@ class ComponentRef(Node):
         """
 
         if self.child:
-            return (self.name, ) + self.child[0].to_tuple()
+            return (self.name,) + self.child[0].to_tuple()
         else:
-            return self.name,
+            return (self.name,)
 
     @classmethod
-    def from_tuple(cls, components: Union[tuple, list]) -> 'ComponentRef':
+    def from_tuple(cls, components: Union[tuple, list]) -> "ComponentRef":
         """
         Convert the tuple pointing to a component to
         a component reference.
@@ -189,7 +195,7 @@ class ComponentRef(Node):
         return component_ref
 
     @classmethod
-    def from_string(cls, s: str) -> 'ComponentRef':
+    def from_string(cls, s: str) -> "ComponentRef":
         """
         Convert the string pointing to a component using dot notation to
         a component reference.
@@ -197,10 +203,10 @@ class ComponentRef(Node):
         :return: ComponentRef
         """
 
-        components = s.split('.')
+        components = s.split(".")
         return cls.from_tuple(components)
 
-    def concatenate(self, arg: 'ComponentRef') -> 'ComponentRef':
+    def concatenate(self, arg: "ComponentRef") -> "ComponentRef":
         """
         Helper function to append two component references to eachother, e.g.
         a "within" component ref and an "object type" component ref.
@@ -220,69 +226,88 @@ class ComponentRef(Node):
 class Expression(Node):
     def __init__(self, **kwargs):
         self.operator = None  # type: Union[str, ComponentRef]
-        self.operands = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.operands = (
+            []
+        )  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(operator={!r}, operands={!r})'.format(type(self).__name__, self.operator, self.operands)
+        return "{}(operator={!r}, operands={!r})".format(
+            type(self).__name__, self.operator, self.operands
+        )
 
 
 class IfExpression(Node):
     def __init__(self, **kwargs):
-        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
-        self.expressions = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.conditions = (
+            []
+        )  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.expressions = (
+            []
+        )  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(conditions={!r}, expressions={!r})'.format(
-            type(self).__name__, self.conditions, self.expressions)
+        return "{}(conditions={!r}, expressions={!r})".format(
+            type(self).__name__, self.conditions, self.expressions
+        )
 
 
 class Equation(Node):
     def __init__(self, **kwargs):
-        self.left = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
-        self.right = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
-        self.comment = ''  # type: str
+        self.left = (
+            None
+        )  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.right = (
+            None
+        )  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(left={!r}, right={!r})'.format(
-            type(self).__name__, self.left, self.right)
+        return "{}(left={!r}, right={!r})".format(type(self).__name__, self.left, self.right)
 
 
 class IfEquation(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.blocks = []  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
-        self.comment = ''  # type: str
+        self.blocks = (
+            []
+        )  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(conditions={!r}, blocks={!r})'.format(
-            type(self).__name__, self.conditions, self.blocks)
+        return "{}(conditions={!r}, blocks={!r})".format(
+            type(self).__name__, self.conditions, self.blocks
+        )
 
 
 class WhenEquation(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.blocks = []  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
-        self.comment = ''  # type: str
+        self.blocks = (
+            []
+        )  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(conditions={!r}, blocks={!r})'.format(
-            type(self).__name__, self.conditions, self.blocks)
+        return "{}(conditions={!r}, blocks={!r})".format(
+            type(self).__name__, self.conditions, self.blocks
+        )
 
 
 class ForIndex(Node):
     def __init__(self, **kwargs):
-        self.name = ''  # type: str
+        self.name = ""  # type: str
         self.expression = None  # type: Union[Expression, Primary, Slice]
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(name={!r}, expression={!r})'.format(
-            type(self).__name__, self.name, self.expression)
+        return "{}(name={!r}, expression={!r})".format(
+            type(self).__name__, self.name, self.expression
+        )
 
 
 class ForEquation(Node):
@@ -293,99 +318,115 @@ class ForEquation(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(indices={!r}, equations={!r})'.format(
-            type(self).__name__, self.indices, self.equations)
+        return "{}(indices={!r}, equations={!r})".format(
+            type(self).__name__, self.indices, self.equations
+        )
 
 
 class ConnectClause(Node):
     def __init__(self, **kwargs):
         self.left = ComponentRef()  # type: ComponentRef
         self.right = ComponentRef()  # type: ComponentRef
-        self.comment = ''  # type: str
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(left={!r}, right={!r})'.format(
-            type(self).__name__, self.left, self.right)
+        return "{}(left={!r}, right={!r})".format(type(self).__name__, self.left, self.right)
 
 
 class AssignmentStatement(Node):
     def __init__(self, **kwargs):
         self.left = []  # type: List[ComponentRef]
         self.right = None  # type: Union[Expression, IfExpression, Primary, ComponentRef]
-        self.comment = ''  # type: str
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(left={!r}, right={!r})'.format(
-            type(self).__name__, self.left, self.right)
+        return "{}(left={!r}, right={!r})".format(type(self).__name__, self.left, self.right)
 
 
 class IfStatement(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
         self.blocks = []  # type: List[List[Union[AssignmentStatement, IfStatement, ForStatement]]]
-        self.comment = ''  # type: str
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(conditions={!r}, blocks={!r})'.format(
-            type(self).__name__, self.conditions, self.blocks)
+        return "{}(conditions={!r}, blocks={!r})".format(
+            type(self).__name__, self.conditions, self.blocks
+        )
 
 
 class WhenStatement(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
         self.blocks = []  # type: List[List[Union[AssignmentStatement, IfStatement, ForStatement]]]
-        self.comment = ''  # type: str
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(conditions={!r}, blocks={!r})'.format(
-            type(self).__name__, self.conditions, self.blocks)
+        return "{}(conditions={!r}, blocks={!r})".format(
+            type(self).__name__, self.conditions, self.blocks
+        )
 
 
 class ForStatement(Node):
     def __init__(self, **kwargs):
         self.indices = []  # type: List[ForIndex]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
-        self.comment = ''  # type: str
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(indices={!r}, statements={!r})'.format(
-            type(self).__name__, self.indices, self.statements)
+        return "{}(indices={!r}, statements={!r})".format(
+            type(self).__name__, self.indices, self.statements
+        )
 
 
 class Function(Node):
     def __init__(self, **kwargs):
-        self.name = '' # type: str
+        self.name = ""  # type: str
         self.arguments = []  # type: List[Union[Expression, Primary, ComponentRef, Array]]
-        self.comment = ''  # type: str
+        self.comment = ""  # type: str
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(name={!r}, arguments={!r})'.format(
-            type(self).__name__, self.name, self.arguments)
+        return "{}(name={!r}, arguments={!r})".format(
+            type(self).__name__, self.name, self.arguments
+        )
 
 
 class Symbol(Node):
     """
     A mathematical variable or state of the model
     """
-    ATTRIBUTES = ['value', 'min', 'max', 'start', 'fixed', 'nominal', 'unit', 'quantity', 'displayUnit']
+
+    ATTRIBUTES = [
+        "value",
+        "min",
+        "max",
+        "start",
+        "fixed",
+        "nominal",
+        "unit",
+        "quantity",
+        "displayUnit",
+    ]
 
     def __init__(self, **kwargs):
         # pylint: disable=invalid-name
-        self.name = ''  # type: str
+        self.name = ""  # type: str
         self.type = ComponentRef()  # type: Union[ComponentRef, InstanceClass]
         self.prefixes = []  # type: List[str]
         self.redeclare = False  # type: bool
         self.final = False  # type: bool
         self.inner = False  # type: bool
         self.outer = False  # type: bool
-        self.dimensions = [[Primary(value=None)]]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
-        self.comment = ''  # type: str
+        self.dimensions = [
+            [Primary(value=None)]
+        ]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
+        self.comment = ""  # type: str
         self.start = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.min = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.max = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
@@ -405,27 +446,28 @@ class Symbol(Node):
         return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
 
     def __repr__(self):
-        return '{}(name={!r}, type={!r})'.format(
-            type(self).__name__, self.name, self.type)
+        return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)
 
 
 class ComponentClause(Node):
     def __init__(self, **kwargs):
         self.prefixes = []  # type: List[str]
         self.type = ComponentRef()  # type: ComponentRef
-        self.dimensions = [[Primary(value=None)]]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
+        self.dimensions = [
+            [Primary(value=None)]
+        ]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
         self.comment = []  # type: List[str]
         self.symbol_list = []  # type: List[Symbol]
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(prefixes={!r}, type={}, dimensions={!r}, symbol_list={!r})'.format(
-            type(self).__name__, self.prefixes, self.type, self.dimensions, self.symbol_list)
+        return "{}(prefixes={!r}, type={}, dimensions={!r}, symbol_list={!r})".format(
+            type(self).__name__, self.prefixes, self.type, self.dimensions, self.symbol_list
+        )
 
     def __str__(self):
-        pre = ' '.join([str(s) for s in self.prefixes])
-        return '{} {!r} {!r} {!r}'.format(
-            pre, self.type, self.dimensions, self.symbol_list)
+        pre = " ".join([str(s) for s in self.prefixes])
+        return "{} {!r} {!r} {!r}".format(pre, self.type, self.dimensions, self.symbol_list)
 
 
 class EquationSection(Node):
@@ -435,8 +477,9 @@ class EquationSection(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(initial={!r}, equations={!r})'.format(
-            type(self).__name__, self.initial, self.equations)
+        return "{}(initial={!r}, equations={!r})".format(
+            type(self).__name__, self.initial, self.equations
+        )
 
 
 class AlgorithmSection(Node):
@@ -446,57 +489,64 @@ class AlgorithmSection(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(initial={!r}, statements={!r})'.format(
-            type(self).__name__, self.initial, self.statements)
+        return "{}(initial={!r}, statements={!r})".format(
+            type(self).__name__, self.initial, self.statements
+        )
 
 
 class ImportClause(Node):
     def __init__(self, **kwargs):
         self.components = []  # type: List[ComponentRef]
-        self.short_name = ''  # type: str
-        self.unqualified = False # type: bool
+        self.short_name = ""  # type: str
+        self.unqualified = False  # type: bool
         # Comments are rare, so ignore
         super().__init__(**kwargs)
 
     def __str__(self):
-        star = ''
+        star = ""
         if self.unqualified:
-            star = '.*'
-        return 'import {!r}{!r}{!r}'.format(self.short_name, self.components, star)
+            star = ".*"
+        return "import {!r}{!r}{!r}".format(self.short_name, self.components, star)
 
     def __repr__(self):
-        return '{}(components={}, short_name={!r}), unqualfied={!r}'.format(
-            type(self).__name__, self.components, self.short_name, self.unqualified)
+        return "{}(components={}, short_name={!r}), unqualfied={!r}".format(
+            type(self).__name__, self.components, self.short_name, self.unqualified
+        )
 
 
 class ElementModification(Node):
     def __init__(self, **kwargs):
         self.component = ComponentRef()  # type: ComponentRef
-        self.modifications = []  # type: List[Union[Primary, Expression, ClassModification, Array, ComponentRef]]
+        self.modifications = (
+            []
+        )  # type: List[Union[Primary, Expression, ClassModification, Array, ComponentRef]]
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(component={}, modifications={!r})'.format(
-            type(self).__name__, self.component, self.modifications)
+        return "{}(component={}, modifications={!r})".format(
+            type(self).__name__, self.component, self.modifications
+        )
 
     def __str__(self):
-        return '{!r} = {!r}'.format(self.component, self.modifications)
+        return "{!r} = {!r}".format(self.component, self.modifications)
 
 
 class ShortClassDefinition(Node):
     def __init__(self, **kwargs):
-        self.name = ''  # type: str
-        self.type = ''  # type: str
+        self.name = ""  # type: str
+        self.type = ""  # type: str
         self.component = ComponentRef()  # type: ComponentRef
         self.class_modification = ClassModification()  # type: ClassModification
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(name={!r}, type={!r}, component={}, class_modification={!r})'.format(
-            type(self).__name__, self.name, self.type, self.component, self.class_modification)
+        return "{}(name={!r}, type={!r}, component={}, class_modification={!r})".format(
+            type(self).__name__, self.name, self.type, self.component, self.class_modification
+        )
 
     def __str__(self):
-        return '{!r} = {!r}'.format(self.name, self.component)
+        return "{!r} = {!r}".format(self.name, self.component)
+
 
 class ElementReplaceable(Node):
     def __init__(self, **kwargs):
@@ -504,7 +554,7 @@ class ElementReplaceable(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}()'.format(type(self).__name__)
+        return "{}()".format(type(self).__name__)
 
 
 class ClassModification(Node):
@@ -513,7 +563,7 @@ class ClassModification(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(arguments={!r})'.format(type(self).__name__, self.arguments)
+        return "{}(arguments={!r})".format(type(self).__name__, self.arguments)
 
 
 class ClassModificationArgument(Node):
@@ -524,8 +574,9 @@ class ClassModificationArgument(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(value={!r}, scope={!r}, redeclare={!r})'.format(
-            type(self).__name__, self.value, self.scope, self.redeclare)
+        return "{}(value={!r}, scope={!r}, redeclare={!r})".format(
+            type(self).__name__, self.value, self.scope, self.redeclare
+        )
 
     def __deepcopy__(self, memo):
         _scope, _deepcp = self.scope, self.__deepcopy__
@@ -544,8 +595,10 @@ class ExtendsClause(Node):
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return '{}(component={}, class_modification={!r}, visibility={!r})'.format(
-            type(self).__name__, self.component, self.class_modification, self.visibility)
+        return "{}(component={}, class_modification={!r}, visibility={!r})".format(
+            type(self).__name__, self.component, self.class_modification, self.visibility
+        )
+
 
 class Class(Node):
     BUILTIN = ("Real", "Integer", "String", "Boolean")
@@ -557,22 +610,26 @@ class Class(Node):
         self.encapsulated = False  # type: bool
         self.partial = False  # type: bool
         self.final = False  # type: bool
-        self.type = ''  # type: str
-        self.comment = ''  # type: str
+        self.type = ""  # type: str
+        self.comment = ""  # type: str
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
         self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
         self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
-        self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
+        self.initial_statements = (
+            []
+        )  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.annotation = []  # type: Union[Type[None], ClassModification]
         self.parent = None  # type: Class
 
         super().__init__(**kwargs)
 
-    def _find_class(self, component_ref: ComponentRef, search_parent=True, search_imports=True) -> 'Class':
-        """ Recursively search for component_ref in self and linked classes
+    def _find_class(
+        self, component_ref: ComponentRef, search_parent=True, search_imports=True
+    ) -> "Class":
+        """Recursively search for component_ref in self and linked classes
 
         Implement lookup rules per spec chapter 5, see also chapter 13.
         This is more succinctly outlined in
@@ -593,7 +650,9 @@ class Class(Node):
                 if search_imports:
                     if component_ref.name in self.imports:
                         # First search qualified imports (most common case)
-                        import_ = self.imports[component_ref.name] # type: Union[ImportClause, ComponentRef]
+                        import_ = self.imports[
+                            component_ref.name
+                        ]  # type: Union[ImportClause, ComponentRef]
                         if isinstance(import_, ImportClause):
                             # Expand short name
                             if component_ref.child:
@@ -605,15 +664,17 @@ class Class(Node):
                         return self._find_class(import_)
                     else:
                         # Next search packages for unqualified imports (slow, but assuming not common)
-                        if '*' in self.imports:
+                        if "*" in self.imports:
                             c = None
-                            for package_ref in self.imports['*'].components:
-                                imported_comp_ref = package_ref.concatenate(ComponentRef(name=component_ref.name))
+                            for package_ref in self.imports["*"].components:
+                                imported_comp_ref = package_ref.concatenate(
+                                    ComponentRef(name=component_ref.name)
+                                )
                                 # Search within the package
                                 try:
                                     # Avoid infinite recursion with search_imports = False
                                     c = self._find_class(imported_comp_ref, search_imports=False)
-                                except(KeyError, ClassNotFoundError):
+                                except (KeyError, ClassNotFoundError):
                                     pass
                             if c is not None:
                                 # Store result for next lookup
@@ -631,8 +692,13 @@ class Class(Node):
                 else:
                     raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
 
-    def find_class(self, component_ref: ComponentRef, copy=True,
-                   check_builtin_classes=False, search_imports=True) -> 'Class':
+    def find_class(
+        self,
+        component_ref: ComponentRef,
+        copy=True,
+        check_builtin_classes=False,
+        search_imports=True,
+    ) -> "Class":
         if component_ref.name in self.BUILTIN:
             if check_builtin_classes:
                 type_ = component_ref.name
@@ -657,7 +723,6 @@ class Class(Node):
         return c
 
     def _find_constant_symbol(self, component_ref: ComponentRef, search_parent=True) -> Symbol:
-
         if component_ref.child:
             # Try classes first, and constant symbols second
             t = component_ref.to_tuple()
@@ -671,7 +736,7 @@ class Class(Node):
                 except KeyError:
                     raise ConstantSymbolNotFoundError()
 
-                if 'constant' not in s.prefixes:
+                if "constant" not in s.prefixes:
                     raise ConstantSymbolNotFoundError()
 
                 # Found a symbol. Continue lookup on type of this symbol.
@@ -691,7 +756,6 @@ class Class(Node):
     def find_constant_symbol(self, component_ref: ComponentRef) -> Symbol:
         return self._find_constant_symbol(component_ref)
 
-
     def full_reference(self):
         names = []
 
@@ -706,7 +770,7 @@ class Class(Node):
         # Exclude the root node's name
         return ComponentRef.from_tuple(tuple(reversed(names[:-1])))
 
-    def _extend(self, other: 'Class') -> None:
+    def _extend(self, other: "Class") -> None:
         for class_name in other.classes.keys():
             if class_name in self.classes.keys():
                 self.classes[class_name]._extend(other.classes[class_name])
@@ -723,7 +787,7 @@ class Class(Node):
     def copy_including_children(self):
         return copy.deepcopy(self)
 
-    def add_class(self, c: 'Class') -> None:
+    def add_class(self, c: "Class") -> None:
         """
         Add a (sub)class to this class.
 
@@ -732,7 +796,7 @@ class Class(Node):
         self.classes[c.name] = c
         c.parent = self
 
-    def remove_class(self, c: 'Class') -> None:
+    def remove_class(self, c: "Class") -> None:
         """
         Removes a (sub)class from this class.
 
@@ -802,7 +866,7 @@ class Class(Node):
         return new
 
     def __repr__(self):
-        return '{}(type={!r}, name={!r})'.format(type(self).__name__, self.type, self.name)
+        return "{}(type={!r}, name={!r})".format(type(self).__name__, self.type, self.name)
 
     def __str__(self):
         return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
@@ -814,19 +878,23 @@ class InstanceClass(Class):
     symbols and extends clauses are shifted to the modification environment of
     this InstanceClass.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.modification_environment = ClassModification()
 
     def __repr__(self):
-        return '{}(type={!r}, name={!r}, modification_environment={!r})'.format(
-            type(self).__name__, self.type, self.name, self.modification_environment)
+        return "{}(type={!r}, name={!r}, modification_environment={!r})".format(
+            type(self).__name__, self.type, self.name, self.modification_environment
+        )
+
 
 class Tree(Class):
     """
     The root class.
     """
-    def extend(self, other: 'Tree') -> None:
+
+    def extend(self, other: "Tree") -> None:
         self._extend(other)
         self.update_parent_refs()
 
@@ -839,4 +907,4 @@ class Tree(Class):
         self._update_parent_refs(self)
 
     def __repr__(self):
-        return '{}(classes={!r})'.format(type(self).__name__, self.classes)
+        return "{}(classes={!r})".format(type(self).__name__, self.classes)
