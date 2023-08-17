@@ -1,21 +1,21 @@
-from __future__ import print_function, absolute_import, division, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import itertools
 import logging
-from collections import namedtuple, deque, OrderedDict
+from collections import OrderedDict, deque, namedtuple
+from typing import Dict, Iterable, Union
 
 import casadi as ca
+
 import numpy as np
-import itertools
-from typing import Union, Dict, Iterable
 
 from pymoca import ast
-from pymoca.tree import TreeWalker, TreeListener, flatten
-
-from .alias_relation import AliasRelation
-from .model import Model, Variable, StringVariable, DelayArgument
-from .mtensor import _MTensor, _new_mx
+from pymoca.tree import TreeListener, TreeWalker, flatten
 
 from ._options import _merge_default_options
+from .model import DelayArgument, Model, StringVariable, Variable
+from .mtensor import _MTensor, _new_mx
+
 
 logger = logging.getLogger("pymoca")
 
@@ -213,8 +213,8 @@ class Generator(TreeListener):
             if "output" in v.prefixes
         ]
 
-        def discard_empty(l):
-            return list(filter(lambda x: not ca.MX(x).is_empty(), l))
+        def discard_empty(eqs):
+            return list(filter(lambda x: not ca.MX(x).is_empty(), eqs))
 
         self.model.equations = discard_empty([self.get_mx(e) for e in tree.equations])
         self.model.initial_equations = discard_empty(
@@ -436,7 +436,9 @@ class Generator(TreeListener):
         src_right = ca.MX(src_right)
 
         # According to the Modelica spec,
-        # "It is possible to omit left hand side component references and/or truncate the left hand side list in order to discard outputs from a function call."
+        # "It is possible to omit left hand side component references and/or
+        #  truncate the left hand side list in order to discard outputs from
+        #  a function call."
         if isinstance(tree.right, ast.Expression) and tree.right.operator in self.root.classes:
             if src_left.size1() < src_right.size1():
                 src_right = src_right[0 : src_left.size1()]
@@ -527,12 +529,12 @@ class Generator(TreeListener):
         logger.debug("exitIfEquation")
 
         # Check if every equation block contains the same number of equations
-        if len(set((len(x) for x in tree.blocks))) != 1:
+        if len({len(x) for x in tree.blocks}) != 1:
             raise Exception("Every branch in an if-equation needs the same number of equations.")
 
         # NOTE: We currently assume that we always have an else-clause. This
         # is not strictly necessary, see the Modelica Spec on if equations.
-        assert tree.conditions[-1] == True
+        assert tree.conditions[-1] is True
 
         src = ca.vertcat(*[self.get_mx(e) for e in tree.blocks[-1]])
 
@@ -559,22 +561,21 @@ class Generator(TreeListener):
 
         # We assume an equal number of statements per branch.
         # Furthermore, we assume that every branch assigns to the same variables.
-        assert len(set((len(x) for x in tree.blocks))) == 1
+        assert len({len(x) for x in tree.blocks}) == 1
 
         # NOTE: We currently assume that we always have an else-clause. This
         # is not strictly necessary, see the Modelica Spec on if statements.
-        assert tree.conditions[-1] == True
+        assert tree.conditions[-1] is True
 
         expanded_blocks = OrderedDict()
 
         for b in tree.blocks:
-            block_assignments = []
             for s in b:
                 assignments = self.get_mx(s)
                 for assignment in assignments:
                     expanded_blocks.setdefault(assignment.left, []).append(assignment.right)
 
-        assert len(set((len(x) for x in expanded_blocks.values()))) == 1
+        assert len({len(x) for x in expanded_blocks.values()}) == 1
 
         all_assignments = []
 
@@ -913,10 +914,15 @@ class Generator(TreeListener):
                     indexed_symbol = _new_mx(
                         "{}[{},{}]".format(tree.name, for_loop.name, indices[1]), s.size2()
                     )
-                    index_function = lambda i: (i, indices[1])
+
+                    def index_function(i):
+                        return (i, indices[1])
+
                 else:
                     indexed_symbol = _new_mx("{}[{}]".format(tree.name, for_loop.name))
-                    index_function = lambda i: i
+
+                    def index_function(i):
+                        return i
 
                 # If the indexed symbol is empty, we know we do not have to
                 # map the for loop over it
@@ -929,10 +935,10 @@ class Generator(TreeListener):
                 indexed_symbol = _new_mx(
                     "{}[{},{}]".format(tree.name, indices[0], for_loop.name), s.size2()
                 )
-                index_function = lambda i: (indices[0], i)
+
                 if np.prod(s.shape) != 0:
                     for_loop.register_indexed_symbol(
-                        indexed_symbol, index_function, False, tree, indices[1]
+                        indexed_symbol, lambda i: (indices[0], i), False, tree, indices[1]
                     )
             return indexed_symbol
         else:

@@ -5,19 +5,20 @@ This duplicates some things in casadi.api, but is useful for other backends
 TODO: Perhaps refactor the parts common with casadi backend
 """
 from __future__ import generators
-import sys
-from typing import List, Tuple, Union
-from pathlib import Path
-import argparse
-import time
-import logging
-import json
 
-from pymoca import __version__
+import argparse
+import json
+import logging
+import sys
+import time
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
+
 import pymoca.ast
-import pymoca.tree
-import pymoca.backends.sympy.generator as sympy_gen
 import pymoca.backends.casadi.api as casadi_api
+import pymoca.backends.sympy.generator as sympy_gen
+import pymoca.tree
+from pymoca import __version__
 
 log = logging.getLogger("pymoca")
 logging.basicConfig(stream=sys.stderr)
@@ -63,7 +64,7 @@ def parse_file(path: Path) -> Union[pymoca.ast.Tree, None]:
         elif log.level == logging.DEBUG:
             log.debug(json.dumps(ast.to_json(ast), indent=2))
     # KeyError and AttributeError are problems in ASTListener
-    except (KeyError, AttributeError, IOError, OSError):
+    except (KeyError, AttributeError, OSError):
         if log.level in (logging.DEBUG, logging.INFO):
             log.exception('Parse error in file "%s"', path)
         else:
@@ -115,7 +116,7 @@ def translate(
     model: str,
     translator: str,
     options: dict,
-    outdir: Path = Path("."),
+    outdir: Optional[Path] = None,
 ) -> bool:
     """Given parsed Modelica AST, generate code for model into given directory
 
@@ -126,6 +127,9 @@ def translate(
     :param outdir: directory to put results in
     :return: True on success, False on failure
     """
+    if outdir is None:
+        outdir = Path(".")
+
     log.info("Generating model for %s ...", model)
     # Currenly only support sympy; envision others being added in future
     if translator == "sympy":
@@ -134,7 +138,7 @@ def translate(
             outfile = outdir.joinpath(model + ".py")
             with outfile.open("w") as file:
                 file.write(result)
-        except (IOError, OSError):
+        except OSError:
             if log.level is logging.DEBUG:
                 log.exception('Error writing "%s"', outfile)
             else:
@@ -222,7 +226,7 @@ def main(argv: List[str]) -> int:
             errors += 1
 
     # Build target generator options dict from args
-    options = dict()
+    options = {}
     if args.option:
         for opt in args.option:
             optsplit = opt.split("=")

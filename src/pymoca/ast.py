@@ -2,13 +2,13 @@
 """
 Modelica AST definitions
 """
-from __future__ import print_function, absolute_import, division, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import json
-from enum import Enum
-from typing import List, Union, Dict, Type
 from collections import OrderedDict
+from enum import Enum
+from typing import Dict, List, Type, Union  # noqa: F401
 
 
 class ClassNotFoundError(Exception):

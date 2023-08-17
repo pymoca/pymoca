@@ -2,23 +2,18 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import print_function, absolute_import, division, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import copy
+from collections import OrderedDict, deque
+from typing import Dict, List, Union  # noqa: F401
 
 import antlr4
 import antlr4.Parser
-from typing import Dict, List, Union
-from collections import deque, OrderedDict
-import copy
 
 from . import ast
-
-# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaLexer import ModelicaLexer
-
-# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaListener import ModelicaListener
-
-# noinspection PyUnresolvedReferences,PyUnresolvedReferences
 from .generated.ModelicaParser import ModelicaParser
 
 

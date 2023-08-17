@@ -1,22 +1,22 @@
+import contextlib
+import fnmatch
 import itertools
-from collections import namedtuple
+import logging
+import os
+import pickle
 from enum import IntEnum
 from typing import Dict
+
 import casadi as ca
+
 import numpy as np
-import copy
-import sys
-import os
-import fnmatch
-import logging
-import pickle
-import contextlib
 
 from pymoca import __version__
+
 from . import generator
+from ._options import _merge_default_options
 from .alias_relation import AliasRelation
-from .model import CASADI_ATTRIBUTES, Model, Variable, DelayArgument
-from ._options import _merge_default_options, _get_default_options as get_default_options
+from .model import CASADI_ATTRIBUTES, DelayArgument, Model, Variable
 
 logger = logging.getLogger("pymoca")
 
@@ -108,7 +108,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     # Load folders
     tree = None
     for folder in [model_folder] + compiler_options["library_folders"]:
-        for root, dir, files in os.walk(folder, followlinks=True):
+        for root, _dir, files in os.walk(folder, followlinks=True):
             for item in fnmatch.filter(files, "*.mo"):
                 logger.info("Parsing {}".format(item))
 
@@ -174,7 +174,7 @@ def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
         # link() directly with our desired filename instead of
         # link_shared_lib().
         compiler.link(compiler.SHARED_LIBRARY, [object_name], library, extra_preargs=linker_flags)
-    except:
+    except Exception:
         raise
     finally:
         with contextlib.suppress(FileNotFoundError):
@@ -241,7 +241,7 @@ def save_model(
         # Metadata dependency checking
         parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
 
-        for k, key in enumerate(["states", "alg_states", "inputs", "parameters", "constants"]):
+        for key in ["states", "alg_states", "inputs", "parameters", "constants"]:
             metadata_shape = (len(getattr(model, key)), len(CASADI_ATTRIBUTES))
             m = db[key + "__metadata_dependent"] = np.zeros(metadata_shape, dtype=int)
             if np.prod(m.shape) > 0:
@@ -308,7 +308,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         # Mtime check
         cache_mtime = os.path.getmtime(db_file)
         for folder in [model_folder] + compiler_options["library_folders"]:
-            for root, dir, files in os.walk(folder, followlinks=True):
+            for root, _dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
                     filename = os.path.join(root, item)
                     if os.path.getmtime(filename) > cache_mtime:
@@ -362,7 +362,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         variable_dict = {}
         for key in variables_with_metadata:
             variables = getattr(model, key)
-            for i, d in enumerate(db[key]):
+            for d in db[key]:
                 variable = Variable.from_dict(d)
                 variables.append(variable)
                 variable_dict[variable.symbol.name()] = variable
@@ -391,7 +391,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
             )
         )
 
-        for k, key in enumerate(variables_with_metadata):
+        for key in variables_with_metadata:
             m = db[key + "__metadata_dependent"]
             for i, d in enumerate(db[key]):
                 variable = variable_dict[d["name"]]

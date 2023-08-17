@@ -3,14 +3,13 @@
 Tools for tree walking and visiting etc.
 """
 
-from __future__ import print_function, absolute_import, division, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy  # TODO
 import logging
 import sys
 from collections import OrderedDict
-from typing import Union, Iterable
-import os
+from typing import Iterable, Union
 
 import numpy as np
 
@@ -230,7 +229,7 @@ class TreeWalker:
         """
         name = tree.__class__.__name__
         if hasattr(listener, "enterEvery"):
-            getattr(listener, "enterEvery")(tree)
+            listener.enterEvery(tree)
         if hasattr(listener, "enter" + name):
             getattr(listener, "enter" + name)(tree)
         for child_name in self.order_keys(tree.__dict__.keys()):
@@ -238,7 +237,7 @@ class TreeWalker:
                 continue
             self.handle_walk(listener, tree.__dict__[child_name])
         if hasattr(listener, "exitEvery"):
-            getattr(listener, "exitEvery")(tree)
+            listener.exitEvery(tree)
         if hasattr(listener, "exit" + name):
             getattr(listener, "exit" + name)(tree)
 
@@ -376,7 +375,7 @@ def build_instance_tree(
             extended_orig_class.classes[argument.name] = scope_class.find_class(argument.component)
 
             # Fix references to symbol types that were already in the instance tree
-            for sym_name, sym in extended_orig_class.symbols.items():
+            for sym in extended_orig_class.symbols.values():
                 if isinstance(sym.type, ast.InstanceClass) and sym.type.name is old_class.name:
                     c = extended_orig_class.classes[argument.name]
                     sym.type = build_instance_tree(c, sym.class_modification, c.parent)
@@ -429,7 +428,7 @@ def build_instance_tree(
 
     # Check that all symbol modifications to be applied on this class exist
     for arg in extended_orig_class.modification_environment.arguments:
-        if not arg.value.component.name in extended_orig_class.symbols:
+        if arg.value.component.name not in extended_orig_class.symbols:
             raise ModificationTargetNotFound(
                 "Trying to modify symbol {}, which does not exist in class {}".format(
                     arg.value.component.name, extended_orig_class.full_reference()
@@ -807,7 +806,7 @@ class FunctionExpander(TreeListener):
 
                 tree.operator = full_name
                 self.function_set[full_name] = function_class
-            except (KeyError, ast.ClassNotFoundError) as e:
+            except (KeyError, ast.ClassNotFoundError):
                 # Assume built-in function
                 pass
 
@@ -965,7 +964,7 @@ class ConstantReferenceApplier(TreeListener):
         c.symbols.update(syms)
 
     def enterClass(self, tree: ast.InstanceClass):
-        assert False, "All classes should have been replaced by instance classes."
+        raise AssertionError("All classes should have been replaced by instance classes.")
 
 
 def apply_constant_references(class_: ast.InstanceClass) -> None:
