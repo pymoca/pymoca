@@ -1,8 +1,8 @@
-from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function, print_function, unicode_literals
 
 import copy
 import os
-from typing import List, Dict, Union
+from typing import Dict, List, Union  # noqa: F401
 
 import jinja2
 

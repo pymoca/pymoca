@@ -14,6 +14,7 @@ from pymoca.backends.xml import analysis, generator, sim_scipy
 from pymoca.backends.xml import parser as xml_parser
 from pymoca.backends.xml.analysis import plt
 
+
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(TEST_DIR, "models")
 GENERATED_DIR = os.path.join(TEST_DIR, "generated")

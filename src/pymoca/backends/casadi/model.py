@@ -1,16 +1,16 @@
-from collections import namedtuple, OrderedDict
-import casadi as ca
-import numpy as np
 import itertools
 import logging
 import re
 import sys
+from collections import OrderedDict, namedtuple
 
-from pymoca import ast
+import casadi as ca
 
+import numpy as np
+
+from ._options import _merge_default_options
 from .alias_relation import AliasRelation
 from .mtensor import _MTensor
-from ._options import _merge_default_options
 
 logger = logging.getLogger("pymoca")
 
@@ -172,8 +172,8 @@ class Model:
                 )
 
     @staticmethod
-    def _symbols(l):
-        return [v.symbol for v in l]
+    def _symbols(variables):
+        return [v.symbol for v in variables]
 
     def _substitute_delay_arguments(self, delay_arguments, symbols, values):
         exprs = ca.substitute(
@@ -203,7 +203,7 @@ class Model:
         symbols_sx = [ca.SX.sym(x.name(), *x.shape) for x in symbols_mx]
         sx_equations = f_mx.call(symbols_sx)
 
-        sx_to_mx_map = {s: m for s, m in zip(symbols_sx, symbols_mx)}
+        sx_to_mx_map = dict(zip(symbols_sx, symbols_mx))
 
         def _sx_to_mx(sx_expr):
             if not sx_expr.is_scalar():
@@ -273,8 +273,15 @@ class Model:
         symbols = []
         values = []
 
-        for l in ["states", "der_states", "alg_states", "inputs", "parameters", "constants"]:
-            old_vars = getattr(self, l)
+        for vgroup in [
+            "states",
+            "der_states",
+            "alg_states",
+            "inputs",
+            "parameters",
+            "constants",
+        ]:
+            old_vars = getattr(self, vgroup)
             new_vars = []
             for old_var in old_vars:
                 # For delayed states we do not have any reliable shape
@@ -357,7 +364,7 @@ class Model:
                                     if old_var.python_type in {float, int}:
                                         val = old_var.python_type(val)
                                 else:
-                                    assert False, "Unexpected type from CasADi generator"
+                                    raise TypeError("Unexpected type from CasADi generator")
                             else:
                                 if np.prod(value.shape) == 1:
                                     # Just assign without indexing
@@ -416,7 +423,7 @@ class Model:
                 else:
                     new_vars.append(old_var)
 
-            setattr(self, l, new_vars)
+            setattr(self, vgroup, new_vars)
 
         if len(self.equations) > 0:
             self.equations = ca.substitute(self.equations, symbols, values)
@@ -486,7 +493,7 @@ class Model:
             # those of other parameters).
             current_parameters_and_constants = {*self.parameters, *self.constants}
 
-            for i in range(SUBSTITUTE_LOOP_LIMIT):
+            for _ in range(SUBSTITUTE_LOOP_LIMIT):
                 symbols, values = [], []
                 next_parameters_and_constants = []
 
@@ -544,7 +551,7 @@ class Model:
             if len(values) > 0:
                 # Resolve expressions that include other, non-simple parameter
                 # expressions.
-                for i in range(SUBSTITUTE_LOOP_LIMIT):
+                for _ in range(SUBSTITUTE_LOOP_LIMIT):
                     new_values = ca.substitute(values, symbols, values)
                     converged = ca.is_equal(
                         ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH
@@ -584,7 +591,7 @@ class Model:
             if len(values) > 0:
                 # Resolve expressions that include other, non-simple parameter
                 # expressions.
-                for i in range(SUBSTITUTE_LOOP_LIMIT):
+                for _ in range(SUBSTITUTE_LOOP_LIMIT):
                     new_values = ca.substitute(values, symbols, values)
                     converged = ca.is_equal(
                         ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH
@@ -885,7 +892,7 @@ class Model:
             if len(values) > 0:
                 # Resolve expressions that include other, non-simple parameter
                 # expressions.
-                for i in range(SUBSTITUTE_LOOP_LIMIT):
+                for _ in range(SUBSTITUTE_LOOP_LIMIT):
                     new_values = ca.substitute(values, variables, values)
                     converged = ca.is_equal(
                         ca.veccat(*values), ca.veccat(*new_values), CASADI_COMPARISON_DEPTH
@@ -1361,7 +1368,7 @@ class Model:
                     # Try casting to DM first, in case we have a nested list that needs to be interpreted as a matrix.
                     try:
                         value = ca.DM(value)
-                    except:
+                    except Exception:
                         pass
                     value = ca.MX(value)
                     if value.is_zero():

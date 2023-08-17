@@ -2,27 +2,28 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import print_function, absolute_import, division, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 import glob
+import os
+import re
 import unittest
-import itertools
 
 import casadi as ca
+
 import numpy as np
 
 import pymoca.backends.casadi.generator as gen_casadi
+from pymoca import parser
 from pymoca.backends.casadi.alias_relation import AliasRelation
+from pymoca.backends.casadi.api import CachedModel, transfer_model
 from pymoca.backends.casadi.model import (
     CASADI_ATTRIBUTES,
-    Model,
-    Variable,
-    StringVariable,
     DelayArgument,
+    Model,
+    StringVariable,
+    Variable,
 )
-from pymoca.backends.casadi.api import transfer_model, CachedModel
-from pymoca import parser, ast
 
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "models")
@@ -32,9 +33,9 @@ MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "models")
 class GenCasadiTest(unittest.TestCase):
     def assert_model_equivalent(self, A, B):
         def sstr(a):
-            return set([str(e) for e in a])
+            return {str(e) for e in a}
 
-        for l in [
+        for vgroup in [
             "alg_states",
             "states",
             "der_states",
@@ -44,7 +45,7 @@ class GenCasadiTest(unittest.TestCase):
             "parameters",
             "string_parameters",
         ]:
-            self.assertEqual(sstr(getattr(A, l)), sstr(getattr(B, l)))
+            self.assertEqual(sstr(getattr(A, vgroup)), sstr(getattr(B, vgroup)))
 
     def assert_model_variables_equivalant(self, A, B):
         for vgroup in [
@@ -122,6 +123,7 @@ class GenCasadiTest(unittest.TestCase):
                         if a[j, k].is_regular() or b[j, k].is_regular():
                             test = float(ca.norm_2(ca.vec(a[j, k] - b[j, k]))) <= tol
                             if not test:
+                                print(i)
                                 print(j)
                                 print(k)
                                 print(a[j, k])
@@ -177,10 +179,8 @@ class GenCasadiTest(unittest.TestCase):
         with open(os.path.join(MODEL_DIR, "Aircraft.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
-        # noinspection PyUnusedLocal
-        casadi_model = gen_casadi.generate(ast_tree, "Aircraft")
-        # noinspection PyUnusedLocal
-        ref_model = Model()
+        casadi_model = gen_casadi.generate(ast_tree, "Aircraft")  # noqa: F841
+        ref_model = Model()  # noqa: F841
         self.assertTrue(True)
 
     def test_connector_hq(self):
@@ -467,8 +467,6 @@ class GenCasadiTest(unittest.TestCase):
         x = ca.MX.sym("x")
         der_x = ca.MX.sym("der(x)")
         y = ca.MX.sym("y")
-        # noinspection PyUnusedLocal
-        der_y = ca.MX.sym("y")
         k = ca.MX.sym("k")
 
         ref_model.states = list(map(Variable, [x]))
@@ -648,7 +646,7 @@ class GenCasadiTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         casadi_model = gen_casadi.generate(ast_tree, "FunctionCall")
         print("FunctionCall", casadi_model)
-        ref_model = Model()
+        ref_model = Model()  # noqa: F841
 
         # Check that both instances of the function call refer to the same node in the tree
         func_a = casadi_model.equations[0].dep(1).dep(0).dep(0).dep(0).getFunction().__hash__()
@@ -787,7 +785,7 @@ class GenCasadiTest(unittest.TestCase):
         C = ca.MX.sym("C", 2, 3)
         D = ca.MX.sym("D", 3, 2)
         E = ca.MX.sym("E", 2, 3)
-        I = ca.MX.sym("I", 5, 5)
+        I = ca.MX.sym("I", 5, 5)  # noqa: E741
         F = ca.MX.sym("F", 3, 3)
         G = ca.MX.sym("G", 3, 3)
 
@@ -889,7 +887,7 @@ class GenCasadiTest(unittest.TestCase):
 
             x = _array_mx("x", 3)
             y = _array_mx("y", 3)
-            a = _array_mx("a", 3)
+            a = _array_mx("a", 3)  # noqa: F841
             z = _array_mx("z", 3)
             at3_delayed = _array_mx("_pymoca_delay_0", 2)
             delay_time = ca.MX.sym("delay_time")
@@ -1010,8 +1008,7 @@ class GenCasadiTest(unittest.TestCase):
     def test_type(self):
         with open(os.path.join(MODEL_DIR, "Type.mo"), "r") as f:
             txt = f.read()
-        # noinspection PyUnusedLocal
-        ast_tree = parser.parse(txt)
+        ast_tree = parser.parse(txt)  # noqa: F841
         self.assertTrue(True)
 
     def test_cache_metadata(self):
@@ -2318,21 +2315,21 @@ class GenCasadiTest(unittest.TestCase):
 
         ast_tree = parser.parse(txt)
         try:
-            casadi_model = gen_casadi.generate(ast_tree, "B")
+            casadi_model = gen_casadi.generate(ast_tree, "B")  # noqa: F841
         except Exception as e:
             assert (
                 e.args[0] == "Dimension 2 of definition and " "value for symbol a.y differs: 4 != 3"
             )
             return
 
-        assert False, "No exception raised on wrong dimensionality."
+        self.assertFalse(True, "No exception raised on wrong dimensionality.")
 
     def test_skip_annotations(self):
         with open(os.path.join(MODEL_DIR, "Annotations.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
 
-        casadi_model = gen_casadi.generate(ast_tree, "A")
+        casadi_model = gen_casadi.generate(ast_tree, "A")  # noqa: F841
 
     def test_size_one_array(self):
         txt = """
@@ -2630,13 +2627,13 @@ class GenCasadiTest(unittest.TestCase):
             end Test;"""
 
         ast_tree = parser.parse(txt)
-        try:
+        with self.assertRaisesRegex(
+            AssertionError, "Dimensions higher than two are not yet supported"
+        ):
             casadi_model = gen_casadi.generate(ast_tree, "Test", {"expand_vectors": True})
             casadi_model.simplify({"expand_vectors": True})
-        except AssertionError as e:
-            assert e.args[0] == "Dimensions higher than two are not yet supported"
-            return
-        assert false
+
+        return
 
         # This will be an interesting test case once we do decide to support dimensions higher
         # than two. The output should then be as follows.
@@ -2703,15 +2700,14 @@ class GenCasadiTest(unittest.TestCase):
                 end Test;"""
 
         ast_tree = parser.parse(txt)
-        try:
-            casadi_model = gen_casadi.generate(ast_tree, "Test")
-        except Exception as e:
-            assert (
-                e.args[0] == "Index 4 of symbol x is out of bounds. Index should be in range "
+        with self.assertRaisesRegex(
+            Exception,
+            re.escape(
+                "Index 4 of symbol x is out of bounds. Index should be in range "
                 "[1,3] (Modelica uses 1-based indexing)."
-            )
-            return
-        assert false
+            ),
+        ):
+            casadi_model = gen_casadi.generate(ast_tree, "Test")  # noqa: F841
 
     def test_1based_indexing_error(self):
         txt = """
@@ -2722,15 +2718,14 @@ class GenCasadiTest(unittest.TestCase):
                         end Test;"""
 
         ast_tree = parser.parse(txt)
-        try:
-            casadi_model = gen_casadi.generate(ast_tree, "Test")
-        except Exception as e:
-            assert (
-                e.args[0] == "Index 0 of symbol x is out of bounds. Index should be in range "
+        with self.assertRaisesRegex(
+            Exception,
+            re.escape(
+                "Index 0 of symbol x is out of bounds. Index should be in range "
                 "[1,3] (Modelica uses 1-based indexing)."
-            )
-            return
-        assert false
+            ),
+        ):
+            casadi_model = gen_casadi.generate(ast_tree, "Test")  # noqa: F841
 
     def test_nested_indexing_error(self):
         txt = """
@@ -2746,15 +2741,14 @@ class GenCasadiTest(unittest.TestCase):
             end Test;"""
 
         ast_tree = parser.parse(txt)
-        try:
-            casadi_model = gen_casadi.generate(ast_tree, "Test")
-        except Exception as e:
-            assert (
-                e.args[0] == "Index 4 of symbol x in nested symbol a.x is out of bounds. "
+        with self.assertRaisesRegex(
+            Exception,
+            re.escape(
+                "Index 4 of symbol x in nested symbol a.x is out of bounds. "
                 "Index should be in range [1,3] (Modelica uses 1-based indexing)."
-            )
-            return
-        assert false
+            ),
+        ):
+            casadi_model = gen_casadi.generate(ast_tree, "Test")  # noqa: F841
 
     def test_index_at_wrong_symbol_error(self):
         txt = """
@@ -2771,15 +2765,14 @@ class GenCasadiTest(unittest.TestCase):
             end Test;"""
 
         ast_tree = parser.parse(txt)
-        try:
-            casadi_model = gen_casadi.generate(ast_tree, "Test")
-        except Exception as e:
-            assert (
-                e.args[0] == "Symbol a in nested symbol a.x was given an index of 1 "
+        with self.assertRaisesRegex(
+            Exception,
+            re.escape(
+                "Symbol a in nested symbol a.x was given an index of 1 "
                 "but this symbol is not an array."
-            )
-            return
-        assert false
+            ),
+        ):
+            casadi_model = gen_casadi.generate(ast_tree, "Test")  # noqa: F841
 
     def test_2d_index_at_wrong_symbol_error(self):
         txt = """
@@ -2794,15 +2787,14 @@ class GenCasadiTest(unittest.TestCase):
             end Test;"""
 
         ast_tree = parser.parse(txt)
-        try:
-            casadi_model = gen_casadi.generate(ast_tree, "Test")
-        except Exception as e:
-            assert (
-                e.args[0] == "Too many indices found for symbol a in nested symbol a.x, "
+        with self.assertRaisesRegex(
+            Exception,
+            re.escape(
+                "Too many indices found for symbol a in nested symbol a.x, "
                 "check if the symbol has the correct dimensions."
-            )
-            return
-        assert false
+            ),
+        ):
+            casadi_model = gen_casadi.generate(ast_tree, "Test")  # noqa: F841
 
     def test_nested_constants(self):
         txt = """

@@ -206,7 +206,7 @@ class ModelListener:
             }
         )
 
-    def exit_classDefinition(self, tree: etree._Element):  # noqa: too-complex
+    def exit_classDefinition(self, tree: etree._Element):
         dae = HybridDae()
         dae.t = self.scope["time"]
         self.model[tree] = dae

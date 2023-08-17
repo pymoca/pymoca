@@ -13,9 +13,7 @@ import scipy.integrate
 from .model import HybridOde
 
 
-def sim(  # noqa: too-complex
-    model: HybridOde, options: Dict = None, user_callback=None
-) -> Dict[str, np.array]:
+def sim(model: HybridOde, options: Dict = None, user_callback=None) -> Dict[str, np.array]:
     """
     Simulates a Dae model.
 

@@ -2,17 +2,17 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function, print_function, unicode_literals
 
 import os
 import sys
+import threading
 import time
 import unittest
-import threading
 
+from pymoca import ast
 from pymoca import parser
 from pymoca import tree
-from pymoca import ast
 
 MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(MY_DIR, "models")
@@ -81,7 +81,7 @@ class ParseTest(unittest.TestCase):
 
         # Use a timeout of 5 seconds. We check every 100 ms sec, such that the
         # test is fast to succeed when everything works as expected.
-        for i in range(50):
+        for _ in range(50):
             time.sleep(0.1)
             if not thread.is_alive():
                 return
@@ -127,7 +127,7 @@ class ParseTest(unittest.TestCase):
         with open(os.path.join(MODEL_DIR, "Connector.mo"), "r") as f:
             txt = f.read()
         # noinspection PyUnusedLocal
-        ast_tree = parser.parse(txt)
+        ast_tree = parser.parse(txt)  # noqa: F841
         # states = ast_tree.classes['Aircraft'].states
         # names = sorted([state.name for state in states])
         # names_set = sorted(list(set(names)))
@@ -181,7 +181,7 @@ class ParseTest(unittest.TestCase):
 
         for c in ["Good1", "Good2"]:
             ast_tree = parser.parse(txt)
-            flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name=c))
+            flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name=c))  # noqa: F841
 
     def test_tree_lookup(self):
         with open(os.path.join(MODEL_DIR, "TreeLookup.mo"), "r") as f:
@@ -372,7 +372,7 @@ class ParseTest(unittest.TestCase):
         comp_ref = ast.ComponentRef.from_string(class_name)
 
         with self.assertRaisesRegex(Exception, "Cannot extend class 'A' with itself"):
-            flat_tree = tree.flatten(ast_tree, comp_ref)
+            flat_tree = tree.flatten(ast_tree, comp_ref)  # noqa: F841
 
     def test_unit_type(self):
         txt = """
@@ -596,7 +596,7 @@ class ParseTest(unittest.TestCase):
         model_name = "ModelicaCompliance.Scoping.NameLookup.Imports.ExtendImport"
         flat_class = ast.ComponentRef.from_string(model_name)
         with self.assertRaises(ast.ClassNotFoundError):
-            flat_ast = tree.flatten(library_ast, flat_class)
+            flat_ast = tree.flatten(library_ast, flat_class)  # noqa: F841
 
     # Tests using the Modelica Standard Library
     def test_msl_opamp_units(self):

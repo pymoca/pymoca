@@ -2,7 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import print_function, absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
@@ -10,9 +10,9 @@ import time
 import unittest
 
 import pymoca.backends.sympy.generator as gen_sympy
+from pymoca import ast
 from pymoca import parser
 from pymoca import tree
-from pymoca import ast
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(TEST_DIR, "models")
@@ -48,8 +48,7 @@ class GenSympyTest(unittest.TestCase):
         e = Estimator()
         e.linearize_symbolic()
         e.linearize()
-        # noinspection PyUnusedLocal
-        res = e.simulate(x0=[1.0])
+        res = e.simulate(x0=[1.0])  # noqa: F841
         self.flush()
 
     def test_spring(self):
@@ -66,8 +65,7 @@ class GenSympyTest(unittest.TestCase):
         e = SpringSystem()
         e.linearize_symbolic()
         e.linearize()
-        # noinspection PyUnusedLocal
-        res = e.simulate(x0=[1.0, 1.0])
+        res = e.simulate(x0=[1.0, 1.0])  # noqa: F841
         self.flush()
 
     def test_aircraft(self):
@@ -83,8 +81,7 @@ class GenSympyTest(unittest.TestCase):
         e = Aircraft()
         e.linearize_symbolic()
         e.linearize()
-        # noinspection PyUnusedLocal
-        res = e.simulate()
+        res = e.simulate()  # noqa: F841
         self.flush()
 
     def test_quad(self):
@@ -100,8 +97,7 @@ class GenSympyTest(unittest.TestCase):
         e = Quad()
         e.linearize_symbolic()
         e.linearize()
-        # noinspection PyUnusedLocal
-        res = e.simulate()
+        res = e.simulate()  # noqa: F841
         self.flush()
 
     @unittest.skip
@@ -111,16 +107,12 @@ class GenSympyTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
         # print(ast_tree)
 
-        # noinspection PyUnusedLocal
-        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="Aircraft"))
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="Aircraft"))  # noqa: F841
         # print(flat_tree)
 
-        # noinspection PyUnusedLocal
-        walker = tree.TreeWalker()
-        # noinspection PyUnusedLocal
-        classes = ast_tree.classes
-        # noinspection PyUnusedLocal
-        root = ast_tree.classes["Aircraft"]
+        walker = tree.TreeWalker()  # noqa: F841
+        classes = ast_tree.classes  # noqa: F841
+        root = ast_tree.classes["Aircraft"]  # noqa: F841
 
         # instantiator = tree.Instantiator(classes=classes)
         # walker.walk(instantiator, root)
@@ -170,8 +162,7 @@ class GenSympyTest(unittest.TestCase):
         e = ForcedSpringSystem()
         e.linearize_symbolic()
         e.linearize()
-        # noinspection PyUnusedLocal
-        res = e.simulate(x0=[1.0, 1.0])
+        res = e.simulate(x0=[1.0, 1.0])  # noqa: F841
         self.flush()
 
 
