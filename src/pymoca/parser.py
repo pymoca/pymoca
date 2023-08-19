@@ -90,7 +90,7 @@ class ASTListener(ModelicaListener):
     def exitShort_class_definition(self, ctx):
         self.ast[ctx] = ast.ShortClassDefinition(name=ctx.IDENT().getText(),
                                                  type=ctx.class_prefixes().class_type().getText(),
-                                                 component=self.ast[ctx.component_reference()])
+                                                 component=self.ast[ctx.component_reference()],)
 
     def exitClass_spec_comp(self, ctx: ModelicaParser.Class_spec_compContext):
         class_node = self.class_node
@@ -213,7 +213,7 @@ class ASTListener(ModelicaListener):
     def exitEquation_simple(self, ctx: ModelicaParser.Equation_simpleContext):
         self.ast[ctx] = ast.Equation(
             left=self.ast[ctx.simple_expression()],
-            right=self.ast[ctx.expression()])
+            right=self.ast[ctx.expression()],)
 
     def exitEquation_if(self, ctx: ModelicaParser.Equation_ifContext):
         self.ast[ctx] = self.ast[ctx.if_equation()]
@@ -248,7 +248,7 @@ class ASTListener(ModelicaListener):
     def exitFor_equation(self, ctx: ModelicaParser.For_equationContext):
         self.ast[ctx] = ast.ForEquation(
             indices=self.ast[ctx.for_indices()],
-            equations =self.ast[ctx.equation_block()])
+            equations=self.ast[ctx.equation_block()],)
 
     def exitConnect_clause(self, ctx: ModelicaParser.Connect_clauseContext):
         self.ast[ctx] = ast.ConnectClause(
@@ -278,7 +278,7 @@ class ASTListener(ModelicaListener):
     def exitStatement_component_reference(self, ctx: ModelicaParser.Statement_component_referenceContext):
         self.ast[ctx] = ast.AssignmentStatement(
             left=[self.ast[ctx.component_reference()]],
-            right=self.ast[ctx.expression()])
+            right=self.ast[ctx.expression()],)
 
     def exitStatement_component_function(self, ctx: ModelicaParser.Statement_component_functionContext):
         all_comp_refs = [self.ast[x] for x in ctx.component_reference()]
@@ -323,7 +323,7 @@ class ASTListener(ModelicaListener):
     def exitFor_statement(self, ctx: ModelicaParser.For_statementContext):
         self.ast[ctx] = ast.ForStatement(
             indices=self.ast[ctx.for_indices()],
-            statements=self.ast[ctx.statement_block()])
+            statements=self.ast[ctx.statement_block()],)
 
     # EXPRESSIONS ===========================================================
 
@@ -356,25 +356,25 @@ class ASTListener(ModelicaListener):
     def exitExpr_add(self, ctx: ModelicaParser.Expr_addContext):
         self.ast[ctx] = ast.Expression(
             operator=ctx.op.text,
-            operands=[self.ast[e] for e in ctx.expr()]
+            operands=[self.ast[e] for e in ctx.expr()],
         )
 
     def exitExpr_exp(self, ctx: ModelicaParser.Expr_expContext):
         self.ast[ctx] = ast.Expression(
             operator=ctx.op.text,
-            operands=[self.ast[e] for e in ctx.primary()]
+            operands=[self.ast[e] for e in ctx.primary()],
         )
 
     def exitExpr_mul(self, ctx: ModelicaParser.Expr_mulContext):
         self.ast[ctx] = ast.Expression(
             operator=ctx.op.text,
-            operands=[self.ast[e] for e in ctx.expr()]
+            operands=[self.ast[e] for e in ctx.expr()],
         )
 
     def exitExpr_rel(self, ctx: ModelicaParser.Expr_relContext):
         self.ast[ctx] = ast.Expression(
             operator=ctx.op.text,
-            operands=[self.ast[e] for e in ctx.expr()]
+            operands=[self.ast[e] for e in ctx.expr()],
         )
 
     def exitExpr_not(self, ctx: ModelicaParser.Expr_notContext):
@@ -386,13 +386,13 @@ class ASTListener(ModelicaListener):
     def exitExpr_and(self, ctx: ModelicaParser.Expr_andContext):
         self.ast[ctx] = ast.Expression(
             operator='and',
-            operands=[self.ast[e] for e in ctx.expr()]
+            operands=[self.ast[e] for e in ctx.expr()],
         )
 
     def exitExpr_or(self, ctx: ModelicaParser.Expr_orContext):
         self.ast[ctx] = ast.Expression(
             operator='or',
-            operands=[self.ast[e] for e in ctx.expr()]
+            operands=[self.ast[e] for e in ctx.expr()],
         )
 
     def exitExpr_signed(self, ctx: ModelicaParser.Expr_signedContext):
