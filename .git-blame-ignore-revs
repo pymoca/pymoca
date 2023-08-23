@@ -1,0 +1,25 @@
+# This file contains revisions to be ignored by git blame.
+# These revisions are expected to be formatting-only changes.
+#
+# Calling `git blame --ignore-revs-file .git-blame-ignore-revs` will
+# tell git blame to ignore changes made by these revisions when assigning
+# assigning blame, as if the change never happened.
+#
+# You can enable this as a default for your local repository by running
+# `git config blame.ignoreRevsFile .git-blame-ignore-revs`
+# This will probably be automatically picked by your IDE
+#
+# Important: if you are switching to the branch without this file,
+# `git blame` will fail with an error
+#
+# Guidelines:
+# - Only large automated refactorings are expected to be included in this file.
+#   Do not add new revision just because it feels unimportant
+# - Add a link to the relevant issue/MR
+
+# START https://github.com/pymoca/pymoca/pull/281
+a6c9d42b4d11b9e22db4bf927ed09708551810be
+19e3eaed2552a253b49d62b0c79c0fb5744a377e
+4bef88aadd7f05eafe52092d0e2172bb7babd96a
+999577de93e39e40170fb1464fff64620d3054b5
+# END https://github.com/pymoca/pymoca/pull/281
