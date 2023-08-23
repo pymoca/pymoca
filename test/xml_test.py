@@ -7,11 +7,11 @@ import sys
 import time
 import unittest
 
+# get matplotlib from analysis, since logic for plotting
+# without display already handled there
 import pymoca.parser as mo_parser
 from pymoca.backends.xml import analysis, generator, sim_scipy
 from pymoca.backends.xml import parser as xml_parser
-# get matplotlib from analysis, since logic for plotting
-# without display already handled there
 from pymoca.backends.xml.analysis import plt
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
