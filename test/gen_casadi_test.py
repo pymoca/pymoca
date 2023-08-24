@@ -3015,6 +3015,56 @@ class GenCasadiTest(unittest.TestCase):
         casadi_model.simplify(compiler_options)
         self.assertEqual(ineg.value, -1.0)
 
+    def test_resolve_parameter_values_lists(self):
+        """Test that `resolve_parameter_values` works for lists/arrays"""
+        txt = """
+            model A
+              parameter Real metadata[5] = {1.0, 2.0, 3.0, 4.0, 5.0};
+
+              parameter Real x = metadata[1];
+              Real y(min=metadata[2], max=metadata[3], nominal=10.0);
+              Real z(nominal=metadata[4]) = metadata[5];
+            end A;
+        """
+
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, 'A')
+
+        ref_model = Model()
+        metadata = ca.MX.sym('metadata', 5)
+        x = ca.MX.sym('x')
+        y = ca.MX.sym('y')
+        z = ca.MX.sym('z')
+
+        ref_model.parameters = list(map(Variable, [metadata, x]))
+        ref_model.alg_states = list(map(Variable, [y, z]))
+
+        metadata_values = [1.0, 2.0, 3.0, 4.0, 5.0]
+        ref_model.parameters[0].value = metadata_values
+
+        ref_model.parameters[1].value = metadata[0]
+
+        ref_model.alg_states[0].min = metadata[1]
+        ref_model.alg_states[0].max = metadata[2]
+        ref_model.alg_states[0].nominal = 10.0
+
+        ref_model.alg_states[1].nominal = metadata[3]
+
+        ref_model.equations = [z - metadata[4]]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
+        # First replace just the parameter values in the metadata (_not_ in the equations)
+        compiler_options = {'resolve_parameter_values': True}
+        casadi_model.simplify(compiler_options)
+
+        ref_model.parameters[1].value = metadata_values[0]
+        ref_model.alg_states[0].min = metadata_values[1]
+        ref_model.alg_states[0].max = metadata_values[2]
+        ref_model.alg_states[1].nominal = metadata_values[3]
+
+        self.assert_model_equivalent(ref_model, casadi_model)
+
 
 if __name__ == "__main__":
     unittest.main()

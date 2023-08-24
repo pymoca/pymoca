@@ -491,7 +491,7 @@ class Model:
                 next_parameters_and_constants = []
 
                 for p in current_parameters_and_constants:
-                    if isinstance(p.value, list):
+                    if isinstance(p.value, (list, np.ndarray)):
                         p.value = np.array(p.value)
 
                         if not np.issubdtype(p.value.dtype, np.number):
@@ -501,7 +501,7 @@ class Model:
 
                         if not np.any(np.isnan(p.value)):
                             symbols.append(p.symbol)
-                            values.append(value)
+                            values.append(p.value)
                     else:
                         value = ca.MX(p.value)
                         if value.is_constant() and value.is_regular():
