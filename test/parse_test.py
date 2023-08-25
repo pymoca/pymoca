@@ -4,15 +4,24 @@ Modelica parse Tree to AST tree.
 """
 from __future__ import absolute_import, division, print_function, print_function, unicode_literals
 
+import contextlib
+import enum
+import logging
 import os
+import sqlite3
 import sys
+import tempfile
 import threading
 import time
 import unittest
+from pathlib import Path
 
+import pymoca
 from pymoca import ast
 from pymoca import parser
 from pymoca import tree
+from pymoca.parser import DEFAULT_MODEL_CACHE_DB
+
 
 MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(MY_DIR, "models")
@@ -20,6 +29,34 @@ COMPLIANCE_DIR = os.path.join(MY_DIR, "libraries", "Modelica-Compliance", "Model
 IMPORTS_DIR = os.path.join(COMPLIANCE_DIR, "Scoping", "NameLookup", "Imports")
 MSL3_DIR = os.path.join(MY_DIR, "libraries", "MSL-3.2.3")
 MSL4_DIR = os.path.join(MY_DIR, "libraries", "MSL-4.0.x")
+
+
+class WorkDirState(enum.Enum):
+    CLEAN = "clean"
+    DIRTY = "dirty"
+
+
+@contextlib.contextmanager
+def modify_version(version_type: WorkDirState):
+    pymoca_version = pymoca.__version__
+    if pymoca_version.endswith(".dirty"):
+        clean_version = pymoca_version[:-6]
+    else:
+        clean_version = pymoca_version
+
+    dirty_version = clean_version + ".dirty"
+
+    if version_type == WorkDirState.CLEAN:
+        pymoca.__version__ = clean_version
+    elif version_type == WorkDirState.DIRTY:
+        pymoca.__version__ = dirty_version
+    else:
+        raise ValueError("Unknown version type")
+
+    try:
+        yield
+    finally:
+        pymoca.__version__ = pymoca_version
 
 
 class ParseTest(unittest.TestCase):
@@ -712,6 +749,288 @@ class ParseTest(unittest.TestCase):
         self.assertIsNone(flat_tree.classes[class_name].symbols["d.c.y"].value.value)
         self.assertEqual(flat_tree.classes[class_name].equations[0].left.name, "d.c.y")
         self.assertEqual(flat_tree.classes[class_name].equations[0].right.value, 4)
+
+    def test_parse_cache_hit(self):
+        """Test caching of models"""
+
+        txt = """
+            model A
+              parameter Real x, y;
+            equation
+              der(y) = x;
+            end A;
+        """
+
+        with modify_version(WorkDirState.CLEAN), tempfile.TemporaryDirectory() as tmpdirname:
+            full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+
+            # The cache database should not exist yet
+            self.assertFalse(full_db_path.exists())
+
+            _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+            # And now the database _should exist_, and we check its contents
+            # where we expect to find a single cached entry
+            self.assertTrue(full_db_path.exists())
+
+            conn = sqlite3.connect(full_db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT value FROM metadata WHERE key='created_at'")
+            first_created_at = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT last_hit FROM models")
+            first_hit_time = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM models")
+            self.assertEqual(cursor.fetchone()[0], 1)
+
+            # Parse again to update the cache hit time
+            _ = parser.parse(txt, model_cache_folder=Path(tmpdirname), always_update_last_hit=True)
+
+            cursor.execute("SELECT value FROM metadata WHERE key='created_at'")
+            second_created_at = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT last_hit FROM models")
+            second_hit_time = cursor.fetchone()[0]
+
+            # Check that the created_at time was _not_ updated, i.e. the
+            # database was not recreated for some reason.
+            self.assertEqual(first_created_at, second_created_at)
+
+            # Check that, if we parse it _again_, the `last_hit` updates
+            self.assertGreater(second_hit_time, first_hit_time)
+
+            # Check that there's still only one model in the cache
+            cursor.execute("SELECT COUNT(*) FROM models")
+            self.assertEqual(cursor.fetchone()[0], 1)
+
+            cursor.close()
+            conn.close()
+
+    def test_parse_cache_purge(self):
+        """Test that models that have not been hit in N days are purged"""
+
+        model_a = """
+            model A
+              parameter Real x, y;
+            equation
+              der(y) = x;
+            end A;
+        """
+
+        model_b = """
+            model B
+              parameter Real x, y;
+            equation
+              der(y) = x;
+            end B;
+        """
+
+        with modify_version(WorkDirState.CLEAN), tempfile.TemporaryDirectory() as tmpdirname:
+            full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+
+            # Parse the models to add them to the cache
+            for txt in [model_a, model_b]:
+                _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+            conn = sqlite3.connect(full_db_path)
+            cursor = conn.cursor()
+
+            # Check that the models are in the cache
+            cursor.execute("SELECT COUNT(*) FROM models")
+            self.assertEqual(cursor.fetchone()[0], 2)
+
+            cursor.execute("SELECT value FROM metadata WHERE key='last_prune'")
+            first_prune_time = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT value FROM metadata WHERE key='created_at'")
+            first_created_at = int(cursor.fetchone()[0])
+
+            # Reimport the module to force a cache purge check, but with an
+            # expiration time such that the models should not be purged
+            import importlib
+
+            importlib.reload(parser)
+
+            _ = parser.parse(
+                model_b,
+                model_cache_folder=Path(tmpdirname),
+                cache_expiration_days=1,
+            )
+
+            cursor.execute("SELECT COUNT(*) FROM models")
+            self.assertEqual(cursor.fetchone()[0], 2)
+
+            # Reimport the module again, but now we force a purge by setting
+            # expiration to zero
+            importlib.reload(parser)
+
+            _ = parser.parse(
+                model_b,
+                model_cache_folder=Path(tmpdirname),
+                cache_expiration_days=0,
+            )
+
+            cursor.execute("SELECT value FROM metadata WHERE key='last_prune'")
+            second_prune_time = int(cursor.fetchone()[0])
+
+            cursor.execute("SELECT value FROM metadata WHERE key='created_at'")
+            second_created_at = int(cursor.fetchone()[0])
+
+            # Check that the other model has been purged from the cache.
+            cursor.execute("SELECT COUNT(*) FROM models")
+            self.assertEqual(cursor.fetchone()[0], 1)
+
+            # Check that the last prune time was updated
+            self.assertGreater(second_prune_time, first_prune_time)
+
+            # And that the creation time was not
+            self.assertEqual(first_created_at, second_created_at)
+
+            cursor.close()
+            conn.close()
+
+    def test_dirty_no_caching(self):
+        """Test cache and cache creation bypass if working directory is dirty"""
+
+        txt = """
+            model A
+              parameter Real x, y;
+            equation
+              der(y) = x;
+            end A;
+        """
+
+        with modify_version(WorkDirState.DIRTY), tempfile.TemporaryDirectory() as tmpdirname:
+            full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+
+            # The cache database should not exist yet
+            self.assertFalse(full_db_path.exists())
+
+            _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+            # And now the database should not exist
+            self.assertFalse(full_db_path.exists())
+
+    def test_unpickling_error(self):
+        """Test that we can handle unpickling errors, and then recreate the cache entry"""
+
+        txt = """
+            model A
+              parameter Real x, y;
+            equation
+              der(y) = x;
+            end A;
+        """
+
+        with modify_version(WorkDirState.CLEAN), tempfile.TemporaryDirectory() as tmpdirname:
+            full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+
+            # The cache database should not exist yet
+            self.assertFalse(full_db_path.exists())
+
+            _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+            self.assertTrue(full_db_path.exists())
+
+            # Modify the single entry in the cache to make it unpickleable
+            conn = sqlite3.connect(full_db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT txt_hash FROM models")
+            txt_hash = cursor.fetchone()[0]
+            cursor.execute(
+                "UPDATE models SET data = ? WHERE txt_hash = ?", (b"not a pickle", txt_hash)
+            )
+            conn.commit()
+
+            cursor.close()
+            conn.close()
+
+            # Check that we get log messages saying the cache entry is corrupt
+            logger = logging.getLogger("pymoca")
+            with self.assertLogs(logger, level="WARNING") as cm:
+                _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+                self.assertIn("failed to unpickle", cm.output[0])
+                n_warnings = len(cm.output)
+
+                # Check that we get no additional warnings when unpickling again
+                _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+                self.assertEqual(len(cm.output), n_warnings)
+
+    def test_incorrect_table_layout(self):
+        """Test that a corrupt cache file is ignored"""
+
+        txt = """
+            model A
+              parameter Real x, y;
+            equation
+              der(y) = x;
+            end A;
+        """
+
+        with modify_version(WorkDirState.CLEAN), tempfile.TemporaryDirectory() as tmpdirname:
+            full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+
+            # The cache database should not exist yet
+            self.assertFalse(full_db_path.exists())
+
+            # Create a database with incorrectly structured tables
+            conn = sqlite3.connect(full_db_path)
+            cursor = conn.cursor()
+
+            dummy_table_str = """
+                CREATE TABLE {} (
+                    wrong_key TEXT,
+                    wrong_value TEXT,
+                    PRIMARY KEY (wrong_key)
+                )
+            """
+
+            cursor.execute(dummy_table_str.format("models"))
+            cursor.execute(dummy_table_str.format("metadata"))
+
+            conn.close()
+
+            # And now the database should exist
+            self.assertTrue(full_db_path.exists())
+
+            # Check that we get log messages saying the layout is incorrect
+            logger = logging.getLogger("pymoca")
+            with self.assertLogs(logger, level="WARNING") as cm:
+                _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+                self.assertIn("Model text cache table layout didn't match", cm.output[0])
+                self.assertIn("Metadata table layout didn't match", cm.output[1])
+
+    def test_corrupt_cache_file(self):
+        """Test that a corrupt cache file is ignored"""
+
+        txt = """
+            model A
+              parameter Real x, y;
+            equation
+              der(y) = x;
+            end A;
+        """
+
+        with modify_version(WorkDirState.CLEAN), tempfile.TemporaryDirectory() as tmpdirname:
+            full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+
+            # The cache database should not exist yet
+            self.assertFalse(full_db_path.exists())
+
+            # Create a corrupt cache file
+            with open(full_db_path, "w") as f:
+                f.write("This is not a valid SQLite database file")
+
+            logger = logging.getLogger("pymoca")
+            with self.assertLogs(logger, level="WARNING") as cm:
+                _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+                self.assertIn("Model cache database is corrupt", cm.output[0])
 
 
 if __name__ == "__main__":
