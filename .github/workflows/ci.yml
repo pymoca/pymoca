@@ -18,22 +18,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: lsst-sqre/run-tox@v1
         with:
           python-version: "3.11"
-      - run: pip install tox
-      - run: tox -e flake8
+          tox-envs: "flake8"
 
   style-black:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: lsst-sqre/run-tox@v1
         with:
           python-version: "3.11"
-      - run: pip install tox
-      - run: tox -e black
+          tox-envs: "black"
 
   test:
     needs: [style-flake8, style-black]
@@ -47,13 +45,10 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    - uses: actions/setup-python@v4
+    - uses: lsst-sqre/run-tox@v1
       with:
         python-version: ${{ matrix.python-version }}
-    - run: |
-        python -m pip install --upgrade pip
-        pip install tox
-    - run: tox -e py
+        tox-envs: "py"
 
   coverage:
     needs: test
@@ -64,13 +59,10 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    - uses: actions/setup-python@v4
+    - uses: lsst-sqre/run-tox@v1
       with:
         python-version: "3.11"
-    - run: |
-        python -m pip install --upgrade pip
-        pip install tox
-    - run: tox -e coverage
+        tox-envs: "coverage"
     - uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
@@ -98,4 +90,3 @@ jobs:
       with:
         files: dist/*
         generate_release_notes: true
-        
