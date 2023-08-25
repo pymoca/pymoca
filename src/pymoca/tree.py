@@ -25,7 +25,6 @@ class ModificationTargetNotFound(Exception):
     pass
 
 
-# noinspection PyPep8Naming
 class TreeListener:
     """
     Defines interface for tree listeners.
@@ -811,7 +810,6 @@ class FunctionExpander(TreeListener):
                 pass
 
 
-# noinspection PyUnusedLocal
 def fully_scope_function_calls(
     node: ast.Tree, expression: ast.Expression, function_set: OrderedDict
 ) -> ast.Expression:
@@ -1033,7 +1031,6 @@ def expand_connectors(node: ast.Class) -> None:
                 if class_left is None:
                     # We may be connecting classes which are not connectors, such as Reals.
                     class_left = node.find_class(sym_left.type)
-                # noinspection PyUnusedLocal
                 class_right = getattr(sym_right, "__connector_type", None)
                 if class_right is None:
                     # We may be connecting classes which are not connectors, such as Reals.

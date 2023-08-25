@@ -46,7 +46,6 @@ OP_MAP = {
 ForLoopIndexedSymbol = namedtuple("ForLoopIndexedSymbol", ["tree", "transpose", "indices"])
 
 
-# noinspection PyPep8Naming,PyUnresolvedReferences
 class ForLoop:
     def __init__(self, generator, tree):
         self.tree = tree
@@ -91,7 +90,6 @@ class GeneratorWalker(TreeWalker):
         return sorted(keys, key=lambda attr: 0 if attr == "symbols" else 1)
 
 
-# noinspection PyPep8Naming,PyUnresolvedReferences
 class Generator(TreeListener):
     def __init__(self, root: ast.Tree, class_name: str, options: Dict[str, bool]):
         super(Generator, self).__init__()

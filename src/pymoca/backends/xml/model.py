@@ -40,7 +40,6 @@ class CasadiModel:
         return s
 
 
-# noinspection PyPep8Naming
 class HybridOde(CasadiModel):
     """Hybrid Oridinary Differential Equation Model"""
 
@@ -207,7 +206,6 @@ def permute(x: SYM, perm: List[int]) -> SYM:
     return ca.vertcat(*x_s)
 
 
-# noinspection PyPep8Naming,SpellCheckingInspection
 def blt(f: List[SYM], x: List[SYM]) -> Dict[str, Any]:
     """
     Sort equations by dependence
@@ -226,7 +224,6 @@ def blt(f: List[SYM], x: List[SYM]) -> Dict[str, Any]:
     }
 
 
-# noinspection PyPep8Naming
 def tangent_approx(f: SYM, x: SYM, a: SYM = None, assert_linear: bool = False) -> Dict[str, SYM]:
     """
     Create a tangent approximation of a non-linear function f(x) about point a

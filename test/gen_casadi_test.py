@@ -29,7 +29,6 @@ from pymoca.backends.casadi.model import (
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "models")
 
 
-# noinspection PyPep8Naming,PyUnresolvedReferences
 class GenCasadiTest(unittest.TestCase):
     def assert_model_equivalent(self, A, B):
         def sstr(a):
