@@ -3028,13 +3028,13 @@ class GenCasadiTest(unittest.TestCase):
         """
 
         ast_tree = parser.parse(txt)
-        casadi_model = gen_casadi.generate(ast_tree, 'A')
+        casadi_model = gen_casadi.generate(ast_tree, "A")
 
         ref_model = Model()
-        metadata = ca.MX.sym('metadata', 5)
-        x = ca.MX.sym('x')
-        y = ca.MX.sym('y')
-        z = ca.MX.sym('z')
+        metadata = ca.MX.sym("metadata", 5)
+        x = ca.MX.sym("x")
+        y = ca.MX.sym("y")
+        z = ca.MX.sym("z")
 
         ref_model.parameters = list(map(Variable, [metadata, x]))
         ref_model.alg_states = list(map(Variable, [y, z]))
@@ -3055,7 +3055,7 @@ class GenCasadiTest(unittest.TestCase):
         self.assert_model_equivalent(ref_model, casadi_model)
 
         # First replace just the parameter values in the metadata (_not_ in the equations)
-        compiler_options = {'resolve_parameter_values': True}
+        compiler_options = {"resolve_parameter_values": True}
         casadi_model.simplify(compiler_options)
 
         ref_model.parameters[1].value = metadata_values[0]
