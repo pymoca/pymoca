@@ -161,8 +161,8 @@ class TreeWalker:
         endless recursion by skipping references to e.g. parent nodes.
         :return: True if child needs to be skipped, False otherwise.
         """
-        if isinstance(tree, ast.Class) and child_name == 'parent' or \
-                isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__'):
+        if (isinstance(tree, ast.Class) and child_name == 'parent') or \
+                (isinstance(tree, ast.ClassModificationArgument) and child_name in ('scope', '__deepcopy__')):
             return True
         return False
 
