@@ -5,11 +5,21 @@ Modelica parse Tree to AST tree.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
+import hashlib
+import logging
+import os
+import pickle
+import platform
+import sqlite3
 from collections import OrderedDict, deque
-from typing import Dict, List, Union  # noqa: F401
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional, Union  # noqa: F401
 
 import antlr4
 import antlr4.Parser
+
+import pymoca
 
 from . import ast
 from .generated.ModelicaLexer import ModelicaLexer
@@ -20,6 +30,12 @@ from .generated.ModelicaParser import ModelicaParser
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
+
+
+logger = logging.getLogger("pymoca")
+
+
+DEFAULT_MODEL_CACHE_DB = "model_txt_cache.db"
 
 
 class ModelicaFile:
@@ -793,7 +809,7 @@ class ModelicaParserErrorListener(antlr4.error.ErrorListener.ErrorListener):
         super().syntaxError(recognizer, offendingSymbol, line, column, msg, e)
 
 
-def parse(text: str) -> Union[ast.Tree, None]:
+def _parse(text: str) -> Union[ast.Tree, None]:
     """Parse Modelica code given in text"""
     input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
@@ -810,3 +826,284 @@ def parse(text: str) -> Union[ast.Tree, None]:
     parse_walker.walk(ast_listener, parse_tree)
     modelica_file = ast_listener.file_node
     return file_to_tree(modelica_file)
+
+
+def _microseconds_since_epoch(datetime_: Optional[datetime] = None) -> int:
+    if datetime_ is None:
+        datetime_ = datetime.utcnow()
+    return int(datetime_.timestamp() * 1e6)
+
+
+def _check_database_structure(conn: sqlite3.Connection):
+    """
+    Function to check if the existing database file matches the expected table structure
+    """
+    cursor = conn.cursor()
+
+    cursor.execute("BEGIN TRANSACTION;")
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='models'")
+    table_exists = cursor.fetchone()
+    table_correct = False
+
+    if table_exists:
+        cursor.execute("PRAGMA table_info('models')")
+        columns = cursor.fetchall()
+        expected_columns = [
+            (0, "txt_hash", "TEXT", 0, None, 1),
+            (1, "pymoca_version", "TEXT", 0, None, 2),
+            (2, "data", "BLOB", 0, None, 0),
+            (3, "last_hit", "TIMESTAMP INTEGER", 0, None, 0),
+        ]
+
+        if columns != expected_columns:
+            logger.warning("Model text cache table layout didn't match, recreating")
+            table_correct = False
+        else:
+            table_correct = True
+
+    if not table_correct:
+        cursor.execute("DROP TABLE IF EXISTS models")
+
+        logger.debug("Creating model text cache table in database")
+        cursor.execute(
+            """
+            CREATE TABLE models (
+                txt_hash TEXT,
+                pymoca_version TEXT,
+                data BLOB,
+                last_hit TIMESTAMP INTEGER,
+                PRIMARY KEY (txt_hash, pymoca_version)
+            )
+        """
+        )
+
+    conn.commit()
+
+    # For metadata we check if the table layout is correct, but also whether
+    # the metadata keys exist.
+    cursor.execute("BEGIN TRANSACTION;")
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='metadata'")
+    metadata_table_exists = cursor.fetchone()
+    metadata_table_correct = False
+
+    if metadata_table_exists:
+        cursor.execute("PRAGMA table_info('metadata')")
+        columns = cursor.fetchall()
+        expected_columns = [
+            (0, "key", "TEXT", 0, None, 1),
+            (1, "value", "TEXT", 0, None, 0),
+        ]
+
+        if columns != expected_columns:
+            logger.warning("Metadata table layout didn't match, recreating")
+            metadata_table_correct = False
+        else:
+            metadata_table_correct = True
+
+    if not metadata_table_correct:
+        cursor.execute("DROP TABLE IF EXISTS metadata")
+
+        logger.debug("Creating metadata table in database")
+        cursor.execute(
+            """
+            CREATE TABLE metadata (
+                key TEXT,
+                value TEXT,
+                PRIMARY KEY (key)
+            )
+        """
+        )
+    conn.commit()
+
+    cursor.execute("BEGIN TRANSACTION;")
+    cursor.execute(
+        "INSERT OR IGNORE INTO metadata (key, value) VALUES (?, ?)",
+        ("created_at", _microseconds_since_epoch()),
+    )
+
+    cursor.execute(
+        "INSERT OR IGNORE INTO metadata (key, value) VALUES (?, ?)",
+        ("last_prune", _microseconds_since_epoch()),
+    )
+
+    conn.commit()
+
+
+def _calculate_txt_hash(txt: str):
+    hasher = hashlib.sha256()
+    hasher.update(txt.encode("utf-8"))
+    return hasher.hexdigest()
+
+
+def _get_default_cache_path() -> Path:
+    """
+    Heavily inspired by https://github.com/davidhalter/parso/blob/master/parso/cache.py
+
+    The path where the cache is stored.
+    On Linux, this defaults to ``~/.cache/pymoca/``, on OS X to
+    ``~/Library/Caches/Pymoca/`` and on Windows to ``%LOCALAPPDATA%\\Pymoca\\Pymoca\\``.
+    On Linux, if environment variable ``$XDG_CACHE_HOME`` is set,
+    ``$XDG_CACHE_HOME/pymoca`` is used instead of the default one.
+    """
+    if platform.system().lower() == "windows":
+        dir_ = Path(os.getenv("LOCALAPPDATA") or "~") / "Pymoca" / "Pymoca"
+    elif platform.system().lower() == "darwin":
+        dir_ = Path("~") / "Library" / "Caches" / "Pymoca"
+    else:
+        dir_ = Path(os.getenv("XDG_CACHE_HOME") or "~/.cache") / "pymoca"
+
+    return dir_.expanduser()
+
+
+def parse(
+    txt: str,
+    /,
+    model_cache_folder: Optional[Path] = None,
+    cache_db: str = DEFAULT_MODEL_CACHE_DB,
+    cache_expiration_days: int = 30,
+    always_update_last_hit: bool = False,
+    bypass_cache: bool = False,
+) -> Union[ast.Tree, None]:
+    """
+    Parse the Modelica code given in text and return the Abstract Syntax Tree (AST).
+
+    This function uses a cache to avoid re-parsing the same text multiple times. The
+    cache is stored in a SQLite database file. The cache entries are pruned based on
+    their last access time. If an entry has not been accessed for a certain number of
+    days (defined by cache_expiration_days), it is removed from the cache.
+
+    Args:
+        txt (str): The Modelica code to parse.
+        model_cache_folder (Path, optional): The folder where the cache database is
+            stored. If not provided, a default location based on the operating system is
+            used.
+        cache_db (str, optional): The name of the cache database file. Default is
+            DEFAULT_MODEL_CACHE_DB.
+        cache_expiration_days (int, optional): The number of days after which a cache
+            entry is considered expired and is pruned. Defaultis 30.
+        always_update_last_hit (bool, optional): If True, the last access time of a
+            cache entry is always updated when it is accessed. If False, the last access
+            time is only updated if it is more than a day old. Default is False.
+        bypass_cache (bool, optional): If True, the cache is bypassed and the parsing is
+            performed directly. Default is False.
+
+    Returns:
+        Union[ast.Tree, None]: The AST of the parsed Modelica code, or None if the
+            parsing failed.
+    """
+    if bypass_cache:
+        return _parse(txt)
+
+    pymoca_version = pymoca.__version__
+
+    # Do not use caching if we have a dirty work tree, as the source
+    # code can't be uniquely identified.
+    if pymoca_version.endswith(".dirty"):
+        logger.debug("Bypassing cache because working directory is dirty")
+        return _parse(txt)
+
+    if model_cache_folder is not None:
+        db_folder = model_cache_folder
+    else:
+        db_folder = _get_default_cache_path()
+    db_folder.mkdir(parents=True, exist_ok=True)
+
+    full_db_path = db_folder / cache_db
+    conn = sqlite3.connect(full_db_path, isolation_level=None)
+
+    cursor = conn.cursor()
+
+    if not hasattr(parse, "initialized_dbs") or full_db_path not in parse.initialized_dbs:
+        # Check if the database file is corrupt
+        try:
+            cursor.execute("PRAGMA integrity_check;")
+            result = cursor.fetchone()
+            if result != ("ok",):
+                raise sqlite3.DatabaseError("Database integrity check failed")
+        except sqlite3.DatabaseError:
+            conn.close()
+
+            logger.warning("Model cache database is corrupt, recreating...")
+            os.remove(full_db_path)
+
+            conn = sqlite3.connect(full_db_path, isolation_level=None)
+            cursor = conn.cursor()
+
+        _check_database_structure(conn)
+
+        # Prune the database of entries not hit recently
+        cursor.execute("BEGIN TRANSACTION;")
+        cutoff_time = int(
+            (datetime.utcnow() - timedelta(days=cache_expiration_days)).timestamp() * 1e6
+        )
+        cursor.execute("DELETE FROM models WHERE last_hit < ?", (cutoff_time,))
+        cursor.execute(
+            "UPDATE metadata SET value = ? WHERE key = ?",
+            (_microseconds_since_epoch(), "last_prune"),
+        )
+
+        conn.commit()
+
+        if hasattr(parse, "initialized_dbs"):
+            parse.initialized_dbs.add(full_db_path)
+        else:
+            parse.initialized_dbs = {full_db_path}
+
+    # Check if the txt exists in the database
+    txt_hash = _calculate_txt_hash(txt)
+
+    cursor.execute("BEGIN TRANSACTION;")
+    cursor.execute(
+        "SELECT last_hit, data FROM models WHERE txt_hash=? AND pymoca_version=?",
+        (txt_hash, pymoca_version),
+    )
+    result = cursor.fetchone()
+    conn.commit()
+
+    tree = None
+
+    if result:
+        logger.debug(f"Model with hash '{txt_hash}' ({pymoca_version}) found in cache")
+        last_hit, pickled_data = result
+
+        yesterday = _microseconds_since_epoch(datetime.utcnow() - timedelta(days=1))
+
+        if always_update_last_hit or last_hit < yesterday:
+            cursor.execute("BEGIN TRANSACTION;")
+            cursor.execute(
+                "UPDATE models SET last_hit = ? WHERE txt_hash = ? AND pymoca_version = ?",
+                (_microseconds_since_epoch(), txt_hash, pymoca_version),
+            )
+            conn.commit()
+        try:
+            tree = pickle.loads(pickled_data)
+        except pickle.UnpicklingError:
+            logger.warning(f"Model with hash '{txt_hash}' ({pymoca_version}) failed to unpickle")
+    else:
+        logger.debug(f"Model with hash '{txt_hash}' ({pymoca_version}) not in cache")
+
+    if tree is None:
+        # We get here if we didn't find anything in the cache, or if the
+        # unpickling of the cache failed
+        try:
+            tree = _parse(txt)
+        except Exception:
+            conn.close()
+            raise
+
+        # Don't cache None that _parse() returns on syntax errors
+        if tree is not None:
+            pickled_data = pickle.dumps(tree)
+
+            # Note that we do an 'INSERT OR REPLACE' because concurrent access
+            # might mean two processes/threads try to insert an entry
+            cursor.execute("BEGIN TRANSACTION;")
+            cursor.execute(
+                "INSERT OR REPLACE INTO models (txt_hash, pymoca_version, data, last_hit) VALUES (?, ?, ?, ?)",
+                (txt_hash, pymoca_version, pickled_data, _microseconds_since_epoch()),
+            )
+            conn.commit()
+
+    conn.close()
+
+    return tree
