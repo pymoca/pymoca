@@ -13,7 +13,7 @@ on:
     - cron: "6 6 * * 3"
 
 jobs:
-  style:
+  style-flake8:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,8 +24,19 @@ jobs:
       - run: pip install tox
       - run: tox -e flake8
 
+  style-black:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - run: pip install tox
+      - run: tox -e black
+
   test:
-    needs: style
+    needs: [style-flake8, style-black]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
