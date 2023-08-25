@@ -102,7 +102,6 @@ class StringVariable:
 DelayArgument = namedtuple("DelayArgument", ["expr", "duration"])
 
 
-# noinspection PyUnresolvedReferences
 class Model:
     def __init__(self):
         self.states = []
@@ -1311,7 +1310,6 @@ class Model:
                 )
             )
 
-    # noinspection PyUnusedLocal
     @property
     def initial_residual_function(self):
         if hasattr(self, "_states_vector"):
@@ -1347,7 +1345,6 @@ class Model:
                 )
             )
 
-    # noinspection PyPep8Naming
     @property
     def variable_metadata_function(self):
         in_var = ca.veccat(*self._symbols(self.parameters))
@@ -1425,7 +1422,6 @@ class Model:
 
         return self._expand_mx_func(ca.Function("variable_metadata", [in_var], out))
 
-    # noinspection PyPep8Naming
     @property
     def delay_arguments_function(self):
         # We cannot assume that we can ca.horzcat/vertcat all delay arguments

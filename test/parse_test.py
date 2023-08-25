@@ -65,7 +65,6 @@ class ParseTest(unittest.TestCase):
 
         # Start a background thread which will run the flattening, such that
         # we can kill it if takes to long.
-        # noinspection PyTypeChecker
         thread = threading.Thread(
             target=tree.flatten,
             args=(
@@ -126,7 +125,6 @@ class ParseTest(unittest.TestCase):
     def test_connector(self):
         with open(os.path.join(MODEL_DIR, "Connector.mo"), "r") as f:
             txt = f.read()
-        # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)  # noqa: F841
         # states = ast_tree.classes['Aircraft'].states
         # names = sorted([state.name for state in states])

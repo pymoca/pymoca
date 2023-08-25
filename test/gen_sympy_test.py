@@ -71,7 +71,6 @@ class GenSympyTest(unittest.TestCase):
     def test_aircraft(self):
         with open(os.path.join(MODEL_DIR, "Aircraft.mo"), "r") as f:
             txt = f.read()
-        # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, "Aircraft")
         with open(os.path.join(GENERATED_DIR, "Aircraft.py"), "w") as f:
@@ -87,7 +86,6 @@ class GenSympyTest(unittest.TestCase):
     def test_quad(self):
         with open(os.path.join(MODEL_DIR, "Quad.mo"), "r") as f:
             txt = f.read()
-        # noinspection PyUnusedLocal
         ast_tree = parser.parse(txt)
         text = gen_sympy.generate(ast_tree, "Quad")
         with open(os.path.join(GENERATED_DIR, "Quad.py"), "w") as f:

@@ -29,7 +29,6 @@ class ModelicaFile:
         super().__init__(**kwargs)
 
 
-# noinspection PyPep8Naming
 class ASTListener(ModelicaListener):
     def __init__(self):
         self.file_node = None  # type: ModelicaFile

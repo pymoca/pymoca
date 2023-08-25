@@ -7,7 +7,6 @@ from pymoca import ast
 from pymoca.tree import TreeListener, TreeWalker, flatten
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-# noinspection PyUnresolvedReferences
 BUILTINS = dir(__builtins__) + ["psi"]
 
 E = objectify.E

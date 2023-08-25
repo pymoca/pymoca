@@ -4,8 +4,6 @@ from typing import Union
 
 import casadi as ca
 
-# noinspection PyPackageRequirements
-
 from lxml import etree
 
 from .model import HybridDae
@@ -33,7 +31,6 @@ class XMLParser:
 Sym = Union[ca.MX, ca.SX]
 
 
-# noinspection PyProtectedMember,PyPep8Naming
 class ModelListener:
     """Converts ModelicaXML file to Hybrid DAE"""
 
@@ -184,7 +181,6 @@ class ModelListener:
         # print name to log
         self.log("}", tree.tag)
 
-    # noinspection PyUnusedLocal
     def enter_classDefinition(self, tree: etree._Element):
         # we don't know if variables are states
         # yet, we need to wait until equations are parsed
@@ -373,7 +369,6 @@ class ModelListener:
         self.model[tree] = [self.model[c] for c in tree]
 
 
-# noinspection PyProtectedMember
 def walk(e: etree._Element, listener: ModelListener) -> None:
     tag = e.tag
     listener.call("enter_every_before", e)
