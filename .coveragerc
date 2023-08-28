@@ -3,7 +3,6 @@ branch = True
 source = pymoca
 omit =
     */pymoca/_version.py
-    */pymoca/versioneer.py
     */pymoca/generated/*
     */pymoca/test/*
 
