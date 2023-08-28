@@ -80,3 +80,4 @@ jit_tmp.c
 tmp*.o
 *.orig
 *.pymoca_cache
+test/generated/
