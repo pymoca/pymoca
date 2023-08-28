@@ -2,7 +2,6 @@ include LICENSE
 include README.md
 recursive-include doc *
 recursive-include java *
-include versioneer.py
 include src/pymoca/_version.py
 include src/pymoca/Modelica.g4
 include src/pymoca/backends/xml/ModelicaXML/schemas/*.xsd
