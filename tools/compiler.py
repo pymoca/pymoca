@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import pymoca.ast
-import pymoca.backends.casadi.api as casadi_api
-import pymoca.backends.sympy.generator as sympy_gen
 import pymoca.tree
 from pymoca import __version__
+
+# Import of backends delayed until needed
 
 log = logging.getLogger("pymoca")
 logging.basicConfig(stream=sys.stderr)
@@ -133,6 +133,8 @@ def translate(
     log.info("Generating model for %s ...", model)
     # Currenly only support sympy; envision others being added in future
     if translator == "sympy":
+        import pymoca.backends.sympy.generator as sympy_gen
+
         try:
             result = sympy_gen.generate(library_ast, model, options)
             outfile = outdir.joinpath(model + ".py")
@@ -272,6 +274,8 @@ def main(argv: List[str]) -> int:
                         errors += 1
 
     elif args.target == "casadi":
+        import pymoca.backends.casadi.api as casadi_api
+
         modelica_files = list_modelica_files(args.PATH)
         if not modelica_files:
             errors += 1
