@@ -8,6 +8,7 @@ import contextlib
 import enum
 import logging
 import os
+import re
 import sqlite3
 import sys
 import tempfile
@@ -39,12 +40,12 @@ class WorkDirState(enum.Enum):
 @contextlib.contextmanager
 def modify_version(version_type: WorkDirState):
     pymoca_version = pymoca.__version__
-    if pymoca_version.endswith(".dirty"):
-        clean_version = pymoca_version[:-6]
+    if re.search(r"\.d\d{8}$", pymoca_version):
+        clean_version = pymoca_version[:-10]
     else:
         clean_version = pymoca_version
 
-    dirty_version = clean_version + ".dirty"
+    dirty_version = clean_version + ".d" + time.strftime("%Y%m%d")
 
     if version_type == WorkDirState.CLEAN:
         pymoca.__version__ = clean_version

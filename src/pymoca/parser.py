@@ -10,6 +10,7 @@ import logging
 import os
 import pickle
 import platform
+import re
 import sqlite3
 from collections import OrderedDict, deque
 from datetime import datetime, timedelta
@@ -998,7 +999,7 @@ def parse(
 
     # Do not use caching if we have a dirty work tree, as the source
     # code can't be uniquely identified.
-    if pymoca_version.endswith(".dirty"):
+    if re.search(r"\.d\d{8}$", pymoca_version):
         logger.debug("Bypassing cache because working directory is dirty")
         return _parse(txt)
 

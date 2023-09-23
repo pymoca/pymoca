@@ -1,3 +1,6 @@
-from . import _version
+from importlib.metadata import PackageNotFoundError, version
 
-__version__ = _version.get_versions()["version"]
+try:
+    __version__ = version("pymoca")
+except PackageNotFoundError:
+    pass

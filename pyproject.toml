@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "versioneer[toml]==0.29"]
+requires = ["setuptools>=62", "setuptools-scm[toml]>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -52,16 +52,7 @@ sympy = ["sympy>=0.7.6.1", "scipy>=0.13.3", "jinja2>=2.10.1"]
 examples = ["jupyterlab", "matplotlib"]
 all = ["pymoca[casadi,lxml,sympy,examples]"]
 
-# See the docstring in versioneer.py for instructions. Note that after changing
-# this section, run `versioneer install --no-vendor`, commit the results.
-
-[tool.versioneer]
-VCS = "git"
-style = "pep440"
-versionfile_source = "src/pymoca/_version.py"
-versionfile_build = "pymoca/_version.py"
-tag_prefix = ""
-parentdir_prefix = "pymoca-"
+[tool.setuptools_scm]
 
 [tool.black]
 line-length = 100
@@ -69,7 +60,6 @@ target-version = ['py38', 'py39', 'py310', 'py311']
 force-exclude = '''
 	(
 		  src/pymoca/generated
-		| src/pymoca/_version.py
 		| test/generated
 		| test/libraries
 	)
