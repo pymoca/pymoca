@@ -1,3 +1,4 @@
-from . import _version
+from pymoca.version import __version__
 
-__version__ = _version.get_versions()["version"]
+
+__all__ = ["__version__"]
