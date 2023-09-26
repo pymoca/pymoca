@@ -963,8 +963,9 @@ class ConstantReferenceApplier(TreeListener):
 
     def exitInstanceClass(self, tree: ast.InstanceClass):
         c = self.classes.pop()
-        syms = self.extra_symbols.pop()
-        c.symbols.update(syms)
+        if c.type != "__builtin":
+            syms = self.extra_symbols.pop()
+            c.symbols.update(syms)
 
     def enterClass(self, tree: ast.InstanceClass):
         raise AssertionError("All classes should have been replaced by instance classes.")
