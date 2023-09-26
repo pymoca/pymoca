@@ -678,6 +678,41 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(aircraft.symbols["accel.ma_x"].comment, "measured acceleration")
         self.assertEqual(aircraft.symbols["body.g"].comment, "")
 
+    def test_derived_type_value_modification(self):
+        """Test modifying the value of a derived type"""
+        txt = """
+            package A
+                type X = Integer;
+                type Y = X; /* Derived type */
+                model B
+                    Y y = 1; /* Modification 1 */
+                end B;
+                model C
+                    B c(y = 2); /* Modification 2 */
+                end C;
+                model D = C(c.y = 3); /* Modification 3 */
+                model E
+                    D d(c.y = 4); /* Modification 4 */
+                end E;
+            end A;
+        """
+        ast_tree = parser.parse(txt)
+        class_name = "A.D"
+        comp_ref = ast.ComponentRef.from_string(class_name)
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+        self.assertIsNone(flat_tree.classes[class_name].symbols["c.y"].value.value)
+        self.assertEqual(flat_tree.classes[class_name].equations[0].left.name, "c.y")
+        self.assertEqual(flat_tree.classes[class_name].equations[0].right.value, 3)
+
+        # Parsing AST again, otherwise there is an error in A.E flattening
+        ast_tree = parser.parse(txt)
+        class_name = "A.E"
+        comp_ref = ast.ComponentRef.from_string(class_name)
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+        self.assertIsNone(flat_tree.classes[class_name].symbols["d.c.y"].value.value)
+        self.assertEqual(flat_tree.classes[class_name].equations[0].left.name, "d.c.y")
+        self.assertEqual(flat_tree.classes[class_name].equations[0].right.value, 4)
+
 
 if __name__ == "__main__":
     unittest.main()
