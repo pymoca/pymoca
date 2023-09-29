@@ -718,41 +718,6 @@ class ParseTest(unittest.TestCase):
         """Test constant references in non-elementary typed equations"""
         txt = """
             package Package
-                type Length = Real;
-                // Make sure this value is different from the
-                // one in Model, so we can make sure the correct one
-                // is referred to and flattened.
-                constant Real KM_TO_M = 900.0;
-            end Package;
-
-            model Model
-                constant Real KM_TO_M = 1000.0;
-                Package.Length distance_km = 1.0;
-                Package.Length distance_m = Package.KM_TO_M * distance_km;
-            end Model;
-        """
-
-        ast_tree = parser.parse(txt)
-        class_name = "Model"
-        comp_ref = ast.ComponentRef.from_string(class_name)
-        flat_tree = tree.flatten(ast_tree, comp_ref)
-
-        # Check that the constant symbol is in the flattened class, has the correct value, and is
-        # also referenced to in the flattened set of equations.
-        self.assertIn("Package.KM_TO_M", flat_tree.classes[class_name].symbols.keys())
-        self.assertEqual(
-            flat_tree.classes[class_name].symbols["Package.KM_TO_M"].value.value, 900.0
-        )
-        self.assertIsNone(flat_tree.classes[class_name].symbols["distance_m"].value.value)
-        self.assertSetEqual(
-            {"distance_km", "Package.KM_TO_M"},
-            {x.name for x in flat_tree.classes[class_name].equations[1].right.operands},
-        )
-
-    def test_constant_reference_type_equation(self):
-        """Test constant references in non-elementary typed equations"""
-        txt = """
-            package Package
               type Length = Real;
               constant Real KM_TO_M = 900.0;
             end Package;
