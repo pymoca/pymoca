@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import unittest
+from typing import Set, Union
 
 from pymoca import ast
 from pymoca import parser
@@ -747,6 +748,83 @@ class ParseTest(unittest.TestCase):
             {"distance_km", "Package.KM_TO_M"},
             {x.name for x in flat_tree.classes[class_name].equations[1].right.operands},
         )
+
+    def test_constant_reference_type_equation(self):
+        """Test constant references in non-elementary typed equations"""
+        txt = """
+            package Package
+              type Length = Real;
+              constant Real KM_TO_M = 900.0;
+            end Package;
+
+            model Model
+              constant Real KM_TO_M = 1000;
+              Package.Length distance_km = 1.0;
+
+              model Nested
+                constant Real KM_TO_M = 1100;
+                Package.Length distance_km = 1.0;
+                Package.Length distance_m = KM_TO_M * distance_km;
+              end Nested;
+              Package.Length distance_m = Package.KM_TO_M * distance_km;
+              Package.Length distance_m_nested = Nested.KM_TO_M * distance_km;
+
+              Nested b;
+              Nested c(KM_TO_M = 1200.0);
+            end Model;
+        """
+
+        ast_tree = parser.parse(txt)
+        class_name = "Model"
+        comp_ref = ast.ComponentRef.from_string(class_name)
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+
+        # Check that the constant symbols are in the flattened class and have the correct value
+        self.assertIn("Package.KM_TO_M", flat_tree.classes[class_name].symbols.keys())
+        self.assertEqual(
+            flat_tree.classes[class_name].symbols["Package.KM_TO_M"].value.value, 900.0
+        )
+        self.assertIn("KM_TO_M", flat_tree.classes[class_name].symbols.keys())
+        self.assertEqual(flat_tree.classes[class_name].symbols["KM_TO_M"].value.value, 1000.0)
+        self.assertIn("Nested.KM_TO_M", flat_tree.classes[class_name].symbols.keys())
+        self.assertEqual(
+            flat_tree.classes[class_name].symbols["Nested.KM_TO_M"].value.value, 1100.0
+        )
+        self.assertIn("b.KM_TO_M", flat_tree.classes[class_name].symbols.keys())
+        self.assertEqual(flat_tree.classes[class_name].symbols["b.KM_TO_M"].value.value, 1100.0)
+        self.assertIn("c.KM_TO_M", flat_tree.classes[class_name].symbols.keys())
+        self.assertEqual(flat_tree.classes[class_name].symbols["c.KM_TO_M"].value.value, 1200.0)
+
+        def _rhs_for_symbol(class_: ast.Class, sym_name: str) -> Union[ast.Expression, ast.Primary]:
+            sym = class_.symbols[sym_name]
+            eqs = [x for x in class_.equations if x.left is sym]
+            assert len(eqs) == 1
+            return eqs[0].right
+
+        def rhs_value_for_symbol(class_: ast.Class, sym_name: str) -> float:
+            return _rhs_for_symbol(class_, sym_name).value
+
+        def rhs_operands_for_symbol(class_: ast.Class, sym_name: str) -> Set[str]:
+            return {x.name for x in _rhs_for_symbol(class_, sym_name).operands}
+
+        class_ = flat_tree.classes[class_name]
+
+        self.assertEqual(1.0, rhs_value_for_symbol(class_, "distance_km"))
+        self.assertEqual(1.0, rhs_value_for_symbol(class_, "b.distance_km"))
+        self.assertEqual(1.0, rhs_value_for_symbol(class_, "c.distance_km"))
+
+        self.assertSetEqual(
+            {"Package.KM_TO_M", "distance_km"}, rhs_operands_for_symbol(class_, "distance_m")
+        )  # 900.0
+        self.assertSetEqual(
+            {"Nested.KM_TO_M", "distance_km"}, rhs_operands_for_symbol(class_, "distance_m_nested")
+        )  # 1100.0
+        self.assertSetEqual(
+            {"b.KM_TO_M", "b.distance_km"}, rhs_operands_for_symbol(class_, "b.distance_m")
+        )  # 1100.0
+        self.assertSetEqual(
+            {"c.KM_TO_M", "c.distance_km"}, rhs_operands_for_symbol(class_, "c.distance_m")
+        )  # 1200.0
 
 
 if __name__ == "__main__":

@@ -55,6 +55,9 @@ class TreeListener:
     def enterClassModification(self, tree: ast.ClassModification) -> None:
         pass
 
+    def enterClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
+        pass
+
     def enterComponentClause(self, tree: ast.ComponentClause) -> None:
         pass
 
@@ -132,6 +135,9 @@ class TreeListener:
         pass
 
     def exitClassModification(self, tree: ast.ClassModification) -> None:
+        pass
+
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
         pass
 
     def exitComponentClause(self, tree: ast.ComponentClause) -> None:
@@ -918,24 +924,31 @@ def apply_symbol_modifications(node: ast.Node, scope: ast.InstanceClass) -> None
 class ConstantReferenceApplier(TreeListener):
     """
     This walker applies all references to constants. For each referenced
-    constant it makes a symbol in the passed in InstanceClass class_, with the
+    constant it makes a symbol in appropriate scope, with the
     flattened component reference to the constant as the symbol's name.
     """
 
     def __init__(self, class_: ast.InstanceClass):
-        self.classes = []
+        self.scope = []
 
         # We cannot directly mutate the dictionary while we are looping over
         # it, so instead we store symbol updates here.
-        self.extra_symbols = []
+        self.extra_symbols = {}
 
         self.depth = 0
 
         super().__init__()
 
+    def enterClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
+        self.scope.append(tree.scope)
+        self.extra_symbols.setdefault(tree.scope, {})
+
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
+        self.scope.pop()
+
     def enterComponentRef(self, tree: ast.ComponentRef):
-        # If it is not a nested comonent reference, we do not have to do
-        # anyhing as the symbol we look for would already be in the current
+        # If it is not a nested component reference, we do not have to do
+        # anything as the symbol we look for would already be in the current
         # class
         self.depth += 1
 
@@ -945,7 +958,9 @@ class ConstantReferenceApplier(TreeListener):
 
         if tree.child:
             try:
-                self.extra_symbols[-1][str(tree)] = self.classes[-1].find_constant_symbol(tree)
+                self.extra_symbols[self.scope[-1]][str(tree)] = self.scope[-1].find_constant_symbol(
+                    tree
+                )
             except (
                 KeyError,
                 ast.ClassNotFoundError,
@@ -957,15 +972,12 @@ class ConstantReferenceApplier(TreeListener):
     def exitComponentRef(self, tree: ast.ComponentRef):
         self.depth -= 1
 
-    def enterInstanceClass(self, tree: ast.InstanceClass):
-        self.classes.append(tree)
-        self.extra_symbols.append(OrderedDict())
-
     def exitInstanceClass(self, tree: ast.InstanceClass):
-        c = self.classes.pop()
-        if c.type != "__builtin":
-            syms = self.extra_symbols.pop()
-            c.symbols.update(syms)
+        try:
+            syms = self.extra_symbols.pop(tree)
+            tree.symbols.update(syms)
+        except KeyError:
+            pass
 
     def enterClass(self, tree: ast.InstanceClass):
         raise AssertionError("All classes should have been replaced by instance classes.")
