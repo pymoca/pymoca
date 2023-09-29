@@ -956,6 +956,10 @@ class ConstantReferenceApplier(TreeListener):
             # Already inside a component reference. Do not perform lookups.
             return
 
+        if not self.scope:
+            # Not in a class modification argument
+            return
+
         if tree.child:
             try:
                 self.extra_symbols[self.scope[-1]][str(tree)] = self.scope[-1].find_constant_symbol(
