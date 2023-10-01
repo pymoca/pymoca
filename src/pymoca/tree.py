@@ -396,6 +396,9 @@ def build_instance_tree(
         x for x in extended_orig_class.modification_environment.arguments if not x.redeclare
     ]
 
+    # Set the correct scope
+    apply_scope(extended_orig_class,extended_orig_class.modification_environment)
+
     # Only ast.ElementModification type modifications left in the class's
     # modification environment. No more ComponentClause or
     # ShortClassDefinitions (which are both redeclares). There are still
@@ -501,6 +504,11 @@ def build_instance_tree(
                 sym.class_modification.arguments.extend(sym_mod.arguments)
             else:
                 sym.class_modification = sym_mod
+
+            # Set the correct scope
+            for arg in sym.class_modification.arguments:
+                if arg.scope is None:
+                    arg.scope = extended_orig_class
         else:
             # Symbol is not elementary type. Check if we need to move any modifications along.
             sym_arguments = [
@@ -843,7 +851,7 @@ def fully_scope_function_calls(
 
 def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
     """
-    Apply a modification to a symbol if the scope matches (or is None)
+    Apply a modification to a symbol if the scope matches (or is None, or is a constant we lifted to keep it around)
     :param sym: symbol to apply modifications for
     :param scope: scope of modification
     """
@@ -855,12 +863,14 @@ def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
         for x in sym.class_modification.arguments
         if x.scope is None
         or x.scope.full_reference().to_tuple() == scope.full_reference().to_tuple()
+        or "constant" in sym.prefixes
     ]
     skip_args = [
         x
         for x in sym.class_modification.arguments
         if x.scope is not None
         and x.scope.full_reference().to_tuple() != scope.full_reference().to_tuple()
+        and "constant" not in sym.prefixes
     ]
 
     for class_mod_argument in apply_args:
@@ -1243,6 +1253,25 @@ def annotate_states(node: ast.Node) -> None:
     """
     w = TreeWalker()
     w.walk(StateAnnotator(node), node)
+
+
+class ScopeApplier(TreeListener):
+    """
+    Finds all variables that are differentiated and annotates them with the state prefix
+    """
+
+    def __init__(self, scope: ast.InstanceClass):
+        super().__init__()
+        self.scope = scope
+
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
+        if tree.scope is None:
+            tree.scope = self.scope
+
+
+def apply_scope(scope: ast.InstanceClass, modification_environment: ast.ClassModification) -> None:
+    w = TreeWalker()
+    w.walk(ScopeApplier(scope), modification_environment)
 
 
 def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
