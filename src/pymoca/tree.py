@@ -667,7 +667,7 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name="") -> ast.Class:
                 sym.type = sym.type.name
 
     # Apply any symbol modifications if the scope of said modification is equal to that of the current class
-    apply_symbol_modifications(flat_class, class_)
+    apply_symbol_modifications(flat_class)
 
     # now resolve all references inside the symbol definitions
     for sym_name, sym in flat_class.symbols.items():
@@ -849,31 +849,16 @@ def fully_scope_function_calls(
     return expression_copy
 
 
-def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
+def modify_symbol(sym: ast.Symbol) -> None:
     """
-    Apply a modification to a symbol if the scope matches (or is None, or is a constant we lifted to keep it around)
+    Apply modifications to a symbol
     :param sym: symbol to apply modifications for
     :param scope: scope of modification
     """
 
     # We assume that we do not screw up the order of applying modifications
     # when "moving up" with the scope.
-    apply_args = [
-        x
-        for x in sym.class_modification.arguments
-        if x.scope is None
-        or x.scope.full_reference().to_tuple() == scope.full_reference().to_tuple()
-        or "constant" in sym.prefixes
-    ]
-    skip_args = [
-        x
-        for x in sym.class_modification.arguments
-        if x.scope is not None
-        and x.scope.full_reference().to_tuple() != scope.full_reference().to_tuple()
-        and "constant" not in sym.prefixes
-    ]
-
-    for class_mod_argument in apply_args:
+    for class_mod_argument in sym.class_modification.arguments:
         argument = class_mod_argument.value
 
         assert isinstance(
@@ -888,7 +873,7 @@ def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
 
         setattr(sym, argument.component.name, argument.modifications[0])
 
-    sym.class_modification.arguments = skip_args
+    sym.class_modification.arguments = []
 
 
 class SymbolModificationApplier(TreeListener):
@@ -899,9 +884,8 @@ class SymbolModificationApplier(TreeListener):
     on non-elementary types.
     """
 
-    def __init__(self, node: ast.Node, scope: ast.InstanceClass):
+    def __init__(self, node: ast.Node):
         self.node = node
-        self.scope = scope
         super().__init__()
 
     def exitSymbol(self, tree: ast.Symbol):
@@ -911,7 +895,7 @@ class SymbolModificationApplier(TreeListener):
             ), "Found symbol modification on non-elementary type in instance tree."
         elif tree.class_modification is not None:
             if tree.class_modification.arguments:
-                modify_symbol(tree, self.scope)
+                modify_symbol(tree)
 
             if not tree.class_modification.arguments:
                 tree.class_modification = None
@@ -926,9 +910,9 @@ class SymbolModificationApplier(TreeListener):
         ), "Found unhandled modification on instance class."
 
 
-def apply_symbol_modifications(node: ast.Node, scope: ast.InstanceClass) -> None:
+def apply_symbol_modifications(node: ast.Node) -> None:
     w = TreeWalker()
-    w.walk(SymbolModificationApplier(node, scope), node)
+    w.walk(SymbolModificationApplier(node), node)
 
 
 class ConstantReferenceApplier(TreeListener):

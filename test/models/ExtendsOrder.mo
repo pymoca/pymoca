@@ -1,5 +1,7 @@
 // Taken from https://trac.modelica.org/Modelica/ticket/1829#comment:38
 package P
+  constant Real max_m = 1000;
+  constant Real min_m = 1.0;
   model BT
     parameter Real m = -1;
       Real x;
@@ -21,7 +23,8 @@ package P
     model B
       model BT
         Real x;
-        parameter Real m = 0;
+        parameter Real bla = 100;
+        parameter Real m(nominal=bla, min=P.min_m, max=max_m) = 0;
       equation
         x = m;
       end BT;
