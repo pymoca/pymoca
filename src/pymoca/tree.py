@@ -726,7 +726,10 @@ class ComponentRefToSymbolRef:
     def enterComponentRef(self, tree: ast.ComponentRef):
         # HACK: Already worked around the AttributeRef thing, but now also a type is a ComponentRef... everything is a ComponentRef,
         # but they're not all equal. Can we handle them differently in the parser, that way we can also handle them easily differently here.
-        if not self.skip_children_of:
+        if not self.skip_children_of and tree._resolved_symbol is None:
+            # TODO: How come sometimes we have already resolved the symbol? E.g. with the "ExtendsModification" test case,
+            # we get "not found" error when we've already found it before (if we leave the `and tree._resolved_symbol` out of the above condition).
+            # Why does this happen?
             if self.scope is not None:
                 # Inside a passed-along modification
                 scope = self.scope
