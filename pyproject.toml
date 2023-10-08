@@ -46,7 +46,9 @@ classifiers = [
 homepage = "https://github.com/pymoca/pymoca"
 
 [project.optional-dependencies]
-casadi = ["casadi>=3.4.0"]
+# Note that we need setuptools for the distutils.ccompiler dependency
+# in the CasADi backend.
+casadi = ["casadi>=3.4.0", "setuptools>=60.0.0"]
 lxml = ["lxml>=3.5.0", "scipy>=0.13.3"]
 sympy = ["sympy>=0.7.6.1", "scipy>=0.13.3", "jinja2>=2.10.1"]
 examples = ["jupyterlab", "matplotlib"]
