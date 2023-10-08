@@ -388,7 +388,7 @@ def build_instance_tree(
         argument = class_mod_argument.value
         if isinstance(argument, ast.ShortClassDefinition):
             old_class = extended_orig_class.classes[argument.name]
-            extended_orig_class.classes[argument.name] = scope_class.find_class(argument.component)
+            extended_orig_class.classes[argument.name] = scope_class.find_class(argument.component, copy=False)
 
             # Fix references to symbol types that were already in the instance tree
             for sym in extended_orig_class.symbols.values():
@@ -761,7 +761,7 @@ def resolve_component_references_to_symbols(class_: ast.InstanceClass) -> None:
 
 class ComponentRefFlattener(TreeListener):
 
-    def __init__(self, class_: ast.InstanceClass):
+    def __init__(self, class_: ast.Class):
         self.class_ = class_
         self.symbols = set(class_.symbols.values())
         self.bladiebla = []
@@ -785,7 +785,7 @@ class ComponentRefFlattener(TreeListener):
 
         a = 1
 
-def flatten_component_refs(class_: ast.InstanceClass) -> None:
+def flatten_component_refs(class_: ast.Class) -> None:
     w = TreeWalker()
     w.walk(ComponentRefFlattener(class_), class_)
 
