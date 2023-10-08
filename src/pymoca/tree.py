@@ -301,6 +301,7 @@ def flatten_extends(
                 )
             extended_orig_class.type = c.type
 
+        apply_scope(extended_orig_class, extends.class_modification)
         c = flatten_extends(c, extends.class_modification, parent=c.parent)
 
         # Imports are not inherited (spec 3.5 sections 5.3.1 and 7.1)
