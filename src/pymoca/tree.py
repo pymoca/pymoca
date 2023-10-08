@@ -682,6 +682,10 @@ class SymbolReference:
 
 
 class ComponentRefToSymbolRef:
+    # TODO:
+    # Ugh, I only really want to look up symbols...
+    # But with everything being ComponentRefs, how do I know if it's a Symbol reference or some
+    # other thing lke an Import clause, class reference, what have you.
 
     def __init__(self, class_):
         self.instance_class = []
@@ -702,9 +706,9 @@ class ComponentRefToSymbolRef:
     def enterSymbol(self, tree: ast.Symbol) -> None:
         if isinstance(tree.type, ast.ComponentRef):
             tree.type = ast.SymbolTypeRef(tree.type)
-    
-    def enterSymbolReference(self, tree: SymbolReference) -> None:
-        a = 1
+
+    def enterImportClause(self, tree: SymbolReference) -> None:
+        self.skip_children_of.append(tree)
 
     def enterClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
         self.scope = tree.scope
@@ -735,10 +739,6 @@ class ComponentRefToSymbolRef:
             if tree.child:
                 self.skip_children_of.append(tree)
             
-    def exitComponentRef(self, tree: ast.ComponentRef) -> None:
-        if self.skip_children_of and tree is self.skip_children_of[-1]:
-            self.skip_children_of.pop()
-   
     def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
         self.scope = None
         self.modification.pop()
@@ -750,6 +750,9 @@ class ComponentRefToSymbolRef:
         self.bladiebla.append(tree)
 
     def exitEvery(self, tree: ast.Node):
+        if self.skip_children_of and tree is self.skip_children_of[-1]:
+            self.skip_children_of.pop()
+
         self.bladiebla.pop()
 
 
