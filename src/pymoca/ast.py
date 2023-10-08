@@ -829,7 +829,7 @@ class Class(Node):
 
                 # Found a symbol. Continue lookup on type of this symbol.
                 if isinstance(s.type, InstanceClass):
-                    return s.type._find_symbol(ComponentRef.from_tuple(t[1:]), False)
+                    return s.type._find_symbol(ComponentRef.from_tuple(t[1:]), False, in_original_scope)
                 elif isinstance(s.type, ComponentRef):
                     node = self._find_class(s.type)  # Parent lookups is OK here.
                     return node._find_symbol(ComponentRef.from_tuple(t[1:]), False)
