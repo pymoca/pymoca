@@ -19,7 +19,19 @@ class ConstantSymbolNotFoundError(Exception):
     pass
 
 
+class SymbolNotFoundError(Exception):
+    pass
+
+
+class NonConstantSymbolFoundError(Exception):
+    pass
+
+
 class FoundElementaryClassError(Exception):
+    pass
+
+
+class UnsupportedFullReferenceLookup(Exception):
     pass
 
 
@@ -153,6 +165,7 @@ class ComponentRef(Node):
         self.name = ""  # type: str
         self.indices = [[None]]  # type: List[List[Union[Expression, Slice, Primary, ComponentRef]]]
         self.child = []  # type: List[ComponentRef]
+        self._resolved_symbol = None  # type: SymbolReference
         super().__init__(**kwargs)
 
     def __repr__(self) -> str:
@@ -222,6 +235,23 @@ class ComponentRef(Node):
         n.child = [b]
         return a
 
+
+class AttributeRef(ComponentRef):
+    def __init__(self, component_ref: ComponentRef):
+        assert len(component_ref.child) == 0
+        assert component_ref.name in Symbol.ATTRIBUTES
+        assert component_ref.indices == [[None]]
+
+        super().__init__(name=component_ref.name)
+
+
+class SymbolTypeRef(ComponentRef):
+    def __init__(self, component_ref: ComponentRef):
+        assert len(component_ref.child) == 0
+        assert component_ref.name == "Real"
+        assert component_ref.indices == [[None]]
+
+        super().__init__(name=component_ref.name)
 
 class Expression(Node):
     def __init__(self, **kwargs):
@@ -440,10 +470,37 @@ class Symbol(Node):
         self.order = 0  # type: int
         self.visibility = Visibility.PRIVATE  # type: Visibility
         self.class_modification = None  # type: ClassModification
+        self._parent = None  # type: Class
         super().__init__(**kwargs)
 
+    def full_reference(self):
+        """
+        This type of lookup / reference only works when we're not in InstanceClasses.
+        To get the full reference then also involves including parent symbol names instead of just
+        classes all the way to the top.
+
+        TODO:
+        We should actually be able to do this. Not sure if we _need_ it though.
+        """
+
+        names = [self.name]
+
+        c = self._parent
+        while True:
+            if isinstance(c, InstanceClass):
+                raise UnsupportedFullReferenceLookup(f"Can't get full reference of Symbol '{self}', because it is part of an instantiated class '{c}'")
+
+            names.append(c.name)
+            if c.parent is c.root:
+                break
+            else:
+                c = c.parent
+
+        # Exclude the root node's name
+        return ComponentRef.from_tuple(tuple(reversed(names)))
+
     def __str__(self):
-        return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
+        return '{} {}, Type "{}", id="{}"'.format(type(self).__name__, self.name, self.type, id(self))
 
     def __repr__(self):
         return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)
@@ -756,6 +813,51 @@ class Class(Node):
     def find_constant_symbol(self, component_ref: ComponentRef) -> Symbol:
         return self._find_constant_symbol(component_ref)
 
+    def _find_symbol(self, component_ref: ComponentRef, search_parent=True, in_original_scope=False) -> Symbol:
+        if component_ref.child:
+            # Try classes first, and constant symbols second
+            t = component_ref.to_tuple()
+
+            try:
+                node = self._find_class(ComponentRef(name=t[0]), search_parent)
+                return node._find_symbol(ComponentRef.from_tuple(t[1:]), False)
+            except ClassNotFoundError:
+                try:
+                    s = self.symbols[t[0]]
+                except KeyError:
+                    raise SymbolNotFoundError()
+
+                # Found a symbol. Continue lookup on type of this symbol.
+                if isinstance(s.type, InstanceClass):
+                    return s.type._find_symbol(ComponentRef.from_tuple(t[1:]), False)
+                elif isinstance(s.type, ComponentRef):
+                    node = self._find_class(s.type)  # Parent lookups is OK here.
+                    return node._find_symbol(ComponentRef.from_tuple(t[1:]), False)
+                else:
+                    raise Exception("Unknown object type of symbol type: {}".format(type(s.type)))
+        else:
+            try:
+                sym = self.symbols[component_ref.name]
+                if in_original_scope:
+                    return sym
+                else:
+                    # Not in the original scope, and then we are only allowed to refer to constants.
+                    if "constant" in sym.prefixes:
+                        return sym
+                    else:
+                        raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in enclosing scope, but is not a constant.")                   
+            except KeyError:
+                if search_parent and self.parent is not None:
+                    return self.parent._find_symbol(component_ref)
+                else:
+                    raise SymbolNotFoundError()
+
+    def find_symbol(self, component_ref: ComponentRef) -> Symbol:
+        try:
+            return self._find_symbol(component_ref, in_original_scope=True)
+        except NonConstantSymbolFoundError as e:
+            raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in enclosing scope, but is not a constant.") from e
+
     def full_reference(self):
         names = []
 
@@ -869,7 +971,7 @@ class Class(Node):
         return "{}(type={!r}, name={!r})".format(type(self).__name__, self.type, self.name)
 
     def __str__(self):
-        return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
+        return '{} {}, Type "{}", Id "{}"'.format(type(self).__name__, self.name, self.type, id(self))
 
 
 class InstanceClass(Class):

@@ -676,6 +676,7 @@ class ASTListener(ModelicaListener):
         sym.dimensions = dimensions
         sym.prefixes = self.comp_clause.prefixes
         sym.type = self.comp_clause.type
+        sym._parent = self.class_node
 
         # Declarations can also occur in extends clauses, in which case we do not have to add it to the class's symbols.
         if not self.in_extends_clause:
