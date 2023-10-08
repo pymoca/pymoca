@@ -238,9 +238,14 @@ class ComponentRef(Node):
 
 class AttributeRef(ComponentRef):
     def __init__(self, component_ref: ComponentRef):
-        assert len(component_ref.child) == 0
-        assert component_ref.name in Symbol.ATTRIBUTES
-        assert component_ref.indices == [[None]]
+        # TODO:
+        # Had to disable checks, because we also loop over annotations where
+        # other things than "value/nominal/..." are referenced
+        # assert len(component_ref.child) == 0
+        # if component_ref.name not in Symbol.ATTRIBUTES:
+        #     a = 1
+        # assert component_ref.name in Symbol.ATTRIBUTES
+        # assert component_ref.indices == [[None]]
 
         super().__init__(name=component_ref.name)
 
