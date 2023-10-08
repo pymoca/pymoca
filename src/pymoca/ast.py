@@ -248,7 +248,7 @@ class AttributeRef(ComponentRef):
 class SymbolTypeRef(ComponentRef):
     def __init__(self, component_ref: ComponentRef):
         assert len(component_ref.child) == 0
-        assert component_ref.name == "Real"
+        assert component_ref.name in Class.BUILTIN
         assert component_ref.indices == [[None]]
 
         super().__init__(name=component_ref.name)
