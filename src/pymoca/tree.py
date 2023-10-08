@@ -701,7 +701,13 @@ class ComponentRefToSymbolRef:
         super().__init__()
 
     def enterInstanceClass(self, tree: ast.InstanceClass) -> None:
-        self.instance_class.append(tree)
+        if isinstance(tree.type, str) and tree.type == "__builtin":
+            # HACK: Due to the way we handle things, we have moved modifications one lever deeper to apply them
+            # on a "builtin" class. However, the scope of all variables referred to is still that of the original
+            # class. Therefore, push _that_ one (and then later pop it when leaving)
+            self.instance_class.append(self.instance_class[-1])
+        else:
+            self.instance_class.append(tree)
 
     def enterSymbol(self, tree: ast.Symbol) -> None:
         if isinstance(tree.type, ast.ComponentRef):
@@ -712,7 +718,6 @@ class ComponentRefToSymbolRef:
 
     def enterClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
         self.scope = tree.scope
-        
         self.modification.append(tree)
 
         tree.value.component = ast.AttributeRef(tree.value.component)
@@ -728,13 +733,20 @@ class ComponentRefToSymbolRef:
                 # Not inside a modification, e.g. a in a local modification or an equation
                 scope = self.instance_class[-1]
 
-            sym = scope.find_symbol(tree)
-            if isinstance(sym.type, ast.ComponentRef):
-                sym.type = ast.SymbolTypeRef(sym.type)
+            try:
+                sym = scope.find_symbol(tree)
+            except ast.SymbolNotFoundError as e:
+                # TODO: I really do not want to pass exceptions like this here.
+                # I only want to process componentrefs if they're a symbol reference, and then
+                # we can have proper error checking on whether symbol's were found or not.
+                pass
+            else:
+                if isinstance(sym.type, ast.ComponentRef):
+                    sym.type = ast.SymbolTypeRef(sym.type)
 
-            # Note that we will walk this symbol reference (skipping the scope to avoid endless recursion).
-            # TODO: We don't really need the scope anyway right? Just get rid of it.
-            tree._resolved_symbol = SymbolReference(sym, scope)
+                # Note that we will walk this symbol reference (skipping the scope to avoid endless recursion).
+                # TODO: We don't really need the scope anyway right? Just get rid of it.
+                tree._resolved_symbol = SymbolReference(sym, scope)
 
             if tree.child:
                 self.skip_children_of.append(tree)
