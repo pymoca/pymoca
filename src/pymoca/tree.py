@@ -218,7 +218,7 @@ class TreeWalker:
         :return: True if child needs to be skipped, False otherwise.
         """
         if (
-            (isinstance(tree, ast.Class) and child_name == "parent")
+            (isinstance(tree, ast.Class) and child_name in {"parent", "annotation"})
             or (
                 isinstance(tree, ast.ClassModificationArgument)
                 and child_name in {"scope", "__deepcopy__"}
