@@ -679,6 +679,8 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name="") -> ast.Class:
 class SymbolReference:
     def __init__(self, symbol: ast.Symbol, scope: ast.InstanceClass):
         self.symbol = symbol
+
+        # TODO: We don't need/use scope, get rid of it
         self.scope = scope
 
 
@@ -740,10 +742,16 @@ class ComponentRefToSymbolRef:
             try:
                 sym = scope.find_symbol(tree)
             except ast.SymbolNotFoundError as e:
-                # TODO: I really do not want to pass exceptions like this here.
-                # I only want to process componentrefs if they're a symbol reference, and then
-                # we can have proper error checking on whether symbol's were found or not.
-                pass
+                
+                # Also ugly, can't we make "find_function" part of "find_symbol" (even though it's more like find_class really).
+                c = scope.find_class(tree)
+                if c.type == "function":
+                    tree._resolved_symbol = SymbolReference(c, scope)
+                else:
+                    # TODO: I really do not want to pass exceptions like this here.
+                    # I only want to process componentrefs if they're a symbol reference, and then
+                    # we can have proper error checking on whether symbol's were found or not.
+                    pass  # instead of reraise
             else:
                 if isinstance(sym.type, ast.ComponentRef):
                     sym.type = ast.SymbolTypeRef(sym.type)
@@ -799,8 +807,14 @@ class ComponentRefFlattener(TreeListener):
         if sym in self.symbols:
             tree.name = sym.name
             tree.child = []
+        elif sym.type == "function":
+            # TODO: Something with functions
+            pass
+        elif "constant" in sym.prefixes:
+            # TODO: Debugging thing so we know when to fix constants pulling
+            raise Exception("Unpulled constant, fix me")
         else:
-            raise Exception("Hmm, constant?")
+            raise Exception("Some other thing failed while flattening symbols?")
 
         a = 1
 
