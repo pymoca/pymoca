@@ -852,6 +852,20 @@ class Class(Node):
                     else:
                         raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in enclosing scope, but is not a constant.")                   
             except KeyError:
+                # Try imports
+                if "*" in self.imports:
+                    for package_ref in self.imports["*"].components:
+                        imported_comp_ref_class = package_ref
+                        try:
+                            c = self._find_class(imported_comp_ref_class)
+                            sym = c.find_symbol(component_ref)
+                            if "constant" in sym.prefixes:
+                                return sym
+                            else:
+                                raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in imports, but is not a constant.")
+                        except (KeyError, ClassNotFoundError):
+                            pass
+
                 if search_parent and self.parent is not None:
                     return self.parent._find_symbol(component_ref)
                 else:
