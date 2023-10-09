@@ -853,6 +853,7 @@ class Class(Node):
                         raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in enclosing scope, but is not a constant.")                   
             except KeyError:
                 # Try imports
+                # TODO: Prettyify, bit of duplicate code between if and elif branches
                 if "*" in self.imports:
                     for package_ref in self.imports["*"].components:
                         imported_comp_ref_class = package_ref
@@ -865,6 +866,16 @@ class Class(Node):
                                 raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in imports, but is not a constant.")
                         except (KeyError, ClassNotFoundError):
                             pass
+                elif component_ref.name in self.imports:
+                    # TODO: Probably need some test cases to cover the
+                    # ImportClause etc stuff in the similar code in find_class
+                    # and implement the same logic here if needed (not sure yet, it being in find_class might be good enough).
+                    sym = self.find_symbol(self.imports[component_ref.name])
+                    if "constant" in sym.prefixes:
+                        return sym
+                    else:
+                        raise NonConstantSymbolFoundError(
+                            f"Symbol '{component_ref}' found in imports, but is not a constant.")
 
                 if search_parent and self.parent is not None:
                     return self.parent._find_symbol(component_ref)
