@@ -993,9 +993,15 @@ class ConstantReferencePuller(TreeListener):
         self.skip_children_of = []
         super().__init__()
 
+        self.bladiebla = []
+
     def enterComponentRef(self, tree: ast.ComponentRef):
         if not self.skip_children_of:
-            sym = tree._resolved_symbol.symbol
+            try:
+                sym = tree._resolved_symbol.symbol
+            except Exception as e:
+                a = 1
+                raise
 
             # TODO: Pull functions?
             if sym not in self.symbols and sym not in self.extra_constants and sym.type != "function":
@@ -1014,6 +1020,12 @@ class ConstantReferencePuller(TreeListener):
 
     def exitClass(self, tree: ast.Class) -> None:
         tree.symbols.update({c.name: c for c in self.extra_constants})
+
+    def enterEvery(self, tree: ast.Node):
+        self.bladiebla.append(tree)
+
+    def exitEvery(self, tree: ast.Node):
+        self.bladiebla.pop()
 
 
 def pull_constant_references(flat_class: ast.Class) -> None:
