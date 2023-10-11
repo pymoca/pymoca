@@ -676,6 +676,18 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name="") -> ast.Class:
                 # TODO: Do we need the symbol type after this?
                 sym.type = sym.type.name
 
+    # for all equations in original class
+    for equation in class_.equations:
+        flat_class.equations.append(equation)
+
+        # TODO: Do we still need this?
+        # if isinstance(equation, ast.ConnectClause):
+        #     # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
+        #     if not hasattr(equation, "__left_inner"):
+        #         equation.__left_inner = len(equation.left.child) > 0
+        #     if not hasattr(equation, "__right_inner"):
+        #         equation.__right_inner = len(equation.right.child) > 0
+
     return flat_class
 
 
