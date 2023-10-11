@@ -225,6 +225,9 @@ class TreeWalker:
             )
             or (isinstance(tree, ast.Symbol) and child_name == "_parent")
             or (isinstance(tree, SymbolReference) and child_name == "scope")
+            # HACK: We do this to avoid looping over `imports` again in referenced functions.
+            # Feels a bit ugly though.
+            or (isinstance(tree, SymbolReference) and child_name == "symbol" and tree.symbol.type == "function")
         ):
             return True
         return False
@@ -1294,6 +1297,8 @@ def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
     # pull functions to the top level,
     # putting them prior to the model class so that they are visited
     # first by the tree walker.
+
+    # TODO: I don't know if this is needed/wanted anymore
     functions_and_classes = flat_class.functions
     flat_class.functions = OrderedDict()
     functions_and_classes.update(root.classes)
