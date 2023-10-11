@@ -707,7 +707,7 @@ class ForIndexReference:
 class ComponentRefToSymbolRef:
     # TODO:
     #  It's become more of a "resolve component ref" approach, be it
-    # a symbol ref, import ref, attribute ref, function ref, for inde ref.
+    # a symbol ref, import ref, attribute ref, function ref, iterator ref.
 
     # TODO:
     # Ugh, I only really want to look up symbols...
@@ -720,7 +720,8 @@ class ComponentRefToSymbolRef:
         self.scope = None
         self.skip_children_of = []
 
-        self.for_equation_iterators = {}
+        self.for_equation_iterators = [set()]  # List[Set[str]]
+        self.inside_for_index = []
 
         # Debugging
         self.modification = []
@@ -752,22 +753,32 @@ class ComponentRefToSymbolRef:
         tree.value.component = ast.AttributeRef(tree.value.component)
 
     def enterForEquation(self, tree: ast.ForEquation) -> None:
-        local_iterators = {x.name: tree for x in tree.indices}
+        local_iterators = {x.name for x in tree.indices}
 
         # Check that the iterators don't already exist
         # NOTE: It is allowed for local iterators to conflict in name with symbols with the same name.
         # Inside the for loop, the iterator takes precedence.
-        for i in local_iterators.keys():
-            if i in self.for_equation_iterators:
+        for i in local_iterators:
+            if i in self.for_equation_iterators[-1]:
                 raise Exception(f"An iterator '{i}' is already declared in this scope.")
 
-        self.for_equation_iterators.update(local_iterators)
+        self.for_equation_iterators.append(local_iterators | self.for_equation_iterators[-1])
     
     def exitForEquation(self, tree: ast.ForEquation) -> None:
-        # Unload the iterators declared as part of this for equation
-        to_delete = [i for i, for_eq in self.for_equation_iterators.items() if for_eq is tree]
-        for i in to_delete:
-            self.for_equation_iterators.pop(i)
+        self.for_equation_iterators.pop()
+        
+    def enterForIndex(self, tree: ast.ForIndex) -> None:
+        # HACK: We don't want to process the children of this for index, but we do want to process the
+        # component refs in the equations. 
+        # Also note that we do want to still refer to the index if they are nested loops, so
+        # it's not like we can skip _all_ ForIndex references to local iterators. Just the one
+        # that defines the iterator.
+        # I'm starting to think that every enter/exit can return something like
+        # (new_type, children_to_process, children_to_skip)
+        self.inside_for_index = True
+    
+    def exitForIndex(self, tree: ast.ForIndex) -> None:
+        self.inside_for_index = False
 
     def enterComponentRef(self, tree: ast.ComponentRef):
         # HACK: Already worked around the AttributeRef thing, but now also a type is a ComponentRef... everything is a ComponentRef,
@@ -776,7 +787,8 @@ class ComponentRefToSymbolRef:
             # HACK: This is an ungly way to pass it. I think I still want to have different _types_ of ComponentRefs, or
             # change them here from ComponentRef to -> SymbolComponentRef / ForIndexComponentRef / AttributeComponentRef / Import ... etc
             # Then we can easily handle them differently.
-            if tree.name in self.for_equation_iterators:
+            for_eq_iterator_index = -2 if self.inside_for_index else -1
+            if tree.name in self.for_equation_iterators[for_eq_iterator_index]:
                 assert not tree.child
                 tree._resolved_symbol = ForIndexReference(tree.name)
                 return
