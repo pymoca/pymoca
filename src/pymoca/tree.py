@@ -699,7 +699,16 @@ class SymbolReference:
         self.scope = scope
 
 
+class ForIndexReference:
+    def __init__(self, name: str):
+        self.name = name
+
+
 class ComponentRefToSymbolRef:
+    # TODO:
+    #  It's become more of a "resolve component ref" approach, be it
+    # a symbol ref, import ref, attribute ref, function ref, for inde ref.
+
     # TODO:
     # Ugh, I only really want to look up symbols...
     # But with everything being ComponentRefs, how do I know if it's a Symbol reference or some
@@ -710,6 +719,8 @@ class ComponentRefToSymbolRef:
 
         self.scope = None
         self.skip_children_of = []
+
+        self.for_equation_iterators = {}
 
         # Debugging
         self.modification = []
@@ -740,10 +751,36 @@ class ComponentRefToSymbolRef:
 
         tree.value.component = ast.AttributeRef(tree.value.component)
 
+    def enterForEquation(self, tree: ast.ForEquation) -> None:
+        local_iterators = {x.name: tree for x in tree.indices}
+
+        # Check that the iterators don't already exist
+        # NOTE: It is allowed for local iterators to conflict in name with symbols with the same name.
+        # Inside the for loop, the iterator takes precedence.
+        for i in local_iterators.keys():
+            if i in self.for_equation_iterators:
+                raise Exception(f"An iterator '{i}' is already declared in this scope.")
+
+        self.for_equation_iterators.update(local_iterators)
+    
+    def exitForEquation(self, tree: ast.ForEquation) -> None:
+        # Unload the iterators declared as part of this for equation
+        to_delete = [i for i, for_eq in self.for_equation_iterators.items() if for_eq is tree]
+        for i in to_delete:
+            self.for_equation_iterators.pop(i)
+
     def enterComponentRef(self, tree: ast.ComponentRef):
         # HACK: Already worked around the AttributeRef thing, but now also a type is a ComponentRef... everything is a ComponentRef,
         # but they're not all equal. Can we handle them differently in the parser, that way we can also handle them easily differently here.
         if not self.skip_children_of and tree._resolved_symbol is None:
+            # HACK: This is an ungly way to pass it. I think I still want to have different _types_ of ComponentRefs, or
+            # change them here from ComponentRef to -> SymbolComponentRef / ForIndexComponentRef / AttributeComponentRef / Import ... etc
+            # Then we can easily handle them differently.
+            if tree.name in self.for_equation_iterators:
+                assert not tree.child
+                tree._resolved_symbol = ForIndexReference(tree.name)
+                return
+
             # TODO: How come sometimes we have already resolved the symbol? E.g. with the "ExtendsModification" test case,
             # we get "not found" error when we've already found it before (if we leave the `and tree._resolved_symbol` out of the above condition).
             # Why does this happen?
