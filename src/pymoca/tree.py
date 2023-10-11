@@ -997,7 +997,8 @@ class ConstantReferencePuller(TreeListener):
         if not self.skip_children_of:
             sym = tree._resolved_symbol.symbol
 
-            if sym not in self.symbols and sym not in self.extra_constants:
+            # TODO: Pull functions?
+            if sym not in self.symbols and sym not in self.extra_constants and sym.type != "function":
                 sym.name = str(sym.full_reference())
 
                 self.extra_constants.add(sym)
