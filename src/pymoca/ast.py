@@ -1041,6 +1041,8 @@ class Tree(Class):
     The root class.
     """
 
+    # TODO: Where do we check if the number and type of arguments is correct?
+    # What does OMC do on this front?
     BUILTIN_FUNCTIONS = {
         # See Modelica Specification:
         # Section 3.7 Built-in Intrinsic Operators with Function Syntax
@@ -1097,6 +1099,39 @@ class Tree(Class):
         "edge",
         "change",
         "reinit",
+
+        #
+        # Built-in Array Functions
+        #
+        "promote",
+
+        # Dimension and Size Functions
+        "ndims",
+        "size",
+        # Dimensionality Conversion Functions
+        "scalar",
+        "vector",
+        "matrix",
+        # Specialized Array Constructor Functions
+        "identity",
+        "diagonal",
+        "zeros",
+        "ones",
+        "fill",
+        "linspace",
+        # Reduction Functions and Operators
+        "min",
+        "max",
+        "sum",
+        "product",
+        # Matrix and Vector Algebra Functions
+        "transpose",
+        "outerProduct",
+        "symmetric",
+        "cross",
+        "skew",
+        # TODO: Where does this one belong?
+        "cat",
     }
 
     def __init__(self, *args, **kwargs):
