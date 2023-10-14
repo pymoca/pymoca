@@ -793,6 +793,8 @@ class ComponentRefToSymbolRef:
                 tree._resolved_symbol = ForIndexReference(tree.name)
                 return
 
+            # NOTE: User-defined symbols/functions/etc take precedence over built-in functions.
+
             # TODO: How come sometimes we have already resolved the symbol? E.g. with the "ExtendsModification" test case,
             # we get "not found" error when we've already found it before (if we leave the `and tree._resolved_symbol` out of the above condition).
             # Why does this happen?

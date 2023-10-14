@@ -677,6 +677,7 @@ class ExtendsClause(Node):
 
 
 class Class(Node):
+    # TODO: This really should be a set as well, we only ever do "is in"
     BUILTIN = ("Real", "Integer", "String", "Boolean")
 
     def __init__(self, **kwargs):
@@ -1039,6 +1040,69 @@ class Tree(Class):
     """
     The root class.
     """
+
+    BUILTIN_FUNCTIONS = {
+        # See Modelica Specification:
+        # Section 3.7 Built-in Intrinsic Operators with Function Syntax
+
+        # Numeric Functions and Conversion Functions
+        "abs",
+        "sign",
+        "sqrt"
+        "Integer",
+        "EnumTypeName",
+        "String",
+
+        # Event Triggering Mathematical Functions
+        "div",
+        "mod",
+        "rem",
+        "ceil",
+        "floor",
+        "integer",
+
+        # Elementary Mathematical Functions
+        "sin",
+        "cos",
+        "tan",
+        "asin",
+        "acos",
+        "atan",
+        "atan2",
+        "sinh",
+        "cosh",
+        "tanh",
+        "exp",
+        "log",
+        "log10",
+
+        # Derivative and Special Purpose Operators with Function Syntax
+        "der",
+        "delay",
+        "cardinality",
+        "homotopy",
+        "semiLinear",
+        "inStream",
+        "actualStream",
+        "spatialDistribution",
+        "getInstanceName",
+
+        # Event-Related Operators with Function Syntax
+        "initial",
+        "terminal",
+        "noEvent",
+        "smooth",
+        "sample",
+        "pre",
+        "edge",
+        "change",
+        "reinit",
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for f in self.BUILTIN_FUNCTIONS:
+            self.classes[f] = Class(name=f, type="function", parent=self)
 
     def extend(self, other: "Tree") -> None:
         self._extend(other)
