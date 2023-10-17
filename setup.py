@@ -99,7 +99,7 @@ def setup_package():
             'scipy >= 0.13.3',
         ],
         'sympy': [
-            'sympy >= 0.7.6.1',
+            'sympy >= 0.7.6.1, <= 1.11',
             'scipy >= 0.13.3',
         ],
         # Examples
