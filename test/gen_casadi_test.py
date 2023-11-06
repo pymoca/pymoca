@@ -14,7 +14,7 @@ import casadi as ca
 import numpy as np
 
 import pymoca.backends.casadi.generator as gen_casadi
-from pymoca import parser
+from pymoca import parser, ast, tree
 from pymoca.backends.casadi.alias_relation import AliasRelation
 from pymoca.backends.casadi.api import CachedModel, transfer_model
 from pymoca.backends.casadi.model import (

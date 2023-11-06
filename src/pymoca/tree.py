@@ -332,6 +332,15 @@ def flatten_extends(
 
             sym._parent = extended_orig_class
 
+    # Resolve non-elementary symbol types from ast.ComponentRef to an ast.Class reference
+    for sym_name, sym in orig_class.symbols.items():
+        if isinstance(sym.type, ast.ComponentRef):
+            try:
+                sym.type = orig_class.find_class(sym.type)
+            except ast.FoundElementaryClassError:
+                # We will handle these later when building the instance tree
+                pass
+
     extended_orig_class.imports.update(orig_class.imports)
     extended_orig_class.classes.update(orig_class.classes)
     extended_orig_class.symbols.update(orig_class.symbols)
@@ -466,7 +475,7 @@ def build_instance_tree(
         class_name = sym.type
 
         try:
-            if not isinstance(sym.type, ast.InstanceClass):
+            if not isinstance(sym.type, ast.Class):
                 c = extended_orig_class.find_class(sym.type)
             else:
                 c = sym.type
