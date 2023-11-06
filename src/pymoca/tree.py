@@ -13,6 +13,8 @@ from typing import Iterable, Union
 
 import numpy as np
 
+from pymoca import ast
+
 from . import ast
 
 CLASS_SEPARATOR = "."
@@ -53,6 +55,9 @@ class TreeListener:
         pass
 
     def enterClassModification(self, tree: ast.ClassModification) -> None:
+        pass
+
+    def enterClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
         pass
 
     def enterComponentClause(self, tree: ast.ComponentClause) -> None:
@@ -134,6 +139,9 @@ class TreeListener:
     def exitClassModification(self, tree: ast.ClassModification) -> None:
         pass
 
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
+        pass
+
     def exitComponentClause(self, tree: ast.ComponentClause) -> None:
         pass
 
@@ -209,9 +217,17 @@ class TreeWalker:
         endless recursion by skipping references to e.g. parent nodes.
         :return: True if child needs to be skipped, False otherwise.
         """
-        if (isinstance(tree, ast.Class) and child_name == "parent") or (
-            isinstance(tree, ast.ClassModificationArgument)
-            and child_name in ("scope", "__deepcopy__")
+        if (
+            (isinstance(tree, ast.Class) and child_name in {"parent", "annotation"})
+            or (
+                isinstance(tree, ast.ClassModificationArgument)
+                and child_name in {"scope", "__deepcopy__"}
+            )
+            or (isinstance(tree, ast.Symbol) and child_name == "_parent")
+            or (isinstance(tree, SymbolReference) and child_name == "scope")
+            # HACK: We do this to avoid looping over `imports` again in referenced functions.
+            # Feels a bit ugly though.
+            or (isinstance(tree, SymbolReference) and child_name == "symbol" and tree.symbol.type == "function")
         ):
             return True
         return False
@@ -248,6 +264,8 @@ class TreeWalker:
         :return: None
         """
         if isinstance(tree, ast.Node):
+            self.walk(listener, tree)
+        elif isinstance(tree, SymbolReference):
             self.walk(listener, tree)
         elif isinstance(tree, dict):
             for k in tree.keys():
@@ -286,6 +304,7 @@ def flatten_extends(
                 )
             extended_orig_class.type = c.type
 
+        apply_scope(extended_orig_class, extends.class_modification)
         c = flatten_extends(c, extends.class_modification, parent=c.parent)
 
         # Imports are not inherited (spec 3.5 sections 5.3.1 and 7.1)
@@ -306,10 +325,21 @@ def flatten_extends(
             c.modification_environment.arguments
         )
 
-        # set visibility
+        # set visibility and parent scope
         for sym in extended_orig_class.symbols.values():
             if sym.visibility > extends.visibility:
                 sym.visibility = extends.visibility
+
+            sym._parent = extended_orig_class
+
+    # Resolve non-elementary symbol types from ast.ComponentRef to an ast.Class reference
+    for sym_name, sym in orig_class.symbols.items():
+        if isinstance(sym.type, ast.ComponentRef):
+            try:
+                sym.type = orig_class.find_class(sym.type)
+            except ast.FoundElementaryClassError:
+                # We will handle these later when building the instance tree
+                pass
 
     extended_orig_class.imports.update(orig_class.imports)
     extended_orig_class.classes.update(orig_class.classes)
@@ -371,7 +401,7 @@ def build_instance_tree(
         argument = class_mod_argument.value
         if isinstance(argument, ast.ShortClassDefinition):
             old_class = extended_orig_class.classes[argument.name]
-            extended_orig_class.classes[argument.name] = scope_class.find_class(argument.component)
+            extended_orig_class.classes[argument.name] = scope_class.find_class(argument.component, copy=False)
 
             # Fix references to symbol types that were already in the instance tree
             for sym in extended_orig_class.symbols.values():
@@ -389,6 +419,9 @@ def build_instance_tree(
     extended_orig_class.modification_environment.arguments = [
         x for x in extended_orig_class.modification_environment.arguments if not x.redeclare
     ]
+
+    # Set the correct scope
+    # apply_scope(extended_orig_class, extended_orig_class.modification_environment)
 
     # Only ast.ElementModification type modifications left in the class's
     # modification environment. No more ComponentClause or
@@ -442,7 +475,7 @@ def build_instance_tree(
         class_name = sym.type
 
         try:
-            if not isinstance(sym.type, ast.InstanceClass):
+            if not isinstance(sym.type, ast.Class):
                 c = extended_orig_class.find_class(sym.type)
             else:
                 c = sym.type
@@ -652,143 +685,217 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name="") -> ast.Class:
                 # TODO: Do we need the symbol type after this?
                 sym.type = sym.type.name
 
-    # Apply any symbol modifications if the scope of said modification is equal to that of the current class
-    apply_symbol_modifications(flat_class, class_)
-
-    # now resolve all references inside the symbol definitions
-    for sym_name, sym in flat_class.symbols.items():
-        flat_sym = flatten_component_refs(flat_class, sym, instance_prefix)
-        flat_class.symbols[sym_name] = flat_sym
-
-    # A set of component refs to functions
-    pulled_functions = OrderedDict()
-
     # for all equations in original class
     for equation in class_.equations:
-        # Equation returned has function calls replaced with their full scope
-        # equivalent, and it pulls out all references into the pulled_functions.
-        fs_equation = fully_scope_function_calls(class_, equation, pulled_functions)
+        flat_class.equations.append(equation)
 
-        flat_equation = flatten_component_refs(flat_class, fs_equation, instance_prefix)
-        flat_class.equations.append(flat_equation)
-        if isinstance(flat_equation, ast.ConnectClause):
-            # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
-            if not hasattr(flat_equation, "__left_inner"):
-                flat_equation.__left_inner = len(equation.left.child) > 0
-            if not hasattr(flat_equation, "__right_inner"):
-                flat_equation.__right_inner = len(equation.right.child) > 0
-
-    # Create fully scoped equivalents
-    fs_initial_equations = [
-        fully_scope_function_calls(class_, e, pulled_functions) for e in class_.initial_equations
-    ]
-    fs_statements = [
-        fully_scope_function_calls(class_, e, pulled_functions) for e in class_.statements
-    ]
-    fs_initial_statements = [
-        fully_scope_function_calls(class_, e, pulled_functions) for e in class_.initial_statements
-    ]
-
-    flat_class.initial_equations += [
-        flatten_component_refs(flat_class, e, instance_prefix) for e in fs_initial_equations
-    ]
-    flat_class.statements += [
-        flatten_component_refs(flat_class, e, instance_prefix) for e in fs_statements
-    ]
-    flat_class.initial_statements += [
-        flatten_component_refs(flat_class, e, instance_prefix) for e in fs_initial_statements
-    ]
-
-    for f, c in pulled_functions.items():
-        pulled_functions[f] = flatten_class(c)
-        c = pulled_functions[f]
-        flat_class.functions.update(c.functions)
-        c.functions = OrderedDict()
-
-    flat_class.functions.update(pulled_functions)
+        # TODO: Do we still need this?
+        # if isinstance(equation, ast.ConnectClause):
+        #     # following section 9.2 of the Modelica spec, we treat 'inner' and 'outer' connectors differently.
+        #     if not hasattr(equation, "__left_inner"):
+        #         equation.__left_inner = len(equation.left.child) > 0
+        #     if not hasattr(equation, "__right_inner"):
+        #         equation.__right_inner = len(equation.right.child) > 0
 
     return flat_class
 
 
-class ComponentRefFlattener(TreeListener):
-    """
-    A listener that flattens references to components and performs name mangling,
-    it also locates all symbols and determines which are states (
-    one of the equations contains a derivative of the symbol)
-    """
+class SymbolReference:
+    def __init__(self, symbol: ast.Symbol, scope: ast.InstanceClass):
+        self.symbol = symbol
 
-    def __init__(self, container: ast.Class, instance_prefix: str):
-        self.container = container
-        self.instance_prefix = instance_prefix
-        self.depth = 0
-        self.cutoff_depth = sys.maxsize
-        self.inside_modification = 0  # We do flatten component references in modifications
+        # TODO: We don't need/use scope, get rid of it
+        self.scope = scope
+
+
+class ForIndexReference:
+    def __init__(self, name: str):
+        self.name = name
+
+
+class ComponentRefToSymbolRef:
+    # TODO:
+    #  It's become more of a "resolve component ref" approach, be it
+    # a symbol ref, import ref, attribute ref, function ref, iterator ref.
+
+    # TODO:
+    # Ugh, I only really want to look up symbols...
+    # But with everything being ComponentRefs, how do I know if it's a Symbol reference or some
+    # other thing lke an Import clause, class reference, what have you.
+
+    def __init__(self, class_):
+        self.instance_class = []
+
+        self.scope = None
+        self.skip_children_of = []
+
+        self.for_equation_iterators = [set()]  # List[Set[str]]
+        self.inside_for_index = []
+
+        # Debugging
+        self.modification = []
+        self.class_ = class_
+        self.bladiebla = []
+
         super().__init__()
 
-    def enterClassModificationArgument(self, tree: ast.ClassModificationArgument):
-        if tree.scope is not None:
-            self.inside_modification += 1
+    def enterInstanceClass(self, tree: ast.InstanceClass) -> None:
+        if isinstance(tree.type, str) and tree.type == "__builtin":
+            # HACK: Due to the way we handle things, we have moved modifications one lever deeper to apply them
+            # on a "builtin" class. However, the scope of all variables referred to is still that of the original
+            # class. Therefore, push _that_ one (and then later pop it when leaving)
+            self.instance_class.append(self.instance_class[-1])
+        else:
+            self.instance_class.append(tree)
 
-    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
-        if tree.scope is not None:
-            self.inside_modification -= 1
+    def enterSymbol(self, tree: ast.Symbol) -> None:
+        if isinstance(tree.type, ast.ComponentRef):
+            tree.type = ast.SymbolTypeRef(tree.type)
+
+    def enterImportClause(self, tree: SymbolReference) -> None:
+        self.skip_children_of.append(tree)
+
+    def enterClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
+        self.scope = tree.scope
+        self.modification.append(tree)
+
+        tree.value.component = ast.AttributeRef(tree.value.component)
+
+    def enterForEquation(self, tree: ast.ForEquation) -> None:
+        local_iterators = {x.name for x in tree.indices}
+
+        # Check that the iterators don't already exist
+        # NOTE: It is allowed for local iterators to conflict in name with symbols with the same name.
+        # Inside the for loop, the iterator takes precedence.
+        for i in local_iterators:
+            if i in self.for_equation_iterators[-1]:
+                raise Exception(f"An iterator '{i}' is already declared in this scope.")
+
+        self.for_equation_iterators.append(local_iterators | self.for_equation_iterators[-1])
+    
+    def exitForEquation(self, tree: ast.ForEquation) -> None:
+        self.for_equation_iterators.pop()
+        
+    def enterForIndex(self, tree: ast.ForIndex) -> None:
+        # HACK: We don't want to process the children of this for index, but we do want to process the
+        # component refs in the equations. 
+        # Also note that we do want to still refer to the index if they are nested loops, so
+        # it's not like we can skip _all_ ForIndex references to local iterators. Just the one
+        # that defines the iterator.
+        # I'm starting to think that every enter/exit can return something like
+        # (new_type, children_to_process, children_to_skip)
+        self.inside_for_index = True
+    
+    def exitForIndex(self, tree: ast.ForIndex) -> None:
+        self.inside_for_index = False
 
     def enterComponentRef(self, tree: ast.ComponentRef):
-        self.depth += 1
-        if self.depth > self.cutoff_depth:
-            return
+        # HACK: Already worked around the AttributeRef thing, but now also a type is a ComponentRef... everything is a ComponentRef,
+        # but they're not all equal. Can we handle them differently in the parser, that way we can also handle them easily differently here.
+        if not self.skip_children_of and tree._resolved_symbol is None:
+            # HACK: This is an ungly way to pass it. I think I still want to have different _types_ of ComponentRefs, or
+            # change them here from ComponentRef to -> SymbolComponentRef / ForIndexComponentRef / AttributeComponentRef / Import ... etc
+            # Then we can easily handle them differently.
+            for_eq_iterator_index = -2 if self.inside_for_index else -1
+            if tree.name in self.for_equation_iterators[for_eq_iterator_index]:
+                assert not tree.child
+                tree._resolved_symbol = ForIndexReference(tree.name)
+                return
 
-        # Compose flatted name
-        new_name = self.instance_prefix + tree.name
-        c = tree
-        while len(c.child) > 0:
-            c = c.child[0]
-            new_name += CLASS_SEPARATOR + c.name
+            # NOTE: User-defined symbols/functions/etc take precedence over built-in functions.
 
-        # If the flattened name exists in the container, use it.
-        # Otherwise, skip this reference.
-        # We also do not want to modify any component references inside
-        # modifications (that still need to be applied), as those have an
-        # accompanying scope and will be handled by the modification applier.
-        # Only when modifications have been applied, will they be picked up
-        # below.
-        if new_name in self.container.symbols and self.inside_modification == 0:
-            tree.name = new_name
-            c = tree
-            while len(c.child) > 0:
-                c = c.child[0]
-                tree.indices += c.indices
-            tree.child = []
-        else:
-            # The component was not found in the container.  We leave this
-            # reference alone.
-            self.cutoff_depth = self.depth
+            # TODO: How come sometimes we have already resolved the symbol? E.g. with the "ExtendsModification" test case,
+            # we get "not found" error when we've already found it before (if we leave the `and tree._resolved_symbol` out of the above condition).
+            # Why does this happen?
+            if self.scope is not None:
+                # Inside a passed-along modification
+                scope = self.scope
+            else:
+                # Not inside a modification, e.g. a in a local modification or an equation
+                scope = self.instance_class[-1]
 
-    def exitComponentRef(self, tree: ast.ComponentRef):
-        self.depth -= 1
-        if self.depth < self.cutoff_depth:
-            self.cutoff_depth = sys.maxsize
+            try:
+                sym = scope.find_symbol(tree)
+            except ast.SymbolNotFoundError as e:
+                
+                # Also ugly, can't we make "find_function" part of "find_symbol" (even though it's more like find_class really).
+                c = scope.find_class(tree)
+                if c.type == "function":
+                    tree._resolved_symbol = SymbolReference(c, scope)
+                else:
+                    # TODO: I really do not want to pass exceptions like this here.
+                    # I only want to process componentrefs if they're a symbol reference, and then
+                    # we can have proper error checking on whether symbol's were found or not.
+                    pass  # instead of reraise
+            else:
+                if isinstance(sym.type, ast.ComponentRef):
+                    sym.type = ast.SymbolTypeRef(sym.type)
+
+                # Note that we will walk this symbol reference (skipping the scope to avoid endless recursion).
+                # TODO: We don't really need the scope anyway right? Just get rid of it.
+                tree._resolved_symbol = SymbolReference(sym, scope)
+
+            if tree.child:
+                self.skip_children_of.append(tree)
+            
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument):
+        self.scope = None
+        self.modification.pop()
+
+    def exitInstanceClass(self, tree: ast.InstanceClass) -> None:
+        self.instance_class.pop()
+
+    def enterEvery(self, tree: ast.Node):
+        self.bladiebla.append(tree)
+
+    def exitEvery(self, tree: ast.Node):
+        if self.skip_children_of and tree is self.skip_children_of[-1]:
+            self.skip_children_of.pop()
+
+        self.bladiebla.pop()
 
 
-def flatten_component_refs(
-    container: ast.Class,
-    expression: ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol],
-    instance_prefix: str,
-) -> ast.Union[ast.ConnectClause, ast.AssignmentStatement, ast.ForStatement, ast.Symbol]:
-    """
-    Flattens component refs in a tree
-    :param container: class
-    :param expression: original expression
-    :param instance_prefix: prefix for instance
-    :return: flattened expression
-    """
-
-    expression_copy = copy.deepcopy(expression)
-
+def resolve_component_references_to_symbols(class_: ast.InstanceClass) -> None:
     w = TreeWalker()
-    w.walk(ComponentRefFlattener(container, instance_prefix), expression_copy)
+    w.walk(ComponentRefToSymbolRef(class_), class_)
+    a = 1
 
-    return expression_copy
+
+class ComponentRefFlattener(TreeListener):
+
+    def __init__(self, class_: ast.Class):
+        self.class_ = class_
+        self.symbols = set(class_.symbols.values())
+        self.bladiebla = []
+        super().__init__()
+
+    def enterEvery(self, tree: ast.Node):
+        self.bladiebla.append(tree)
+
+    def exitEvery(self, tree: ast.Node):
+        self.bladiebla.pop()
+
+    def enterComponentRef(self, tree: ast.ComponentRef):
+        # TODO: Somehow also make constants referred to work the way with AttributeRef and SymbolTypeRef
+        # What is the prettier way? Do it in the parser? Do it as a separate processing step on the entire tree at some point?
+        sym = tree._resolved_symbol.symbol
+        if sym in self.symbols:
+            tree.name = sym.name
+            tree.child = []
+        elif sym.type == "function":
+            # TODO: Something with functions
+            pass
+        elif "constant" in sym.prefixes:
+            # TODO: Debugging thing so we know when to fix constants pulling
+            raise Exception("Unpulled constant, fix me")
+        else:
+            raise Exception("Some other thing failed while flattening symbols?")
+
+        a = 1
+
+def flatten_component_refs(class_: ast.Class) -> None:
+    w = TreeWalker()
+    w.walk(ComponentRefFlattener(class_), class_)
 
 
 class FunctionExpander(TreeListener):
@@ -835,29 +942,15 @@ def fully_scope_function_calls(
     return expression_copy
 
 
-def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
+def modify_symbol(sym: ast.Symbol) -> None:
     """
-    Apply a modification to a symbol if the scope matches (or is None)
+    Apply modifications to a symbol
     :param sym: symbol to apply modifications for
-    :param scope: scope of modification
     """
 
     # We assume that we do not screw up the order of applying modifications
     # when "moving up" with the scope.
-    apply_args = [
-        x
-        for x in sym.class_modification.arguments
-        if x.scope is None
-        or x.scope.full_reference().to_tuple() == scope.full_reference().to_tuple()
-    ]
-    skip_args = [
-        x
-        for x in sym.class_modification.arguments
-        if x.scope is not None
-        and x.scope.full_reference().to_tuple() != scope.full_reference().to_tuple()
-    ]
-
-    for class_mod_argument in apply_args:
+    for class_mod_argument in sym.class_modification.arguments:
         argument = class_mod_argument.value
 
         assert isinstance(
@@ -872,7 +965,7 @@ def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
 
         setattr(sym, argument.component.name, argument.modifications[0])
 
-    sym.class_modification.arguments = skip_args
+    sym.class_modification.arguments = []
 
 
 class SymbolModificationApplier(TreeListener):
@@ -883,9 +976,8 @@ class SymbolModificationApplier(TreeListener):
     on non-elementary types.
     """
 
-    def __init__(self, node: ast.Node, scope: ast.InstanceClass):
+    def __init__(self, node: ast.Node):
         self.node = node
-        self.scope = scope
         super().__init__()
 
     def exitSymbol(self, tree: ast.Symbol):
@@ -895,7 +987,7 @@ class SymbolModificationApplier(TreeListener):
             ), "Found symbol modification on non-elementary type in instance tree."
         elif tree.class_modification is not None:
             if tree.class_modification.arguments:
-                modify_symbol(tree, self.scope)
+                modify_symbol(tree)
 
             if not tree.class_modification.arguments:
                 tree.class_modification = None
@@ -910,69 +1002,58 @@ class SymbolModificationApplier(TreeListener):
         ), "Found unhandled modification on instance class."
 
 
-def apply_symbol_modifications(node: ast.Node, scope: ast.InstanceClass) -> None:
+def apply_symbol_modifications(node: ast.Node) -> None:
     w = TreeWalker()
-    w.walk(SymbolModificationApplier(node, scope), node)
+    w.walk(SymbolModificationApplier(node), node)
 
 
-class ConstantReferenceApplier(TreeListener):
-    """
-    This walker applies all references to constants. For each referenced
-    constant it makes a symbol in the passed in InstanceClass class_, with the
-    flattened component reference to the constant as the symbol's name.
-    """
+class ConstantReferencePuller(TreeListener):
 
-    def __init__(self, class_: ast.InstanceClass):
-        self.classes = []
-
-        # We cannot directly mutate the dictionary while we are looping over
-        # it, so instead we store symbol updates here.
-        self.extra_symbols = []
-
-        self.depth = 0
-
+    def __init__(self, flat_class: ast.Class):
+        self.flat_class = flat_class
+        self.symbols = set(self.flat_class.symbols.values())
+        self.extra_constants = set()
+        self.skip_children_of = []
         super().__init__()
 
+        self.bladiebla = []
+
     def enterComponentRef(self, tree: ast.ComponentRef):
-        # If it is not a nested comonent reference, we do not have to do
-        # anyhing as the symbol we look for would already be in the current
-        # class
-        self.depth += 1
-
-        if self.depth > 1:
-            # Already inside a component reference. Do not perform lookups.
-            return
-
-        if tree.child:
+        if not self.skip_children_of:
             try:
-                self.extra_symbols[-1][str(tree)] = self.classes[-1].find_constant_symbol(tree)
-            except (
-                KeyError,
-                ast.ClassNotFoundError,
-                ast.FoundElementaryClassError,
-                ast.ConstantSymbolNotFoundError,
-            ):
-                pass
+                sym = tree._resolved_symbol.symbol
+            except Exception as e:
+                a = 1
+                raise
 
-    def exitComponentRef(self, tree: ast.ComponentRef):
-        self.depth -= 1
+            # TODO: Pull functions?
+            if sym not in self.symbols and sym not in self.extra_constants and sym.type != "function":
+                sym.name = str(sym.full_reference())
 
-    def enterInstanceClass(self, tree: ast.InstanceClass):
-        self.classes.append(tree)
-        self.extra_symbols.append(OrderedDict())
+                self.extra_constants.add(sym)
+                # TODO: Can you have non-elementary constants? How would we deal with those?
+                assert isinstance(sym.type, ast.ComponentRef), "constant is not elementary type"
 
-    def exitInstanceClass(self, tree: ast.InstanceClass):
-        c = self.classes.pop()
-        syms = self.extra_symbols.pop()
-        c.symbols.update(syms)
+            if tree.child:
+                self.skip_children_of.append(tree)
 
-    def enterClass(self, tree: ast.InstanceClass):
-        raise AssertionError("All classes should have been replaced by instance classes.")
+    def exitComponentRef(self, tree: ast.ComponentRef) -> None:
+        if self.skip_children_of and tree is self.skip_children_of[-1]:
+            self.skip_children_of.pop()
+
+    def exitClass(self, tree: ast.Class) -> None:
+        tree.symbols.update({c.name: c for c in self.extra_constants})
+
+    def enterEvery(self, tree: ast.Node):
+        self.bladiebla.append(tree)
+
+    def exitEvery(self, tree: ast.Node):
+        self.bladiebla.pop()
 
 
-def apply_constant_references(class_: ast.InstanceClass) -> None:
+def pull_constant_references(flat_class: ast.Class) -> None:
     w = TreeWalker()
-    w.walk(ConstantReferenceApplier(class_), class_)
+    w.walk(ConstantReferencePuller(flat_class), flat_class)
 
 
 def flatten_class(orig_class: ast.Class) -> ast.Class:
@@ -991,11 +1072,32 @@ def flatten_class(orig_class: ast.Class) -> ast.Class:
     #    modification is retained, such that flattening of symbols can be done
     #    correctly.
 
-    # Pull references to constants
-    apply_constant_references(instance_tree)
+    # Next step is to resolve all component references to symbols in the instance tree
+    # before we start applying modifications and flattening. That way, we can later resolve the SymbolReference back to 
+    # a ComponentRef when the flattening is done, without having to worry about updating the ComponentRef _while_ flattening.
+    # There are a couple types of component references, which we differently:
+    # - Type: Real - just skip these
+    # - Attribute: nominal/max/min: skip these
+    # TODO: We couldn't do this before easily, but if we do it this way we can:
+    # - Throw errors when we cannot find a symbol that is referred to in a modification or equation, or wherever
+    resolve_component_references_to_symbols(instance_tree)
+
+    # Apply symbol modifications
+    apply_symbol_modifications(instance_tree)
+
+    # TODO: How what why are the modifications for constants _outside_ the instance tree applied?
 
     # Finally we flatten all symbols and apply modifications.
     flat_class = flatten_symbols(instance_tree)
+
+    # Pull constant symbols into the flattened class
+    pull_constant_references(flat_class)
+
+    # Pull references to constants
+    flatten_component_refs(flat_class)
+
+
+    a = 1
 
     return flat_class
 
@@ -1228,6 +1330,25 @@ def annotate_states(node: ast.Node) -> None:
     w.walk(StateAnnotator(node), node)
 
 
+class ScopeApplier(TreeListener):
+    """
+    Finds all variables that are differentiated and annotates them with the state prefix
+    """
+
+    def __init__(self, scope: ast.InstanceClass):
+        super().__init__()
+        self.scope = scope
+
+    def exitClassModificationArgument(self, tree: ast.ClassModificationArgument) -> None:
+        if tree.scope is None:
+            tree.scope = self.scope
+
+
+def apply_scope(scope: ast.InstanceClass, modification_environment: ast.ClassModification) -> None:
+    w = TreeWalker()
+    w.walk(ScopeApplier(scope), modification_environment)
+
+
 def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
     """
     This function takes a Tree and flattens it so that all subclasses instances
@@ -1261,6 +1382,8 @@ def flatten(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Class:
     # pull functions to the top level,
     # putting them prior to the model class so that they are visited
     # first by the tree walker.
+
+    # TODO: I don't know if this is needed/wanted anymore
     functions_and_classes = flat_class.functions
     flat_class.functions = OrderedDict()
     functions_and_classes.update(root.classes)

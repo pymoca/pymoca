@@ -19,7 +19,19 @@ class ConstantSymbolNotFoundError(Exception):
     pass
 
 
+class SymbolNotFoundError(Exception):
+    pass
+
+
+class NonConstantSymbolFoundError(Exception):
+    pass
+
+
 class FoundElementaryClassError(Exception):
+    pass
+
+
+class UnsupportedFullReferenceLookup(Exception):
     pass
 
 
@@ -153,6 +165,7 @@ class ComponentRef(Node):
         self.name = ""  # type: str
         self.indices = [[None]]  # type: List[List[Union[Expression, Slice, Primary, ComponentRef]]]
         self.child = []  # type: List[ComponentRef]
+        self._resolved_symbol = None  # type: SymbolReference
         super().__init__(**kwargs)
 
     def __repr__(self) -> str:
@@ -222,6 +235,42 @@ class ComponentRef(Node):
         n.child = [b]
         return a
 
+
+class AttributeRef(ComponentRef):
+    def __init__(self, component_ref: ComponentRef):
+        # TODO:
+        # Had to disable checks, because we also loop over annotations where
+        # other things than "value/nominal/..." are referenced
+        # assert len(component_ref.child) == 0
+        # if component_ref.name not in Symbol.ATTRIBUTES:
+        #     a = 1
+        # assert component_ref.name in Symbol.ATTRIBUTES
+        # assert component_ref.indices == [[None]]
+
+        super().__init__(name=component_ref.name)
+
+
+class ForLoopIndexRef(ComponentRef):
+    def __init__(self, component_ref: ComponentRef):
+        # TODO:
+        # Had to disable checks, because we also loop over annotations where
+        # other things than "value/nominal/..." are referenced
+        # assert len(component_ref.child) == 0
+        # if component_ref.name not in Symbol.ATTRIBUTES:
+        #     a = 1
+        # assert component_ref.name in Symbol.ATTRIBUTES
+        # assert component_ref.indices == [[None]]
+
+        super().__init__(name=component_ref.name)
+
+
+class SymbolTypeRef(ComponentRef):
+    def __init__(self, component_ref: ComponentRef):
+        assert len(component_ref.child) == 0
+        assert component_ref.name in Class.BUILTIN
+        assert component_ref.indices == [[None]]
+
+        super().__init__(name=component_ref.name)
 
 class Expression(Node):
     def __init__(self, **kwargs):
@@ -440,10 +489,37 @@ class Symbol(Node):
         self.order = 0  # type: int
         self.visibility = Visibility.PRIVATE  # type: Visibility
         self.class_modification = None  # type: ClassModification
+        self._parent = None  # type: Class
         super().__init__(**kwargs)
 
+    def full_reference(self):
+        """
+        This type of lookup / reference only works when we're not in InstanceClasses.
+        To get the full reference then also involves including parent symbol names instead of just
+        classes all the way to the top.
+
+        TODO:
+        We should actually be able to do this. Not sure if we _need_ it though.
+        """
+
+        names = [self.name]
+
+        c = self._parent
+        while True:
+            if isinstance(c, InstanceClass):
+                raise UnsupportedFullReferenceLookup(f"Can't get full reference of Symbol '{self}', because it is part of an instantiated class '{c}'")
+
+            names.append(c.name)
+            if c.parent is c.root:
+                break
+            else:
+                c = c.parent
+
+        # Exclude the root node's name
+        return ComponentRef.from_tuple(tuple(reversed(names)))
+
     def __str__(self):
-        return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
+        return '{} {}, Type "{}", id="{}"'.format(type(self).__name__, self.name, self.type, id(self))
 
     def __repr__(self):
         return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)
@@ -601,6 +677,7 @@ class ExtendsClause(Node):
 
 
 class Class(Node):
+    # TODO: This really should be a set as well, we only ever do "is in"
     BUILTIN = ("Real", "Integer", "String", "Boolean")
 
     def __init__(self, **kwargs):
@@ -756,6 +833,76 @@ class Class(Node):
     def find_constant_symbol(self, component_ref: ComponentRef) -> Symbol:
         return self._find_constant_symbol(component_ref)
 
+    def _find_symbol(self, component_ref: ComponentRef, search_parent=True, in_original_scope=False) -> Symbol:
+        if component_ref.child:
+            # Try classes first, and constant symbols second
+            t = component_ref.to_tuple()
+
+            try:
+                node = self._find_class(ComponentRef(name=t[0]), search_parent)
+                return node._find_symbol(ComponentRef.from_tuple(t[1:]), False)
+            except ClassNotFoundError:
+                try:
+                    s = self.symbols[t[0]]
+                except KeyError:
+                    raise SymbolNotFoundError()
+
+                # Found a symbol. Continue lookup on type of this symbol.
+                if isinstance(s.type, InstanceClass):
+                    return s.type._find_symbol(ComponentRef.from_tuple(t[1:]), False, in_original_scope)
+                elif isinstance(s.type, ComponentRef):
+                    node = self._find_class(s.type)  # Parent lookups is OK here.
+                    return node._find_symbol(ComponentRef.from_tuple(t[1:]), False)
+                else:
+                    raise Exception("Unknown object type of symbol type: {}".format(type(s.type)))
+        else:
+            try:
+                sym = self.symbols[component_ref.name]
+                if in_original_scope:
+                    return sym
+                else:
+                    # Not in the original scope, and then we are only allowed to refer to constants.
+                    if "constant" in sym.prefixes:
+                        return sym
+                    else:
+                        raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in enclosing scope, but is not a constant.")                   
+            except KeyError:
+                # Try imports
+                # TODO: Prettyify, bit of duplicate code between if and elif branches
+                if "*" in self.imports:
+                    for package_ref in self.imports["*"].components:
+                        imported_comp_ref_class = package_ref
+                        try:
+                            c = self._find_class(imported_comp_ref_class)
+                            sym = c.find_symbol(component_ref)
+                            if "constant" in sym.prefixes:
+                                return sym
+                            else:
+                                raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in imports, but is not a constant.")
+                        except (KeyError, ClassNotFoundError):
+                            pass
+                elif component_ref.name in self.imports:
+                    # TODO: Probably need some test cases to cover the
+                    # ImportClause etc stuff in the similar code in find_class
+                    # and implement the same logic here if needed (not sure yet, it being in find_class might be good enough).
+                    sym = self.find_symbol(self.imports[component_ref.name])
+                    if "constant" in sym.prefixes:
+                        return sym
+                    else:
+                        raise NonConstantSymbolFoundError(
+                            f"Symbol '{component_ref}' found in imports, but is not a constant.")
+
+                if search_parent and self.parent is not None:
+                    return self.parent._find_symbol(component_ref)
+                else:
+                    raise SymbolNotFoundError()
+
+    def find_symbol(self, component_ref: ComponentRef) -> Symbol:
+        try:
+            return self._find_symbol(component_ref, in_original_scope=True)
+        except NonConstantSymbolFoundError as e:
+            raise NonConstantSymbolFoundError(f"Symbol '{component_ref}' found in enclosing scope, but is not a constant.") from e
+
     def full_reference(self):
         names = []
 
@@ -869,7 +1016,7 @@ class Class(Node):
         return "{}(type={!r}, name={!r})".format(type(self).__name__, self.type, self.name)
 
     def __str__(self):
-        return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
+        return '{} {}, Type "{}", Id "{}"'.format(type(self).__name__, self.name, self.type, id(self))
 
 
 class InstanceClass(Class):
@@ -893,6 +1040,104 @@ class Tree(Class):
     """
     The root class.
     """
+
+    # TODO: Where do we check if the number and type of arguments is correct?
+    # What does OMC do on this front?
+    BUILTIN_FUNCTIONS = {
+        # See Modelica Specification:
+        # Section 3.7 Built-in Intrinsic Operators with Function Syntax
+
+        # Numeric Functions and Conversion Functions
+        "abs",
+        "sign",
+        "sqrt"
+        "Integer",
+        "EnumTypeName",
+        "String",
+
+        # Event Triggering Mathematical Functions
+        "div",
+        "mod",
+        "rem",
+        "ceil",
+        "floor",
+        "integer",
+
+        # Elementary Mathematical Functions
+        "sin",
+        "cos",
+        "tan",
+        "asin",
+        "acos",
+        "atan",
+        "atan2",
+        "sinh",
+        "cosh",
+        "tanh",
+        "exp",
+        "log",
+        "log10",
+
+        # Derivative and Special Purpose Operators with Function Syntax
+        "der",
+        "delay",
+        "cardinality",
+        "homotopy",
+        "semiLinear",
+        "inStream",
+        "actualStream",
+        "spatialDistribution",
+        "getInstanceName",
+
+        # Event-Related Operators with Function Syntax
+        "initial",
+        "terminal",
+        "noEvent",
+        "smooth",
+        "sample",
+        "pre",
+        "edge",
+        "change",
+        "reinit",
+
+        #
+        # Built-in Array Functions
+        #
+        "promote",
+
+        # Dimension and Size Functions
+        "ndims",
+        "size",
+        # Dimensionality Conversion Functions
+        "scalar",
+        "vector",
+        "matrix",
+        # Specialized Array Constructor Functions
+        "identity",
+        "diagonal",
+        "zeros",
+        "ones",
+        "fill",
+        "linspace",
+        # Reduction Functions and Operators
+        "min",
+        "max",
+        "sum",
+        "product",
+        # Matrix and Vector Algebra Functions
+        "transpose",
+        "outerProduct",
+        "symmetric",
+        "cross",
+        "skew",
+        # TODO: Where does this one belong?
+        "cat",
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for f in self.BUILTIN_FUNCTIONS:
+            self.classes[f] = Class(name=f, type="function", parent=self)
 
     def extend(self, other: "Tree") -> None:
         self._extend(other)
