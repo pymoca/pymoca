@@ -396,8 +396,7 @@ class NameFinder:
                 or current_scope.encapsulated
             ):
                 break
-            else:
-                current_scope = current_scope.parent
+            current_scope = current_scope.parent
         # If name matches a variable (a.k.a. component a.k.a. symbol) in an enclosing class,
         # it must be a `constant`.
         if (
