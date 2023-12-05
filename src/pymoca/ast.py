@@ -645,7 +645,9 @@ class Class(Node):
                 return self.classes[component_ref.name]
             else:
                 # Avoid infinite recursion by passing search_parent = False
-                return self.classes[component_ref.name]._find_class(component_ref.child[0], False)
+                return self.classes[component_ref.name]._find_class(
+                    component_ref.child[0], search_parent=False
+                )
         except (KeyError, ClassNotFoundError):
             try:
                 if search_imports:
