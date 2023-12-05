@@ -246,7 +246,7 @@ class SimpleNameLookupTest(unittest.TestCase):
         found = finder.find_name("d.x", scope)
         self.assertIsNotNone(found)
         x_value = found.class_modification.arguments[0].value.modifications[0].value
-        self.assertAlmostEqual(x_value, 2.0)
+        self.assertAlmostEqual(x_value, 4.0)
 
 
 if __name__ == "__main__":

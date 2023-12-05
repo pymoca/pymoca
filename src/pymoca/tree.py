@@ -551,8 +551,9 @@ class NameFinder:
                     return found
         return None
 
-    def find_imported(self, name: str, scope: ast.Class) -> Optional[Union[ast.Class, ast.Symbol]]:
-        # TODO: Test and fix this as-is logic
+    def find_imported(
+        self, name: str, scope: ast.Class, current_extends: Optional[ast.ExtendsClause] = None
+    ) -> Optional[Union[ast.Class, ast.Symbol]]:
         # TODO: Rewrite this to work with parser rewrite of this.
         # TODO: Add the following checks:
         # 1. Upon expansion of "*" imports, error if key is already there (name already imported)
@@ -569,18 +570,22 @@ class NameFinder:
             return self.find_name(import_, scope, copy=False)
         else:
             if "*" in scope.imports:
-                # TODO: This logic looks questionable
                 c = None
                 for package_ref in scope.imports["*"].components:
                     imported_comp_ref = package_ref.concatenate(ast.ComponentRef(name=name))
                     # Search within the package
-                    # TODO: Avoid infinite recursion with search_imports = False?
-                    c = self.find_name(imported_comp_ref, scope, copy=False)
-                if c is not None:
-                    # Store result for next lookup
-                    scope.imports[name] = imported_comp_ref
-                    return c
-
+                    # Avoid infinite recursion with search_imports = False
+                    c = self.find_name(
+                        imported_comp_ref,
+                        scope,
+                        search_imports=False,
+                        current_extends=current_extends,
+                        copy=False,
+                    )
+                    if c is not None:
+                        # Store result for next lookup
+                        scope.imports[name] = imported_comp_ref
+                        return c
         return None
 
     def find_simple_name(
@@ -596,7 +601,7 @@ class NameFinder:
             or (found := self.find_local(name, scope))
             or (found := self.find_inherited(name, scope, current_extends))
             or search_imports
-            and (found := self.find_imported(name, scope))
+            and (found := self.find_imported(name, scope, current_extends))
         ):
             return found
         return None
