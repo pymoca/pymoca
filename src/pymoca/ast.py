@@ -8,7 +8,7 @@ import copy
 import json
 from collections import OrderedDict
 from enum import Enum
-from typing import Dict, List, Optional, Type, Union  # noqa: F401
+from typing import Dict, List, Optional, Tuple, Type, Union  # noqa: F401
 
 
 class ClassNotFoundError(Exception):
@@ -165,7 +165,7 @@ class ComponentRef(Node):
     def __str__(self) -> str:
         return ".".join(self.to_tuple())
 
-    def to_tuple(self) -> tuple:
+    def to_tuple(self) -> Tuple[str]:
         """
         Convert the nested component reference to flat tuple of names, which is
         hashable and can therefore be used as dictionary key. Note that this
