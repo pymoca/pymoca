@@ -191,6 +191,16 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].nominal.value, 0.0)
         self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].max.value, 10.0)
 
+    def test_inheritance_instantiation(self):
+        with open(os.path.join(MODEL_DIR, "RecursiveInstantiation.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("M"))
+
+        self.assertEqual(flat_tree.classes["M"].symbols["b.a.e"].type.name, "Real")
+        self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].type.name, "Integer")
+        self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].value.value, 1)
+
     def test_nested_classes(self):
         with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
             txt = f.read()
