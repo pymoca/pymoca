@@ -9,7 +9,7 @@ import copy  # TODO
 import logging
 import sys
 from collections import OrderedDict
-from typing import Iterable, Union
+from typing import Iterable, Optional, Union
 
 import numpy as np
 
@@ -257,6 +257,277 @@ class TreeWalker:
                 self.handle_walk(listener, tree[i])
         else:
             pass
+
+
+# TODO: Fix these comments when done iterating on implementation
+# Copied from instantiate_class from flatten_extends with intent to make it a two-step process:
+# 1) Instantiate
+# 2) Flatten
+# Currently flattening and instantiation are interleaved but it is causing scope issues
+# during lookup:
+# flatten ->
+#   flatten_class ->
+#       build_instance_tree ->
+#           flatten_extends ->
+#               Creates InstanceClass
+#               Flattens extends into InstanceClass
+#               Copies references to class contents into InstanceClass
+#           Applies redeclares for current class
+#           Merges/passes along modifications for classes and symbols
+#       apply_constant_references() Makes symbols for constants?
+#       Flattens symbols
+#
+# Are we possibly doing extra work above by fully instantiating everything?
+# The spec says (emphasis mine): "The partially instantiated elements are used later
+# for lookup during the generation of the flat equation system and are instantiated
+# fully, **if necessary**, using the stored modification environment."
+# Also, it says "References in modifications and equations are resolved later
+# (during generation of flat equation system)"
+#
+#
+# Outline from spec 3.5 section 5.6.1 Instantiation:
+# Definitions
+#   - Element: Class, Component, or Extends Clause (all Modelica parlance)
+#   - Symbol: Pymoca parlance for Component in Modelica parlance
+# 1. For element itself:
+#   a. Create an instance of the class to be instantiated ("partially instantiated element")
+#   b. Redeclare of element itself is done
+#   c. Modifiers are merged for the element itself (but contained references are resolved during flattening)
+# 2. For each element (Class or Component) in the local contents of the current element:
+#   a. Apply step 1 to the element
+#   b. Equations, algorithms, and annotations are copied into the component instance without merging
+#      (but references in equations are resolved later during flattening)
+# 3. For each element in the extends clauses of the current element:
+#   a. Apply steps 1 and 2 to the element, replacing the extends clause with the extends instance
+# 4. Lookup classes of extends and ensure it is identical to lookup result from step 3
+# 5. Check that all children of the current element (including extends) with same name are identical
+#    (error if not) and only keep one if so (to preserve function argument order)
+#
+# Some possible refactoring improvements to the new way:
+# Separate out functions to help follow and spec steps in DRY way.
+# * partially_instantiate_class()
+# * lookup_class_and_merge_modifiers()
+# * fully_instantiate_class() used during lookup while flattening
+#
+#
+# So here is a possible refactoring of existing code (following spec 5.6.1.4):
+# flatten ->
+#   instantiate_class (recursively) ->
+#       Creates InstanceClass ("partially instantiated class")
+#       Applies redeclares for current class (as part of previous step?)
+#       Copies references to class contents into InstanceClass
+#       Merges/passes along modifications for classes and symbols
+#       Add extends nodes into InstanceClass ->
+#           Looks up classes in extends clause
+#           Merges/passes along modifications(including redeclares) for classes and symbols
+#           (Only contains inherited contents from the base classs)
+#           Check that class lookups generate the same result before and after
+#       Check for redundant children with same name (including extends) and remove all but first, error if all not identical
+#   flatten_class (recursively) ->
+#
+# What does OpenModelica do for Instantiation? Look at the output for some models.
+#
+# Implementation Ideas/Alternatives:
+# - Should find_class() be moved from ast.Class to tree.py since it depends on parser.py?
+#   However tree.py would now explicitly depend on parser.py for MODELICAPATH, but that
+#   would be a good thing because now ast.py has a hidden dependence on parser.py. See
+#   find_class_pre_modelicapath.svg, find_class_current.svg, and
+#   find_class_refactor.svg. The latter is the graph for moving find_class to tree.py.
+#   So maybe a better approach would be to move MODELICAPATH code into compiler.py to
+#   isolate file system-dependent stuff in there. See
+#   find_class_refactor_with_compiler.dot. Parser continues to take txt input and
+#   remains oblivious of the file system which allows current tests to remain as-is and
+#   keeps parser as a lower-level, isolated API that can be called by tools with other
+#   needs. Syntax and other error text for printout are returned by parser in an
+#   exception. Then compiler prints the file name and error text. The current
+#   ast.Class.find_class() calls parser.Root.find_ref_in_modelicapath() but that can be
+#   pulled out of there and put into compiler that would catch the find_class
+#   exception/error and then try MODELICAPATH which if files are found would restart the
+#   find_class. However ast.Class.find_class() is called throughout tree.py during
+#   instantiation and flattening. This would now be tree.find_class or tree.find_name or
+#   compiler.find_name or ??? There needs to be an overarching find_name that searches
+#   first the in-memory ast, then MODELICAPATH and if found in MODELICAPATH then parses
+#   and returns the newly-parsed reference, but that can only be done after that newly
+#   parsed tree is grafted onto the in-memory ast. This latter action could be done
+#   within the MODELICAPATH code (mirroring what is done in parser.parse in a DRY way)
+#   so that the name lookup doesn't have to start from scratch again. (But that would be
+#   a good debug check that I should allow especially for initial implementation
+#   checking.) At some point it looks like there has to be a circular dependency for
+#   lazy parsing. Do we have tree.py now depend on compiler.py? compiler.py already
+#   depends on tree.py. Another option would be to add another Python file that depends
+#   on tree.py and parser.py, but that adds too much complication?
+#   Another consideration is that MODELICAPATH contains name lookup logic similar to
+#   in-memory AST lookup logic, but at a filesystem level. Can we unify the name lookup
+#   such that some functions are shared (DRY)? If so, then it appears that in-memory
+#   name lookup and MODELICPATH name lookup should be in the same module, probably in
+#   tree.py, but could also be in a separate module focusing on name lookup and
+#   MODELICAPATH.
+
+#   Would find_class() be slower to implement as a TreeWalker? I think so because of the number of
+#   times it would have to be instantiated to cover that complicated Modelica name lookup rules.
+# - Name lookup needs to be rewritten to conform to the spec. Key differences vs
+#   ast.Class.find_class() are:
+#       * Components and Classes are part of the same name space and can't have the same names.
+#         This implies symbols and classes could (should?) be stored in the same dictionary.
+#       * Should the AST be closer to Modelica grammar (e.g. keep component clauses and don't create
+#         symbols until instantiation)? This would make it easier to go from the AST
+#         back to Modelica but not after flattening, which is what we want to do.
+#         Also would be nice to output Modelica from flattening process. Also
+#         would perhaps make name lookup and flattening logic cleaner and easier to follow the spec.
+#       * Lookup needs to be on more than just Class names. Spec gives this order:
+#         I. Simple Name Lookup (spec 5.3.1)
+#           1. Iteration variables
+#           2. Classes
+#           3. Components
+#           4. Classes and Components from Extends Clauses
+#           5. Qualified Import names, see IV (but not from Extends Clauses) (spec 13.2.1)
+#           6. Public Unqualified Imports (error if multiple are found) (spec 13.2.1)
+#         for each lexically enclosing instance scope, except:
+#              a. Stopping at `encapsulated` unless predefined type, function, operator.
+#              b. If name matches a variable (a.k.a. component a.k.a. symbol) in an enclosing class,
+#                 it must be a `constant`.
+#         II. Composite Name Lookup (e.g. `A.B.C`) (spec 5.3.2)
+#           1. `A` is looked up using Simple Name Lookup
+#           2. If `A` is a Component:
+#           2a. `B.C` is looked up from named elements of `A`
+#           2b. `A` must be a non-operator function if `A` is a scalar or can be
+#               evaluated as a scalar from an array and then `B` and `C` must be classes
+#           3. If `A` is a Class:
+#           3a. `A` is temporarily flattened without modifiers
+#           3B. `B.C` is looked up among named elements of temp flattened class,
+#                but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+#                and "the class we look inside shall not be partial in a simulation model".
+#         III. Global Name Lookup (e.g. `.A.B.C`) (spec 5.3.3)
+#           1. `A` is looked up in global scope. (`A` must be a class or a global constant.)
+#           2. If `A` is a class, follow procedure II.3.
+#         IV. Imported Name Lookup (e.g. `A.B.C` or `D = A.B.C` or `A.B.*` or `A.B.{C,D}`) (spec 13.2.1)
+#           1. `A` is looked up in global scope
+#           2. `B.C` (and `B.D`) or `B.*` is looked up. `A.B` must be a package.
+#       * To keep logic for the above DRY, here are the functions:
+#         - I.2-3 (used inside I, III.1, IV.1 with an argument of starting scope (could be global))
+#         - I (used inside II with an argument of starting scope (could be global))
+#         - II.3 (used inside II, III.2)
+#         - II
+#         - III.1 (used inside III, IV) (a very thin wrapper around I.2-3)
+#         - III
+#         - IV
+#         - perhaps a generic TreeWalker for looking in appropriate Class attributes taking
+#           a function argument to perform specific actions for the above
+#         - LOOK AT MODELICAPATH CODE to see how it would neatly integrate with this
+#       * How do we keep track of found scope (i.e. to fix the extends scope issue)?
+#         - Add parent to Symbol?
+#         - Add parent to Node (unused in most cases?)?
+#         - Return found scope?
+
+# Some earlier ideas that may no longer make sense:
+# - Search in extends while doing replaceable and what else? Need to figure out when
+#    to search in extends and when we can actually flatten extends. Spec section 5.6
+#    intro says 1) instantiate, then 2) generate the flat equation system.
+# - add keyword arg: Class.find_class(..., search_extends=False) to optionally look in extends
+#   (or make part of InstanceClass instead?)
+#
+# Incremental Refactoring Plan (unit test (doctest?) each before moving to next):
+# - [x] Remove MODELICAPATH code so can do PR on just #266 fix.
+# - [x] Make a PR to fix the extends scoping problem #266. (Did this early to
+#       communicate with @jackvreeken.)
+# - [ ] Create new new tree.find_name(), but leave ast.Class.find_class() in place for now
+# - [ ] Divide flatten_extends() and build_instance_tree() into instantiate_class() and
+#       flatten_class() or just refactor build_instance_tree() to just instantiate
+#       (using parts of flatten_extends()) and make flatten_extends() just do what it
+#       says it is. Probably renaming is best, then can incrementally implement and test
+#       vs existing code, then replace existing code as last step.
+# Rest of these steps may need modification or order change:
+# - [ ] Implement Class.find_class(..., search_extends=False) using new
+#       InstanceExtends when True.
+# - [ ] Implement InstanceClass.find_class() without search_extends argument that calls
+#       super().find_class(..., search_extends=True)
+# - [ ] Rebase MODELICAPATH commits on above.
+# - [ ] Move tools/compiler.py into src/pymoca (cherry pick existing)
+# - [ ] Pull MODELICAPATH impl out of Class.find_class() and move into tree.py to move
+#       dependence on parsing files out of ast.py. So have a tree.find_class()!
+# - [ ] PR to close #248 Support MODELICAPATH
+
+
+def instantiate_class(
+    orig_class: Union[ast.Class, ast.InstanceClass],
+    modification_environment: Optional[ast.ClassModification] = None,
+    parent: Optional[Union[ast.Class, ast.InstanceClass]] = None,
+) -> ast.InstanceClass:
+    """Instantiate class per Modelica 3.5 spec, section 5.6.1"""
+
+    instance = ast.InstanceClass(
+        name=orig_class.name,
+        type=orig_class.type,
+        comment=orig_class.comment,
+        annotation=ast.ClassModification(),
+        parent=parent,
+    )
+
+    if isinstance(orig_class, ast.InstanceClass):
+        instance.modification_environment = orig_class.modification_environment
+
+    for extends in orig_class.extends:
+        c = orig_class.find_class(extends.component, check_builtin_classes=True)
+
+        if str(c.full_reference()) == str(orig_class.full_reference()):
+            raise Exception("Cannot extend class '{}' with itself".format(c.full_reference()))
+
+        if c.type == "__builtin":
+            if len(orig_class.extends) > 1:
+                raise Exception(
+                    "When extending a built-in class (Real, Integer, ...) you cannot extend other classes as well"
+                )
+            instance.type = c.type
+
+        c = flatten_extends(c, extends.class_modification, parent=c.parent)
+
+        # Imports are not inherited (spec 3.5 sections 5.3.1 and 7.1)
+        # instance.imports.update(c.imports)
+        instance.classes.update(c.classes)
+        instance.symbols.update(c.symbols)
+        instance.equations += c.equations
+        instance.initial_equations += c.initial_equations
+        instance.statements += c.statements
+        instance.initial_statements += c.initial_statements
+        if isinstance(c.annotation, ast.ClassModification):
+            instance.annotation.arguments += c.annotation.arguments
+        instance.functions.update(c.functions)
+
+        # Note that all extends clauses are handled before any modifications
+        # are applied.
+        instance.modification_environment.arguments.extend(c.modification_environment.arguments)
+
+        # set visibility
+        for sym in instance.symbols.values():
+            if sym.visibility > extends.visibility:
+                sym.visibility = extends.visibility
+
+    instance.imports.update(orig_class.imports)
+    instance.classes.update(orig_class.classes)
+    instance.symbols.update(orig_class.symbols)
+    instance.equations += orig_class.equations
+    instance.initial_equations += orig_class.initial_equations
+    instance.statements += orig_class.statements
+    instance.initial_statements += orig_class.initial_statements
+    if isinstance(orig_class.annotation, ast.ClassModification):
+        instance.annotation.arguments += orig_class.annotation.arguments
+    instance.functions.update(orig_class.functions)
+
+    if modification_environment is not None:
+        instance.modification_environment.arguments.extend(modification_environment.arguments)
+
+    # If the current class is inheriting an elementary type, we shift modifications from the class to its __value symbol
+    if instance.type == "__builtin":
+        if instance.symbols["__value"].class_modification is not None:
+            instance.symbols["__value"].class_modification.arguments.extend(
+                instance.modification_environment.arguments
+            )
+        else:
+            instance.symbols["__value"].class_modification = instance.modification_environment
+
+        instance.modification_environment = ast.ClassModification()
+
+    return instance
 
 
 def flatten_extends(

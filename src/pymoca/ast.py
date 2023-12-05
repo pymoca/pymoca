@@ -8,7 +8,7 @@ import copy
 import json
 from collections import OrderedDict
 from enum import Enum
-from typing import Dict, List, Type, Union  # noqa: F401
+from typing import Dict, List, Optional, Type, Union  # noqa: F401
 
 
 class ClassNotFoundError(Exception):
@@ -866,27 +866,77 @@ class Class(Node):
         return new
 
     def __repr__(self):
-        return "{}(type={!r}, name={!r})".format(type(self).__name__, self.type, self.name)
+        return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)
 
     def __str__(self):
         return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
 
 
-class InstanceClass(Class):
+# TODO: Fix these comments when done iterating on implementation
+# Idea is to make the code consistent for both classes and symbols
+# to remove the redundancy in build_instance_tree() while also following the MLS.
+# This may not be the best way to do it. Needs more thought.
+# Continue looking at MLS section 5.6.1.
+# 2nd pass at improvement should get rid of all the special __builtin__ and __value__
+# stuff and place builtin types in the root of the instance tree per the spec.
+class InstanceElement:
     """
-    Class used during instantiation/expansion of the model. Modififcations on
+    Base class for instance elements (symbols, classes, extends clauses, etc.).
+    """
+
+    def __init__(self, ast_ref: Optional[Node] = None, **kwargs):
+        # Reference to the AST node that this instance element was created from.
+        self.ast_ref: Optional[Node] = ast_ref
+        self.modification_environment = ClassModification()
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "ast_ref={!r}, modification_environment={!r}".format(
+            self.ast_ref, self.modification_environment
+        )
+
+
+class InstanceClass(InstanceElement, Class):
+    """
+    Class used during instantiation/expansion of the model. Modifications on
     symbols and extends clauses are shifted to the modification environment of
     this InstanceClass.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.modification_environment = ClassModification()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def __repr__(self):
-        return "{}(type={!r}, name={!r}, modification_environment={!r})".format(
-            type(self).__name__, self.type, self.name, self.modification_environment
+        return "{}(name={!r}, type={!r}, {!s})".format(
+            type(self).__name__, self.name, self.type, super().__repr__()
         )
+
+
+class InstanceSymbol(InstanceElement, Symbol):
+    """
+    Symbol used during instantiation/expansion of the model.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(name={!r}, type={!r}, {!s})".format(
+            type(self).__name__, self.name, self.type, super().__repr__()
+        )
+
+
+class InstanceExtends(InstanceElement, ExtendsClause):
+    """
+    Placeholder for extends clause during instantiation/expansion of the model.
+    This is the "unnamed node" referenced in the language spec.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}({!s})".format(type(self).__name__, super().__repr__())
 
 
 class Tree(Class):
