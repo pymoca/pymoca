@@ -221,8 +221,10 @@ class TreeWalker:
         endless recursion by skipping references to e.g. parent nodes.
         :return: True if child needs to be skipped, False otherwise.
         """
-        if (isinstance(tree, ast.Class) and child_name == "parent") or (
-            isinstance(tree, ast.ClassModificationArgument)
+        if (
+            isinstance(tree, (ast.Class, ast.Symbol))
+            and child_name == "parent"
+            or isinstance(tree, ast.ClassModificationArgument)
             and child_name in ("scope", "__deepcopy__")
         ):
             return True
@@ -775,10 +777,11 @@ def flatten_extends(
             c.modification_environment.arguments
         )
 
-        # set visibility
+        # set visibility and parent
         for sym in extended_orig_class.symbols.values():
             if sym.visibility > extends.visibility:
                 sym.visibility = extends.visibility
+            sym.parent = extended_orig_class
 
     extended_orig_class.imports.update(orig_class.imports)
     extended_orig_class.classes.update(orig_class.classes)

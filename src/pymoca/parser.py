@@ -653,14 +653,14 @@ class ASTListener(ModelicaListener):
             s.type = copy.deepcopy(clause.type)
 
     def enterComponent_declaration(self, ctx: ModelicaParser.Component_declarationContext):
-        sym = ast.Symbol(order=self.sym_count)
+        sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
         self.comp_clause.symbol_list += [sym]
 
     def enterComponent_declaration1(self, ctx: ModelicaParser.Component_declaration1Context):
-        sym = ast.Symbol(order=self.sym_count)
+        sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
@@ -670,7 +670,7 @@ class ASTListener(ModelicaListener):
         if self.symbol_node is not None:
             self.ast[ctx] = self.symbol_node
         else:
-            sym = ast.Symbol(order=self.sym_count)
+            sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
             self.sym_count += 1
             self.ast[ctx] = sym
             self.symbol_node = sym
