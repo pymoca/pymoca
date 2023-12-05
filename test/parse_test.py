@@ -180,6 +180,17 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes["C2"].symbols["bcomp3.a"].value.value, 1.0)
         self.assertEqual(flat_tree.classes["C2"].symbols["bcomp3.b"].value.value, 2.0)
 
+    def test_inheritance_resistor(self):
+        with open(os.path.join(MODEL_DIR, "InheritanceInstantiationResistor.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("P.M"))
+
+        self.assertEqual(flat_tree.classes["P.M"].symbols["p.v"].nominal.value, 0.0)
+        self.assertEqual(flat_tree.classes["P.M"].symbols["p.v"].max.value, 10.0)
+        self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].nominal.value, 0.0)
+        self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].max.value, 10.0)
+
     def test_nested_classes(self):
         with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
             txt = f.read()
