@@ -289,8 +289,9 @@ class TreeWalker:
 #           1. `A` is looked up using Simple Name Lookup
 #           2. If `A` is a Component:
 #           2a. `B.C` is looked up from named component elements of `A`
-#           2b. `A` must be a non-operator function if `A` is a scalar or can be
-#               evaluated as a scalar from an array and then `B` and `C` must be classes
+#           2b. if not found and if `A.B.C is used as a function call and `A` is a scalar or can be
+#               evaluated as a scalar from an array and `B` and `C` are be classes,
+#               it is a non-operator function call.
 #           3. If `A` is a Class:
 #           3a. `A` is temporarily flattened without modifiers
 #           3B. `B.C` is looked up among named elements of temp flattened class,
@@ -360,9 +361,13 @@ class NameFinder:
         if found is not None and ref.child:
             if isinstance(found, ast.Symbol):
                 found = self.find_composite_name_in_symbols(rest_of_name, scope)
-                if found is None:
-                    pass  # TODO
+                if not found:
+                    # TODO: Search for non-operator function call
+                    found = self.find_composite_name_in_classes(rest_of_name, scope)
+                    pass
+                raise NotImplementedError("Non-operator function call name lookup")
             else:  # ast.Class
+                # TODO: A is temporarily flattened without modifiers
                 found = self.find_composite_name_in_classes(rest_of_name, scope)
         return found
 
