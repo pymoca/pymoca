@@ -37,7 +37,7 @@ class XmlTest(unittest.TestCase):
         sys.stdout.flush()
         time.sleep(0.01)
 
-    @unittest.skip('Modelica XML support likely to be deprecated')
+    @unittest.skip("Modelica XML support likely to be deprecated")
     def test_noise(self):
         # compile to ModelicaXML
         with open(os.path.join(MODEL_DIR, "Noise.mo"), "r") as f:
@@ -66,7 +66,7 @@ class XmlTest(unittest.TestCase):
         plt.pause(0.1)
         plt.close()
 
-    @unittest.skip('Modelica XML support likely to be deprecated')
+    @unittest.skip("Modelica XML support likely to be deprecated")
     def test_simple_circuit(self):
         # compile to ModelicaXML
         with open(os.path.join(MODEL_DIR, "SimpleCircuit.mo"), "r") as f:
@@ -95,7 +95,7 @@ class XmlTest(unittest.TestCase):
         plt.pause(0.1)
         plt.close()
 
-    @unittest.skip('Modelica XML support likely to be deprecated')
+    @unittest.skip("Modelica XML support likely to be deprecated")
     def test_bouncing_ball(self):
         # generate
         with open(os.path.join(MODEL_DIR, "BouncingBall.mo"), "r") as f:
