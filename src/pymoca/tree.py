@@ -477,27 +477,29 @@ class NameFinder:
     def find_composite_name_in_symbols(self, name: str, scope: ast.Class) -> Optional[ast.Symbol]:
         """Search for composite name (e.g. A.B.C) in local symbols, recursively"""
         first_name, _, next_names = name.partition(".")
-        found = None
-        if first_name in scope.symbols:
-            found = scope.symbols[first_name]
-        if found and next_names:
-            # See spec 5.3.2 bullet 2 (emphasis mine): "If the first identifier denotes
-            # a component, the rest of the name (e.g., B or B.C) is looked up among the
-            # declared named *component* elements of the component"
-            # Look up the type (Class) within the current scope if necessary
-            if isinstance(found.type, ast.ComponentRef):
-                type_name = str(found.type)
-                found_type_class = self.find_name(type_name, scope, copy=False)
-                if found_type_class is None:
-                    scope_full_reference = str(scope.full_reference())
-                    raise NameLookupError(
-                        f'Symbol type "{type_name}" not found in scope "{scope_full_reference}"'
-                    )
-            else:
-                # type is already an InstanceClass
-                found_type_class = found.type
-            # Look in symbols of the type
-            found = self.find_composite_name_in_symbols(next_names, found_type_class)
+        # See spec 5.3.2 bullet 2 (emphasis mine): "If the first identifier denotes
+        # a component, the rest of the name (e.g., B or B.C) is looked up among the
+        # declared named *component* elements of the component".
+        # This can include inherited and imported components.
+        # Look up the type (Class) within the current scope if necessary
+        found = self.find_name(first_name, scope, search_parent=False, copy=False)
+        if isinstance(found, ast.Symbol):
+            if next_names:
+                if isinstance(found.type, ast.ComponentRef):
+                    type_name = str(found.type)
+                    found_type_class = self.find_name(type_name, scope, copy=False)
+                    if found_type_class is None or isinstance(found_type_class, ast.Symbol):
+                        scope_full_reference = str(scope.full_reference())
+                        raise NameLookupError(
+                            f'Symbol type "{type_name}" not found in scope "{scope_full_reference}"'
+                        )
+                else:
+                    # type is already an InstanceClass
+                    found_type_class = found.type
+                # Look in symbols of the type
+                found = self.find_composite_name_in_symbols(next_names, found_type_class)
+        else:
+            found = None
         return found
 
     def find_predefined(
@@ -559,13 +561,12 @@ class NameFinder:
         # 2. Public Unqualified import names
         if name in scope.imports:
             # First search qualified imports (most common case)
-            # TODO: scope.imports should only contain ImportClause.
+            # TODO: scope.imports should only contain ImportClause
             # Convert ComponentRef at point of inception or include as part of ImportClause?
             import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
             if isinstance(import_, ast.ImportClause):
-                # (name is simple)
                 import_ = import_.components[0]
-                return self.find_name(ast.ComponentRef(name=import_), scope, copy=False)
+            return self.find_name(import_, scope, copy=False)
         else:
             if "*" in scope.imports:
                 # TODO: This logic looks questionable
