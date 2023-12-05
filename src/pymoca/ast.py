@@ -8,7 +8,8 @@ import copy
 import json
 from collections import OrderedDict
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Type, Union  # noqa: F401
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
 
 
 class ClassNotFoundError(Exception):
@@ -87,15 +88,20 @@ class Node:
 
     @classmethod
     def to_json(cls, var):
+        def guard(var):
+            if isinstance(var, Path):
+                return var.resolve().as_uri()
+            return var
+
         if isinstance(var, list):
-            res = [cls.to_json(item) for item in var]
+            res = [cls.to_json(guard(item)) for item in var]
         elif isinstance(var, dict):
-            res = {key: cls.to_json(var[key]) for key in var.keys()}
+            res = {key: cls.to_json(guard(var[key])) for key in var.keys()}
         elif isinstance(var, Node):
             # Avoid infinite recursion by not handling attributes that may go
             # back up in the tree again.
             res = {
-                key: cls.to_json(var.__dict__[key])
+                key: cls.to_json(guard(var.__dict__[key]))
                 for key in var.__dict__.keys()
                 if key not in ("parent", "scope", "__deepcopy__")
             }
@@ -601,6 +607,38 @@ class ExtendsClause(Node):
         )
 
 
+class LazyParseDict(dict):
+    """A dict to implement lazy parsing of classes
+    Unparsed stub classes should have already been created by MODELICAPATH code
+    """
+
+    def __getitem__(self, __key: Any) -> Any:
+        class_ = super().__getitem__(__key)
+        if class_.parsed:
+            return class_
+        # Import locally to avoid circular imports/references
+        from . import parser
+
+        file = parser.parse_text(class_.path.read_text(encoding="utf-8"))
+        # Fail lookup if parse fails
+        if file is None:
+            raise KeyError
+        # Fail lookup if class is not in top level of parsed file
+        if __key not in file.classes:
+            raise KeyError
+        # Update class_ with parsed __key class
+        class_.parsed = True
+        parsed_class = file.classes[__key]
+        class_.update_classes(parsed_class.classes)
+        # Include any additional classes that may have been parsed
+        file.classes[__key] = class_
+        class_.update_classes(file.classes)
+        return class_
+
+    def __repr__(self):
+        return "{}{}".format(type(self).__name__, super().__repr__())
+
+
 class Class(Node):
     BUILTIN = ("Real", "Integer", "String", "Boolean")
 
@@ -613,7 +651,7 @@ class Class(Node):
         self.final = False  # type: bool
         self.type = ""  # type: str
         self.comment = ""  # type: str
-        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
+        self.classes = LazyParseDict()  # type: dict[str, Class]
         self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
         self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
@@ -624,6 +662,8 @@ class Class(Node):
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.annotation = []  # type: Union[Type[None], ClassModification]
         self.parent = None  # type: Class
+        self.path = Path("/")  # type: Path
+        self.parsed = True  # type: bool
 
         super().__init__(**kwargs)
 
@@ -779,6 +819,10 @@ class Class(Node):
                 self.classes[class_name]._extend(other.classes[class_name])
             else:
                 self.classes[class_name] = other.classes[class_name]
+
+    def update_classes(self, other: dict[str, "Class"]) -> None:
+        for class_ in other.values():
+            self.add_class(class_)
 
     @property
     def root(self):
