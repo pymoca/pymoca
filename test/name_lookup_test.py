@@ -14,6 +14,7 @@ MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(MY_DIR, "models")
 COMPLIANCE_DIR = os.path.join(MY_DIR, "libraries", "Modelica-Compliance", "ModelicaCompliance")
 SIMPLE_LOOKUP_DIR = os.path.join(COMPLIANCE_DIR, "Scoping", "NameLookup", "Simple")
+COMPOSITE_LOOKUP_DIR = os.path.join(COMPLIANCE_DIR, "Scoping", "NameLookup", "Composite")
 
 
 def parse_file(pathname):
@@ -38,6 +39,16 @@ def parse_model_files(*pathnames):
 def parse_simple_lookup_file(pathname):
     "Parse given path relative to SIMPLE_LOOKUP_DIR and return parsed ast.Tree"
     arg_ast = parse_file(os.path.join(SIMPLE_LOOKUP_DIR, pathname))
+    icon_ast = parse_file(os.path.join(COMPLIANCE_DIR, "Icons.mo"))
+    if None in (arg_ast, icon_ast):
+        return None
+    icon_ast.extend(arg_ast)
+    return icon_ast
+
+
+def parse_composite_lookup_file(pathname):
+    "Parse given path relative to SIMPLE_LOOKUP_DIR and return parsed ast.Tree"
+    arg_ast = parse_file(os.path.join(COMPOSITE_LOOKUP_DIR, pathname))
     icon_ast = parse_file(os.path.join(COMPLIANCE_DIR, "Icons.mo"))
     if None in (arg_ast, icon_ast):
         return None
@@ -247,6 +258,66 @@ class SimpleNameLookupTest(unittest.TestCase):
         self.assertIsNotNone(found)
         x_value = found.class_modification.arguments[0].value.modifications[0].value
         self.assertAlmostEqual(x_value, 4.0)
+
+
+class CompositeNameLookupTest(unittest.TestCase):
+    """Composite name lookup tests from ModelicaCompliance"""
+
+    # TODO: Update when new name lookup is connected to flattening (see todos hints below)
+
+    def test_package_lookup_class(self):
+        """Checks that it's possible to look up a class in a package"""
+        ast = parse_composite_lookup_file("PackageLookupClass.mo")
+        found = finder.find_name(
+            "Scoping.NameLookup.Composite.PackageLookupClass.a.x", ast.classes["ModelicaCompliance"]
+        )
+        self.assertIsNotNone(found)
+        self.assertIsInstance(found, pymoca.ast.Symbol)
+        # TODO: flatten and check a.x.value = 531.0
+
+    def test_package_lookup_constant(self):
+        """Checks that it's possible to look up a constant in a package"""
+        ast = parse_composite_lookup_file("PackageLookupConstant.mo")
+        found = finder.find_name(
+            "Scoping.NameLookup.Composite.PackageLookupConstant.P.x",
+            ast.classes["ModelicaCompliance"],
+        )
+        self.assertIsNotNone(found)
+        self.assertIsInstance(found, pymoca.ast.Symbol)
+        # TODO: flatten and check y.value = 5.1
+
+    def test_nested_comp_lookup(self):
+        """Checks that composite names where each identifier is a component can be looked up"""
+        ast = parse_composite_lookup_file("NestedCompLookup.mo")
+        found = finder.find_name(
+            "Scoping.NameLookup.Composite.NestedCompLookup.c.b.a.x",
+            ast.classes["ModelicaCompliance"],
+        )
+        self.assertIsNotNone(found)
+        self.assertIsInstance(found, pymoca.ast.Symbol)
+        # TODO: flatten and check y.value = 17 (integer)
+
+    def test_partial_class_lookup(self):
+        """Checks that it's not allowed to look up a name in a partial class
+
+        Above is what PartialClassLookup.mo says, but according to the spec,
+        it's only forbidden in a simulation model, so the check for partial
+        is left to the caller and find_name returns the found class."""
+        ast = parse_composite_lookup_file("PartialClassLookup.mo")
+        found = finder.find_name(
+            "Scoping.NameLookup.Composite.PartialClassLookup.P.x", ast.classes["ModelicaCompliance"]
+        )
+        self.assertIsNotNone(found)
+        self.assertTrue(found.parent.partial)
+
+    def test_non_function_lookup_via_comp(self):
+        """Checks that it's not allowed to look up a non-function class via a component."""
+        ast = parse_composite_lookup_file("NonFunctionLookupViaComp.mo")
+        found = finder.find_name(
+            "Scoping.NameLookup.Composite.NonFunctionLookupViaComp.a.B",
+            ast.classes["ModelicaCompliance"],
+        )
+        self.assertIsNone(found)
 
 
 if __name__ == "__main__":

@@ -421,13 +421,16 @@ class NameFinder:
                         raise NameLookupError(f"Lookup failed for type of symbol {full_ref}")
                 found = self.find_composite_name_in_symbols(rest_of_name, type_class)
                 if not found:
-                    # TODO: Implement non-operator function call rule details:
+                    # Can only find in classes if the below rules apply:
                     # 2b. if not found and if `A.B.C` is used as a function call
                     # and `A` is a scalar or can be evaluated as a scalar from an array
                     # and `B` and `C` are classes,
                     # it is a non-operator function call.
-                    # For now caller is responsible for checking all of the above.
-                    found = self.find_composite_name_in_classes(rest_of_name, new_scope.parent)
+                    found = self.find_composite_name_in_classes(rest_of_name, type_class)
+                    # This only checks if function; caller is responsible for checking rest
+                    # TODO: Implement rest of non-operator function call rule details above
+                    if isinstance(found, ast.Class) and found.type != "function":
+                        found = None
             elif isinstance(found, ast.Class):
                 # Spec Section 5.3.2, 4th bullet (`A` is a class):
                 # "If the identifier denotes a class, that class is temporarily
