@@ -268,9 +268,11 @@ class CompositeNameLookupTest(unittest.TestCase):
     def test_package_lookup_class(self):
         """Checks that it's possible to look up a class in a package"""
         ast = parse_composite_lookup_file("PackageLookupClass.mo")
-        found = finder.find_name(
-            "Scoping.NameLookup.Composite.PackageLookupClass.a.x", ast.classes["ModelicaCompliance"]
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.PackageLookupClass",
+            ast.classes["ModelicaCompliance"],
         )
+        found = finder.find_name("a.x", scope)
         self.assertIsNotNone(found)
         self.assertIsInstance(found, pymoca.ast.Symbol)
         # TODO: flatten and check a.x.value = 531.0
@@ -278,10 +280,11 @@ class CompositeNameLookupTest(unittest.TestCase):
     def test_package_lookup_constant(self):
         """Checks that it's possible to look up a constant in a package"""
         ast = parse_composite_lookup_file("PackageLookupConstant.mo")
-        found = finder.find_name(
-            "Scoping.NameLookup.Composite.PackageLookupConstant.P.x",
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.PackageLookupConstant",
             ast.classes["ModelicaCompliance"],
         )
+        found = finder.find_name("P.x", scope)
         self.assertIsNotNone(found)
         self.assertIsInstance(found, pymoca.ast.Symbol)
         # TODO: flatten and check y.value = 5.1
@@ -289,10 +292,11 @@ class CompositeNameLookupTest(unittest.TestCase):
     def test_nested_comp_lookup(self):
         """Checks that composite names where each identifier is a component can be looked up"""
         ast = parse_composite_lookup_file("NestedCompLookup.mo")
-        found = finder.find_name(
-            "Scoping.NameLookup.Composite.NestedCompLookup.c.b.a.x",
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.NestedCompLookup",
             ast.classes["ModelicaCompliance"],
         )
+        found = finder.find_name("c.b.a.x", scope)
         self.assertIsNotNone(found)
         self.assertIsInstance(found, pymoca.ast.Symbol)
         # TODO: flatten and check y.value = 17 (integer)
@@ -304,19 +308,22 @@ class CompositeNameLookupTest(unittest.TestCase):
         it's only forbidden in a simulation model, so the check for partial
         is left to the caller and find_name returns the found class."""
         ast = parse_composite_lookup_file("PartialClassLookup.mo")
-        found = finder.find_name(
-            "Scoping.NameLookup.Composite.PartialClassLookup.P.x", ast.classes["ModelicaCompliance"]
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.PartialClassLookup",
+            ast.classes["ModelicaCompliance"],
         )
+        found = finder.find_name("P.x", scope)
         self.assertIsNotNone(found)
         self.assertTrue(found.parent.partial)
 
     def test_non_function_lookup_via_comp(self):
         """Checks that it's not allowed to look up a non-function class via a component."""
         ast = parse_composite_lookup_file("NonFunctionLookupViaComp.mo")
-        found = finder.find_name(
-            "Scoping.NameLookup.Composite.NonFunctionLookupViaComp.a.B",
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.NonFunctionLookupViaComp",
             ast.classes["ModelicaCompliance"],
         )
+        found = finder.find_name("a.B", scope)
         self.assertIsNone(found)
 
     def test_non_package_lookup_comp(self):
@@ -329,10 +336,7 @@ class CompositeNameLookupTest(unittest.TestCase):
             ast.classes["ModelicaCompliance"],
         )
         with self.assertRaises(pymoca.tree.NameLookupError):
-            _ = finder.find_name(
-                "A.x",
-                scope,
-            )
+            _ = finder.find_name("A.x", scope)
 
 
 if __name__ == "__main__":
