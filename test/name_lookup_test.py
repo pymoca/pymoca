@@ -319,6 +319,21 @@ class CompositeNameLookupTest(unittest.TestCase):
         )
         self.assertIsNone(found)
 
+    def test_non_package_lookup_comp(self):
+        """Checks that looking up an non-encapsulated element, in this
+        case a component, inside a class which does not satisfy the requirements for
+        a package is forbidden"""
+        ast = parse_composite_lookup_file("NonPackageLookupComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.NonPackageLookupComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name(
+                "A.x",
+                scope,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

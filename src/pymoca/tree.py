@@ -449,12 +449,16 @@ class NameFinder:
                 # is left to the caller.
                 # TODO: `A` is temporarily flattened without modifiers
                 # For now, we are just going to use recursive name lookup in contained elements
-                # TODO: If `A` is not a package, lookup restricted to `encapsulated` elements only
-                # How to check if the flattened class satisfies requirements of a package? See spec
-                # 4.6: "package – May only contain declarations of classes and
-                # constants. Enhanced to allow import of elements of packages. (See also
-                # chapter 13 on packages.)"
                 found = self.find_name(rest_of_name, new_scope, search_parent=False, copy=False)
+                # Check non-package lookup requirements
+                if (
+                    found is not None
+                    and new_scope.type != "package"
+                    and not (isinstance(found, ast.Class) and found.encapsulated)
+                ):
+                    raise NameLookupError(
+                        f"{new_scope.name} is not a package so {found.name} must be encapsulated"
+                    )
             else:
                 raise NameLookupError(f'Found unexpected node "{found!r}" during name lookup')
         if copy and isinstance(found, ast.Class):
