@@ -67,9 +67,10 @@ class SimpleNameLookupTest(unittest.TestCase):
     def test_encapsulation(self):
         """Tests that names can be found or not if the scope is encapsulated"""
         ast = parse_simple_lookup_file("Encapsulation.mo")
-        found = finder.find_name(
-            "Scoping.NameLookup.Simple.Encapsulation.A.x", ast.classes["ModelicaCompliance"]
+        scope = finder.find_name(
+            "Scoping.NameLookup.Simple.Encapsulation.A", ast.classes["ModelicaCompliance"]
         )
+        found = finder.find_name("x", scope)
         self.assertIsNotNone(found)
         self.assertIsInstance(found, pymoca.ast.Symbol)
         # TODO: flatten and check x.value
@@ -90,10 +91,11 @@ class SimpleNameLookupTest(unittest.TestCase):
     def test_enclosing_class_lookup_class(self):
         """Tests that classes can be looked up in an enclosing scope"""
         ast = parse_simple_lookup_file("EnclosingClassLookupClass.mo")
-        found = finder.find_name(
-            "Scoping.NameLookup.Simple.EnclosingClassLookupClass.b.a.x",
+        scope = finder.find_name(
+            "Scoping.NameLookup.Simple.EnclosingClassLookupClass",
             ast.classes["ModelicaCompliance"],
         )
+        found = finder.find_name("b.a.x", scope)
         self.assertIsNotNone(found)
         self.assertIsInstance(found, pymoca.ast.Symbol)
         # Now go reverse direction, looking for a compound name but not fully qualified
@@ -106,9 +108,12 @@ class SimpleNameLookupTest(unittest.TestCase):
         """Tests that constants can be looked up in an enclosing scope"""
         ast = parse_simple_lookup_file("EnclosingClassLookupConstant.mo")
         scope = finder.find_name(
-            "Scoping.NameLookup.Simple.EnclosingClassLookupConstant.A",
+            "Scoping.NameLookup.Simple.EnclosingClassLookupConstant",
             ast.classes["ModelicaCompliance"],
         )
+        self.assertIsNotNone(scope)
+        self.assertIsInstance(scope, pymoca.ast.Class)
+        scope = finder.find_name("A", scope)
         self.assertIsNotNone(scope)
         self.assertIsInstance(scope, pymoca.ast.Class)
         found = finder.find_name("x", scope)
@@ -120,9 +125,10 @@ class SimpleNameLookupTest(unittest.TestCase):
         """Tests that variables found in an enclosing scope must be declared constant"""
         ast = parse_simple_lookup_file("EnclosingClassLookupNonConstant.mo")
         scope = finder.find_name(
-            "Scoping.NameLookup.Simple.EnclosingClassLookupNonConstant.A",
+            "Scoping.NameLookup.Simple.EnclosingClassLookupNonConstant",
             ast.classes["ModelicaCompliance"],
         )
+        scope = finder.find_name("A", scope)
         self.assertIsNotNone(scope)
         self.assertIsInstance(scope, pymoca.ast.Class)
         with self.assertRaises(pymoca.tree.NameLookupError):
@@ -132,9 +138,15 @@ class SimpleNameLookupTest(unittest.TestCase):
         """Tests that variables found in an enclosing scope must be declared constant"""
         ast = parse_simple_lookup_file("EnclosingClassLookupShadowedConstant.mo")
         scope = finder.find_name(
-            "Scoping.NameLookup.Simple.EnclosingClassLookupShadowedConstant.A.B",
+            "Scoping.NameLookup.Simple.EnclosingClassLookupShadowedConstant",
             ast.classes["ModelicaCompliance"],
         )
+        self.assertIsNotNone(scope)
+        self.assertIsInstance(scope, pymoca.ast.Class)
+        scope = finder.find_name("A", scope)
+        self.assertIsNotNone(scope)
+        self.assertIsInstance(scope, pymoca.ast.Class)
+        scope = finder.find_name("B", scope)
         self.assertIsNotNone(scope)
         self.assertIsInstance(scope, pymoca.ast.Class)
         with self.assertRaises(pymoca.tree.NameLookupError):
@@ -187,9 +199,15 @@ class SimpleNameLookupTest(unittest.TestCase):
         can't be found in the encapsulated scope"""
         ast = parse_simple_lookup_file("OutsideEncapsulationMulti.mo")
         scope = finder.find_name(
-            "Scoping.NameLookup.Simple.OutsideEncapsulationMulti.A.B",
+            "Scoping.NameLookup.Simple.OutsideEncapsulationMulti",
             ast.classes["ModelicaCompliance"],
         )
+        self.assertIsNotNone(scope)
+        self.assertIsInstance(scope, pymoca.ast.Class)
+        scope = finder.find_name("A", scope)
+        self.assertIsNotNone(scope)
+        self.assertIsInstance(scope, pymoca.ast.Class)
+        scope = finder.find_name("B", scope)
         self.assertIsNotNone(scope)
         self.assertIsInstance(scope, pymoca.ast.Class)
         found = finder.find_name("x", scope)
