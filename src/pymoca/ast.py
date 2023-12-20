@@ -820,7 +820,7 @@ class Class(Node):
             else:
                 self.classes[class_name] = other.classes[class_name]
 
-    def update_classes(self, other: dict[str, "Class"]) -> None:
+    def update_classes(self, other: Dict[str, "Class"]) -> None:
         for class_ in other.values():
             self.add_class(class_)
 
