@@ -336,8 +336,9 @@ class NameFinder:
     It does look up Symbols also, so maybe more intuitive to be in tree.py?
     """
 
+    @classmethod
     def _parse_str_or_ref(
-        self, name: Union[str, ast.ComponentRef]
+        cls, name: Union[str, ast.ComponentRef]
     ) -> Tuple[str, str, ast.ComponentRef]:
         """Return (left_name, rest_of_name, full ComponentRef)
         given composite name as a str or ComponentRef
@@ -352,6 +353,10 @@ class NameFinder:
             left_name = name_parts[0]
             rest_of_name = ".".join(name_parts[1:])
         return left_name, rest_of_name, ref
+
+    @classmethod
+    def _first_name(cls, name: str) -> str:
+        return name.split(".")[0]
 
     def find_name(
         self,
@@ -451,8 +456,10 @@ class NameFinder:
                 # For now, we are just going to use recursive name lookup in contained elements
                 found = self.find_name(rest_of_name, new_scope, search_parent=False, copy=False)
                 # Check non-package lookup requirements
+                # Check found.name to protect against checking on way back up stack
                 if (
                     found is not None
+                    and found.name == self._first_name(rest_of_name)
                     and new_scope.type != "package"
                     and not (isinstance(found, ast.Class) and found.encapsulated)
                 ):
