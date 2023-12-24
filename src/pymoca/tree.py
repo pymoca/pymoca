@@ -432,10 +432,15 @@ class NameFinder:
                     # and `B` and `C` are classes,
                     # it is a non-operator function call.
                     found = self.find_composite_name_in_classes(rest_of_name, type_class)
-                    # This only checks if function; caller is responsible for checking rest
-                    # TODO: Implement rest of non-operator function call rule details above
-                    if isinstance(found, ast.Class) and found.type != "function":
-                        found = None
+                    if isinstance(found, ast.Class):
+                        if found.type != "function":
+                            found = None
+                        else:
+                            if new_scope.dimensions[0][0].value is not None:
+                                raise NameLookupError(
+                                    f"Array {new_scope.name} must have subscripts to lookup function {found.name}"
+                                )
+
             elif isinstance(found, ast.Class):
                 # Spec Section 5.3.2, 4th bullet (`A` is a class):
                 # "If the identifier denotes a class, that class is temporarily
@@ -455,8 +460,9 @@ class NameFinder:
                 # TODO: `A` is temporarily flattened without modifiers
                 # For now, we are just going to use recursive name lookup in contained elements
                 found = self.find_name(rest_of_name, new_scope, search_parent=False, copy=False)
-                # Check non-package lookup requirements
-                # Check found.name to protect against checking on way back up stack
+                # Check that found meets non-package lookup requirements in spec section 5.3.2
+                # The found.name test is so we only check going left to right in composite name
+                # and not the other direction as we pop the recursive call stack.
                 if (
                     found is not None
                     and found.name == self._first_name(rest_of_name)

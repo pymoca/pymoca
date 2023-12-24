@@ -356,6 +356,122 @@ class CompositeNameLookupTest(unittest.TestCase):
         with self.assertRaises(pymoca.tree.NameLookupError):
             _ = finder.find_name("A.x", scope)
 
+    def test_non_package_lookup_encapsulated(self):
+        """Checks that looking up an encapsulated element inside a class
+        which does not satisfy the requirements for a package is allowed."""
+        ast = parse_composite_lookup_file("NonPackageLookupEncapsulated.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.NonPackageLookupEncapsulated",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = finder.find_name("A.B", scope)
+        self.assertIsNotNone(found)
+
+    def test_non_package_lookup_non_encapsulated(self):
+        """Checks that looking up an non-encapsulated element inside a class
+        which does not satisfy the requirements for a package is forbidden"""
+        ast = parse_composite_lookup_file("NonPackageLookupNonEncapsulated.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.NonPackageLookupNonEncapsulated",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("A.B", scope)
+
+    def test_function_lookup_via_comp(self):
+        """Checks that it's allowed to look up a function via a component"""
+        ast = parse_composite_lookup_file("FunctionLookupViaComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.FunctionLookupViaComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = finder.find_name("a.f", scope)
+        self.assertIsNotNone(found)
+
+    @unittest.skip("TODO: Do this test when new instantiation/flattening is implemented")
+    def test_function_lookup_via_comp_non_call(self):
+        """Checks that it's only legal to look up a function name via a
+        component if the name is used as a function call"""
+        # TODO: How to check that name is used as a function call?
+        ast = parse_composite_lookup_file("FunctionLookupViaComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.FunctionLookupViaComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("a.f", scope)
+
+    def test_function_lookup_via_class_comp(self):
+        """Checks that it's allowed to look up a function via a component
+        if the rest of the composite name consists of class references"""
+        ast = parse_composite_lookup_file("FunctionLookupViaClassComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.FunctionLookupViaClassComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = finder.find_name("a.B.C.f", scope)
+        self.assertIsNotNone(found)
+
+    def test_function_lookup_via_non_class_comp(self):
+        """Checks that looking up a function via a component is only
+        allowed if the rest of the composite name consists of class references"""
+        ast = parse_composite_lookup_file("FunctionLookupViaNonClassComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.FunctionLookupViaNonClassComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = finder.find_name("a.B.c.f", scope)
+        self.assertIsNone(found)
+
+    @unittest.skip("TODO: Do this test when operator functions are implemented")
+    def test_function_in_operator_lookup_via_comp(self):
+        """Checks that it's not allowed to look up a function in an operator
+        via a component"""
+        ast = parse_composite_lookup_file("FunctionInOperatorLookupViaComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.FunctionInOperatorLookupViaComp.FunctionInOperatorLookupViaComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("or1.'+'.add", scope)
+
+    @unittest.skip("TODO: Do this test when operator functions are implemented")
+    def test_operator_function_lookup_via_comp(self):
+        """Checks that it's not allowed to look up an operator function
+        via a component"""
+        ast = parse_composite_lookup_file("OperatorFunctionLookupViaComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.OperatorFunctionLookupViaComp.OperatorFunctionLookupViaComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("or1.'+'", scope)
+
+    def test_function_lookup_via_array_comp(self):
+        """Checks that it's not allowed to look up a function via an
+        array component"""
+        ast = parse_composite_lookup_file("FunctionLookupViaArrayComp.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.FunctionLookupViaArrayComp",
+            ast.classes["ModelicaCompliance"],
+        )
+        # with self.assertRaises(pymoca.tree.NameLookupError):
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("a.f", scope)
+
+    @unittest.skip("TODO: Do this test when new instantiation/flattening is implemented")
+    def test_function_lookup_via_array_element(self):
+        """Checks that it's allowed to look up a function via an
+        array element if the element is a scalar component"""
+        ast = parse_composite_lookup_file("FunctionLookupViaArrayElement.mo")
+        scope = finder.find_name(
+            "Scoping.NameLookup.Composite.FunctionLookupViaArrayElement",
+            ast.classes["ModelicaCompliance"],
+        )
+        # with self.assertRaises(pymoca.tree.NameLookupError):
+        found = finder.find_name("a[2].f", scope)
+        self.assertIsNotNone(found)
+
 
 if __name__ == "__main__":
     unittest.main()
