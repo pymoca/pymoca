@@ -587,7 +587,7 @@ class NameFinder:
             import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
             if isinstance(import_, ast.ImportClause):
                 import_ = import_.components[0]
-            return self.find_name(import_, scope, copy=False)
+            return self.find_name(import_, scope.root, copy=False)
         else:
             if "*" in scope.imports:
                 c = None
