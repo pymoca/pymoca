@@ -146,12 +146,12 @@ class ASTListener(ModelicaListener):
         class_node.extends.append(extends_clause)
 
     def exitComposition(self, ctx: ModelicaParser.CompositionContext):
-        for clause in self.ast[ctx.epriv]:
+        for clause in self.ast[ctx.edef]:
             if isinstance(clause, ast.ComponentClause):
                 for symbol in clause.symbol_list:
-                    symbol.visibility = ast.Visibility.PRIVATE
+                    symbol.visibility = ast.Visibility.PUBLIC
             elif isinstance(clause, ast.ExtendsClause):
-                clause.visibility = ast.Visibility.PRIVATE
+                clause.visibility = ast.Visibility.PUBLIC
 
         if ctx.epub is not None:
             for clause in self.ast[ctx.epub]:
