@@ -576,6 +576,9 @@ class NameFinder:
         # TODO: Rewrite this to work with parser rewrite of this.
         # TODO: Add the following checks:
         # 1. Upon expansion of "*" imports, error if key is already there (name already imported)
+        #    This check is already done at the parser level.
+        # 2. For A.B.C or A.B.*, A.B must be a package. This check is done here because
+        #    name lookup is required.
         # TODO: Should be this order, but since I copy/paste/modified existing, not sure
         # 1. Qualified import names (most common case)
         # 2. Public Unqualified import names
@@ -586,7 +589,9 @@ class NameFinder:
             import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
             if isinstance(import_, ast.ImportClause):
                 import_ = import_.components[0]
-            return self.find_name(import_, scope.root, copy=False)
+            found = self.find_name(import_, scope.root, copy=False)
+            self._check_parent_is_package(found)
+            return found
         else:
             if "*" in scope.imports:
                 c = None
@@ -601,11 +606,23 @@ class NameFinder:
                         current_extends=current_extends,
                         copy=False,
                     )
+                    self._check_parent_is_package(c)
                     if c is not None:
                         # Store result for next lookup
                         scope.imports[name] = imported_comp_ref
                         return c
         return None
+
+    def _check_parent_is_package(self, element: Optional[Union[ast.Class, ast.Symbol]]) -> None:
+        if element is None:
+            return
+        if not element.parent:
+            raise NameLookupError(f"Import {element.name} must be contained in a package")
+        if element.parent.type != "package":
+            full_name = str(element.parent.full_reference()) + "." + element.name
+            parent = element.parent.name
+            message = f"{parent} must be a package in import {full_name}"
+            raise NameLookupError(message)
 
     def find_simple_name(
         self,

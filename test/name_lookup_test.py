@@ -585,7 +585,7 @@ class ImportedNameLookupTest(unittest.TestCase):
         """Checks that it's not allowed to have multiple qualified
         import-clauses with the same import name"""
         # This is caught at the parse stage, not in name lookup
-        with self.assertRaises(SyntaxError):
+        with self.assertRaises(pymoca.parser.ModelicaSyntaxError):
             _ = parse_imported_lookup_file("QualifiedImportConflict.mo")
 
     def test_qualified_import_non_package(self):
@@ -596,8 +596,8 @@ class ImportedNameLookupTest(unittest.TestCase):
             "Scoping.NameLookup.Imports.QualifiedImportNonPackage",
             ast.classes["ModelicaCompliance"],
         )
-        found = finder.find_name("A2", scope)
-        self.assertIsNone(found)
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("A2", scope)
 
     def test_qualified_import_protected(self):
         """Checks that it's an error to import a protected element"""
