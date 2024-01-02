@@ -606,8 +606,8 @@ class ImportedNameLookupTest(unittest.TestCase):
             "Scoping.NameLookup.Imports.QualifiedImportProtected",
             ast.classes["ModelicaCompliance"],
         )
-        found = finder.find_name("P.y", scope)
-        self.assertIsNone(found)
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("A.y", scope)
 
     def test_recursive(self):
         """Tests that a named recursive import does not work"""

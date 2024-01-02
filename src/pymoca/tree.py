@@ -590,7 +590,7 @@ class NameFinder:
             if isinstance(import_, ast.ImportClause):
                 import_ = import_.components[0]
             found = self.find_name(import_, scope.root, copy=False)
-            self._check_parent_is_package(found)
+            self._check_import_rules(found)
             return found
         else:
             if "*" in scope.imports:
@@ -606,14 +606,14 @@ class NameFinder:
                         current_extends=current_extends,
                         copy=False,
                     )
-                    self._check_parent_is_package(c)
+                    self._check_import_rules(c)
                     if c is not None:
                         # Store result for next lookup
                         scope.imports[name] = imported_comp_ref
                         return c
         return None
 
-    def _check_parent_is_package(self, element: Optional[Union[ast.Class, ast.Symbol]]) -> None:
+    def _check_import_rules(self, element: Optional[Union[ast.Class, ast.Symbol]]) -> None:
         if element is None:
             return
         if not element.parent:
@@ -623,6 +623,8 @@ class NameFinder:
             parent = element.parent.name
             message = f"{parent} must be a package in import {full_name}"
             raise NameLookupError(message)
+        if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
+            raise NameLookupError(f"Import {element.name} must not be protected or private")
 
     def find_simple_name(
         self,
