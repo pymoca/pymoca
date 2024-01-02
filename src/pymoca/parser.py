@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Union  # noqa: F401
 
 import antlr4
 import antlr4.Parser
+from antlr4 import ParserRuleContext
 
 import pymoca
 
@@ -41,6 +42,23 @@ logger = logging.getLogger("pymoca")
 
 
 DEFAULT_MODEL_CACHE_DB = "model_txt_cache.db"
+
+
+class ModelicaSyntaxError(SyntaxError):
+    """SyntaxError built from an ANTLR context object"""
+
+    def __init__(self, message: str, ctx: ParserRuleContext, file_name: str = ""):
+        # file_name defaults to empty because our current parser takes text str only
+        line1 = ctx.start.line
+        col1 = ctx.start.column
+        line2 = ctx.stop.line
+        col2 = ctx.stop.column
+        text = ctx.start.source[1].strdata.splitlines()
+        error_text = text[line1 - 1]
+        for line in range(line1, line2):
+            error_text += text[line]
+        # last two args were were added in Python 3.10, previous will ignore
+        super().__init__(message, line1, col1, error_text, file_name, line2, col2)
 
 
 class ModelicaFile:
@@ -658,6 +676,8 @@ class ASTListener(ModelicaListener):
                 import_clause.unqualified = True
         if import_clause.short_name:
             # import_clause instead of comp_ref signifies short_name
+            if import_clause.short_name in self.class_node.imports:
+                raise ModelicaSyntaxError(f"{import_clause.short_name} already imported", ctx)
             self.class_node.imports[import_clause.short_name] = import_clause
         elif import_clause.unqualified:
             # Postpone processing this uncommon case until actually needed
@@ -672,7 +692,7 @@ class ASTListener(ModelicaListener):
                 name = comp.to_tuple()[-1]
                 # Check for name clashes
                 if name in self.class_node.imports:
-                    raise IOError(name, "already imported")
+                    raise ModelicaSyntaxError(f"{name} already imported", ctx)
                 self.class_node.imports[name] = comp
 
     def enterExtends_clause(self, ctx: ModelicaParser.Extends_clauseContext):

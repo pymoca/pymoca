@@ -584,13 +584,9 @@ class ImportedNameLookupTest(unittest.TestCase):
     def test_qualified_import_conflict(self):
         """Checks that it's not allowed to have multiple qualified
         import-clauses with the same import name"""
-        ast = parse_imported_lookup_file("QualifiedImportConflict.mo")
-        scope = finder.find_name(
-            "Scoping.NameLookup.Imports.QualifiedImportConflict",
-            ast.classes["ModelicaCompliance"],
-        )
-        found = finder.find_name("A.P", scope)
-        self.assertIsNone(found)
+        # This is caught at the parse stage, not in name lookup
+        with self.assertRaises(SyntaxError):
+            _ = parse_imported_lookup_file("QualifiedImportConflict.mo")
 
     def test_qualified_import_non_package(self):
         """Checks that it's not allowed to import a definition which is
