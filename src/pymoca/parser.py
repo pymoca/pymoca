@@ -638,7 +638,7 @@ class ASTListener(ModelicaListener):
     # TODO: Rewrite this as follows:
     # Simple Name Lookup (the first step of name lookup) is by import name as follows:
     # Import name of A.B.C is C, so ast.Class.imports dictionary key is C for simple name lookup.
-    # Import name of D = A.B.C is D, so D is the dictionary key.
+    # Import name of D = A.B.C is D, so D is the dictionary key and element C is the value.
     # Import names of A.B.{C,D} are C and D, both added as keys.
     # The special case of import A.B.* is processed during lookup (it is uncommon and expensive);
     # in this case the dictionary key is "*" and the value is a list containing all of the
@@ -676,6 +676,7 @@ class ASTListener(ModelicaListener):
                 import_clause.unqualified = True
         if import_clause.short_name:
             # import_clause instead of comp_ref signifies short_name
+            self._check_not_already_imported(import_clause.short_name, ctx)
             if import_clause.short_name in self.class_node.imports:
                 raise ModelicaSyntaxError(f"{import_clause.short_name} already imported", ctx)
             self.class_node.imports[import_clause.short_name] = import_clause
@@ -690,10 +691,13 @@ class ASTListener(ModelicaListener):
             # Simple case, fast lookup
             for comp in import_clause.components:
                 name = comp.to_tuple()[-1]
-                # Check for name clashes
-                if name in self.class_node.imports:
-                    raise ModelicaSyntaxError(f"{name} already imported", ctx)
+                self._check_not_already_imported(name, ctx)
                 self.class_node.imports[name] = comp
+
+    def _check_not_already_imported(self, import_name: str, ctx: ParserRuleContext) -> None:
+        """Check for import name clashes"""
+        if import_name in self.class_node.imports:
+            raise ModelicaSyntaxError(f"{import_name} already imported", ctx)
 
     def enterExtends_clause(self, ctx: ModelicaParser.Extends_clauseContext):
         self.in_extends_clause = True
