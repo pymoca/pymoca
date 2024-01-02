@@ -596,7 +596,7 @@ class NameFinder:
                     # Avoid infinite recursion with search_imports = False
                     c = self.find_name(
                         imported_comp_ref,
-                        scope,
+                        scope.root,
                         search_imports=False,
                         current_extends=current_extends,
                         copy=False,
