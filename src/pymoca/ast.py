@@ -24,7 +24,6 @@ class FoundElementaryClassError(Exception):
 
 
 class Visibility(Enum):
-    PRIVATE = 0, "private"
     PROTECTED = 1, "protected"
     PUBLIC = 2, "public"
 
@@ -438,7 +437,7 @@ class Symbol(Node):
         self.displayUnit = Primary(value=None)  # type: Primary
         self.id = 0  # type: int
         self.order = 0  # type: int
-        self.visibility = Visibility.PRIVATE  # type: Visibility
+        self.visibility = Visibility.PUBLIC  # type: Visibility
         self.class_modification = None  # type: ClassModification
         self.parent = None  # type: Optional[Class]
         super().__init__(**kwargs)
@@ -592,7 +591,7 @@ class ExtendsClause(Node):
     def __init__(self, **kwargs):
         self.component = None  # type: ComponentRef
         self.class_modification = None  # type: ClassModification
-        self.visibility = Visibility.PRIVATE  # type: Visibility
+        self.visibility = Visibility.PUBLIC  # type: Visibility
         super().__init__(**kwargs)
 
     def __repr__(self):
