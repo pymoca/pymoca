@@ -630,9 +630,13 @@ class NameFinder:
         if not element.parent:
             raise NameLookupError(f"Import {element.name} must be contained in a package")
         if element.parent.type != "package":
-            full_name = str(element.parent.full_reference()) + "." + element.name
-            parent = element.parent.name
-            message = f"{parent} must be a package in import {full_name}"
+            full_name = element.name
+            if element.parent.name:
+                full_name = str(element.parent.full_reference()) + "." + full_name
+                parent = element.parent.name
+                message = f"{parent} must be a package in import {full_name}"
+            else:
+                message = f"{full_name} is not in a package so can't be imported"
             raise NameLookupError(message)
         # TODO: Remove ast.Symbol test when visibility is added to ast.Class (see grammar)
         if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
