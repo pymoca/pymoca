@@ -590,7 +590,7 @@ class NameFinder:
             if isinstance(import_, ast.ImportClause):
                 import_ = import_.components[0]
             found = self.find_name(import_, scope.root, copy=False)
-            self._check_import_rules(found)
+            self._check_import_rules(found, scope)
             return found
         else:
             if "*" in scope.imports:
@@ -606,14 +606,18 @@ class NameFinder:
                         current_extends=current_extends,
                         copy=False,
                     )
-                    self._check_import_rules(c)
+                    self._check_import_rules(c, scope)
                     if c is not None:
                         # Store result for next lookup
                         scope.imports[name] = imported_comp_ref
                         return c
         return None
 
-    def _check_import_rules(self, element: Optional[Union[ast.Class, ast.Symbol]]) -> None:
+    def _check_import_rules(
+        self,
+        element: Optional[Union[ast.Class, ast.Symbol]],
+        scope: ast.Class,
+    ) -> None:
         if element is None:
             return
         if not element.parent:
@@ -625,6 +629,9 @@ class NameFinder:
             raise NameLookupError(message)
         if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
             raise NameLookupError(f"Import {element.name} must not be protected or private")
+        # We test on parent and name instead of just "is" because we may have a copy of a Class
+        if element.parent is scope.parent and element.name == scope.name:
+            raise NameLookupError(f"Import {str(element.full_reference())} is recursive")
 
     def find_simple_name(
         self,

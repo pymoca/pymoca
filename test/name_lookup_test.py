@@ -616,8 +616,8 @@ class ImportedNameLookupTest(unittest.TestCase):
             "Scoping.NameLookup.Imports.Recursive",
             ast.classes["ModelicaCompliance"],
         )
-        found = finder.find_name("A", scope)
-        self.assertIsNone(found)
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("A", scope)
 
     @unittest.skip("TODO: Do this test when new instantiation/flattening is implemented")
     def test_redeclare_import(self):
