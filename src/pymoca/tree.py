@@ -627,6 +627,7 @@ class NameFinder:
             parent = element.parent.name
             message = f"{parent} must be a package in import {full_name}"
             raise NameLookupError(message)
+        # TODO: Remove ast.Symbol test when visibility is added to ast.Class (see grammar)
         if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
             raise NameLookupError(f"Import {element.name} must not be protected or private")
         # We test on parent and name instead of just "is" because we may have a copy of a Class

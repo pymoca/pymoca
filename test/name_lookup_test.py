@@ -685,9 +685,16 @@ class ImportedNameLookupTest(unittest.TestCase):
         self.assertIsNotNone(found)
         # TODO: flatten and check b.a.x.value = 1.0
 
+    @unittest.skip("ModelicaCompliance test case has a bug")
     def test_unqualified_import_conflict(self):
         """Checks that it's an error if the same name is found in
         multiple unqualified imports"""
+        # UnqualifiedImportConflict.mo imports from QualifiedImportConflict which is OK
+        # if ModelicaCompliance is in MODELICAPATH but not OK as a standalone test that
+        # we prefer here. If we do implement this after the ModelicaCompliance bug is
+        # fixed it will slow down already slow unqualified name lookup. Unqualified
+        # imports are rare and this test case is even more rare, so it seems like maybe
+        # not a good idea at this stage for Pymoca.
         ast = parse_imported_lookup_file("UnqualifiedImportConflict.mo")
         scope = finder.find_name(
             "Scoping.NameLookup.Imports.UnqualifiedImportConflict",
@@ -718,10 +725,8 @@ class ImportedNameLookupTest(unittest.TestCase):
             "Scoping.NameLookup.Imports.UnqualifiedImportNonPackage",
             ast.classes["ModelicaCompliance"],
         )
-        # TODO: Is the lookup on the right name?
-        # with self.assertRaises(pymoca.tree.NameLookupError):
-        found = finder.find_name("B", scope)
-        self.assertIsNone(found)
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("B", scope)
 
     def test_unqualified_import_protected(self):
         """Checks that the name lookup only considers public members of
@@ -731,10 +736,8 @@ class ImportedNameLookupTest(unittest.TestCase):
             "Scoping.NameLookup.Imports.UnqualifiedImportProtected",
             ast.classes["ModelicaCompliance"],
         )
-        # TODO: This is passing, but should it? Is the lookup on the right name?
-        # with self.assertRaises(pymoca.tree.NameLookupError):
-        found = finder.find_name("P.y", scope)
-        self.assertIsNone(found)
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("A.y", scope)
 
 
 if __name__ == "__main__":
