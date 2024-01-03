@@ -649,8 +649,8 @@ class ImportedNameLookupTest(unittest.TestCase):
             "Scoping.NameLookup.Imports.RenamingImportNonPackage",
             ast.classes["ModelicaCompliance"],
         )
-        found = finder.find_name("A2", scope)
-        self.assertIsNone(found)
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = finder.find_name("A2", scope)
 
     def test_renaming_single_definition_import(self):
         """Tests that a renaming import works"""
