@@ -9,7 +9,7 @@ import copy  # TODO
 import logging
 import sys
 from collections import OrderedDict
-from typing import Iterable, Optional, Tuple, Union
+from typing import Iterable, Optional, Set, Tuple, Union
 
 import numpy as np
 
@@ -365,7 +365,7 @@ class NameFinder:
         copy: bool = True,
         check_builtin_classes=False,
         search_imports: bool = True,
-        current_extends: Optional[ast.ExtendsClause] = None,
+        current_extends: Optional[Set[ast.ExtendsClause]] = None,
         search_parent: bool = True,
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         """Simple or Composite Name Lookup (spec 5.3.1, 5.3.2)"""
@@ -549,29 +549,36 @@ class NameFinder:
         return None
 
     def find_inherited(
-        self, name: str, scope: ast.Class, current_extends: Optional[ast.ExtendsClause] = None
+        self, name: str, scope: ast.Class, current_extends: Optional[Set[ast.ExtendsClause]] = None
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         """Find simple name in inherited classes"""
         # TODO: Update when we reorganize to use "unnamed" extends nodes in InstanceClass per spec
         for extends in scope.extends:
-            if extends is current_extends:
-                # We are in the middle of processing this one, don't do it infinitely :-)
-                continue
+            if current_extends:
+                if extends in current_extends:
+                    # We are in the middle of processing this one, don't do it infinitely :-)
+                    continue
+            else:
+                current_extends = set()
+            current_extends.add(extends)
             extends_scope = self.find_name(
-                extends.component, scope, current_extends=extends, copy=False
+                extends.component, scope, current_extends=current_extends, copy=False
             )
             if extends_scope is not None:
                 if isinstance(extends_scope, ast.Symbol):
                     continue
                 found = self.find_simple_name(
-                    name, extends_scope, search_imports=False, current_extends=extends
+                    name, extends_scope, current_extends=current_extends, search_imports=False
                 )
+                current_extends.remove(extends)
                 if found is not None:
                     return found
+            else:
+                current_extends.remove(extends)
         return None
 
     def find_imported(
-        self, name: str, scope: ast.Class, current_extends: Optional[ast.ExtendsClause] = None
+        self, name: str, scope: ast.Class, current_extends: Optional[Set[ast.ExtendsClause]] = None
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         # TODO: Rewrite this to work with parser rewrite of this.
         # TODO: Add the following checks:
@@ -639,7 +646,7 @@ class NameFinder:
         name: str,
         scope: ast.Class,
         search_imports: bool = True,
-        current_extends: Optional[ast.ExtendsClause] = None,
+        current_extends: Optional[Set[ast.ExtendsClause]] = None,
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
         if (
