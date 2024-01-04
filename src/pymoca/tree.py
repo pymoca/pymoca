@@ -409,7 +409,10 @@ class NameFinder:
         # then search predefined functions and operators in global scope
         # TODO: Add predefined functions and operators to global scope before this
         if found is None and current_scope.encapsulated:
-            return self.find_local(left_name, scope.root)
+            found = self.find_local(left_name, scope.root)
+            if not isinstance(found, ast.Class) or found.type not in ("function", "operator"):
+                found = None
+            return found
 
         # Composite Name Lookup if necessary
         if found is not None and ref.child:
@@ -578,7 +581,10 @@ class NameFinder:
         return None
 
     def find_imported(
-        self, name: str, scope: ast.Class, current_extends: Optional[Set[ast.ExtendsClause]] = None
+        self,
+        name: str,
+        scope: ast.Class,
+        current_extends: Optional[Set[ast.ExtendsClause]] = None,
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         # TODO: Rewrite this to work with parser rewrite of this.
         # TODO: Add the following checks:
@@ -596,7 +602,7 @@ class NameFinder:
             import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
             if isinstance(import_, ast.ImportClause):
                 import_ = import_.components[0]
-            found = self.find_name(import_, scope.root, copy=False)
+            found = self.find_name(import_, scope.root, search_parent=False, copy=False)
             self._check_import_rules(found, scope)
             return found
         else:
@@ -610,6 +616,7 @@ class NameFinder:
                         imported_comp_ref,
                         scope.root,
                         search_imports=False,
+                        search_parent=False,
                         current_extends=current_extends,
                         copy=False,
                     )
