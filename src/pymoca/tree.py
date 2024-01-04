@@ -386,6 +386,7 @@ class NameFinder:
             found = self.find_simple_name(
                 left_name,
                 current_scope,
+                check_builtin_classes=check_builtin_classes,
                 search_imports=search_imports,
                 current_extends=current_extends,
             )
@@ -529,7 +530,7 @@ class NameFinder:
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         """Return an instance if given name is a predefined type"""
         # TODO: Add instances to tree in __init__
-        # For now backward compatible with Class.find_name, i.e. build it here
+        # For now backward compatible with Class.find_class, i.e. build it here
         c = None
         if name in ast.Class.BUILTIN:
             type_ = name
@@ -552,7 +553,11 @@ class NameFinder:
         return None
 
     def find_inherited(
-        self, name: str, scope: ast.Class, current_extends: Optional[Set[ast.ExtendsClause]] = None
+        self,
+        name: str,
+        scope: ast.Class,
+        check_builtin_classes: bool = False,
+        current_extends: Optional[Set[ast.ExtendsClause]] = None,
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         """Find simple name in inherited classes"""
         # TODO: Update when we reorganize to use "unnamed" extends nodes in InstanceClass per spec
@@ -565,13 +570,23 @@ class NameFinder:
                 current_extends = set()
             current_extends.add(extends)
             extends_scope = self.find_name(
-                extends.component, scope, current_extends=current_extends, copy=False
+                extends.component,
+                scope,
+                check_builtin_classes=check_builtin_classes,
+                current_extends=current_extends,
+                copy=False,
             )
             if extends_scope is not None:
                 if isinstance(extends_scope, ast.Symbol):
                     continue
-                found = self.find_simple_name(
-                    name, extends_scope, current_extends=current_extends, search_imports=False
+                # TODO: This can be find_simple_name when we remove check_builtin_classes
+                found = self.find_name(
+                    name,
+                    extends_scope,
+                    check_builtin_classes=check_builtin_classes,
+                    search_parent=False,
+                    current_extends=current_extends,
+                    search_imports=False,
                 )
                 current_extends.remove(extends)
                 if found is not None:
@@ -584,6 +599,7 @@ class NameFinder:
         self,
         name: str,
         scope: ast.Class,
+        check_builtin_classes: bool = False,
         current_extends: Optional[Set[ast.ExtendsClause]] = None,
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         # TODO: Rewrite this to work with parser rewrite of this.
@@ -602,7 +618,13 @@ class NameFinder:
             import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
             if isinstance(import_, ast.ImportClause):
                 import_ = import_.components[0]
-            found = self.find_name(import_, scope.root, search_parent=False, copy=False)
+            found = self.find_name(
+                import_,
+                scope.root,
+                check_builtin_classes=check_builtin_classes,
+                search_parent=False,
+                copy=False,
+            )
             self._check_import_rules(found, scope)
             return found
         else:
@@ -617,6 +639,7 @@ class NameFinder:
                         scope.root,
                         search_imports=False,
                         search_parent=False,
+                        check_builtin_classes=check_builtin_classes,
                         current_extends=current_extends,
                         copy=False,
                     )
@@ -658,15 +681,30 @@ class NameFinder:
         name: str,
         scope: ast.Class,
         search_imports: bool = True,
+        check_builtin_classes: bool = False,
         current_extends: Optional[Set[ast.ExtendsClause]] = None,
     ) -> Optional[Union[ast.Class, ast.Symbol]]:
         """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
         if (
             (found := self.find_iteration_variable(name, scope))
             or (found := self.find_local(name, scope))
-            or (found := self.find_inherited(name, scope, current_extends))
+            or (
+                found := self.find_inherited(
+                    name,
+                    scope,
+                    check_builtin_classes=check_builtin_classes,
+                    current_extends=current_extends,
+                )
+            )
             or search_imports
-            and (found := self.find_imported(name, scope, current_extends))
+            and (
+                found := self.find_imported(
+                    name,
+                    scope,
+                    check_builtin_classes=check_builtin_classes,
+                    current_extends=current_extends,
+                )
+            )
         ):
             return found
         return None
