@@ -650,7 +650,8 @@ class NameFinder:
             raise NameLookupError(f"Import {element.name} must not be protected or private")
         # We test on parent and name instead of just "is" because we may have a copy of a Class
         if element.parent is scope.parent and element.name == scope.name:
-            raise NameLookupError(f"Import {str(element.full_reference())} is recursive")
+            full_name = str(element.parent.full_reference()) + "." + element.name
+            raise NameLookupError(f"Import {full_name} is recursive")
 
     def find_simple_name(
         self,
