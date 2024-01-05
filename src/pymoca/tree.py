@@ -273,441 +273,464 @@ class TreeWalker:
             pass
 
 
-# TODO: Clean up these comments for PR
-# Name lookup on a tree containing a mixture of ast.Class and ast.InstanceClass
-#       * Lookup needs to be on more than just Class names. Spec gives this order:
-#         I. Simple Name Lookup (spec 5.3.1)
-#           0. Predefined types (`Real`, `Integer`, `Boolean`, `String`) (spec 4.8)
-#           1. Iteration variables
-#           2. Classes
-#           3. Components (Symbols in Pymoca)
-#           4. Classes and Components from Extends Clauses
-#           5. Qualified Import names, see IV (but not from Extends Clauses) (spec 13.2.1)
-#           6. Public Unqualified Imports (error if multiple are found) (spec 13.2.1)
-#         for each lexically enclosing instance scope, except:
-#              a. Stopping at `encapsulated` unless predefined type, function, operator.
-#              b. If name matches a variable (a.k.a. component a.k.a. symbol) in an enclosing class,
-#                 it must be a `constant`.
-#         II. Composite Name Lookup (e.g. `A.B.C`) (spec 5.3.2)
-#           1. `A` is looked up using Simple Name Lookup
-#           2. If `A` is a Component:
-#           2a. `B.C` is looked up from named component elements of `A`
-#           2b. if not found and if `A.B.C` is used as a function call and `A` is a scalar or can be
-#               evaluated as a scalar from an array and `B` and `C` are classes,
-#               it is a non-operator function call.
-#           3. If `A` is a Class:
-#           3a. `A` is temporarily flattened without modifiers
-#           3b. `B.C` is looked up among named elements of temp flattened class,
-#                but if `A` is not a package, lookup is restricted to `encapsulated` elements only
-#                and "the class we look inside shall not be partial in a simulation model".
-#         III. Global Name Lookup (e.g. `.A.B.C`) (spec 5.3.3)
-#           1. `A` is looked up in global scope. (`A` must be a class or a global constant.)
-#           2. If `A` is a class, follow procedure II.3.
-#         IV. Imported Name Lookup (e.g. `A.B.C` or `D = A.B.C` or `A.B.*` or `A.B.{C,D}`) (spec 13.2.1)
-#           1. `A` is looked up in global scope
-#           2. `B.C` (and `B.D`) or `B.*` is looked up. `A.B` must be a package.
-#       * To keep logic for the above DRY, here are the functions:
-#         - I.2-3 (used inside I, III.1, IV.1 with an argument of starting scope (could be global))
-#         - I (used inside II with an argument of starting scope (could be global))
-#         - II.3 (used inside II, III.2)
-#         - II
-#         - III.1 (used inside III, IV) (a very thin wrapper around I.2-3)
-#         - III
-#         - IV
-#         - First implement as a set of functions for simplicity's sake, if there are aspects that
-#           are not DRY, then try perhaps a generic TreeWalker for looking in appropriate Class
-#           attributes taking a function argument to perform specific actions for the above
-#         - TODO: LOOK AT MODELICAPATH CODE to see how it would neatly integrate with this
-#       * How do we keep track of found scope (i.e. to fix the extends scope issue)?
-#         - Add parent to Symbol? PICKING THIS ONE FOR NOW
-#         - Add parent to Node (unused in most cases?)?
-#         - Return found scope?
+def find_name(
+    name: Union[str, ast.ComponentRef],
+    scope: ast.Class,
+    copy: bool = True,
+    search_imports: bool = True,
+    search_parent: bool = True,
+    check_builtin_classes=False,
+    current_extends: Optional[Set[ast.ExtendsClause]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Modelica name lookup on a tree of ast.Class and ast.InstanceClass
+
+    Look for ast.Class or ast.Symbol per the Modelica Language Specification Version 3.5:
+    1. Simple Name Lookup (spec 5.3.1)
+        0. Predefined types (`Real`, `Integer`, `Boolean`, `String`) (spec 4.8)
+        1. Iteration variables
+        2. Classes
+        3. Components (Symbols in Pymoca)
+        4. Classes and Components from Extends Clauses
+        5. Qualified Import names, see 4 (but not from Extends Clauses) (spec 13.2.1)
+        6. Public Unqualified Imports (error if multiple are found) (spec 13.2.1)
+        7. Repeat 1-6 for each lexically enclosing instance scope, stopping at `encapsulated`
+        unless predefined type, function, operator. If name matches a variable (a.k.a. component,
+        symbol) in an enclosing class, it must be a `constant`.
+    2. Composite Name Lookup (e.g. `A.B.C`) (spec 5.3.2)
+        1. `A` is looked up using Simple Name Lookup
+        2. If `A` is a Component:
+            1. `B.C` is looked up from named component elements of `A`
+            2. If not found and if `A.B.C` is used as a function call and `A` is a scalar or can be
+            evaluated as a scalar from an array and `B` and `C` are classes,
+            it is a non-operator function call.
+        3. If `A` is a Class:
+            1. `A` is temporarily flattened without modifiers
+            2. `B.C` is looked up among named elements of temp flattened class,
+            but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+            and "the class we look inside shall not be partial in a simulation model".
+    3. Global Name Lookup (e.g. `.A.B.C`) (spec 5.3.3)
+        1. `A` is looked up in global scope. (`A` must be a class or a global constant.)
+        2. If `A` is a class, follow procedure 2.3.
+    4. Imported Name Lookup (e.g. `A.B.C`, `D = A.B.C`, `A.B.*`, or `A.B.{C,D}`) (spec 13.2.1)
+        1. `A` is looked up in global scope
+        2. `B.C` (and `B.D`) or `B.*` is looked up. `A.B` must be a package.
+    """
+    # TODO: Default to copy False and check_builtin True with new instantiation/flattening
+
+    left_name, rest_of_name = _parse_str_or_ref(name)
+
+    # Simple Name Lookup first
+    found = _find_simple_name(
+        left_name,
+        scope,
+        search_imports=search_imports,
+        search_parent=search_parent,
+        check_builtin_classes=check_builtin_classes,
+        current_extends=current_extends,
+    )
+
+    # Composite Name Lookup if necessary
+    if found is not None and rest_of_name:
+        found = _find_rest_of_name(found, rest_of_name)
+
+    if copy and isinstance(found, ast.Class):
+        found = found.copy_including_children()
+
+    return found
 
 
-class NameFinder:
-    """Modelica name lookup
+def _parse_str_or_ref(name: Union[str, ast.ComponentRef]) -> Tuple[str, str]:
+    """Return (left_name, rest_of_name) given composite name as a str or ComponentRef"""
+    assert isinstance(name, (str, ast.ComponentRef))
+    if isinstance(name, str):
+        left_name, _, rest_of_name = name.partition(".")
+    else:
+        name_parts = name.to_tuple()
+        left_name = name_parts[0]
+        rest_of_name = ".".join(name_parts[1:])
+    return left_name, rest_of_name
 
-    This class is needed to work around Python function not defined issues
-    for circular funtion references that happens for functions in a module.
-    Circular function references are needed to implement Modelica name lookup
-    rules in a DRY way.
 
-    TODO: should this be moved back into ast.Class?
-    It does look up Symbols also, so maybe more intuitive to be in tree.py?
+def _find_simple_name(
+    name: str,
+    scope: ast.Class,
+    search_imports: bool = True,
+    search_parent: bool = True,
+    check_builtin_classes: bool = False,
+    current_extends: Optional[Set[ast.ExtendsClause]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup
+
+    0. Predefined types (`Real`, `Integer`, `Boolean`, `String`) (spec 4.8)
+    1. Iteration variables
+    2. Classes
+    3. Components (Symbols in Pymoca)
+    4. Classes and Components from Extends Clauses
+    5. Qualified Import names, see 4 (but not from Extends Clauses) (spec 13.2.1)
+    6. Public Unqualified Imports (error if multiple are found) (spec 13.2.1)
+    7. Repeat 1-6 for each lexically enclosing instance scope, stopping at `encapsulated`
+    unless predefined type, function, operator. If name matches a variable (a.k.a. component,
+    symbol) in an enclosing class, it must be a `constant`.
     """
 
-    @classmethod
-    def _parse_str_or_ref(
-        cls, name: Union[str, ast.ComponentRef]
-    ) -> Tuple[str, str, ast.ComponentRef]:
-        """Return (left_name, rest_of_name, full ComponentRef)
-        given composite name as a str or ComponentRef
-        """
-        assert isinstance(name, (str, ast.ComponentRef))
-        if isinstance(name, str):
-            ref = ast.ComponentRef.from_string(name)
-            left_name, _, rest_of_name = name.partition(".")
-        else:
-            ref = name
-            name_parts = ref.to_tuple()
-            left_name = name_parts[0]
-            rest_of_name = ".".join(name_parts[1:])
-        return left_name, rest_of_name, ref
-
-    @classmethod
-    def _first_name(cls, name: str) -> str:
-        return name.split(".")[0]
-
-    def find_name(
-        self,
-        name: Union[str, ast.ComponentRef],
-        scope: ast.Class,
-        copy: bool = True,
-        check_builtin_classes=False,
-        search_imports: bool = True,
-        current_extends: Optional[Set[ast.ExtendsClause]] = None,
-        search_parent: bool = True,
-    ) -> Optional[Union[ast.Class, ast.Symbol]]:
-        """Simple or Composite Name Lookup (spec 5.3.1, 5.3.2)"""
-        # TODO: Default to copy False and check_builtin True when done testing vs find_class()
-        left_name, rest_of_name, ref = self._parse_str_or_ref(name)
-
-        # Simple Name Lookup first
-        found = self.find_predefined(left_name, scope)
-        # TODO: Refactor this when refactoring predefined classes and instantiation/flattening
-        # For now, we keep it backward compatible for testing vs ast.Class.find_class()
-        if found is not None:
-            if check_builtin_classes:
-                return found
-            else:
-                raise ast.FoundElementaryClassError()
-        current_scope = scope
-        while True:
-            found = self.find_simple_name(
-                left_name,
-                current_scope,
-                check_builtin_classes=check_builtin_classes,
-                search_imports=search_imports,
-                current_extends=current_extends,
-            )
-            if (
-                found is not None
-                or not search_parent
-                or not current_scope.parent
-                or current_scope.encapsulated
-            ):
-                break
-            current_scope = current_scope.parent
-        # If name matches a variable (a.k.a. component a.k.a. symbol) in an enclosing class,
-        # it must be a `constant`.
+    current_scope = scope
+    while True:
         if (
-            isinstance(found, ast.Symbol)
-            and current_scope != scope
-            and "constant" not in found.prefixes
-        ):
-            raise NameLookupError("Non-constant Symbol found in enclosing class")
-        # If not found and we stopped at an encapsulated class,
-        # then search predefined functions and operators in global scope
-        # TODO: Add predefined functions and operators to global scope before this
-        if found is None and current_scope.encapsulated:
-            found = self.find_local(left_name, scope.root)
-            if not isinstance(found, ast.Class) or found.type not in ("function", "operator"):
-                found = None
-            return found
-
-        # Composite Name Lookup if necessary
-        if found is not None and ref.child:
-            new_scope = found
-            if isinstance(found, ast.Symbol):
-                # Find the symbol type
-                if isinstance(found.type, ast.Class):
-                    type_class = found.type
-                else:
-                    type_class = self.find_name(found.type, found.parent, copy=False)
-                    if type_class is None:
-                        full_ref = str(found.parent.full_reference()) + "." + found.name
-                        raise NameLookupError(f"Lookup failed for type of symbol {full_ref}")
-                found = self.find_composite_name_in_symbols(rest_of_name, type_class)
-                if not found:
-                    # Can only find in classes if the below rules apply:
-                    # 2b. if not found and if `A.B.C` is used as a function call
-                    # and `A` is a scalar or can be evaluated as a scalar from an array
-                    # and `B` and `C` are classes,
-                    # it is a non-operator function call.
-                    found = self.find_composite_name_in_classes(rest_of_name, type_class)
-                    if isinstance(found, ast.Class):
-                        if found.type != "function":
-                            found = None
-                        else:
-                            if new_scope.dimensions[0][0].value is not None:
-                                raise NameLookupError(
-                                    f"Array {new_scope.name} must have subscripts to lookup function {found.name}"
-                                )
-
-            elif isinstance(found, ast.Class):
-                # Spec Section 5.3.2, 4th bullet (`A` is a class):
-                # "If the identifier denotes a class, that class is temporarily
-                # flattened (as if instantiating a component without modifiers of this
-                # class, see section 7.2.2) and using the enclosing classes of the
-                # denoted class. The rest of the name (e.g., B or B.C) is looked up
-                # among the declared named elements of the temporary flattened class. If
-                # the class does not satisfy the requirements for a package, the lookup
-                # is restricted to encapsulated elements only. The class we look inside
-                # shall not be partial in a simulation model."
-                # "The class" in the two last sentences I take to refer to the temporarily
-                # flattened class due to locality with the previous sentence.
-                # Why do we have to temporarily flatten the class? Flattening requires name lookup
-                # and with this name lookup requires flattening. Yikes. Can it be simplified?
-                # Checking "the class we look inside shall not be partial in a simulation model"
-                # is left to the caller.
-                # TODO: `A` is temporarily flattened without modifiers
-                # For now, we are just going to use recursive name lookup in contained elements
-                found = self.find_name(rest_of_name, new_scope, search_parent=False, copy=False)
-                # Check that found meets non-package lookup requirements in spec section 5.3.2
-                # The found.name test is so we only check going left to right in composite name
-                # and not the other direction as we pop the recursive call stack.
-                if (
-                    found is not None
-                    and found.name == self._first_name(rest_of_name)
-                    and new_scope.type != "package"
-                    and not (isinstance(found, ast.Class) and found.encapsulated)
-                ):
-                    raise NameLookupError(
-                        f"{new_scope.name} is not a package so {found.name} must be encapsulated"
-                    )
-            else:
-                raise NameLookupError(f'Found unexpected node "{found!r}" during name lookup')
-        if copy and isinstance(found, ast.Class):
-            found = found.copy_including_children()
-
-        return found
-
-    def find_iteration_variable(self, name: str, scope: ast.Class) -> Optional[ast.Symbol]:
-        """TODO: Passing for now. Do we currently handle iteration variables?"""
-        return None
-
-    def find_composite_name_in_classes(self, name: str, scope: ast.Class) -> Optional[ast.Class]:
-        """Search for composite name (e.g. A.B.C) in local classes, recursively"""
-        first_name, _, next_names = name.partition(".")
-        #  TODO: Per spec 5.3.2 bullet 4, class is temporarily flattened
-        found = None
-        if first_name in scope.classes:
-            found = scope.classes[first_name]
-        if found and next_names:
-            found = self.find_composite_name_in_classes(next_names, found)
-        return found
-
-    def find_composite_name_in_symbols(self, name: str, scope: ast.Class) -> Optional[ast.Symbol]:
-        """Search for composite name (e.g. A.B.C) in local symbols, recursively"""
-        first_name, _, next_names = name.partition(".")
-        # See spec 5.3.2 bullet 2 (emphasis mine): "If the first identifier denotes
-        # a component, the rest of the name (e.g., B or B.C) is looked up among the
-        # declared named *component* elements of the component".
-        # This can include inherited and imported components.
-        # Look up the type (Class) within the current scope if necessary
-        found = self.find_name(first_name, scope, search_parent=False, copy=False)
-        if isinstance(found, ast.Symbol):
-            if next_names:
-                if isinstance(found.type, ast.ComponentRef):
-                    type_name = str(found.type)
-                    found_type_class = self.find_name(type_name, scope, copy=False)
-                    if found_type_class is None or isinstance(found_type_class, ast.Symbol):
-                        scope_full_reference = str(scope.full_reference())
-                        raise NameLookupError(
-                            f'Symbol type "{type_name}" not found in scope "{scope_full_reference}"'
-                        )
-                else:
-                    # type is already an InstanceClass
-                    found_type_class = found.type
-                # Look in symbols of the type
-                found = self.find_composite_name_in_symbols(next_names, found_type_class)
-        else:
-            found = None
-        return found
-
-    def find_predefined(
-        self, name: str, scope: ast.Class
-    ) -> Optional[Union[ast.Class, ast.Symbol]]:
-        """Return an instance if given name is a predefined type"""
-        # TODO: Add instances to tree in __init__
-        # For now backward compatible with Class.find_class, i.e. build it here
-        c = None
-        if name in ast.Class.BUILTIN:
-            type_ = name
-
-            c = ast.Class(name=type_)
-            c.type = "__builtin"
-            c.parent = scope.root
-
-            cref = ast.ComponentRef(name=type_)
-            s = ast.Symbol(name="__value", type=cref, parent=c)
-            c.symbols[s.name] = s
-
-        return c
-
-    def find_local(self, name: str, scope: ast.Class) -> Optional[Union[ast.Class, ast.Symbol]]:
-        if name in scope.classes:
-            return scope.classes[name]
-        if name in scope.symbols:
-            return scope.symbols[name]
-        return None
-
-    def find_inherited(
-        self,
-        name: str,
-        scope: ast.Class,
-        check_builtin_classes: bool = False,
-        current_extends: Optional[Set[ast.ExtendsClause]] = None,
-    ) -> Optional[Union[ast.Class, ast.Symbol]]:
-        """Find simple name in inherited classes"""
-        # TODO: Update when we reorganize to use "unnamed" extends nodes in InstanceClass per spec
-        for extends in scope.extends:
-            if current_extends:
-                if extends in current_extends:
-                    # We are in the middle of processing this one, don't do it infinitely :-)
-                    continue
-            else:
-                current_extends = set()
-            current_extends.add(extends)
-            extends_scope = self.find_name(
-                extends.component,
-                scope,
-                check_builtin_classes=check_builtin_classes,
-                current_extends=current_extends,
-                copy=False,
-            )
-            if extends_scope is not None:
-                if isinstance(extends_scope, ast.Symbol):
-                    continue
-                # TODO: This can be find_simple_name when we remove check_builtin_classes
-                found = self.find_name(
+            (
+                found := _find_local(
                     name,
-                    extends_scope,
+                    current_scope,
                     check_builtin_classes=check_builtin_classes,
-                    search_parent=False,
-                    current_extends=current_extends,
-                    search_imports=False,
                 )
-                current_extends.remove(extends)
-                if found is not None:
-                    return found
-            else:
-                current_extends.remove(extends)
-        return None
-
-    def find_imported(
-        self,
-        name: str,
-        scope: ast.Class,
-        check_builtin_classes: bool = False,
-        current_extends: Optional[Set[ast.ExtendsClause]] = None,
-    ) -> Optional[Union[ast.Class, ast.Symbol]]:
-        # TODO: Rewrite this to work with parser rewrite of this.
-        # TODO: Add the following checks:
-        # 1. Upon expansion of "*" imports, error if key is already there (name already imported)
-        #    This check is already done at the parser level.
-        # 2. For A.B.C or A.B.*, A.B must be a package. This check is done here because
-        #    name lookup is required.
-        # TODO: Should be this order, but since I copy/paste/modified existing, not sure
-        # 1. Qualified import names (most common case)
-        # 2. Public Unqualified import names
-        if name in scope.imports:
-            # First search qualified imports (most common case)
-            # TODO: scope.imports should only contain ImportClause
-            # Convert ComponentRef at point of inception or include as part of ImportClause?
-            import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
-            if isinstance(import_, ast.ImportClause):
-                import_ = import_.components[0]
-            found = self.find_name(
-                import_,
-                scope.root,
-                check_builtin_classes=check_builtin_classes,
-                search_parent=False,
-                copy=False,
             )
-            self._check_import_rules(found, scope)
-            return found
-        else:
-            if "*" in scope.imports:
-                c = None
-                for package_ref in scope.imports["*"].components:
-                    imported_comp_ref = package_ref.concatenate(ast.ComponentRef(name=name))
-                    # Search within the package
-                    # Avoid infinite recursion with search_imports = False
-                    c = self.find_name(
-                        imported_comp_ref,
-                        scope.root,
-                        search_imports=False,
-                        search_parent=False,
-                        check_builtin_classes=check_builtin_classes,
-                        current_extends=current_extends,
-                        copy=False,
-                    )
-                    self._check_import_rules(c, scope)
-                    if c is not None:
-                        # Store result for next lookup
-                        scope.imports[name] = imported_comp_ref
-                        return c
-        return None
-
-    def _check_import_rules(
-        self,
-        element: Optional[Union[ast.Class, ast.Symbol]],
-        scope: ast.Class,
-    ) -> None:
-        if element is None:
-            return
-        if not element.parent:
-            raise NameLookupError(f"Import {element.name} must be contained in a package")
-        if element.parent.type != "package":
-            full_name = element.name
-            if element.parent.name:
-                full_name = str(element.parent.full_reference()) + "." + full_name
-                parent = element.parent.name
-                message = f"{parent} must be a package in import {full_name}"
-            else:
-                message = f"{full_name} is not in a package so can't be imported"
-            raise NameLookupError(message)
-        # TODO: Remove ast.Symbol test when visibility is added to ast.Class (see grammar)
-        if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
-            raise NameLookupError(f"Import {element.name} must not be protected or private")
-        # We test on parent and name instead of just "is" because we may have a copy of a Class
-        if element.parent is scope.parent and element.name == scope.name:
-            full_name = str(element.parent.full_reference()) + "." + element.name
-            raise NameLookupError(f"Import {full_name} is recursive")
-
-    def find_simple_name(
-        self,
-        name: str,
-        scope: ast.Class,
-        search_imports: bool = True,
-        check_builtin_classes: bool = False,
-        current_extends: Optional[Set[ast.ExtendsClause]] = None,
-    ) -> Optional[Union[ast.Class, ast.Symbol]]:
-        """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
-        if (
-            (found := self.find_iteration_variable(name, scope))
-            or (found := self.find_local(name, scope))
             or (
-                found := self.find_inherited(
+                found := _find_inherited(
                     name,
-                    scope,
+                    current_scope,
                     check_builtin_classes=check_builtin_classes,
                     current_extends=current_extends,
                 )
             )
             or search_imports
             and (
-                found := self.find_imported(
+                found := _find_imported(
                     name,
-                    scope,
+                    current_scope,
                     check_builtin_classes=check_builtin_classes,
                     current_extends=current_extends,
                 )
             )
+            or not search_parent
+            or not current_scope.parent
+            or current_scope.encapsulated
         ):
-            return found
-        return None
+            break
+        current_scope = current_scope.parent
+    # If name matches a variable (a.k.a. component a.k.a. symbol) in an enclosing class,
+    # it must be a `constant`.
+    if (
+        isinstance(found, ast.Symbol)
+        and current_scope != scope
+        and "constant" not in found.prefixes
+    ):
+        raise NameLookupError("Non-constant Symbol found in enclosing class")
+
+    # If not found and we stopped at an encapsulated class,
+    # then search predefined functions and operators in global scope
+    # TODO: Add predefined functions and operators to global scope before this
+    if found is None and current_scope.encapsulated:
+        found = _find_local(name, scope.root)
+        if not isinstance(found, ast.Class) or found.type not in ("function", "operator"):
+            found = None
+
+    return found
+
+
+def _find_rest_of_name(
+    first: Union[ast.Class, ast.Symbol], rest_of_name: str
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Lookup the `B.C` part of Composite Name Lookup (`A.B.C`) (spec 5.3.2)
+
+    1. `A` is looked up using Simple Name Lookup and passed as `first` argument
+    2. If `A` is a Component:
+        1. `B.C` is looked up from named component elements of `A`
+        2. if not found and if `A.B.C` is used as a function call and `A` is a scalar or can be
+        evaluated as a scalar from an array and `B` and `C` are classes,
+        it is a non-operator function call.
+    3. If `A` is a Class:
+        1. `A` is temporarily flattened without modifiers
+        2. `B.C` is looked up among named elements of temp flattened class,
+        but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+        and "the class we look inside shall not be partial in a simulation model"."""
+    if isinstance(first, ast.Symbol):
+        # Find the symbol type
+        if isinstance(first.type, ast.Class):
+            type_class = first.type
+        else:
+            type_class = find_name(first.type, first.parent, copy=False)
+            if type_class is None:
+                full_ref = str(first.parent.full_reference()) + "." + first.name
+                raise NameLookupError(f"Lookup failed for type of symbol {full_ref}")
+        found = _find_composite_name_in_symbols(rest_of_name, type_class)
+        if not found:
+            # Can only find in classes if the below rules apply:
+            # 2b. if not found and if `A.B.C` is used as a function call
+            # and `A` is a scalar or can be evaluated as a scalar from an array
+            # and `B` and `C` are classes,
+            # it is a non-operator function call.
+            found = _find_composite_name_in_classes(rest_of_name, type_class)
+            if isinstance(found, ast.Class):
+                if found.type != "function":
+                    found = None
+                else:
+                    if first.dimensions[0][0].value is not None:
+                        raise NameLookupError(
+                            f"Array {first.name} must have subscripts to lookup function {found.name}"
+                        )
+
+    elif isinstance(first, ast.Class):
+        found = _flatten_first_and_find_rest(first, rest_of_name)
+    else:
+        raise NameLookupError(f'Found unexpected node "{found!r}" during name lookup')
+
+    return found
+
+
+def _find_composite_name_in_symbols(name: str, scope: ast.Class) -> Optional[ast.Symbol]:
+    """Search for composite name (e.g. A.B.C) in local symbols, recursively"""
+    first_name, _, next_names = name.partition(".")
+    # See spec 5.3.2 bullet 2 (emphasis mine): "If the first identifier denotes
+    # a component, the rest of the name (e.g., B or B.C) is looked up among the
+    # declared named *component* elements of the component".
+    # This can include inherited and imported components.
+    # Look up the type (Class) within the current scope if necessary
+    found = find_name(first_name, scope, search_parent=False, copy=False)
+    if isinstance(found, ast.Symbol):
+        if next_names:
+            if isinstance(found.type, ast.ComponentRef):
+                type_name = str(found.type)
+                found_type_class = find_name(type_name, scope, copy=False)
+                if found_type_class is None or isinstance(found_type_class, ast.Symbol):
+                    scope_full_reference = str(scope.full_reference())
+                    raise NameLookupError(
+                        f'Symbol type "{type_name}" not found in scope "{scope_full_reference}"'
+                    )
+            else:
+                # type is already an InstanceClass
+                found_type_class = found.type
+            # Look in symbols of the type
+            found = _find_composite_name_in_symbols(next_names, found_type_class)
+    else:
+        found = None
+    return found
+
+
+def _find_composite_name_in_classes(name: str, scope: ast.Class) -> Optional[ast.Class]:
+    """Search for composite name (e.g. A.B.C) in local classes, recursively"""
+    first_name, _, next_names = name.partition(".")
+    #  TODO: Per spec 5.3.2 bullet 4, class is temporarily flattened
+    found = None
+    if first_name in scope.classes:
+        found = scope.classes[first_name]
+    if found and next_names:
+        found = _find_composite_name_in_classes(next_names, found)
+    return found
+
+
+def _flatten_first_and_find_rest(
+    first: ast.Class, rest_of_name: str
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Lookup the `B.C` part of Composite Name Lookup (`A.B.C`) where `A` is a Class (spec 5.3.2)
+
+    3. If `A` is a Class:
+        1. `A` is temporarily flattened without modifiers
+        2. `B.C` is looked up among named elements of temp flattened class,
+        but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+        and "the class we look inside shall not be partial in a simulation model".
+
+        Checking "the class we look inside shall not be partial in a simulation model"
+        is left to the caller.
+    """
+    # Spec Section 5.3.2, 4th bullet (`A` is a class):
+    # "If the identifier denotes a class, that class is temporarily
+    # flattened (as if instantiating a component without modifiers of this
+    # class, see section 7.2.2) and using the enclosing classes of the
+    # denoted class. The rest of the name (e.g., B or B.C) is looked up
+    # among the declared named elements of the temporary flattened class. If
+    # the class does not satisfy the requirements for a package, the lookup
+    # is restricted to encapsulated elements only. The class we look inside
+    # shall not be partial in a simulation model."
+    # Why do we have to temporarily flatten the class? Flattening requires name lookup
+    # and with this name lookup requires flattening. Yikes! Can it be simplified?
+
+    # TODO: `A` is temporarily flattened without modifiers?
+    # For now, we use recursive name lookup in contained elements
+    found = find_name(rest_of_name, first, search_parent=False, copy=False)
+
+    # Check that found meets non-package lookup requirements in spec section 5.3.2
+    # The found.name test is so we only check going left to right in composite name
+    # and not the other direction as we pop the recursive call stack.
+    if (
+        found is not None
+        and found.name == _first_name(rest_of_name)
+        and first.type != "package"
+        and not (isinstance(found, ast.Class) and found.encapsulated)
+    ):
+        raise NameLookupError(f"{first.name} is not a package so {found.name} must be encapsulated")
+
+    return found
+
+
+def _first_name(name: str) -> str:
+    return name.split(".")[0]
+
+
+def _find_local(
+    name: str,
+    scope: ast.Class,
+    check_builtin_classes: bool = False,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Name lookup for predefined classes and contained elements
+
+    0. Predefined types (`Real`, `Integer`, `Boolean`, `String`) (spec 4.8)
+    1. Iteration variables
+    2. Classes
+    3. Components (Symbols in Pymoca)
+    """
+    # 0. Predefined classes and types
+    # TODO: Refactor this when refactoring predefined classes and instantiation/flattening
+    # (it will move from here to an __init__ somewhere that creates predefined classes)
+    # For now backward compatible with Class.find_class, i.e. build it here
+    if name in ast.Class.BUILTIN:
+        if not check_builtin_classes:
+            raise ast.FoundElementaryClassError()
+
+        type_ = name
+
+        c = ast.Class(name=type_)
+        c.type = "__builtin"
+        c.parent = scope.root
+
+        cref = ast.ComponentRef(name=type_)
+        s = ast.Symbol(name="__value", type=cref, parent=c)
+        c.symbols[s.name] = s
+        return c
+
+    # 1. Iteration variables
+    # TODO: Refactor when handling iteration variables (it will move up one level)
+    if found := _find_iteration_variable(name, scope):
+        return found
+
+    # 2. Classes
+    if name in scope.classes:
+        return scope.classes[name]
+
+    # 3. Components (Symbols in Pymoca)
+    if name in scope.symbols:
+        return scope.symbols[name]
+
+    return None
+
+
+def _find_iteration_variable(name: str, scope: ast.Class) -> Optional[ast.Symbol]:
+    """Currently a pass"""
+    # TODO: Implement find name in iteration variables
+    return None
+
+
+def _find_inherited(
+    name: str,
+    scope: ast.Class,
+    check_builtin_classes: bool = False,
+    current_extends: Optional[Set[ast.ExtendsClause]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Find simple name in inherited classes"""
+    # TODO: Update when we reorganize to use "unnamed" extends nodes in InstanceClass per spec
+    for extends in scope.extends:
+        if current_extends:
+            if extends in current_extends:
+                # We are in the middle of processing this one, don't do it infinitely :-)
+                continue
+        else:
+            current_extends = set()
+        current_extends.add(extends)
+        extends_scope = _find_simple_name(
+            extends.component.name,
+            scope,
+            check_builtin_classes=check_builtin_classes,
+            current_extends=current_extends,
+        )
+        if extends_scope is not None:
+            if isinstance(extends_scope, ast.Symbol):
+                continue
+            found = _find_simple_name(
+                name,
+                extends_scope,
+                check_builtin_classes=check_builtin_classes,
+                search_parent=False,
+                current_extends=current_extends,
+                search_imports=False,
+            )
+            current_extends.remove(extends)
+            if found is not None:
+                return found
+        else:
+            current_extends.remove(extends)
+    return None
+
+
+def _find_imported(
+    name: str,
+    scope: ast.Class,
+    check_builtin_classes: bool = False,
+    current_extends: Optional[Set[ast.ExtendsClause]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Find simple name in imports"""
+    # TODO: Rewrite this to work with parser rewrite of import_clause handler.
+    # TODO: Can we do a scope.imports[name] = found Class or Symbol to speed up future calls?
+    # Search qualified imports (most common case)
+    if name in scope.imports:
+        import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
+        if isinstance(import_, ast.ImportClause):
+            import_ = import_.components[0]
+        found = find_name(
+            import_,
+            scope.root,
+            check_builtin_classes=check_builtin_classes,
+            search_parent=False,
+            copy=False,
+        )
+        _check_import_rules(found, scope)
+        return found
+    # Unqualified imports
+    if "*" in scope.imports:
+        c = None
+        for package_ref in scope.imports["*"].components:
+            imported_comp_ref = package_ref.concatenate(ast.ComponentRef(name=name))
+            # Search within the package
+            # Avoid infinite recursion with search_imports = False
+            c = find_name(
+                imported_comp_ref,
+                scope.root,
+                search_imports=False,
+                search_parent=False,
+                check_builtin_classes=check_builtin_classes,
+                current_extends=current_extends,
+                copy=False,
+            )
+            _check_import_rules(c, scope)
+            if c is not None:
+                # Store result for next lookup
+                scope.imports[name] = imported_comp_ref
+                return c
+    return None
+
+
+def _check_import_rules(
+    element: Optional[Union[ast.Class, ast.Symbol]],
+    scope: ast.Class,
+) -> None:
+    """Check import rules per the Modelica spec"""
+    if element is None:
+        return
+    if not element.parent:
+        raise NameLookupError(f"Import {element.name} must be contained in a package")
+    if element.parent.type != "package":
+        full_name = element.name
+        if element.parent.name:
+            full_name = str(element.parent.full_reference()) + "." + full_name
+            parent = element.parent.name
+            message = f"{parent} must be a package in import {full_name}"
+        else:
+            message = f"{full_name} is not in a package so can't be imported"
+        raise NameLookupError(message)
+    # TODO: Remove ast.Symbol test when visibility is added to ast.Class (see grammar)
+    if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
+        raise NameLookupError(f"Import {element.name} must not be protected or private")
+    # We test on parent and name instead of just "is" because we may have a copy of a Class
+    if element.parent is scope.parent and element.name == scope.name:
+        full_name = str(element.parent.full_reference()) + "." + element.name
+        raise NameLookupError(f"Import {full_name} is recursive")
 
 
 # TODO: Fix these comments when done iterating on implementation
@@ -770,7 +793,7 @@ class NameFinder:
 #       Add extends nodes into InstanceClass ->
 #           Looks up classes in extends clause
 #           Merges/passes along modifications(including redeclares) for classes and symbols
-#           (Only contains inherited contents from the base classs)
+#           (Only contains inherited contents from the base class)
 #           Check that class lookups generate the same result before and after
 #       Check for redundant children with same name (including extends) and remove all but first, error if all not identical
 #   flatten_class (recursively) ->
@@ -809,7 +832,7 @@ class NameFinder:
 #   Another consideration is that MODELICAPATH contains name lookup logic similar to
 #   in-memory AST lookup logic, but at a filesystem level. Can we unify the name lookup
 #   such that some functions are shared (DRY)? If so, then it appears that in-memory
-#   name lookup and MODELICPATH name lookup should be in the same module, probably in
+#   name lookup and MODELICAPATH name lookup should be in the same module, probably in
 #   tree.py, but could also be in a separate module focusing on name lookup and
 #   MODELICAPATH.
 
