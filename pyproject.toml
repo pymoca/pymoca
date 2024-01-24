@@ -17,8 +17,9 @@ maintainers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-	"numpy >= 1.8.2",
-	"antlr4-python3-runtime == 4.13.*",
+    "numpy >= 1.8.2",
+    "antlr4-python3-runtime == 4.13.*",
+    "setuptools-scm[toml] >= 8.0",
 ]
 classifiers = [
     "Development Status :: 1 - Planning",
