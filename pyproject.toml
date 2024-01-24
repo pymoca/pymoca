@@ -2,6 +2,56 @@
 requires = ["setuptools", "versioneer[toml]==0.29"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "pymoca"
+dynamic = ["version"]
+license = {file = "LICENSE"}
+description = "A python/modelica based simulation environment."
+keywords = ["modelica", "simulation", "compiler"]
+readme = "README.md"
+authors = [
+    { name = "James Goppert", email = "james.goppert@gmail.com" },
+]
+maintainers = [
+    { name = "James Goppert", email = "james.goppert@gmail.com" },
+]
+requires-python = ">=3.8"
+dependencies = [
+	"numpy >= 1.8.2",
+	"antlr4-python3-runtime == 4.13.*",
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Other",
+    "Topic :: Software Development",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Operating System :: MacOS",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Embedded Systems",
+]
+
+[project.urls]
+homepage = "https://github.com/pymoca/pymoca"
+
+[project.optional-dependencies]
+casadi = ["casadi>=3.4.0"]
+lxml = ["lxml>=3.5.0", "scipy>=0.13.3"]
+sympy = ["sympy>=0.7.6.1", "scipy>=0.13.3", "jinja2>=2.10.1"]
+examples = ["jupyterlab", "matplotlib"]
+all = ["pymoca[casadi,lxml,sympy,examples]"]
+
 # See the docstring in versioneer.py for instructions. Note that after changing
 # this section, run `versioneer install --no-vendor`, commit the results.
 
