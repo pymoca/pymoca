@@ -1,6 +1,2 @@
-from importlib.metadata import PackageNotFoundError, version
-
-try:
-    __version__ = version("pymoca")
-except PackageNotFoundError:
-    pass
+from setuptools_scm import get_version
+__version__ = get_version()
