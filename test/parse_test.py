@@ -785,8 +785,14 @@ class ParseTest(unittest.TestCase):
             cursor.execute("SELECT COUNT(*) FROM models")
             self.assertEqual(cursor.fetchone()[0], 1)
 
-            # Parse again to update the cache hit time
-            _ = parser.parse(txt, model_cache_folder=Path(tmpdirname), always_update_last_hit=True)
+            # Check that we get log messages saying the cache entry was found
+            # We also force an update to the cache hit time
+            logger = logging.getLogger("pymoca")
+            with self.assertLogs(logger, level="DEBUG") as cm:
+                _ = parser.parse(
+                    txt, model_cache_folder=Path(tmpdirname), always_update_last_hit=True
+                )
+                self.assertIn(") found in cache", cm.output[0])
 
             cursor.execute("SELECT value FROM metadata WHERE key='created_at'")
             second_created_at = int(cursor.fetchone()[0])
