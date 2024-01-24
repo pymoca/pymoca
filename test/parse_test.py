@@ -40,7 +40,7 @@ class WorkDirState(enum.Enum):
 @contextlib.contextmanager
 def modify_version(version_type: WorkDirState):
     pymoca_version = pymoca.__version__
-    if re.search(r"\.d\d{8}$", pymoca_version):
+    if re.search(r"[\.\+]d\d{8}$", pymoca_version):
         clean_version = pymoca_version[:-10]
     else:
         clean_version = pymoca_version

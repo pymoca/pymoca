@@ -999,7 +999,7 @@ def parse(
 
     # Do not use caching if we have a dirty work tree, as the source
     # code can't be uniquely identified.
-    if re.search(r"\.d\d{8}$", pymoca_version):
+    if re.search(r"[\.\+]d\d{8}$", pymoca_version):
         logger.debug("Bypassing cache because working directory is dirty")
         return _parse(txt)
 
