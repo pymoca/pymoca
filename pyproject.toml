@@ -10,10 +10,11 @@ description = "A python/modelica based simulation environment."
 keywords = ["modelica", "simulation", "compiler"]
 readme = "README.md"
 authors = [
-    { name = "James Goppert", email = "james.goppert@gmail.com" },
+    { name = "Pymoca Contributors" },
 ]
 maintainers = [
-    { name = "James Goppert", email = "james.goppert@gmail.com" },
+    { name = "Jack Vreeken", email = "jack@vreeken.me" },
+    { name = "Kent Rutan", email = "gs1150e@icloud.com" },
 ]
 requires-python = ">=3.8"
 dependencies = [
