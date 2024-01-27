@@ -2,13 +2,14 @@
 import os
 import subprocess
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Root directory of the repo is one level up from this script
+ROOT_DIR = os.path.split(os.path.dirname(os.path.abspath(__file__)))[0]
 
 
 def call_antlr4(arg):
     "calls antlr4 on grammar file"
     # pylint: disable=unused-argument, unused-variable
-    antlr_path = os.path.join(ROOT_DIR, "java", "antlr-4.13.1-complete.jar")
+    antlr_path = os.path.join(ROOT_DIR, "antlr", "antlr-4.13.1-complete.jar")
     classpath = os.pathsep.join([".", f"{antlr_path:s}", "$CLASSPATH"])
     generated = os.path.join(ROOT_DIR, "src", "pymoca", "generated")
     cmd = (
