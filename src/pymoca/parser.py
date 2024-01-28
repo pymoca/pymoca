@@ -1037,8 +1037,11 @@ def parse(
             (datetime.utcnow() - timedelta(days=cache_expiration_days)).timestamp() * 1e6
         )
         cursor.execute("DELETE FROM models WHERE last_hit < ?", (cutoff_time,))
+        # Sometimes Windows time resolution is a bit coarse, so we make
+        # sure that if we update the last_prune time, it is actually newer
+        # than the previous one.
         cursor.execute(
-            "UPDATE metadata SET value = ? WHERE key = ?",
+            "UPDATE metadata SET value = max(value + 1, ?) + 1 WHERE key = ?",
             (_microseconds_since_epoch(), "last_prune"),
         )
 
@@ -1070,8 +1073,12 @@ def parse(
 
         if always_update_last_hit or last_hit < yesterday:
             cursor.execute("BEGIN TRANSACTION;")
+            # Sometimes Windows time resolution is a bit coarse, so we make
+            # sure that if we update the last_hit time, it is actually newer
+            # than the previous one.
             cursor.execute(
-                "UPDATE models SET last_hit = ? WHERE txt_hash = ? AND pymoca_version = ?",
+                "UPDATE models SET last_hit = max(last_hit + 1, ?) WHERE txt_hash = ? "
+                "AND pymoca_version = ?",
                 (_microseconds_since_epoch(), txt_hash, pymoca_version),
             )
             conn.commit()
