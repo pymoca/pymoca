@@ -1033,8 +1033,8 @@ def parse(
 
         # Prune the database of entries not hit recently
         cursor.execute("BEGIN TRANSACTION;")
-        cutoff_time = int(
-            (datetime.utcnow() - timedelta(days=cache_expiration_days)).timestamp() * 1e6
+        cutoff_time = _microseconds_since_epoch(
+            datetime.utcnow() - timedelta(days=cache_expiration_days)
         )
         cursor.execute("DELETE FROM models WHERE last_hit < ?", (cutoff_time,))
         # Sometimes Windows time resolution is a bit coarse, so we make
