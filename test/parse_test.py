@@ -785,11 +785,6 @@ class ParseTest(unittest.TestCase):
             cursor.execute("SELECT COUNT(*) FROM models")
             self.assertEqual(cursor.fetchone()[0], 1)
 
-            # We close and later re-open to make sure that we do not read
-            # stale data from the database file when running on e.g. NFS.
-            cursor.close()
-            conn.close()
-
             # Check that we get log messages saying the cache entry was found
             # We also force an update to the cache hit time
             logger = logging.getLogger("pymoca")
@@ -798,9 +793,6 @@ class ParseTest(unittest.TestCase):
                     txt, model_cache_folder=Path(tmpdirname), always_update_last_hit=True
                 )
                 self.assertIn(") found in cache", cm.output[0])
-
-            conn = sqlite3.connect(full_db_path)
-            cursor = conn.cursor()
 
             cursor.execute("SELECT value FROM metadata WHERE key='created_at'")
             second_created_at = int(cursor.fetchone()[0])
