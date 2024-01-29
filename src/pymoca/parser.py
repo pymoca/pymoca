@@ -11,8 +11,9 @@ import os
 import pickle
 import platform
 import sqlite3
+import time
 from collections import OrderedDict, deque
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Union  # noqa: F401
 
@@ -831,7 +832,7 @@ def _parse(text: str) -> Union[ast.Tree, None]:
 def _microseconds_since_epoch(timedelta_: Optional[timedelta] = None) -> int:
     if timedelta_ is None:
         timedelta_ = timedelta()
-    return int((datetime.utcnow() + timedelta_).timestamp() * 1e6)
+    return time.time_ns() // 1000 + int(timedelta_.total_seconds() * 1e6)
 
 
 def _check_database_structure(conn: sqlite3.Connection):
