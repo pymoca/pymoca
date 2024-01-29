@@ -828,10 +828,10 @@ def _parse(text: str) -> Union[ast.Tree, None]:
     return file_to_tree(modelica_file)
 
 
-def _microseconds_since_epoch(datetime_: Optional[datetime] = None) -> int:
-    if datetime_ is None:
-        datetime_ = datetime.utcnow()
-    return int(datetime_.timestamp() * 1e6)
+def _microseconds_since_epoch(timedelta_: Optional[timedelta] = None) -> int:
+    if timedelta_ is None:
+        timedelta_ = timedelta()
+    return int((datetime.utcnow() + timedelta_).timestamp() * 1e6)
 
 
 def _check_database_structure(conn: sqlite3.Connection):
@@ -1033,9 +1033,7 @@ def parse(
 
         # Prune the database of entries not hit recently
         cursor.execute("BEGIN TRANSACTION;")
-        cutoff_time = _microseconds_since_epoch(
-            datetime.utcnow() - timedelta(days=cache_expiration_days)
-        )
+        cutoff_time = _microseconds_since_epoch(timedelta(days=-cache_expiration_days))
         cursor.execute("DELETE FROM models WHERE last_hit < ?", (cutoff_time,))
         # Sometimes Windows time resolution is a bit coarse, so we make
         # sure that if we update the last_prune time, it is actually newer
@@ -1069,7 +1067,7 @@ def parse(
         logger.debug(f"Model with hash '{txt_hash}' ({pymoca_version}) found in cache")
         last_hit, pickled_data = result
 
-        yesterday = _microseconds_since_epoch(datetime.utcnow() - timedelta(days=1))
+        yesterday = _microseconds_since_epoch(timedelta(days=-1))
 
         if always_update_last_hit or last_hit < yesterday:
             cursor.execute("BEGIN TRANSACTION;")
