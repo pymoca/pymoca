@@ -8,7 +8,8 @@ import copy
 import json
 from collections import OrderedDict
 from enum import Enum
-from typing import Dict, List, Type, Union  # noqa: F401
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Type, Union  # noqa: F401
 
 
 class ClassNotFoundError(Exception):
@@ -24,7 +25,6 @@ class FoundElementaryClassError(Exception):
 
 
 class Visibility(Enum):
-    PRIVATE = 0, "private"
     PROTECTED = 1, "protected"
     PUBLIC = 2, "public"
 
@@ -87,15 +87,20 @@ class Node:
 
     @classmethod
     def to_json(cls, var):
+        def guard(var):
+            if isinstance(var, Path):
+                return var.resolve().as_uri()
+            return var
+
         if isinstance(var, list):
-            res = [cls.to_json(item) for item in var]
+            res = [cls.to_json(guard(item)) for item in var]
         elif isinstance(var, dict):
-            res = {key: cls.to_json(var[key]) for key in var.keys()}
+            res = {key: cls.to_json(guard(var[key])) for key in var.keys()}
         elif isinstance(var, Node):
             # Avoid infinite recursion by not handling attributes that may go
             # back up in the tree again.
             res = {
-                key: cls.to_json(var.__dict__[key])
+                key: cls.to_json(guard(var.__dict__[key]))
                 for key in var.__dict__.keys()
                 if key not in ("parent", "scope", "__deepcopy__")
             }
@@ -165,7 +170,7 @@ class ComponentRef(Node):
     def __str__(self) -> str:
         return ".".join(self.to_tuple())
 
-    def to_tuple(self) -> tuple:
+    def to_tuple(self) -> Tuple[str]:
         """
         Convert the nested component reference to flat tuple of names, which is
         hashable and can therefore be used as dictionary key. Note that this
@@ -438,8 +443,9 @@ class Symbol(Node):
         self.displayUnit = Primary(value=None)  # type: Primary
         self.id = 0  # type: int
         self.order = 0  # type: int
-        self.visibility = Visibility.PRIVATE  # type: Visibility
+        self.visibility = Visibility.PUBLIC  # type: Visibility
         self.class_modification = None  # type: ClassModification
+        self.parent = None  # type: Optional[Class]
         super().__init__(**kwargs)
 
     def __str__(self):
@@ -591,13 +597,45 @@ class ExtendsClause(Node):
     def __init__(self, **kwargs):
         self.component = None  # type: ComponentRef
         self.class_modification = None  # type: ClassModification
-        self.visibility = Visibility.PRIVATE  # type: Visibility
+        self.visibility = Visibility.PUBLIC  # type: Visibility
         super().__init__(**kwargs)
 
     def __repr__(self):
         return "{}(component={}, class_modification={!r}, visibility={!r})".format(
             type(self).__name__, self.component, self.class_modification, self.visibility
         )
+
+
+class LazyParseDict(dict):
+    """A dict to implement lazy parsing of classes
+    Unparsed stub classes should have already been created by MODELICAPATH code
+    """
+
+    def __getitem__(self, __key: Any) -> Any:
+        class_ = super().__getitem__(__key)
+        if class_.parsed:
+            return class_
+        # Import locally to avoid circular imports/references
+        from . import parser
+
+        file = parser.parse_text(class_.path.read_text(encoding="utf-8"))
+        # Fail lookup if parse fails
+        if file is None:
+            raise KeyError
+        # Fail lookup if class is not in top level of parsed file
+        if __key not in file.classes:
+            raise KeyError
+        # Update class_ with parsed __key class
+        class_.parsed = True
+        parsed_class = file.classes[__key]
+        class_.update_classes(parsed_class.classes)
+        # Include any additional classes that may have been parsed
+        file.classes[__key] = class_
+        class_.update_classes(file.classes)
+        return class_
+
+    def __repr__(self):
+        return "{}{}".format(type(self).__name__, super().__repr__())
 
 
 class Class(Node):
@@ -612,7 +650,7 @@ class Class(Node):
         self.final = False  # type: bool
         self.type = ""  # type: str
         self.comment = ""  # type: str
-        self.classes = OrderedDict()  # type: OrderedDict[str, Class]
+        self.classes = LazyParseDict()  # type: dict[str, Class]
         self.symbols = OrderedDict()  # type: OrderedDict[str, Symbol]
         self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
@@ -623,104 +661,37 @@ class Class(Node):
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.annotation = []  # type: Union[Type[None], ClassModification]
         self.parent = None  # type: Class
+        self.path = Path("/")  # type: Path
+        self.parsed = True  # type: bool
 
         super().__init__(**kwargs)
 
-    def _find_class(
-        self, component_ref: ComponentRef, search_parent=True, search_imports=True
-    ) -> "Class":
-        """Recursively search for component_ref in self and linked classes
-
-        Implement lookup rules per spec chapter 5, see also chapter 13.
-        This is more succinctly outlined in
-        https://mbe.modelica.university/components/packages/lookup/
-        """
-        # TODO: Get rid of exception-based algorithm or make imports have separate exception?
-        # TODO: Move import logic to separate function?
-        # TODO: Implement library path lookup from section 13.2.2 of spec
-        # TODO: Try @functools.lru_cache if profile shows this is hotspot
-        try:
-            if not component_ref.child:
-                return self.classes[component_ref.name]
-            else:
-                # Avoid infinite recursion by passing search_parent = False
-                return self.classes[component_ref.name]._find_class(component_ref.child[0], False)
-        except (KeyError, ClassNotFoundError):
-            try:
-                if search_imports:
-                    if component_ref.name in self.imports:
-                        # First search qualified imports (most common case)
-                        import_ = self.imports[
-                            component_ref.name
-                        ]  # type: Union[ImportClause, ComponentRef]
-                        if isinstance(import_, ImportClause):
-                            # Expand short name
-                            if component_ref.child:
-                                import_ = import_.components[0].concatenate(component_ref.child[0])
-                            else:
-                                import_ = import_.components[0]
-                        elif component_ref.child:
-                            import_ = import_.concatenate(component_ref.child[0])
-                        return self._find_class(import_)
-                    else:
-                        # Next search packages for unqualified imports (slow, but assuming not common)
-                        if "*" in self.imports:
-                            c = None
-                            for package_ref in self.imports["*"].components:
-                                imported_comp_ref = package_ref.concatenate(
-                                    ComponentRef(name=component_ref.name)
-                                )
-                                # Search within the package
-                                try:
-                                    # Avoid infinite recursion with search_imports = False
-                                    c = self._find_class(imported_comp_ref, search_imports=False)
-                                except (KeyError, ClassNotFoundError):
-                                    pass
-                            if c is not None:
-                                # Store result for next lookup
-                                self.imports[component_ref.name] = imported_comp_ref
-                                return c
-                            else:
-                                raise ClassNotFoundError
-                        else:
-                            raise ClassNotFoundError
-                else:
-                    raise ClassNotFoundError
-            except (KeyError, ClassNotFoundError):
-                if search_parent and self.parent is not None and not self.encapsulated:
-                    return self.parent._find_class(component_ref)
-                else:
-                    raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
-
-    def find_class(
+    def new_find_class(
         self,
         component_ref: ComponentRef,
-        copy=True,
         check_builtin_classes=False,
         search_imports=True,
+        search_parent=True,
+        copy=True,
     ) -> "Class":
-        if component_ref.name in self.BUILTIN:
-            if check_builtin_classes:
-                type_ = component_ref.name
+        """Temporary hook into old code"""
+        # TODO: Delete Class.new_find_class() when new instantiation/flattening is done
+        from . import tree
 
-                c = Class(name=type_)
-                c.type = "__builtin"
-                c.parent = self.root
+        found = tree.find_name(
+            name=component_ref,
+            scope=self,
+            copy=copy,
+            check_builtin_classes=check_builtin_classes,
+            search_imports=search_imports,
+            search_parent=search_parent,
+        )
+        if found is None or isinstance(found, Symbol):
+            raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
+        return found
 
-                cref = ComponentRef(name=type_)
-                s = Symbol(name="__value", type=cref)
-                c.symbols[s.name] = s
-
-                return c
-            else:
-                raise FoundElementaryClassError()
-
-        c = self._find_class(component_ref, search_imports)
-
-        if copy:
-            c = c.copy_including_children()
-
-        return c
+    _find_class = new_find_class
+    find_class = new_find_class
 
     def _find_constant_symbol(self, component_ref: ComponentRef, search_parent=True) -> Symbol:
         if component_ref.child:
@@ -776,6 +747,10 @@ class Class(Node):
                 self.classes[class_name]._extend(other.classes[class_name])
             else:
                 self.classes[class_name] = other.classes[class_name]
+
+    def update_classes(self, other: Dict[str, "Class"]) -> None:
+        for class_ in other.values():
+            self.add_class(class_)
 
     @property
     def root(self):
@@ -866,27 +841,77 @@ class Class(Node):
         return new
 
     def __repr__(self):
-        return "{}(type={!r}, name={!r})".format(type(self).__name__, self.type, self.name)
+        return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)
 
     def __str__(self):
         return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
 
 
-class InstanceClass(Class):
+# TODO: Fix these comments when done iterating on implementation
+# Idea is to make the code consistent for both classes and symbols
+# to remove the redundancy in build_instance_tree() while also following the MLS.
+# This may not be the best way to do it. Needs more thought.
+# Continue looking at MLS section 5.6.1.
+# 2nd pass at improvement should get rid of all the special __builtin__ and __value__
+# stuff and place builtin types in the root of the instance tree per the spec.
+class InstanceElement:
     """
-    Class used during instantiation/expansion of the model. Modififcations on
+    Base class for instance elements (symbols, classes, extends clauses, etc.).
+    """
+
+    def __init__(self, ast_ref: Optional[Node] = None, **kwargs):
+        # Reference to the AST node that this instance element was created from.
+        self.ast_ref: Optional[Node] = ast_ref
+        self.modification_environment = ClassModification()
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "ast_ref={!r}, modification_environment={!r}".format(
+            self.ast_ref, self.modification_environment
+        )
+
+
+class InstanceClass(InstanceElement, Class):
+    """
+    Class used during instantiation/expansion of the model. Modifications on
     symbols and extends clauses are shifted to the modification environment of
     this InstanceClass.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.modification_environment = ClassModification()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def __repr__(self):
-        return "{}(type={!r}, name={!r}, modification_environment={!r})".format(
-            type(self).__name__, self.type, self.name, self.modification_environment
+        return "{}(name={!r}, type={!r}, {!s})".format(
+            type(self).__name__, self.name, self.type, super().__repr__()
         )
+
+
+class InstanceSymbol(InstanceElement, Symbol):
+    """
+    Symbol used during instantiation/expansion of the model.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(name={!r}, type={!r}, {!s})".format(
+            type(self).__name__, self.name, self.type, super().__repr__()
+        )
+
+
+class InstanceExtends(InstanceElement, ExtendsClause):
+    """
+    Placeholder for extends clause during instantiation/expansion of the model.
+    This is the "unnamed node" referenced in the language spec.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}({!s})".format(type(self).__name__, super().__repr__())
 
 
 class Tree(Class):

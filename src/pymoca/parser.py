@@ -19,11 +19,17 @@ from typing import Dict, List, Optional, Union  # noqa: F401
 
 import antlr4
 import antlr4.Parser
+from antlr4 import ParserRuleContext
 
 import pymoca
 
 from . import ast
-from .generated.ModelicaLexer import ModelicaLexer
+
+# TODO: There must be a better way!
+from . import tree  # noqa: I202
+
+# noinspection PyUnresolvedReferences,PyUnresolvedReferences
+from .generated.ModelicaLexer import ModelicaLexer  # noqa: I202
 from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
 
@@ -39,6 +45,23 @@ logger = logging.getLogger("pymoca")
 DEFAULT_MODEL_CACHE_DB = "model_txt_cache.db"
 
 
+class ModelicaSyntaxError(SyntaxError):
+    """SyntaxError built from an ANTLR context object"""
+
+    def __init__(self, message: str, ctx: ParserRuleContext, file_name: str = ""):
+        # file_name defaults to empty because our current parser takes text str only
+        line1 = ctx.start.line
+        col1 = ctx.start.column
+        line2 = ctx.stop.line
+        col2 = ctx.stop.column
+        text = ctx.start.source[1].strdata.splitlines()
+        error_text = text[line1 - 1]
+        for line in range(line1, line2):
+            error_text += text[line]
+        # last two args were were added in Python 3.10, previous will ignore
+        super().__init__(message, line1, col1, error_text, file_name, line2, col2)
+
+
 class ModelicaFile:
     def __init__(self, **kwargs):
         self.within = []  # type: List[ast.ComponentRef]
@@ -46,6 +69,84 @@ class ModelicaFile:
         super().__init__(**kwargs)
 
 
+def _path_to_class(path: Path) -> Optional[ast.Class]:
+    """Transform a filesytem path into an ast.Class"""
+    if path.is_dir():
+        try:
+            package = next(path.glob("package.mo"))
+            new_class = ast.Class(name=path.parts[-1], type="package")
+            new_class.path = package
+            # TODO: There must be a better way!
+            # Set this after we have assembled the entire MODELICAPATH but before using it
+            # new_class.parsed = False
+            return new_class
+        except StopIteration:
+            # Directories must contain a package.mo file (per Modelica spec)
+            return None
+    elif path.is_file():
+        if path.suffix != ".mo" or path.stem == "package":
+            return None
+        new_class = ast.Class(name=path.stem, type="package")
+        new_class.path = path
+        return new_class
+    else:
+        # Ignore anything else in MODELICAPATH
+        return None
+
+
+def _dir_to_tree(dir_: Path, this_class: ast.Class) -> None:
+    """Recursively walk a filesystem directory tree and transform to unparsed ast.Class"""
+    for path in dir_.iterdir():
+        path = path.resolve()
+        if child_class := _path_to_class(path):
+            this_class.add_class(child_class)
+            if path.is_dir():
+                _dir_to_tree(path, child_class)
+
+
+def dir_to_tree(dir_: Union[str, Path]) -> ast.Tree:
+    """Transform a MODELICAPATH directory into a tree of unparsed stub Classes
+
+    A directory turns into an ast.Class with the file to parse for that class
+    inserted into the paths attribute and subdirectories inserted as child stub classes.
+    TODO: Add version handling (spec 18.8.3, 18.8.4)
+    """
+    # Accept str or Path argument
+    dir_ = Path(str(dir_))
+    dir_.resolve()
+    root_tree = ast.Tree()
+    if dir_.is_dir():
+        root_class = ast.Class()
+        _dir_to_tree(dir_, root_class)
+        root_tree.name = dir_.parts[-1]
+        root_tree.classes = root_class.classes
+        del root_class
+    return root_tree
+
+
+# TODO: There must be a better way!
+class ActivateLazyParse(tree.TreeListener):
+    def enterClass(self, class_: ast.Class):
+        if class_.path:
+            class_.parsed = False
+
+
+def modelicapath_to_tree(dirs: List[Union[str, Path]]) -> ast.Tree:
+    """Return ast.Tree for all directories in dirs list"""
+    modelicapath_tree = ast.Tree(name="root", type="MODELICAPATH")
+    for dir_ in dirs:
+        dir_tree = dir_to_tree(dir_)
+        modelicapath_tree.extend(dir_tree)
+    # TODO: There must be a better way!
+    # Now turn on the lazy parsing
+    listener = ActivateLazyParse()
+    walker = tree.TreeWalker()
+    walker.walk(listener, modelicapath_tree)
+
+    return modelicapath_tree
+
+
+# noinspection PyPep8Naming
 class ASTListener(ModelicaListener):
     def __init__(self):
         self.file_node = None  # type: ModelicaFile
@@ -128,12 +229,12 @@ class ASTListener(ModelicaListener):
         class_node.extends.append(extends_clause)
 
     def exitComposition(self, ctx: ModelicaParser.CompositionContext):
-        for clause in self.ast[ctx.epriv]:
+        for clause in self.ast[ctx.edef]:
             if isinstance(clause, ast.ComponentClause):
                 for symbol in clause.symbol_list:
-                    symbol.visibility = ast.Visibility.PRIVATE
+                    symbol.visibility = ast.Visibility.PUBLIC
             elif isinstance(clause, ast.ExtendsClause):
-                clause.visibility = ast.Visibility.PRIVATE
+                clause.visibility = ast.Visibility.PUBLIC
 
         if ctx.epub is not None:
             for clause in self.ast[ctx.epub]:
@@ -535,7 +636,26 @@ class ASTListener(ModelicaListener):
     def exitElement(self, ctx: ModelicaParser.ElementContext):
         self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
 
-    # TODO: Clean this up (inheritance or different import clause classes?)
+    # TODO: Rewrite this as follows:
+    # Simple Name Lookup (the first step of name lookup) is by import name as follows:
+    # Import name of A.B.C is C, so ast.Class.imports dictionary key is C for simple name lookup.
+    # Import name of D = A.B.C is D, so D is the dictionary key and element C is the value.
+    # Import names of A.B.{C,D} are C and D, both added as keys.
+    # The special case of import A.B.* is processed during lookup (it is uncommon and expensive);
+    # in this case the dictionary key is "*" and the value is a list containing all of the
+    # A.B, E.F, G, ... package refs, each of which is prepended to the import name for
+    # Global Name Lookup (MLS 5.3.3). We could choose to make the Class.imports values
+    # always a list to make it homogeneous, with most cases being len() == 1,
+    # but this would make most cases slower. I'm leaning toward heterogeneous values.
+    # The Class.imports dictionary values are the fully qualified ComponentRef for
+    # Composite Name Lookup (see MLS), but imports should be skipped for this lookup.
+    # All Class.imports values are ComponentRef, or List[ComponentRef] for A.B.* type imports.
+    # Clean up the logic (inheritance or different import clause classes?, ANTLR rule labels?)
+    # Checks:
+    # 1. ast.Class.imports key is not already there (see spec 13.2.2 last bullet).
+    #    This check should be in a separate function to be used also during the just-in-time
+    #    A.B.* processing.
+    # 2. For A.B.C or A.B.*, A.B must be a package.
     def exitImport_clause(self, ctx: ModelicaParser.Import_clauseContext):
         import_clause = ast.ImportClause()
         self.ast[ctx] = import_clause
@@ -557,6 +677,9 @@ class ASTListener(ModelicaListener):
                 import_clause.unqualified = True
         if import_clause.short_name:
             # import_clause instead of comp_ref signifies short_name
+            self._check_not_already_imported(import_clause.short_name, ctx)
+            if import_clause.short_name in self.class_node.imports:
+                raise ModelicaSyntaxError(f"{import_clause.short_name} already imported", ctx)
             self.class_node.imports[import_clause.short_name] = import_clause
         elif import_clause.unqualified:
             # Postpone processing this uncommon case until actually needed
@@ -569,10 +692,13 @@ class ASTListener(ModelicaListener):
             # Simple case, fast lookup
             for comp in import_clause.components:
                 name = comp.to_tuple()[-1]
-                # Check for name clashes
-                if name in self.class_node.imports:
-                    raise IOError(name, "already imported")
+                self._check_not_already_imported(name, ctx)
                 self.class_node.imports[name] = comp
+
+    def _check_not_already_imported(self, import_name: str, ctx: ParserRuleContext) -> None:
+        """Check for import name clashes"""
+        if import_name in self.class_node.imports:
+            raise ModelicaSyntaxError(f"{import_name} already imported", ctx)
 
     def enterExtends_clause(self, ctx: ModelicaParser.Extends_clauseContext):
         self.in_extends_clause = True
@@ -654,14 +780,14 @@ class ASTListener(ModelicaListener):
             s.type = copy.deepcopy(clause.type)
 
     def enterComponent_declaration(self, ctx: ModelicaParser.Component_declarationContext):
-        sym = ast.Symbol(order=self.sym_count)
+        sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
         self.comp_clause.symbol_list += [sym]
 
     def enterComponent_declaration1(self, ctx: ModelicaParser.Component_declaration1Context):
-        sym = ast.Symbol(order=self.sym_count)
+        sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
@@ -671,7 +797,7 @@ class ASTListener(ModelicaListener):
         if self.symbol_node is not None:
             self.ast[ctx] = self.symbol_node
         else:
-            sym = ast.Symbol(order=self.sym_count)
+            sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
             self.sym_count += 1
             self.ast[ctx] = sym
             self.symbol_node = sym
@@ -810,8 +936,8 @@ class ModelicaParserErrorListener(antlr4.error.ErrorListener.ErrorListener):
         super().syntaxError(recognizer, offendingSymbol, line, column, msg, e)
 
 
-def _parse(text: str) -> Union[ast.Tree, None]:
-    """Parse Modelica code given in text"""
+def _parse_text(text: str) -> Optional[ModelicaFile]:
+    """Parse Modelica code given in text, return ModelicaFile"""
     input_stream = antlr4.InputStream(text)
     lexer = ModelicaLexer(input_stream)
     stream = antlr4.CommonTokenStream(lexer)
@@ -825,7 +951,14 @@ def _parse(text: str) -> Union[ast.Tree, None]:
     ast_listener = ASTListener()
     parse_walker = antlr4.ParseTreeWalker()
     parse_walker.walk(ast_listener, parse_tree)
-    modelica_file = ast_listener.file_node
+    return ast_listener.file_node
+
+
+def _parse(text: str) -> Optional[ast.Tree]:
+    """Parse Modelica code given in text, return Tree"""
+    modelica_file = _parse_text(text)
+    if modelica_file is None:
+        return None
     return file_to_tree(modelica_file)
 
 
@@ -964,7 +1097,7 @@ def parse(
     cache_expiration_days: int = 30,
     always_update_last_hit: bool = False,
     bypass_cache: bool = False,
-) -> Union[ast.Tree, None]:
+) -> Optional[ast.Tree]:
     """
     Parse the Modelica code given in text and return the Abstract Syntax Tree (AST).
 
@@ -992,8 +1125,31 @@ def parse(
         Union[ast.Tree, None]: The AST of the parsed Modelica code, or None if the
             parsing failed.
     """
+    modelica_file = parse_text(
+        txt,
+        model_cache_folder=model_cache_folder,
+        cache_db=cache_db,
+        cache_expiration_days=cache_expiration_days,
+        always_update_last_hit=always_update_last_hit,
+        bypass_cache=bypass_cache,
+    )
+    if modelica_file is None:
+        return None
+    return file_to_tree(modelica_file)
+
+
+def parse_text(
+    txt: str,
+    /,
+    model_cache_folder: Optional[Path] = None,
+    cache_db: str = DEFAULT_MODEL_CACHE_DB,
+    cache_expiration_days: int = 30,
+    always_update_last_hit: bool = False,
+    bypass_cache: bool = False,
+) -> Optional[ModelicaFile]:
+    """Parse the Modelica code given in text and return the parsed ModelicaFile."""
     if bypass_cache:
-        return _parse(txt)
+        return _parse_text(txt)
 
     pymoca_version = pymoca.__version__
 
@@ -1001,7 +1157,7 @@ def parse(
     # code can't be uniquely identified.
     if pymoca_version.endswith(".dirty"):
         logger.debug("Bypassing cache because working directory is dirty")
-        return _parse(txt)
+        return _parse_text(txt)
 
     if model_cache_folder is not None:
         db_folder = model_cache_folder
@@ -1062,7 +1218,7 @@ def parse(
     result = cursor.fetchone()
     conn.commit()
 
-    tree = None
+    file = None
 
     if result:
         logger.debug(f"Model with hash '{txt_hash}' ({pymoca_version}) found in cache")
@@ -1082,24 +1238,24 @@ def parse(
             )
             conn.commit()
         try:
-            tree = pickle.loads(pickled_data)
+            file = pickle.loads(pickled_data)
         except pickle.UnpicklingError:
             logger.warning(f"Model with hash '{txt_hash}' ({pymoca_version}) failed to unpickle")
     else:
         logger.debug(f"Model with hash '{txt_hash}' ({pymoca_version}) not in cache")
 
-    if tree is None:
+    if file is None:
         # We get here if we didn't find anything in the cache, or if the
         # unpickling of the cache failed
         try:
-            tree = _parse(txt)
+            file = _parse_text(txt)
         except Exception:
             conn.close()
             raise
 
         # Don't cache None that _parse() returns on syntax errors
-        if tree is not None:
-            pickled_data = pickle.dumps(tree)
+        if file is not None:
+            pickled_data = pickle.dumps(file)
 
             # Note that we do an 'INSERT OR REPLACE' because concurrent access
             # might mean two processes/threads try to insert an entry
@@ -1112,4 +1268,4 @@ def parse(
 
     conn.close()
 
-    return tree
+    return file

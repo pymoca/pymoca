@@ -180,6 +180,29 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes["C2"].symbols["bcomp3.a"].value.value, 1.0)
         self.assertEqual(flat_tree.classes["C2"].symbols["bcomp3.b"].value.value, 2.0)
 
+    @unittest.skip("TODO: Do this test when new instantiation is implemented")
+    def test_inheritance_resistor(self):
+        with open(os.path.join(MODEL_DIR, "InheritanceInstantiationResistor.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("P.M"))
+
+        self.assertEqual(flat_tree.classes["P.M"].symbols["p.v"].nominal.value, 0.0)
+        self.assertEqual(flat_tree.classes["P.M"].symbols["p.v"].max.value, 10.0)
+        self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].nominal.value, 0.0)
+        self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].max.value, 10.0)
+
+    @unittest.skip("TODO: Do this test when new instantiation is implemented")
+    def test_inheritance_instantiation(self):
+        with open(os.path.join(MODEL_DIR, "RecursiveInstantiation.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("M"))
+
+        self.assertEqual(flat_tree.classes["M"].symbols["b.a.e"].type.name, "Real")
+        self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].type.name, "Integer")
+        self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].value.value, 1)
+
     def test_nested_classes(self):
         with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
             txt = f.read()
@@ -1037,6 +1060,23 @@ class ParseTest(unittest.TestCase):
                 _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
 
                 self.assertIn("Model cache database is corrupt", cm.output[0])
+
+    def test_modelicapath_lookup(self):
+        # Test modelicapath tree top level classes transformed correctly
+        stub_tree = parser.modelicapath_to_tree(dirs=[MODEL_DIR])
+        self.assertGreater(len(stub_tree.classes), 0)
+        keys = set(stub_tree.classes.keys())
+        self.assertIn("Aircraft", keys)
+        self.assertIn("Package", keys)
+        # Test lookup on some MSL that parses OK
+        msl = parser.modelicapath_to_tree(dirs=[MSL4_DIR])
+        # Units is a .mo file, SI is defined inside Units
+        cref = ast.ComponentRef.from_string("Modelica.Units.SI")
+        si = msl.find_class(cref)
+        self.assertTrue(isinstance(si, ast.Class))
+        self.assertIn("Angle", si.classes)
+        # TODO: More tests to get high enough coverage
+        # TODO: Check for all KeyError cases in LazyParseDict.__getitem__
 
 
 if __name__ == "__main__":
