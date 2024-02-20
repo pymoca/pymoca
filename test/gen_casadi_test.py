@@ -3056,6 +3056,13 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assert_model_equivalent(ref_model, casadi_model)
 
+    def test_zero_vector(self):
+        with open(os.path.join(MODEL_DIR, "ZeroVector.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        casadi_model = gen_casadi.generate(ast_tree, "ZeroVector")
+        self.assertEqual(len(casadi_model.dae_residual_function.mx_out()), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
