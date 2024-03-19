@@ -375,7 +375,11 @@ class Generator(TreeListener):
             lhs = ca.MX(self.get_mx(tree.operands[0]))
             rhs = ca.MX(self.get_mx(tree.operands[1]))
             lhs_op = getattr(lhs, OP_MAP[op])
-            src = lhs_op(rhs)
+            if lhs.numel() == 0 and rhs.numel() == 0:
+                # Handle operations on 0x1 and 0x0 vectors
+                src = ca.MX()
+            else:
+                src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
             lhs = ca.MX(self.get_mx(tree.operands[0]))
             lhs_op = getattr(lhs, OP_MAP[op])
@@ -449,7 +453,11 @@ class Generator(TreeListener):
         if src_left.shape != src_right.shape and src_left.shape == src_right.shape[::-1]:
             src_right = ca.transpose(src_right)
 
-        self.src[tree] = src_left - src_right
+        if src_left.numel() == 0 and src_right.numel() == 0:
+            # Handle operations on 0x1 and 0x0 vectors
+            self.src[tree] = ca.MX()
+        else:
+            self.src[tree] = src_left - src_right
 
     def enterForEquation(self, tree):
         logger.debug("enterForEquation")
