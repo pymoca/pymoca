@@ -52,7 +52,7 @@ homepage = "https://github.com/pymoca/pymoca"
 casadi = ["casadi>=3.4.0", "setuptools>=60.0.0"]
 lxml = ["lxml>=3.5.0", "scipy>=0.13.3"]
 sympy = ["sympy>=0.7.6.1", "scipy>=0.13.3", "jinja2>=2.10.1"]
-examples = ["jupyterlab", "matplotlib"]
+examples = ["jupyterlab", "matplotlib", "control==0.10.0"]
 all = ["pymoca[casadi,lxml,sympy,examples]"]
 
 # See the docstring in versioneer.py for instructions. Note that after changing
