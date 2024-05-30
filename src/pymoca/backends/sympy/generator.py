@@ -171,7 +171,7 @@ class {{tree.name}}(OdeModel):
         else:
             operand_src = ",".join([self.src[o] for o in tree.operands])
             src = "{tree.operator.name:s}({operand_src:s})".format(**locals())
-        self.src[tree] = src
+        self.src[tree] = f"({src})"
 
     def exitPrimary(self, tree: ast.Primary):
         val = str(tree.value)
