@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Union  # noqa: F401
 
 import antlr4
 import antlr4.Parser
+from antlr4 import ParserRuleContext
 
 import pymoca
 
@@ -37,6 +38,23 @@ logger = logging.getLogger("pymoca")
 
 
 DEFAULT_MODEL_CACHE_DB = "model_txt_cache.db"
+
+
+class ModelicaSyntaxError(SyntaxError):
+    """SyntaxError built from an ANTLR context object"""
+
+    def __init__(self, message: str, ctx: ParserRuleContext, file_name: str = ""):
+        # file_name defaults to empty because our current parser takes text str only
+        line1 = ctx.start.line
+        col1 = ctx.start.column
+        line2 = ctx.stop.line
+        col2 = ctx.stop.column
+        text = ctx.start.source[1].strdata.splitlines()
+        error_text = text[line1 - 1]
+        for line in range(line1, line2):
+            error_text += text[line]
+        # last two args were were added in Python 3.10, previous will ignore
+        super().__init__(message, line1, col1, error_text, file_name, line2, col2)
 
 
 class ModelicaFile:
@@ -538,7 +556,7 @@ class ASTListener(ModelicaListener):
     # TODO: Rewrite this as follows:
     # Simple Name Lookup (the first step of name lookup) is by import name as follows:
     # Import name of A.B.C is C, so ast.Class.imports dictionary key is C for simple name lookup.
-    # Import name of D = A.B.C is D, so D is the dictionary key.
+    # Import name of D = A.B.C is D, so D is the dictionary key and element C is the value.
     # Import names of A.B.{C,D} are C and D, both added as keys.
     # The special case of import A.B.* is processed during lookup (it is uncommon and may be expensive);
     # in this case the dictionary key is "*" and the value is a list containing all of the
@@ -576,6 +594,7 @@ class ASTListener(ModelicaListener):
                 import_clause.unqualified = True
         if import_clause.short_name:
             # import_clause instead of comp_ref signifies short_name
+            self._check_not_already_imported(import_clause.short_name, ctx)
             self.class_node.imports[import_clause.short_name] = import_clause
         elif import_clause.unqualified:
             # Postpone processing this uncommon case until actually needed
@@ -588,10 +607,13 @@ class ASTListener(ModelicaListener):
             # Simple case, fast lookup
             for comp in import_clause.components:
                 name = comp.to_tuple()[-1]
-                # Check for name clashes
-                if name in self.class_node.imports:
-                    raise IOError(name, "already imported")
+                self._check_not_already_imported(name, ctx)
                 self.class_node.imports[name] = comp
+
+    def _check_not_already_imported(self, import_name: str, ctx: ParserRuleContext) -> None:
+        """Check for import name clashes"""
+        if import_name in self.class_node.imports:
+            raise ModelicaSyntaxError(f"{import_name} already imported", ctx)
 
     def enterExtends_clause(self, ctx: ModelicaParser.Extends_clauseContext):
         self.in_extends_clause = True
