@@ -603,6 +603,23 @@ class ExtendsClause(Node):
 class Class(Node):
     BUILTIN = ("Real", "Integer", "String", "Boolean")
 
+    # TODO: Remove use_find_name when done with new instantiation/flattening
+    FIND_CLASS = None
+    _FIND_CLASS = None
+
+    @classmethod
+    def use_find_name(cls, setting: bool):
+        """False = use find_class (default), True = use tree.find_name"""
+        if cls.FIND_CLASS is None:
+            cls.FIND_CLASS = cls.find_class
+            cls._FIND_CLASS = cls._find_class
+        if setting:
+            cls._find_class = cls.new_find_class  # noqa: F811
+            cls.find_class = cls.new_find_class  # noqa: F811
+        else:
+            cls._find_class = cls._FIND_CLASS
+            cls.find_class = cls.FIND_CLASS
+
     def __init__(self, **kwargs):
         self.name = None  # type: str
         self.imports = OrderedDict()  # type: OrderedDict[str, Union[ImportClause, ComponentRef]]
@@ -626,6 +643,7 @@ class Class(Node):
 
         super().__init__(**kwargs)
 
+    # TODO: Delete _find_class and find_class if tree.find_name is accepted as permanent
     def _find_class(
         self, component_ref: ComponentRef, search_parent=True, search_imports=True
     ) -> "Class":
@@ -721,6 +739,30 @@ class Class(Node):
             c = c.copy_including_children()
 
         return c
+
+    # TODO: Delete new_find_class when done with new instantiation/flattening
+    def new_find_class(
+        self,
+        component_ref: ComponentRef,
+        check_builtin_classes=False,
+        search_imports=True,
+        search_parent=True,
+        copy=True,
+    ) -> "Class":
+        """Hook into tree.find_name for code that uses Class.find_class"""
+        from . import tree
+
+        found = tree.find_name(
+            name=component_ref,
+            scope=self,
+            copy=copy,
+            check_builtin_classes=check_builtin_classes,
+            search_imports=search_imports,
+            search_parent=search_parent,
+        )
+        if found is None or isinstance(found, Symbol):
+            raise ClassNotFoundError("Could not find class '{}'".format(component_ref))
+        return found
 
     def _find_constant_symbol(self, component_ref: ComponentRef, search_parent=True) -> Symbol:
         if component_ref.child:
