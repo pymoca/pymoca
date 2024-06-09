@@ -293,20 +293,14 @@ class TreeWalker:
 def find_name(
     name: Union[str, ast.ComponentRef],
     scope: ast.Class,
-    copy: bool = False,
     search_imports: bool = True,
     search_parent: bool = True,
-    check_builtin_classes=True,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Modelica name lookup on a tree of ast.Class and ast.InstanceClass starting at scope class
 
-    :param copy: If True, return a copy of found class (backward-compatibility only)
     :param search_imports: If True, search in imports also, use False for extends
     :param search_parent: If True, search parent of class
-    :param check_builtin_classes: If True, check for BUILTIN classes,
-                                  if False, return NameLookupError if BUILTIN.
-                                  (backward-compatibility only)
     :param current_extends: internal use only
 
     Implements lookup rules per Modelica Language Specification version 3.5 chapter 5,
@@ -358,7 +352,6 @@ def find_name(
         scope,
         search_imports=search_imports,
         search_parent=search_parent,
-        check_builtin_classes=check_builtin_classes,
         current_extends=current_extends,
     )
 
@@ -373,14 +366,10 @@ def find_name(
         found = find_name(
             name=name,
             scope=scope.ast_ref,
-            copy=copy,
             search_imports=search_imports,
             search_parent=search_parent,
-            check_builtin_classes=check_builtin_classes,
             current_extends=current_extends,
         )
-    elif copy and isinstance(found, ast.Class):
-        found = found.copy_including_children()
 
     return found
 
@@ -402,7 +391,6 @@ def _find_simple_name(
     scope: ast.Class,
     search_imports: bool = True,
     search_parent: bool = True,
-    check_builtin_classes: bool = False,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
@@ -436,14 +424,12 @@ def _find_simple_name(
                 found := _find_local(
                     name,
                     current_scope,
-                    check_builtin_classes=check_builtin_classes,
                 )
             )
             or (
                 found := _find_inherited(
                     name,
                     current_scope,
-                    check_builtin_classes=check_builtin_classes,
                     current_extends=current_extends,
                 )
             )
@@ -452,7 +438,6 @@ def _find_simple_name(
                 found := _find_imported(
                     name,
                     current_scope,
-                    check_builtin_classes=check_builtin_classes,
                     current_extends=current_extends,
                 )
             )
@@ -504,7 +489,7 @@ def _find_rest_of_name(
         if isinstance(first.type, ast.Class):
             type_class = first.type
         else:
-            type_class = find_name(first.type, first.parent, copy=False)
+            type_class = find_name(first.type, first.parent)
             if type_class is None:
                 full_ref = str(first.parent.full_reference()) + "." + first.name
                 raise NameLookupError(f"Lookup failed for type of symbol {full_ref}")
@@ -542,12 +527,12 @@ def _find_composite_name_in_symbols(name: str, scope: ast.Class) -> Optional[ast
     # declared named *component* elements of the component".
     # This can include inherited and imported components.
     # Look up the type (Class) within the current scope if necessary
-    found = find_name(first_name, scope, search_parent=False, copy=False)
+    found = find_name(first_name, scope, search_parent=False)
     if isinstance(found, ast.Symbol):
         if next_names:
             if isinstance(found.type, ast.ComponentRef):
                 type_name = str(found.type)
-                found_type_class = find_name(type_name, scope, copy=False)
+                found_type_class = find_name(type_name, scope)
                 if found_type_class is None or isinstance(found_type_class, ast.Symbol):
                     scope_full_reference = str(scope.full_reference())
                     raise NameLookupError(
@@ -602,7 +587,7 @@ def _flatten_first_and_find_rest(
 
     # TODO: Per spec v3.5 section 5.3.2 bullet 4, class is temporarily flattened
     # For now, we use recursive name lookup in contained elements
-    found = find_name(rest_of_name, first, search_parent=False, copy=False)
+    found = find_name(rest_of_name, first, search_parent=False)
 
     # Check that found meets non-package lookup requirements in spec section 5.3.2
     # The found.name test is so we only check going left to right in composite name
@@ -625,7 +610,6 @@ def _first_name(name: str) -> str:
 def _find_local(
     name: str,
     scope: ast.Class,
-    check_builtin_classes: bool = True,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Name lookup for predefined classes and contained elements"""
 
@@ -658,7 +642,6 @@ def _find_iteration_variable(name: str, scope: ast.Class) -> Optional[ast.Symbol
 def _find_inherited(
     name: str,
     scope: ast.Class,
-    check_builtin_classes: bool = False,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Find simple name in inherited classes"""
@@ -677,14 +660,12 @@ def _find_inherited(
             return find_name(
                 name,
                 extends,
-                check_builtin_classes=check_builtin_classes,
                 current_extends=current_extends,
             )
 
         extends_scope = _find_name(
             extends.component,
             scope,
-            check_builtin_classes=check_builtin_classes,
             current_extends=current_extends,
         )
         if extends_scope is not None:
@@ -693,7 +674,6 @@ def _find_inherited(
             found = find_name(
                 name,
                 extends_scope,
-                check_builtin_classes=check_builtin_classes,
                 search_parent=False,
                 current_extends=current_extends,
                 search_imports=False,
@@ -709,7 +689,6 @@ def _find_inherited(
 def _find_imported(
     name: str,
     scope: ast.Class,
-    check_builtin_classes: bool = False,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Find simple name in imports per MLS v3.5 section 13.2.1"""
@@ -724,9 +703,7 @@ def _find_imported(
         found = find_name(
             import_,
             scope.root,
-            check_builtin_classes=check_builtin_classes,
             search_parent=False,
-            copy=False,
         )
         _check_import_rules(found, scope)
         return found
@@ -742,9 +719,7 @@ def _find_imported(
                 scope.root,
                 search_imports=False,
                 search_parent=False,
-                check_builtin_classes=check_builtin_classes,
                 current_extends=current_extends,
-                copy=False,
             )
             # TODO: Should _check_import_rules be inside `if c is not None` check? (fix in rewrite)
             _check_import_rules(c, scope)
