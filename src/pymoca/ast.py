@@ -8,7 +8,7 @@ import copy
 import json
 from collections import OrderedDict
 from enum import Enum
-from typing import Dict, List, Type, Union  # noqa: F401
+from typing import List, Optional, Type, Union  # noqa: F401
 
 
 class ClassNotFoundError(Exception):
@@ -440,6 +440,7 @@ class Symbol(Node):
         self.order = 0  # type: int
         self.visibility = Visibility.PRIVATE  # type: Visibility
         self.class_modification = None  # type: ClassModification
+        self.parent = None  # type: Optional[Class]
         super().__init__(**kwargs)
 
     def __str__(self):
@@ -708,7 +709,7 @@ class Class(Node):
                 c.parent = self.root
 
                 cref = ComponentRef(name=type_)
-                s = Symbol(name="__value", type=cref)
+                s = Symbol(name="__value", type=cref, parent=c)
                 c.symbols[s.name] = s
 
                 return c
