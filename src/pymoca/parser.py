@@ -125,6 +125,8 @@ class ASTListener(ModelicaListener):
             type=ctx.class_prefixes().class_type().getText(),
             component=self.ast[ctx.component_reference()],
         )
+        if ctx.class_modification() is not None:
+            self.ast[ctx].class_modification = self.ast[ctx.class_modification()]
 
     def exitClass_spec_comp(self, ctx: ModelicaParser.Class_spec_compContext):
         class_node = self.class_node
