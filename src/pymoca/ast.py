@@ -760,7 +760,7 @@ class Class(Node):
                 component_ref, copy=copy, check_builtin_classes=check_builtin_classes
             )
 
-        found = tree.find_name(
+        found = tree._find_name(
             name=component_ref,
             scope=self,
             search_imports=search_imports,
