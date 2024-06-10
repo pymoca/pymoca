@@ -445,8 +445,138 @@ def _find_rest_of_name(
     first: Union[ast.Class, ast.Symbol], rest_of_name: str
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Lookup the `B.C` part of Composite Name Lookup (`A.B.C`) (spec 5.3.2)"""
-    # TODO: Composite name lookup
-    return None
+
+    # 1. `A` is looked up using Simple Name Lookup and passed as `first` argument
+    # 2. If `A` is a Component:
+    #     1. `B.C` is looked up from named component elements of `A`
+    #     2. if not found and if `A.B.C` is used as a function call and `A` is a scalar or can be
+    #     evaluated as a scalar from an array and `B` and `C` are classes,
+    #     it is a non-operator function call.
+    # 3. If `A` is a Class:
+    #     1. `A` is temporarily flattened without modifiers
+    #     2. `B.C` is looked up among named elements of temp flattened class,
+    #     but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+    #     and "the class we look inside shall not be partial in a simulation model".
+    if isinstance(first, ast.Symbol):
+        # Find the symbol type
+        if isinstance(first.type, ast.Class):
+            type_class = first.type
+        else:
+            type_class = find_name(first.type, first.parent, copy=False)
+            if type_class is None:
+                full_ref = str(first.parent.full_reference()) + "." + first.name
+                raise NameLookupError(f"Lookup failed for type of symbol {full_ref}")
+        found = _find_composite_name_in_symbols(rest_of_name, type_class)
+        if not found:
+            # Can only find in classes if the below rules apply:
+            # 2b. if not found and if `A.B.C` is used as a function call
+            # and `A` is a scalar or can be evaluated as a scalar from an array
+            # and `B` and `C` are classes,
+            # it is a non-operator function call.
+            found = _find_composite_name_in_classes(rest_of_name, type_class)
+            if isinstance(found, ast.Class):
+                if found.type != "function":
+                    found = None
+                else:
+                    if first.dimensions[0][0].value is not None:
+                        raise NameLookupError(
+                            f"Array {first.name} must have subscripts to lookup function {found.name}"
+                        )
+
+    elif isinstance(first, ast.Class):
+        found = _flatten_first_and_find_rest(first, rest_of_name)
+    else:
+        raise NameLookupError(f'Found unexpected node "{first!r}" during name lookup')
+
+    return found
+
+
+def _find_composite_name_in_symbols(name: str, scope: ast.Class) -> Optional[ast.Symbol]:
+    """Search for composite name (e.g. A.B.C) in local symbols, recursively"""
+    first_name, _, next_names = name.partition(".")
+    # See spec 5.3.2 bullet 2 (emphasis mine): "If the first identifier denotes
+    # a component, the rest of the name (e.g., B or B.C) is looked up among the
+    # declared named *component* elements of the component".
+    # This can include inherited and imported components.
+    # Look up the type (Class) within the current scope if necessary
+    found = find_name(first_name, scope, search_parent=False, copy=False)
+    if isinstance(found, ast.Symbol):
+        if next_names:
+            if isinstance(found.type, ast.ComponentRef):
+                type_name = str(found.type)
+                found_type_class = find_name(type_name, scope, copy=False)
+                if found_type_class is None or isinstance(found_type_class, ast.Symbol):
+                    scope_full_reference = str(scope.full_reference())
+                    raise NameLookupError(
+                        f'Symbol type "{type_name}" not found in scope "{scope_full_reference}"'
+                    )
+            else:
+                # type is already an InstanceClass
+                found_type_class = found.type
+            # Look in symbols of the type
+            found = _find_composite_name_in_symbols(next_names, found_type_class)
+    else:
+        found = None
+    return found
+
+
+def _find_composite_name_in_classes(name: str, scope: ast.Class) -> Optional[ast.Class]:
+    """Search for composite name (e.g. A.B.C) in local classes, recursively"""
+    first_name, _, next_names = name.partition(".")
+    found = None
+    if first_name in scope.classes:
+        found = scope.classes[first_name]
+    if found and next_names:
+        found = _find_composite_name_in_classes(next_names, found)
+    return found
+
+
+def _flatten_first_and_find_rest(
+    first: ast.Class, rest_of_name: str
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Lookup the `B.C` part of Composite Name Lookup (`A.B.C`) where`A` is a Class"""
+
+    # 3. If `A` is a Class:
+    #     1. `A` is temporarily flattened without modifiers
+    #     2. `B.C` is looked up among named elements of temp flattened class,
+    #     but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+    #     and "the class we look inside shall not be partial in a simulation model".
+
+    #     Checking "the class we look inside shall not be partial in a simulation model"
+    #     is left to the caller.
+
+    # Spec Section 5.3.2, 4th bullet (`A` is a class):
+    # "If the identifier denotes a class, that class is temporarily
+    # flattened (as if instantiating a component without modifiers of this
+    # class, see section 7.2.2) and using the enclosing classes of the
+    # denoted class. The rest of the name (e.g., B or B.C) is looked up
+    # among the declared named elements of the temporary flattened class. If
+    # the class does not satisfy the requirements for a package, the lookup
+    # is restricted to encapsulated elements only. The class we look inside
+    # shall not be partial in a simulation model."
+    # Why do we have to temporarily flatten the class? Flattening requires name lookup
+    # and with this name lookup requires flattening. Yikes! Can it be simplified?
+
+    # TODO: Per spec v3.5 section 5.3.2 bullet 4, class is temporarily flattened
+    # For now, we use recursive name lookup in contained elements
+    found = find_name(rest_of_name, first, search_parent=False, copy=False)
+
+    # Check that found meets non-package lookup requirements in spec section 5.3.2
+    # The found.name test is so we only check going left to right in composite name
+    # and not the other direction as we pop the recursive call stack.
+    if (
+        found is not None
+        and found.name == _first_name(rest_of_name)
+        and first.type != "package"
+        and not (isinstance(found, ast.Class) and found.encapsulated)
+    ):
+        raise NameLookupError(f"{first.name} is not a package so {found.name} must be encapsulated")
+
+    return found
+
+
+def _first_name(name: str) -> str:
+    return name.split(".")[0]
 
 
 def _find_local(
