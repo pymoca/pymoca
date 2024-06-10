@@ -8,7 +8,7 @@ import unittest
 
 import pymoca.ast
 import pymoca.parser
-from pymoca.tree import NameLookupError, find_name
+from pymoca.tree import NameLookupError, find_name, flatten
 
 MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(MY_DIR, "models")
@@ -308,7 +308,7 @@ class SimpleNameLookupTest(unittest.TestCase):
 
 
 class CompositeNameLookupTest(unittest.TestCase):
-    """Composite name lookup tests from ModelicaCompliance"""
+    """Composite name lookup tests from ModelicaCompliance or us"""
 
     # TODO: Update when new name lookup is connected to flattening (see todos hints below)
 
@@ -501,6 +501,44 @@ class CompositeNameLookupTest(unittest.TestCase):
         # with self.assertRaises(pymoca.tree.NameLookupError):
         found = find_name("a[2].f", scope)
         self.assertIsNotNone(found)
+
+    def test_need_for_temporary_flattening(self):
+        """A case @jackvreeken came up with in review comments of #307
+
+        It's a case where ast.Class.find_class fails and tree.find_name
+        works, even without "temporary flattening" mentioned below.
+
+        Excerpt from outline of MLS:
+        3. If `A` is a Class:
+            1. `A` is temporarily flattened without modifiers
+        @jackvreeken wrote: Is there an example of this that used to fail?
+        E.g. extending from a class
+        that is part of contents of an extended class. Something like
+        ...
+        """
+        txt = """
+        // Added encapsulated to fix name lookup error detected by find_name
+        class A
+            // Doesn't have a class B itself, but gets one via C
+            extends C(B.bla=2);
+        end A;
+        class C
+            encapsulated class B
+                constant Integer bla = 0;
+            end B;
+        end C;
+        class M
+        extends A.B(bla=1);
+        end M;
+        """
+        ast_tree = pymoca.parser.parse(txt)
+        class_name = "M"
+        comp_ref = pymoca.ast.ComponentRef.from_string(class_name)
+        # TODO: Remove this `use_find_name` call if `find_name` becomes default
+        pymoca.ast.Class.use_find_name(True)
+        flat_tree = flatten(ast_tree, comp_ref)
+        self.assertEqual(flat_tree.classes[class_name].symbols["bla"].value.value, 1)
+        pymoca.ast.Class.use_find_name(False)
 
 
 @unittest.skip("TODO: Do these after global name syntax is implemented")
