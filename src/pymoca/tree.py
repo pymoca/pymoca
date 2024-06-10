@@ -679,9 +679,72 @@ def _find_imported(
     check_builtin_classes: bool = False,
     current_extends: Optional[Set[ast.ExtendsClause]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
-    """Find simple name in imports"""
-    # TODO: Imported name lookup
+    """Find simple name in imports per MLS v3.5 section 13.2.1"""
+    # TODO: Rewrite this to work with parser rewrite of import_clause handler.
+    # TODO: Can we do a scope.imports[name] = found Class or Symbol to speed up future calls?
+    # Search qualified imports (most common case)
+    if name in scope.imports:
+        import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
+        if isinstance(import_, ast.ImportClause):
+            import_ = import_.components[0]
+        found = find_name(
+            import_,
+            scope.root,
+            check_builtin_classes=check_builtin_classes,
+            search_parent=False,
+            copy=False,
+        )
+        _check_import_rules(found, scope)
+        return found
+    # Unqualified imports
+    if "*" in scope.imports:
+        c = None
+        for package_ref in scope.imports["*"].components:
+            imported_comp_ref = package_ref.concatenate(ast.ComponentRef(name=name))
+            # Search within the package
+            # Avoid infinite recursion with search_imports = False
+            c = find_name(
+                imported_comp_ref,
+                scope.root,
+                search_imports=False,
+                search_parent=False,
+                check_builtin_classes=check_builtin_classes,
+                current_extends=current_extends,
+                copy=False,
+            )
+            _check_import_rules(c, scope)
+            if c is not None:
+                # Store result for next lookup
+                scope.imports[name] = imported_comp_ref
+                return c
     return None
+
+
+def _check_import_rules(
+    element: Optional[Union[ast.Class, ast.Symbol]],
+    scope: ast.Class,
+) -> None:
+    """Check import rules per the Modelica spec"""
+    if element is None:
+        return
+    if not element.parent:
+        raise NameLookupError(f"Import {element.name} must be contained in a package")
+    if element.parent.type != "package":
+        full_name = element.name
+        if element.parent.name:
+            full_name = str(element.parent.full_reference()) + "." + full_name
+            parent = element.parent.name
+            message = f"{parent} must be a package in import {full_name}"
+        else:
+            message = f"{full_name} is not in a package so can't be imported"
+        raise NameLookupError(message)
+    # TODO: Remove ast.Symbol test when visibility is added to ast.Class (see grammar)
+    if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
+        raise NameLookupError(f"Import {element.name} must not be protected or private")
+    # We test on parent and name instead of just "is" because we may have a copy of a Class
+    if element.parent is scope.parent and element.name == scope.name:
+        full_name = str(element.parent.full_reference()) + "." + element.name
+        raise NameLookupError(f"Import {full_name} is recursive")
 
 
 def flatten_extends(

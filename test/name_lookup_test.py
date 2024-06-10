@@ -13,8 +13,11 @@ from pymoca.tree import NameLookupError, find_name
 MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(MY_DIR, "models")
 COMPLIANCE_DIR = os.path.join(MY_DIR, "libraries", "Modelica-Compliance", "ModelicaCompliance")
-SIMPLE_LOOKUP_DIR = os.path.join(COMPLIANCE_DIR, "Scoping", "NameLookup", "Simple")
-COMPOSITE_LOOKUP_DIR = os.path.join(COMPLIANCE_DIR, "Scoping", "NameLookup", "Composite")
+NAME_LOOKUP_DIR = os.path.join(COMPLIANCE_DIR, "Scoping", "NameLookup")
+SIMPLE_LOOKUP_DIR = os.path.join(NAME_LOOKUP_DIR, "Simple")
+COMPOSITE_LOOKUP_DIR = os.path.join(NAME_LOOKUP_DIR, "Composite")
+GLOBAL_LOOKUP_DIR = os.path.join(NAME_LOOKUP_DIR, "Global")
+IMPORTED_LOOKUP_DIR = os.path.join(NAME_LOOKUP_DIR, "Imports")
 
 
 def parse_file(pathname):
@@ -36,9 +39,9 @@ def parse_model_files(*pathnames):
     return tree
 
 
-def parse_simple_lookup_file(pathname):
-    "Parse given path relative to SIMPLE_LOOKUP_DIR and return parsed ast.Tree"
-    arg_ast = parse_file(os.path.join(SIMPLE_LOOKUP_DIR, pathname))
+def parse_lookup_file(pathname, relative_to_dir):
+    "Parse given path relative to relative_to_dir and return parsed ast.Tree"
+    arg_ast = parse_file(os.path.join(relative_to_dir, pathname))
     icon_ast = parse_file(os.path.join(COMPLIANCE_DIR, "Icons.mo"))
     if None in (arg_ast, icon_ast):
         return None
@@ -63,14 +66,24 @@ def lookup_composite_using_simple_only(composite_name, start_scope):
             scope = found
 
 
-def parse_composite_lookup_file(pathname):
+def parse_simple_lookup_file(pathname):
     "Parse given path relative to SIMPLE_LOOKUP_DIR and return parsed ast.Tree"
-    arg_ast = parse_file(os.path.join(COMPOSITE_LOOKUP_DIR, pathname))
-    icon_ast = parse_file(os.path.join(COMPLIANCE_DIR, "Icons.mo"))
-    if None in (arg_ast, icon_ast):
-        return None
-    icon_ast.extend(arg_ast)
-    return icon_ast
+    return parse_lookup_file(pathname, SIMPLE_LOOKUP_DIR)
+
+
+def parse_composite_lookup_file(pathname):
+    "Parse given path relative to COMPOSITE_LOOKUP_DIR and return parsed ast.Tree"
+    return parse_lookup_file(pathname, COMPOSITE_LOOKUP_DIR)
+
+
+def parse_global_lookup_file(pathname):
+    "Parse given path relative to GLOBAL_LOOKUP_DIR and return parsed ast.Tree"
+    return parse_lookup_file(pathname, GLOBAL_LOOKUP_DIR)
+
+
+def parse_imported_lookup_file(pathname):
+    "Parse given path relative to GLOBAL_LOOKUP_DIR and return parsed ast.Tree"
+    return parse_lookup_file(pathname, IMPORTED_LOOKUP_DIR)
 
 
 class SimpleNameLookupTest(unittest.TestCase):
@@ -488,6 +501,262 @@ class CompositeNameLookupTest(unittest.TestCase):
         # with self.assertRaises(pymoca.tree.NameLookupError):
         found = find_name("a[2].f", scope)
         self.assertIsNotNone(found)
+
+
+@unittest.skip("TODO: Do these after global name syntax is implemented")
+class GlobalNameLookupTest(unittest.TestCase):
+    """Global name lookup tests from ModelicaCompliance"""
+
+    # TODO: Update when new name lookup is connected to flattening (see todos hints below)
+
+    def test_encapsulated_global_lookup(self):
+        """Checks that it's possible to look up a global name, even if
+        the current scope is encapsulated"""
+        ast = parse_global_lookup_file("EncapsulatedGlobalLookup.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Global.EncapsulatedGlobalLookup",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("a.y", scope)
+        self.assertIsNotNone(found)
+        self.assertIsInstance(found, pymoca.ast.Symbol)
+        # TODO: flatten and check a.y.value = 1.4
+
+
+class ImportedNameLookupTest(unittest.TestCase):
+    """Imported name lookup tests from ModelicaCompliance"""
+
+    # TODO: Update when new name lookup is connected to flattening (see todos hints below)
+    def test_encapsulated(self):
+        """Checks that it's possible to import from inside an
+        encapsulated model"""
+        ast = parse_imported_lookup_file("EncapsulatedImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.EncapsulatedImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("a.m.x", scope)
+        self.assertIsNotNone(found)
+        self.assertIsInstance(found, pymoca.ast.Symbol)
+        # TODO: flatten and check a.m.x.value = 2.0
+
+    def test_extend_import(self):
+        """Checks that imports are not inherited"""
+        ast = parse_imported_lookup_file("ExtendImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.ExtendImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("C.A", scope)
+        self.assertIsNone(found)
+
+    def test_local_scope(self):
+        """Checks that the lookup of an imported name is not started
+        in the local scope"""
+        ast = parse_imported_lookup_file("ImportLookupLocalScope.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.ImportLookupLocalScope",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("B", scope)
+        self.assertIsNone(found)
+
+    def test_scope_type(self):
+        """Checks that it's allowed to import into any kind of class"""
+        ast = parse_imported_lookup_file("ImportScopeType.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.ImportScopeType",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("a", scope)
+        self.assertIsNotNone(found)
+        found = find_name("b", scope)
+        self.assertIsNotNone(found)
+        found = find_name("m.y", scope)
+        self.assertIsNotNone(found)
+        # TODO: flatten and check a.value = 2.0, b.value = 8.0, and m.y.value = 2.0
+
+    @unittest.skip("TODO: Do this test when new instantiation/flattening is implemented")
+    def test_modify_import(self):
+        """Checks that it's not allowed to modify an import"""
+        ast = parse_imported_lookup_file("ModifyImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.ModifyImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("b", scope)
+        self.assertIsNone(found)
+
+    def test_qualified_import(self):
+        """Tests that a qualified import works"""
+        ast = parse_imported_lookup_file("QualifiedImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.QualifiedImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("b.a.x", scope)
+        self.assertIsNotNone(found)
+        # TODO: flatten and check a.value = 2.0, b.value = 8.0, and m.y.value = 2.0
+
+    def test_qualified_import_conflict(self):
+        """Checks that it's not allowed to have multiple qualified
+        import-clauses with the same import name"""
+        # This is caught at the parse stage, not in name lookup
+        with self.assertRaises(pymoca.parser.ModelicaSyntaxError):
+            _ = parse_imported_lookup_file("QualifiedImportConflict.mo")
+
+    def test_qualified_import_non_package(self):
+        """Checks that it's not allowed to import a definition which is
+        not a package or package element via a qualified import"""
+        ast = parse_imported_lookup_file("QualifiedImportNonPackage.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.QualifiedImportNonPackage",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = find_name("A2", scope)
+
+    def test_qualified_import_protected(self):
+        """Checks that it's an error to import a protected element"""
+        ast = parse_imported_lookup_file("QualifiedImportProtected.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.QualifiedImportProtected",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = find_name("A.y", scope)
+
+    def test_recursive(self):
+        """Tests that a named recursive import does not work"""
+        ast = parse_imported_lookup_file("Recursive.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.Recursive",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = find_name("A", scope)
+
+    @unittest.skip("TODO: Do this test when new instantiation/flattening is implemented")
+    def test_redeclare_import(self):
+        """Checks that it's not allowed to redeclare an import"""
+        ast = parse_imported_lookup_file("RedeclareImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.RedeclareImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("b", scope)
+        self.assertIsNone(found)
+
+    def test_renaming_import(self):
+        """Tests that a renaming import works"""
+        ast = parse_imported_lookup_file("RenamingImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.RenamingImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("b.a.x", scope)
+        self.assertIsNotNone(found)
+        # TODO: flatten and check b.a.x.value = 1.0
+
+    def test_renaming_import_non_package(self):
+        """Checks that it's not allowed to import a definition which is
+        not a package or package element via a renaming import"""
+        ast = parse_imported_lookup_file("RenamingImportNonPackage.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.RenamingImportNonPackage",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = find_name("A2", scope)
+
+    def test_renaming_single_definition_import(self):
+        """Tests that a renaming import works"""
+        ast = parse_imported_lookup_file("RenamingSingleDefinitionImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.RenamingSingleDefinitionImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("b.a.x", scope)
+        self.assertIsNotNone(found)
+        # TODO: flatten and check b.a.x.value = 1.0
+
+    def test_single_definition_import(self):
+        """Tests that a single definition import works"""
+        ast = parse_imported_lookup_file("SingleDefinitionImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.SingleDefinitionImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("b.a.x", scope)
+        self.assertIsNotNone(found)
+        # TODO: flatten and check b.a.x.value = 1.0
+
+    def test_unqualified_import(self):
+        """Tests that an unqualified import works"""
+        ast = parse_imported_lookup_file("UnqualifiedImport.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.UnqualifiedImport",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("b.a.x", scope)
+        self.assertIsNotNone(found)
+        # TODO: flatten and check b.a.x.value = 1.0
+
+    @unittest.skip("ModelicaCompliance test case has a bug")
+    def test_unqualified_import_conflict(self):
+        """Checks that it's an error if the same name is found in
+        multiple unqualified imports"""
+        # This ModelicaCompliance test case has a bug.
+        # See PR https://github.com/modelica/Modelica-Compliance/pull/75
+        # UnqualifiedImportConflict.mo imports from QualifiedImportConflict which is OK
+        # if ModelicaCompliance is in MODELICAPATH but not OK as a standalone test that
+        # we prefer here. If we do implement this after the ModelicaCompliance bug is
+        # fixed it will slow down already slow unqualified name lookup. Unqualified
+        # imports are rare and this test case is even more rare, so it seems like maybe
+        # not a good idea at this stage for Pymoca.
+        ast = parse_imported_lookup_file("UnqualifiedImportConflict.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.UnqualifiedImportConflict",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = find_name("A.x", scope)
+
+    @unittest.skip("TODO: Do this test when new instantiation/flattening is implemented")
+    def test_unqualified_import_non_conflict(self):
+        """Checks that it's not an error to be able to find a name in
+        multiple unqualified imports, it's only an error if such a name is
+        used during name lookup. I.e. both P and P2 contains x in this test, but
+        that's ok since x is not used by the importer A."""
+        ast = parse_imported_lookup_file("UnqualifiedImportNonConflict.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.UnqualifiedImportNonConflict",
+            ast.classes["ModelicaCompliance"],
+        )
+        found = find_name("a", scope)
+        self.assertIsNotNone(found)
+
+    def test_unqualified_import_non_package(self):
+        """Checks that an unqualified import is not allowed to import
+        from a non-package"""
+        ast = parse_imported_lookup_file("UnqualifiedImportNonPackage.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.UnqualifiedImportNonPackage",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = find_name("B", scope)
+
+    def test_unqualified_import_protected(self):
+        """Checks that the name lookup only considers public members of
+        packages imported via unqualified imports"""
+        ast = parse_imported_lookup_file("UnqualifiedImportProtected.mo")
+        scope = find_name(
+            "Scoping.NameLookup.Imports.UnqualifiedImportProtected",
+            ast.classes["ModelicaCompliance"],
+        )
+        with self.assertRaises(pymoca.tree.NameLookupError):
+            _ = find_name("A.y", scope)
 
 
 if __name__ == "__main__":
