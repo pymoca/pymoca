@@ -569,7 +569,7 @@ class ClassModification(Node):
 class ClassModificationArgument(Node):
     def __init__(self, **kwargs):
         self.value = []  # type: Union[ElementModification, ComponentClause, ShortClassDefinition]
-        self.scope = None  # type: InstanceClass
+        self.scope = None  # type: Optional[InstanceClass]
         self.redeclare = False
         super().__init__(**kwargs)
 
@@ -621,9 +621,9 @@ class Class(Node):
             cls.find_class = cls.FIND_CLASS
 
     def __init__(self, **kwargs):
-        self.name = None  # type: str
+        self.name = None  # type: Optional[str]
         self.imports = OrderedDict()  # type: OrderedDict[str, Union[ImportClause, ComponentRef]]
-        self.extends = []  # type: List[ExtendsClause]
+        self.extends = []  # type: List[Union[ExtendsClause, InstanceExtends]]
         self.encapsulated = False  # type: bool
         self.partial = False  # type: bool
         self.final = False  # type: bool
@@ -638,9 +638,11 @@ class Class(Node):
             []
         )  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
-        self.annotation = []  # type: Union[Type[None], ClassModification]
-        self.parent = None  # type: Class
+        self.annotation = None  # type: Optional[ClassModification]
+        self.parent = None  # type: Optional[Class]
 
+        # TODO: Remove hard-wired tree.find_name() when done with prototype
+        self.use_find_name(False)
         super().__init__(**kwargs)
 
     # TODO: Delete _find_class and find_class if tree.find_name is accepted as permanent
@@ -895,6 +897,18 @@ class Class(Node):
         """
         self.initial_equations.remove(e)
 
+    def extend(self, other: "Class") -> None:
+        self._extend(other)
+        self.update_parent_refs()
+
+    def _update_parent_refs(self, parent: "Class") -> None:
+        for c in parent.classes.values():
+            c.parent = parent
+            self._update_parent_refs(c)
+
+    def update_parent_refs(self) -> None:
+        self._update_parent_refs(self)
+
     def __deepcopy__(self, memo):
         # Avoid copying the entire tree
         if self.parent is not None and self.parent not in memo:
@@ -908,45 +922,111 @@ class Class(Node):
         return new
 
     def __repr__(self):
-        return "{}(type={!r}, name={!r})".format(type(self).__name__, self.type, self.name)
+        return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)
 
     def __str__(self):
         return '{} {}, Type "{}"'.format(type(self).__name__, self.name, self.type)
 
 
-class InstanceClass(Class):
+class InstanceElement:
     """
-    Class used during instantiation/expansion of the model. Modififcations on
+    Base class for instance elements (symbols, classes, extends).
+
+    This is the "partially instantiated element" in spec 3.5 section 5.6.1.4.
+    Includes name for lookup and type for redeclares during instantiation.
+    We include the latter two items that are also in sub-classes because we
+    want to allow use of this stand-alone as a "partial instance" for memory
+    efficiency and speed.
+    """
+
+    def __init__(
+        self,
+        ast_ref: Optional[Union[Class, Symbol]] = None,
+        modification_environment: Optional[ClassModification] = None,
+        fully_instantiated: bool = False,
+        **kwargs,
+    ):
+        """ast_ref is a reference to the AST node where this instance is defined.
+        All named keyword arguments optional for backward compatibility."""
+
+        # super().__init__() is only needed if 1st in method resolution order
+        super().__init__(**kwargs)
+
+        self.ast_ref = ast_ref
+
+        if modification_environment is not None:
+            self.modification_environment = modification_environment
+        else:
+            self.modification_environment = ClassModification()
+
+        if "name" in kwargs:
+            self.name = kwargs["name"]
+        elif ast_ref is not None:
+            self.name = ast_ref.name
+        else:
+            self.name = ""  # The default in Symbol
+
+        if "type" in kwargs:
+            self.type = kwargs["type"]
+        elif ast_ref is not None:
+            self.type = ast_ref.type
+        else:
+            self.type = ComponentRef()  # The default in Symbol
+
+        self.fully_instantiated = fully_instantiated
+
+    def __repr__(self):
+        return f"name={self.name!r}, ast_ref={self.ast_ref!r}, modification_environment={self.modification_environment!r}"
+
+
+class InstanceClass(InstanceElement, Class):
+    """
+    Class used during instantiation/expansion of the model. Modifications on
     symbols and extends clauses are shifted to the modification environment of
     this InstanceClass.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.modification_environment = ClassModification()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def __repr__(self):
-        return "{}(type={!r}, name={!r}, modification_environment={!r})".format(
-            type(self).__name__, self.type, self.name, self.modification_environment
-        )
+        return f"{type(self).__name__}({super().__repr__()!s})"
+
+
+class InstanceSymbol(InstanceElement, Symbol):
+    """
+    Symbol used during instantiation/expansion of the model.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()!s})"
+
+
+class InstanceExtends(InstanceElement, Class):
+    """
+    Placeholder for extends during instantiation/expansion of the model.
+    This is the "unnamed node" referenced in the language spec.
+    """
+
+    def __init__(self, visibility: Optional[Visibility] = Visibility.PUBLIC, **kwargs):
+        self.visibility = visibility
+        super().__init__(**kwargs)
+        # "Unnamed node" per spec (name lookup takes care of it)
+        self.name = ""
+        # Imports are not inherited
+        self.imports = OrderedDict()
+
+    def __repr__(self):
+        return f"{type(self).__name__}({super().__repr__()!s})"
 
 
 class Tree(Class):
     """
-    The root class.
+    The root class of the class tree
     """
-
-    def extend(self, other: "Tree") -> None:
-        self._extend(other)
-        self.update_parent_refs()
-
-    def _update_parent_refs(self, parent: Class) -> None:
-        for c in parent.classes.values():
-            c.parent = parent
-            self._update_parent_refs(c)
-
-    def update_parent_refs(self) -> None:
-        self._update_parent_refs(self)
 
     def __repr__(self):
         return "{}(classes={!r})".format(type(self).__name__, self.classes)
