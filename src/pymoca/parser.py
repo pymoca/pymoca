@@ -643,6 +643,7 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] = self.ast[ctx.comp_elem]
         else:
             self.ast[ctx] = self.ast[ctx.class_elem]
+            self.ast[ctx].replaceable = True
 
     def enterComponent_clause(self, ctx: ModelicaParser.Component_clauseContext):
         prefixes = ctx.type_prefix().getText().split(" ")
