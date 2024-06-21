@@ -607,39 +607,12 @@ class ParseTest(unittest.TestCase):
         ast_tree = parser.parse(txt)
 
         instance_tree = tree.InstanceTree(ast_tree)
-        instance = instance_tree.instantiate("E")
-        self.assertIsNotNone(instance)
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError, "In D extends C, C and parents cannot be replaceable"
+        ):
+            instance = instance_tree.instantiate("E")  # noqa: F841
 
-        # TODO: Resolve if original `test_extends_redeclareable` is correct and fix this fail
-        # Is the previous Pymoca result correct? OpenModelica 1.22-def-17-g88d7b964fd-cmake
-        # gives "Class 'C' in 'extends C' is replaceable, the base class name must
-        # be transitively non-replaceable." and refuses to instantiate.
-        # To make it work in OpenModelica, we must first enclose everthing in a package,
-        # then remove the replaceable prefix from the model C definition.
-        # Then OpenModelica will load and instantiate model E, but silently ignores the
-        # redeclare model C=F modification which seems like it should be reported as an error.
-        # Assuming we allow the seemingly incorrect Modelica in the original
-        # ExtendsRedeclarable.mo, shouldn't the instance contain z.x and not z.y
-        # since C is redeclared as F, in which case the z.y(nominal=2) modification
-        # is incorrect and should be reported as an error? I believe this latter
-        # result would be most correct representation of the recursive instantiation
-        # procedure outlined in the spec (if we ignore the original transitively
-        # non-replaceable error) because replaceable is applied during instantiation
-        # and modifications are not resolved and applied until flattening.
-        z_symbols = instance.extends[0].extends[0].symbols["z"].type.symbols
-        self.assertIn("y", z_symbols)
-        y_mod = z_symbols["y"].type.symbols["Real"].modification_environment.arguments[0]
-        self.assertEqual(y_mod.value.component.name, "nominal")
-        self.assertEqual(y_mod.value.modifications[0].value, 2)
-        # Current new instantiation gives:
-        # self.assertIn("x", z_symbols)
-        # y_mod = instance.extends[0].extends[0].symbols["z"].modification_environment.arguments[0]
-        # # In other words, the y modification is left at z because there was no y.
-        # # This could be reported as an error.
-        # self.assertEqual(y_mod.value.component.name, "nominal")
-        # self.assertEqual(y_mod.value.modifications[0].value, 2)
-
-        # TODO: Update when new flattening is implemented
+        # TODO: Update when new flattening is implemented (remove flattening)
         class_name = "E"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
