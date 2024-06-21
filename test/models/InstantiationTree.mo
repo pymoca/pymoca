@@ -5,7 +5,7 @@ package TreeModel
     package TreeParts
         type Oak = Real(nominal=1.0);
         model Trunk
-            type Wood = Real;
+            replaceable type Wood = Real;
             Wood t;
         end Trunk;
         constant Boolean e;

@@ -1265,6 +1265,11 @@ class InstanceTree(ast.Tree):
                 redeclare = arg
                 break
         if redeclare:
+            # TODO: Remove isinstance check when Symbol.replaceable is added
+            if isinstance(element, ast.Class) and not element.replaceable:
+                raise ModelicaSemanticError(
+                    f"Redeclaring {element.full_reference()} that is not replaceable"
+                )
             scope_class = redeclare.scope
             assert scope_class, "Redeclare scope should have been set by now"
             redeclare_name = redeclare.value.component

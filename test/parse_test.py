@@ -621,6 +621,17 @@ class ParseTest(unittest.TestCase):
         self.assertIn("z.y", flat_tree.classes["E"].symbols)
         self.assertEqual(flat_tree.classes["E"].symbols["z.y"].nominal.value, 2.0)
 
+    def test_redeclare_nonreplaceable(self):
+        with open(os.path.join(MODEL_DIR, "RedeclareNonReplaceable.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        instance_tree = tree.InstanceTree(ast_tree)
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError, "Redeclaring D.C that is not replaceable"
+        ):
+            instance = instance_tree.instantiate("E")  # noqa: F841
+
     def test_redeclare_nested(self):
         with open(os.path.join(MODEL_DIR, "RedeclareNestedClass.mo.fail_parse"), "r") as f:
             txt = f.read()
