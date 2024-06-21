@@ -932,6 +932,12 @@ class InstanceTree(ast.Tree):
             raise ModelicaSemanticError(
                 f"Cannot extend class '{extends_class.full_reference()}' with itself"
             )
+        if self._is_transitively_replaceable(extends_class):
+            comp = extends_class.name
+            full_name = extends_class.parent.full_reference()
+            raise ModelicaSemanticError(
+                f"In {full_name} extends {comp}, {comp} and parents cannot be replaceable"
+            )
         # TODO: Check with spec about what to do with extends.class_modification in case of redeclare
         extend_mod = self._append_modifications(
             extends.class_modification,
@@ -961,6 +967,15 @@ class InstanceTree(ast.Tree):
         # TODO: Step 4 Check class lookup before and after extends
 
         return extends_instance
+
+    def _is_transitively_replaceable(self, class_: ast.Class) -> bool:
+        while True:
+            if class_.replaceable:
+                return True
+            class_ = class_.parent
+            if isinstance(class_, ast.Tree):
+                break
+        return False
 
     def _instantiate_symbol(
         self,
@@ -1031,6 +1046,7 @@ class InstanceTree(ast.Tree):
                 parent=parent,
             )
             instance.annotation = ast.ClassModification()
+            instance.replaceable = ast_ref.replaceable
 
             # Mirror class tree for name lookup in the InstanceTree
             # TODO: Is there a better way to maintain the path to root for all classes?
