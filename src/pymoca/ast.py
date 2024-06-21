@@ -627,6 +627,7 @@ class Class(Node):
         self.encapsulated = False  # type: bool
         self.partial = False  # type: bool
         self.final = False  # type: bool
+        self.replaceable = False  # type: bool
         self.type = ""  # type: str
         self.comment = ""  # type: str
         self.classes = OrderedDict()  # type: OrderedDict[str, Class]
