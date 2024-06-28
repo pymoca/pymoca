@@ -853,6 +853,11 @@ class InstanceTree(ast.Tree):
         if isinstance(class_, ast.Symbol):
             raise InstantiationError(f"Found Symbol for {class_name} but need Class to instantiate")
         instance = self._instantiate_class(class_, ast.ClassModification(), self)
+
+        # Update the parents of the instantiated instance, and merge into one big tree
+        self._instantiate_parents_partially(instance)  # Results in a different `instance.root`
+        self.extend(instance.root)  # Bringing it back to the original one
+
         return instance
 
     def _instantiate_class(

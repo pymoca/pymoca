@@ -906,18 +906,6 @@ class Class(Node):
         """
         self.initial_equations.remove(e)
 
-    def extend(self, other: "Class") -> None:
-        self._extend(other)
-        self.update_parent_refs()
-
-    def _update_parent_refs(self, parent: "Class") -> None:
-        for c in parent.classes.values():
-            c.parent = parent
-            self._update_parent_refs(c)
-
-    def update_parent_refs(self) -> None:
-        self._update_parent_refs(self)
-
     def __deepcopy__(self, memo):
         # Avoid copying the entire tree
         if self.parent is not None and self.parent not in memo:
@@ -1034,8 +1022,20 @@ class InstanceExtends(InstanceElement, Class):
 
 class Tree(Class):
     """
-    The root class of the class tree
+    The root class.
     """
+
+    def extend(self, other: "Tree") -> None:
+        self._extend(other)
+        self.update_parent_refs()
+
+    def _update_parent_refs(self, parent: Class) -> None:
+        for c in parent.classes.values():
+            c.parent = parent
+            self._update_parent_refs(c)
+
+    def update_parent_refs(self) -> None:
+        self._update_parent_refs(self)
 
     def __repr__(self):
         return "{}(classes={!r})".format(type(self).__name__, self.classes)
