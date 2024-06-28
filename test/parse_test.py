@@ -233,6 +233,19 @@ class ParseTest(unittest.TestCase):
             msg=f"\nFound non-instances in InstanceTree:\n{non_instances}",
         )
 
+        # Check that we merged the tree correctly when instantiating parents
+        self.assertIn("TreeModel", instance.root.classes)
+
+        tree_model = instance.root.classes["TreeModel"]
+        self.assertIn("TreeTypes", tree_model.classes)
+        self.assertIn("TreeParts", tree_model.classes)
+        self.assertIn("Tree", tree_model.classes)
+
+        tree_parts = instance.root.classes["TreeModel"].classes["TreeParts"]
+        self.assertIn("Trunk", tree_parts.classes)
+        self.assertIn("Branch", tree_parts.classes)
+        self.assertIn("Leaf", tree_parts.classes)
+
     def test_inheritance(self):
         with open(os.path.join(MODEL_DIR, "InheritanceInstantiation.mo"), "r") as f:
             txt = f.read()
