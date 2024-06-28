@@ -352,6 +352,8 @@ def _find_name(
     #     2. `B.C` (and `B.D`) or `B.*` is looked up. `A.B` must be a package.
     # TODO: Global name lookup
 
+    print(f"Finding name {name} in scope {scope.name} (ast.{type(scope).__name__})")
+
     left_name, rest_of_name = _parse_str_or_ref(name)
 
     # Lookup simple name first (the `A` part)
@@ -378,6 +380,11 @@ def _find_name(
             current_extends=current_extends,
         )
 
+    if found is not None:
+        print(
+            f"Found class {found.name} (ast.{type(found).__name__}) in scope {scope.name} (ast.{type(scope).__name__})"
+        )
+
     return found
 
 
@@ -401,6 +408,8 @@ def _find_simple_name(
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
+
+    print(f" - Simple lookup '{name}' in scope {scope.name} (ast.{type(scope).__name__})")
 
     # 0.1 Predefined types (`Real`, `Integer`, `Boolean`, `String`) (spec 4.8)
     # 0.2 The scope itself (the given scope is the name)
@@ -517,6 +526,7 @@ def _find_rest_of_name(
                         )
 
     elif isinstance(first, ast.Class):
+        print(f" - Composite lookup in {first.name}, flattening...")
         found = _flatten_first_and_find_rest(first, rest_of_name)
     else:
         raise NameLookupError(f'Found unexpected node "{first!r}" during name lookup')
@@ -891,6 +901,10 @@ class InstanceTree(ast.Tree):
 
         # 3. Instantiate extends and 4. Check extends class lookup
         for index, extends in enumerate(new_class.extends):
+            print("*" * 80)
+            print(
+                f"Instantiating extends {extends.component} in (instance of) {orig_class.full_reference()}"
+            )
             extends_instance = self._instantiate_extends(
                 extends, modification_environment, new_class, partially
             )
@@ -900,6 +914,8 @@ class InstanceTree(ast.Tree):
 
         # 6. Recursively instantiate symbols
         for symbol in new_class.symbols.values():
+            print("-" * 80)
+            print(f"Instantiating symbol {symbol.name} in {new_class.full_reference()}")
             self._instantiate_symbol(symbol, new_class)
 
         if not partially:
@@ -1051,6 +1067,7 @@ class InstanceTree(ast.Tree):
             # Mirror class tree for name lookup in the InstanceTree
             # TODO: Is there a better way to maintain the path to root for all classes?
             if not isinstance(parent, (InstanceTree, ast.InstanceClass)):
+                print(f"Partially instantiating parents of {instance.full_reference()}")
                 self._instantiate_parents_partially(instance)
                 self.extend(instance.root)
 
