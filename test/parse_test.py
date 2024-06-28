@@ -361,6 +361,126 @@ class ParseTest(unittest.TestCase):
         # self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].type.name, "Integer")
         # self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].value.value, 1)
 
+    def test_extends_lookup_not_in_extended(self):
+        """
+        Check that we do not find 'model B' in the unnamed node 'A' in the
+        following model. We also check that the order of inheritance does not
+        matter for the error message.
+        """
+        txt = """
+        model A
+            model B
+                parameter Real x = 1.0;
+            end B;
+            parameter Real y = 2.0;
+        end A;
+
+        model C
+            extends {};
+            extends {};
+        end C;
+        """
+
+        for extends_1, extends_2 in [("A", "B"), ("B", "A")]:
+            ast_tree = parser.parse(txt.format(extends_1, extends_2))
+            instance_tree = tree.InstanceTree(ast_tree)
+
+            with self.assertRaisesRegex(
+                tree.ModelicaSemanticError, "Extends name B not found in scope C"
+            ):
+                instance = instance_tree.instantiate("C")  # noqa: F841
+
+    def test_error_extends_class_also_extended_name_simple(self):
+        """
+        Check that we are not allowed to inherit from `model B`, because a
+        symbol with the same name is inherited from `model A`. We also check
+        that the order of inheritance does not matter for the error message.
+        """
+        txt = """
+        model A
+            parameter Real B = 1.0;
+            parameter Real y = 2.0;
+        end A;
+
+        model B
+            parameter Real x = 1.0;
+        end B;
+
+        model C
+            extends {};
+            extends {};
+        end C;
+        """
+
+        for extends_1, extends_2 in [("A", "B")]:
+            ast_tree = parser.parse(txt.format(extends_1, extends_2))
+            instance_tree = tree.InstanceTree(ast_tree)
+
+            with self.assertRaisesRegex(
+                tree.ModelicaSemanticError,
+                "Cannot extend 'C' with 'B'; 'B' also exists in names inherited from 'A'",
+            ):
+                instance = instance_tree.instantiate("C")  # noqa: F841
+
+    def test_error_extends_class_also_extended_name_of_self(self):
+        """
+        Check that we are not allowed to inherit from `model A`, because a
+        symbol with the same name is inherited from `model A`.
+        """
+        txt = """
+        model A
+            parameter Real A = 1.0;
+            parameter Real y = 2.0;
+        end A;
+
+        model C
+            extends A;
+        end C;
+        """
+
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError,
+            "Cannot extend 'C' with 'A'; 'A' also exists in names inherited from 'A'",
+        ):
+            instance = instance_tree.instantiate("C")  # noqa: F841
+
+    def test_error_extends_class_also_extended_name_nested(self):
+        """
+        Check that we are not allowed to inherit from `model B.C`, because a
+        symbol with the the name 'B' is inherited from `model A`. We also check
+        that the order of inheritance does not matter for the error message.
+        """
+        txt = """
+        model A
+            parameter Real B = 1.0;
+            parameter Real y = 2.0;
+        end A;
+
+        package B
+            model C
+                parameter Real x = 1.0;
+            end C;
+        end B;
+
+        model D
+            extends {};
+            extends {};
+        end D;
+        """
+
+        for extends_1, extends_2 in [("A", "B.C"), ("B.C", "A")]:
+            ast_tree = parser.parse(txt.format(extends_1, extends_2))
+            instance_tree = tree.InstanceTree(ast_tree)
+
+            with self.assertRaisesRegex(
+                tree.ModelicaSemanticError,
+                "Cannot extend 'D' with 'B.C'; 'B' also exists in names inherited from 'A'",
+            ):
+                instance = instance_tree.instantiate("D")  # noqa: F841
+
     def test_nested_classes(self):
         with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
             txt = f.read()

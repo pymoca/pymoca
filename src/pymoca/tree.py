@@ -312,6 +312,7 @@ def _find_name(
     scope: ast.Class,
     search_imports: bool = True,
     search_parent: bool = True,
+    search_inherited: bool = True,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Internal start point for name lookup with extra parameters to control the lookup"""
@@ -360,6 +361,7 @@ def _find_name(
         scope,
         search_imports=search_imports,
         search_parent=search_parent,
+        search_inherited=search_inherited,
         current_extends=current_extends,
     )
 
@@ -375,6 +377,7 @@ def _find_name(
             scope=scope.ast_ref,
             search_imports=search_imports,
             search_parent=search_parent,
+            search_inherited=search_inherited,
             current_extends=current_extends,
         )
 
@@ -398,6 +401,7 @@ def _find_simple_name(
     scope: ast.Class,
     search_imports: bool = True,
     search_parent: bool = True,
+    search_inherited: bool = True,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
@@ -432,7 +436,8 @@ def _find_simple_name(
                     current_scope,
                 )
             )
-            or (
+            or search_inherited
+            and (
                 found := _find_inherited(
                     name,
                     current_scope,
@@ -890,11 +895,9 @@ class InstanceTree(ast.Tree):
         self._copy_class_contents(new_class, copy_extends=True, partially=partially)
 
         # 3. Instantiate extends and 4. Check extends class lookup
-        for index, extends in enumerate(new_class.extends):
-            extends_instance = self._instantiate_extends(
-                extends, modification_environment, new_class, partially
-            )
-            new_class.extends[index] = extends_instance
+        new_class.extends = self._instantiate_extends(
+            new_class.extends, modification_environment, new_class, partially
+        )
 
         # TODO: Step 5: Check and cull elements with same name in _instantiate_class
 
@@ -909,6 +912,47 @@ class InstanceTree(ast.Tree):
 
     def _instantiate_extends(
         self,
+        extends_list: List[ast.ExtendsClause],
+        modification_environment: ast.ClassModification,
+        parent: ast.InstanceClass,
+        partially=True,
+    ) -> List[ast.InstanceExtends]:
+        # Make sure we do not modify the passed-in list directly
+        extends_list_orig = extends_list
+        extends_list = extends_list.copy()
+
+        for index, extends in enumerate(extends_list):
+            extends_instance = self._instantiate_extends_single(
+                extends, modification_environment, parent, partially
+            )
+            extends_list[index] = extends_instance
+
+        # Check we do not extend from any symbols/classes inherited
+        extends_names = {
+            _parse_str_or_ref(e.component)[0]: str(e.component) for e in extends_list_orig
+        }
+
+        for extends_name, extends_component_ref in extends_names.items():
+            if extends_name in self.BUILTIN_TYPES:
+                # Built-in classes contain a symbol with the same name (which
+                # would cause an error). Note that this is an implementation
+                # detail where we differ a little from the spec at the moment.
+                continue
+            for other_class in extends_list:
+                other_names = {
+                    *other_class.ast_ref.symbols.keys(),
+                    *other_class.ast_ref.classes.keys(),
+                }
+                if extends_name in other_names:
+                    raise ModelicaSemanticError(
+                        f"Cannot extend '{parent.full_reference()}' with '{extends_component_ref}'; "
+                        f"'{extends_name}' also exists in names inherited from '{other_class.ast_ref.name}'"
+                    )
+
+        return extends_list
+
+    def _instantiate_extends_single(
+        self,
         extends: ast.ExtendsClause,
         modification_environment: ast.ClassModification,
         parent: ast.InstanceClass,
@@ -918,7 +962,7 @@ class InstanceTree(ast.Tree):
         #   1. Apply steps 1 and 2 to the element, replacing the extends clause with the extends instance
         # 4. Lookup classes of extends and ensure it is identical to lookup result from step 3
 
-        extends_class = find_name(extends.component, parent)
+        extends_class = _find_name(extends.component, parent, search_inherited=False)
 
         if extends_class is None:
             raise ModelicaSemanticError(
