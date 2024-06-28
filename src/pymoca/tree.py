@@ -361,6 +361,7 @@ def _find_name(
         scope,
         search_imports=search_imports,
         search_parent=search_parent,
+        search_inherited=search_inherited,
         current_extends=current_extends,
     )
 
@@ -377,6 +378,7 @@ def _find_name(
             scope=scope.ast_ref,
             search_imports=search_imports,
             search_parent=search_parent,
+            search_inherited=search_inherited,
             current_extends=current_extends,
         )
 
@@ -436,7 +438,8 @@ def _find_simple_name(
                     current_scope,
                 )
             )
-            or (
+            or search_inherited
+            and (
                 found := _find_inherited(
                     name,
                     current_scope,
@@ -990,7 +993,7 @@ class InstanceTree(ast.Tree):
     ) -> ast.InstanceClass:
         """Instantiate a single extends clause"""
 
-        extends_class = find_name(extends.component, parent)
+        extends_class = _find_name(extends.component, parent, search_inherited=False)
 
         if extends_class is None:
             raise ModelicaSemanticError(
