@@ -904,6 +904,9 @@ class InstanceTree(ast.Tree):
         # 2.2 Copy local contents into the element itself
         self._copy_class_contents(new_class, copy_extends=True, partially=partially)
 
+        # Make a copy of the extends clauses for checks later
+        extends_clauses = new_class.extends.copy()
+
         # 3. Instantiate extends and 4. Check extends class lookup
         for index, extends in enumerate(new_class.extends):
             print("*" * 80)
@@ -914,6 +917,29 @@ class InstanceTree(ast.Tree):
                 extends, modification_environment, new_class, partially
             )
             new_class.extends[index] = extends_instance
+
+        # Check we do not extend from any symbols/classes inherited
+        extends_names = {
+            _parse_str_or_ref(e.component)[0]: str(e.component) for e in extends_clauses
+        }
+
+        for extends_name, extends_component_ref in extends_names.items():
+            if extends_name in self.BUILTIN_TYPES:
+                # Built-in classes contain a symbol with the same name, but they're
+                # a special case
+                # TODO: Why do we do this actually? Why is Real not a top level class/symbol? Could we
+                # when we unify the two?
+                continue
+            for other_class in new_class.extends:
+                other_names = {
+                    *other_class.ast_ref.symbols.keys(),
+                    *other_class.ast_ref.classes.keys(),
+                }
+                if extends_name in other_names:
+                    raise ModelicaSemanticError(
+                        f"Cannot extend '{new_class.full_reference()}' with '{extends_component_ref}'; "
+                        f"'{extends_name}' also exists in names inherited from '{other_class.ast_ref.name}'"
+                    )
 
         # TODO: Step 5: Check and cull elements with same name in _instantiate_class
 
