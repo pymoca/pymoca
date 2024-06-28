@@ -842,6 +842,11 @@ class InstanceTree(ast.Tree):
         if isinstance(class_, ast.Symbol):
             raise InstantiationError(f"Found Symbol for {class_name} but need Class to instantiate")
         instance = self._instantiate_class(class_, ast.ClassModification(), self)
+
+        # Update the parents of the instantiated instance, and merge into one big tree
+        self._instantiate_parents_partially(instance)  # Results in a different `instance.root`
+        self.extend(instance.root)  # Bringing it back to the original one
+
         return instance
 
     def _instantiate_class(
@@ -1205,19 +1210,17 @@ class InstanceTree(ast.Tree):
         This ensures names can be found in the instance tree.
         """
         instance_class = class_
-        while True:
-            parent_class = instance_class.ast_ref.parent
-            assert parent_class is not None, f"Parent of {instance_class.ast_ref} unexpectedly None"
-            if isinstance(parent_class, ast.Tree):
-                instance_class.parent = self
-                self.classes[instance_class.name] = instance_class
-                return
-            parent_instance = self._instantiate_partially(
-                parent_class, ast.ClassModification(), parent_class.parent
-            )
-            instance_class.parent = parent_instance
-            parent_instance.classes[instance_class.name] = instance_class
-            instance_class = parent_instance
+        parent_class = instance_class.ast_ref.parent
+        assert parent_class is not None, f"Parent of {instance_class.ast_ref} unexpectedly None"
+        if isinstance(parent_class, ast.Tree):
+            instance_class.parent = InstanceTree(parent_class)
+            instance_class.parent.classes[instance_class.name] = instance_class
+            return
+        parent_instance = self._instantiate_partially(
+            parent_class, ast.ClassModification(), parent_class.parent
+        )
+        instance_class.parent = parent_instance
+        parent_instance.classes[instance_class.name] = instance_class
 
     def _append_modifications(self, *mods: ast.ClassModification) -> ast.ClassModification:
         """Append modifications in order given"""
