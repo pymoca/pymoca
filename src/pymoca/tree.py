@@ -934,7 +934,9 @@ class InstanceTree(ast.Tree):
         #   1. Apply steps 1 and 2 to the element, replacing the extends clause with the extends instance
         # 4. Lookup classes of extends and ensure it is identical to lookup result from step 3
 
-        extends_class = find_name(extends.component, parent)
+        # Avoid looking up the extends component reference inside the extends
+        # class itself by passing it in `current_extends`
+        extends_class = _find_name(extends.component, parent, current_extends=[extends])
 
         if extends_class is None:
             raise ModelicaSemanticError(
