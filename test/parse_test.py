@@ -361,6 +361,31 @@ class ParseTest(unittest.TestCase):
         # self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].type.name, "Integer")
         # self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].value.value, 1)
 
+    def test_extends_lookup_not_in_extended(self):
+        """
+        Check that we do not look up "extends B" in the unnamed node "A" in the following model:
+        """
+        txt = """
+        model A
+            model B
+                parameter Real x = 1.0;
+            end B;
+            parameter Real y = 2.0;
+        end A;
+
+        model C
+            extends A;
+            extends B;
+        end C;
+        """
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError, "Extends name B not found in scope C"
+        ):
+            _instance = instance_tree.instantiate("C")
+
     def test_nested_classes(self):
         with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
             txt = f.read()

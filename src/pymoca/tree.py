@@ -312,6 +312,7 @@ def _find_name(
     scope: ast.Class,
     search_imports: bool = True,
     search_parent: bool = True,
+    search_inherited: bool = True,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Internal start point for name lookup with extra parameters to control the lookup"""
@@ -362,6 +363,7 @@ def _find_name(
         scope,
         search_imports=search_imports,
         search_parent=search_parent,
+        search_inherited=search_inherited,
         current_extends=current_extends,
     )
 
@@ -377,6 +379,7 @@ def _find_name(
             scope=scope.ast_ref,
             search_imports=search_imports,
             search_parent=search_parent,
+            search_inherited=search_inherited,
             current_extends=current_extends,
         )
 
@@ -405,6 +408,7 @@ def _find_simple_name(
     scope: ast.Class,
     search_imports: bool = True,
     search_parent: bool = True,
+    search_inherited: bool = True,
     current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
@@ -441,7 +445,8 @@ def _find_simple_name(
                     current_scope,
                 )
             )
-            or (
+            or search_inherited
+            and (
                 found := _find_inherited(
                     name,
                     current_scope,
@@ -934,9 +939,7 @@ class InstanceTree(ast.Tree):
         #   1. Apply steps 1 and 2 to the element, replacing the extends clause with the extends instance
         # 4. Lookup classes of extends and ensure it is identical to lookup result from step 3
 
-        # Avoid looking up the extends component reference inside the extends
-        # class itself by passing it in `current_extends`
-        extends_class = _find_name(extends.component, parent, current_extends=[extends])
+        extends_class = _find_name(extends.component, parent, search_inherited=False)
 
         if extends_class is None:
             raise ModelicaSemanticError(
