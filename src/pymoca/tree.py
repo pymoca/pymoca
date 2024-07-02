@@ -1224,7 +1224,8 @@ class InstanceTree(ast.Tree):
         """
         instance_class = class_
         parent_class = instance_class.ast_ref.parent
-        assert parent_class is not None, f"Parent of {instance_class.ast_ref} unexpectedly None"
+        if parent_class is None:
+            raise ValueError(f"Parent of {instance_class.ast_ref} unexpectedly None")
         if isinstance(parent_class, ast.Tree):
             instance_class.parent = InstanceTree(parent_class)
             instance_class.parent.classes[instance_class.name] = instance_class
