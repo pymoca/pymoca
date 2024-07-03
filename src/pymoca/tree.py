@@ -756,7 +756,7 @@ def _check_import_rules(
         raise NameLookupError(message)
     # TODO: Remove ast.Symbol test when visibility is added to ast.Class (see grammar)
     if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
-        raise NameLookupError(f"Import {element.name} must not be protected or private")
+        raise NameLookupError(f"Import {element.name} must not be protected")
     # We test on parent and name instead of just "is" because we may have a copy of a Class
     if element.parent is scope.parent and element.name == scope.name:
         full_name = str(element.parent.full_reference()) + "." + element.name
