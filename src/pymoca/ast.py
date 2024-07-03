@@ -594,10 +594,6 @@ class ExtendsClause(Node):
         self.visibility = Visibility.PUBLIC  # type: Visibility
         super().__init__(**kwargs)
 
-    @property
-    def component_ref(self) -> ComponentRef:
-        return self.component
-
     def __repr__(self):
         return "{}(component={}, class_modification={!r}, visibility={!r})".format(
             type(self).__name__, self.component, self.class_modification, self.visibility

@@ -672,7 +672,7 @@ def _find_inherited(
             )
 
         extends_scope = _find_name(
-            extends.component_ref,
+            extends.component,
             scope,
             current_extends=current_extends,
         )
