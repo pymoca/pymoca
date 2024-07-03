@@ -597,8 +597,6 @@ class ASTListener(ModelicaListener):
         if import_clause.short_name:
             # import_clause instead of comp_ref signifies short_name
             self._check_not_already_imported(import_clause.short_name, ctx)
-            if import_clause.short_name in self.class_node.imports:
-                raise ModelicaSyntaxError(f"{import_clause.short_name} already imported", ctx)
             self.class_node.imports[import_clause.short_name] = import_clause
         elif import_clause.unqualified:
             # Postpone processing this uncommon case until actually needed
