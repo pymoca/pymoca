@@ -813,9 +813,9 @@ class InstanceTree(ast.Tree):
         self.ast_ref = ast_ref
 
         super().__init__(**kwargs)
-        self.create_builtins()
+        self._create_builtins()
 
-    def create_builtins(self):
+    def _create_builtins(self):
         """Add builtins to root of tree"""
         for name, symbol in self.BUILTIN_TYPES.items():
             type_class = ast.Class(name=name, type=name, parent=self)
