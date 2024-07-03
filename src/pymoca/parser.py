@@ -560,12 +560,12 @@ class ASTListener(ModelicaListener):
     # Import name of A.B.C is C, so ast.Class.imports dictionary key is C for simple name lookup.
     # Import name of D = A.B.C is D, so D is the dictionary key and element C is the value.
     # Import names of A.B.{C,D} are C and D, both added as keys.
-    # The special case of import A.B.* is processed during lookup (it is uncommon and expensive);
+    # The special case of import A.B.* is processed during lookup (it is uncommon and may be expensive);
     # in this case the dictionary key is "*" and the value is a list containing all of the
     # A.B, E.F, G, ... package refs, each of which is prepended to the import name for
     # Global Name Lookup (MLS 5.3.3). We could choose to make the Class.imports values
     # always a list to make it homogeneous, with most cases being len() == 1,
-    # but this would make most cases slower. I'm leaning toward heterogeneous values.
+    # but this might make most cases slower. I'm leaning toward heterogeneous values.
     # The Class.imports dictionary values are the fully qualified ComponentRef for
     # Composite Name Lookup (see MLS), but imports should be skipped for this lookup.
     # All Class.imports values are ComponentRef, or List[ComponentRef] for A.B.* type imports.
