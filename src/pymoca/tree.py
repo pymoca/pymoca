@@ -935,6 +935,7 @@ class InstanceTree(ast.Tree):
         )
 
         # TODO: Step 5: Check and cull elements with same name in _instantiate_class
+        # See `parse_test.test_instantiation_function_input_order`
 
         # 6. Recursively instantiate symbols
         for symbol in new_class.symbols.values():
