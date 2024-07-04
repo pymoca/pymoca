@@ -706,6 +706,7 @@ def _find_imported(
     if name in scope.imports:
         import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
         if isinstance(import_, ast.ImportClause):
+            # TODO: Handle import of multiple classes (now only does `A.B.C` for `A.B.{C,D,E}`)
             import_ = import_.components[0]
         found = _find_name(
             import_,
