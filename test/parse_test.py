@@ -246,6 +246,80 @@ class ParseTest(unittest.TestCase):
         self.assertIn("Branch", tree_parts.classes)
         self.assertIn("Leaf", tree_parts.classes)
 
+    @unittest.skip("Only keeping first of same names not implemented yet in instantiation")
+    def test_instantiation_function_input_order(self):
+        """Check that only first definitions of inputs are used in function instantiation."""
+        txt = """
+            package P
+              function A
+                input Real a;
+                input Real b;
+              end A;
+
+              function B
+                extends A;
+                input Real b; // Should be discarded as 2nd instance of b
+                input Real a; // Should be discarded as 2nd instance of a
+              end B;
+
+              function C
+                input Real b;
+                input Real a;
+                extends A;    // Should be discarded as 2nd instances of a and b
+              end C;
+
+              function D
+                input Real a; // Should be kept
+                extends A;    // a should be discarded and b kept from this
+                input Real b; // Should be discarded as 2nd instance of b
+              end D;
+            end P;
+        """
+
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        # Our current implementation does not maintain perfect declaration order because
+        # during parsing we store the declarations from the Modelica code in separate
+        # symbols and extends dictionaries. To maintain order we need to store the
+        # declarations in one list or ordered dictionary containing both symbols and
+        # extends. The checks below are intended to fail until we have implemented this.
+        # TODO: Remove above comments when we have implemented maintaining declaration order
+
+        # TODO: Ensure the checks below are correct when we have an implementation
+        instance = instance_tree.instantiate("P.B")
+        self.assertEqual(("a", "b"), tuple(instance.extends[0].symbols))
+        self.assertNotIn("b", instance.symbols)
+        self.assertNotIn("a", instance.symbols)
+
+        instance = instance_tree.instantiate("P.C")
+        self.assertEqual(("b", "a"), tuple(instance.symbols))
+        self.assertNotIn("a", instance.extends[0].symbols)
+        self.assertNotIn("b", instance.extends[0].symbols)
+
+        instance = instance_tree.instantiate("P.D")
+        self.assertIn("a", instance.symbols)
+        self.assertNotIn("b", instance.symbols)
+        self.assertNotIn("a", instance.extends[0].symbols)
+        self.assertIn("b", instance.extends[0].symbols)
+
+    # TODO: Add additional tests for child name culling
+    # See in Modelica Language Spec v3.5:
+    # * Section 5.6.1.4 Steps of Instantiation, under "The inherited contents of the element"
+    # * Section 4.3 Declaration Order and Usage before Declaration
+    # * Chapter 12
+    # Tests to add:
+    # - function output order
+    # - intermixed funtion input and output declarations
+    # - default on one function argument but not the other with the same name - error?
+    # - records used as arguments to external functions
+    # - instances with same name but different type
+    # - instances with same name, same type, but different prefixes
+    # - instances with same name, same type, but with modifications of differing components
+    # - instances with same name, same type, but with modifications of same comps, different values
+    # - instances with same name, same type, but different redeclarations
+    # - ...?
+
     def test_inheritance(self):
         with open(os.path.join(MODEL_DIR, "InheritanceInstantiation.mo"), "r") as f:
             txt = f.read()
