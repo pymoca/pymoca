@@ -516,6 +516,7 @@ def _find_rest_of_name(
                 if found.type != "function":
                     found = None
                 else:
+                    # TODO: Fix for `test_function_lookup_via_array_element` + other possibilities
                     if first.dimensions[0][0].value is not None:
                         raise NameLookupError(
                             f"Array {first.name} must have subscripts to lookup function {found.name}"
