@@ -419,6 +419,7 @@ def _find_simple_name(
     # symbol) in an enclosing class, it must be a `constant`.
 
     # Step 0.1: Predefined types
+    # TODO: Implement fix for #333 to ensure we don't silently override user-defined BUILTINS
     if name in InstanceTree.BUILTIN_TYPES:
         return scope.root.classes[name]
 
