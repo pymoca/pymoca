@@ -587,11 +587,34 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(c2_v2_mod.component.name, "nominal")
         self.assertEqual(c2_v2_mod.modifications[0].value, 1000)
 
-        # TODO: Update after new flattening is implemented (uncomment below)
+        # TODO: Update after new flattening is implemented
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="C2"))
 
         self.assertEqual(flat_tree.classes["C2"].symbols["v1"].nominal.value, 1000.0)
         self.assertEqual(flat_tree.classes["C2"].symbols["v2"].nominal.value, 1000.0)
+
+    def test_nested_symbol_modifier(self):
+        with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("C3")
+        self.assertIsNotNone(instance)
+
+        c3_v1_type = instance.symbols["c"].type.extends[0].symbols["v1"].type
+        c3_v1 = c3_v1_type.extends[0].symbols["Real"]
+        c3_v1_mod = c3_v1.modification_environment.arguments[-1].value
+        self.assertEqual(c3_v1_mod.component.name, "nominal")
+        self.assertEqual(c3_v1_mod.modifications[0].value, 10)
+
+        # TODO: Update after new flattening is implemented
+        # This fails with Pymoca 0.10 flattening:
+        # IndexError: Processing failed for symbol "C3.c": list index out of range
+        # flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="C3"))
+
+        # self.assertEqual(flat_tree.classes["C3"].symbols["c.v1"].nominal.value, 10.0)
+        # self.assertEqual(flat_tree.classes["C3"].symbols["c.v2"].nominal.value, 1000.0)
 
     def test_inheritance_symbol_modifiers(self):
         with open(os.path.join(MODEL_DIR, "Inheritance.mo"), "r") as f:

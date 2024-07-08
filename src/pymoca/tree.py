@@ -1052,7 +1052,9 @@ class InstanceTree(ast.Tree):
                     for arg in symbol_type.modification_environment.arguments
                     if not isinstance(arg.value, ast.ShortClassDefinition)
                 ]
-                symbol.modification_environment.arguments += extend_args
+                symbol.modification_environment.arguments = (
+                    extend_args + symbol.modification_environment.arguments
+                )
             symbol.type = self._instantiate_class(
                 symbol_type,
                 symbol.modification_environment,
