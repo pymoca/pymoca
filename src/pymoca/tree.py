@@ -1190,6 +1190,9 @@ class InstanceTree(ast.Tree):
 
             instance.modification_environment = sym_mod
 
+        # TODO: Fix modification scope. It is often *not* the instance parent as done here!
+        # Modification scope should be the parent of the class, extends, or symbol declaration
+
         # Set modification argument scope now that we have an instance
         for index, arg in enumerate(instance.modification_environment.arguments):
             if arg.scope is None:
