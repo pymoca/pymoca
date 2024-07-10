@@ -731,6 +731,7 @@ def _find_imported(
                 search_parent=False,
                 current_extends=current_extends,
             )
+            # TODO: Should _check_import_rules be inside `if c is not None` check? (fix in rewrite)
             _check_import_rules(c, scope)
             if c is not None:
                 # Store result for next lookup
@@ -746,6 +747,7 @@ def _check_import_rules(
     """Check import rules per the Modelica spec"""
     if element is None:
         return
+    # TODO: Is `not element.parent` a sufficient check for the error message? (fix in rewrite)
     if not element.parent:
         raise NameLookupError(f"Import {element.name} must be contained in a package")
     if element.parent.type != "package":
