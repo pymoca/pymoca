@@ -240,7 +240,6 @@ class SimpleNameLookupTest(unittest.TestCase):
         found = find_name("x", scope)
         self.assertIsNone(found)
 
-    @unittest.skip("Unskip when import name lookup is implemented")
     def test_qualified_import_priority(self):
         """Tests that qualified imports have lower priority than local
         and inherited names during name lookup"""
@@ -279,7 +278,6 @@ class SimpleNameLookupTest(unittest.TestCase):
         # self.assertAlmostEqual(x_value, 2.0)
         # # TODO: What happens if we try to generate a casadi model for D in Pymoca 0.10?
 
-    @unittest.skip("Unskip when import name lookup is implemented")
     def test_unqualified_import_priority(self):
         """Tests that unqualified imports have lowest priority"""
         ast = parse_simple_lookup_file("UnqualifiedImportPriority.mo")
