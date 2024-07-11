@@ -501,21 +501,13 @@ class CompositeNameLookupTest(unittest.TestCase):
         self.assertIsNotNone(found)
 
     def test_need_for_temporary_flattening(self):
-        """A case @jackvreeken came up with in review comments of #307
+        """Test name lookup through 2 levels of inheritance with symbol value modifications
 
-        It's a case where ast.Class.find_class fails and tree.find_name
-        works, even without "temporary flattening" mentioned below.
-
-        Excerpt from outline of MLS:
-        3. If `A` is a Class:
-            1. `A` is temporarily flattened without modifiers
-        @jackvreeken wrote: Is there an example of this that used to fail?
-        E.g. extending from a class
-        that is part of contents of an extended class. Something like
-        ...
+        This is a case where ast.Class.find_class fails and tree.find_name
+        works, even if it is not "temporarily flattened" as mentioned in the
+        Modelica 3.5 spec section 5.3.2.
         """
         txt = """
-        // Added encapsulated to fix name lookup error detected by find_name
         class A
             // Doesn't have a class B itself, but gets one via C
             extends C(B.bla=2);
@@ -526,7 +518,7 @@ class CompositeNameLookupTest(unittest.TestCase):
             end B;
         end C;
         class M
-        extends A.B(bla=1);
+            extends A.B(bla=1);
         end M;
         """
         ast_tree = pymoca.parser.parse(txt)
