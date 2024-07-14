@@ -370,6 +370,7 @@ def _find_name(
         found = _find_rest_of_name(found, rest_of_name)
 
     # Maintaining backward compatibility by including InstanceTree (not strictly correct)
+    # TODO: (0.11) Remove InstanceTree to make spec compliant and fix test/models
     if not found and isinstance(scope, (ast.InstanceClass, InstanceTree)):
         # Not found in instance tree, look in class tree
         found = _find_name(
@@ -2223,9 +2224,11 @@ def expand_connectors(node: ast.Class) -> None:
                 operands = [op_spec[0] for op_spec in operand_specs]
             else:
                 operands = [
-                    op_spec[0]
-                    if op_spec[1]
-                    else ast.Expression(operator="-", operands=[op_spec[0]])
+                    (
+                        op_spec[0]
+                        if op_spec[1]
+                        else ast.Expression(operator="-", operands=[op_spec[0]])
+                    )
                     for op_spec in operand_specs
                 ]
             expr = operands[-1]
