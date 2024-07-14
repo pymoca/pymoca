@@ -10,7 +10,7 @@ import logging
 import math
 import sys
 from collections import OrderedDict
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
@@ -313,7 +313,7 @@ def _find_name(
     search_imports: bool = True,
     search_parent: bool = True,
     search_inherited: bool = True,
-    current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Internal start point for name lookup with extra parameters to control the lookup"""
     # Look for ast.Class or ast.Symbol per the MLS v3.5:
@@ -402,7 +402,7 @@ def _find_simple_name(
     search_imports: bool = True,
     search_parent: bool = True,
     search_inherited: bool = True,
-    current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
 
@@ -654,7 +654,7 @@ def _find_iteration_variable(name: str, scope: ast.Class) -> Optional[ast.Symbol
 def _find_inherited(
     name: str,
     scope: ast.Class,
-    current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Find simple name in inherited classes"""
     for extends in scope.extends:
@@ -663,8 +663,8 @@ def _find_inherited(
                 # We are in the middle of processing this one, don't do it infinitely :-)
                 continue
         else:
-            current_extends = []
-        current_extends.append(extends)
+            current_extends = set()
+        current_extends.add(extends)
 
         if isinstance(extends, ast.InstanceExtends):
             return _find_name(
@@ -699,7 +699,7 @@ def _find_inherited(
 def _find_imported(
     name: str,
     scope: ast.Class,
-    current_extends: Optional[List[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Find simple name in imports per MLS v3.5 section 13.2.1"""
     # TODO: Rewrite this to work with parser rewrite of import_clause handler.
