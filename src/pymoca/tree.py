@@ -659,9 +659,11 @@ def _find_inherited(
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Find simple name in inherited classes"""
     for extends in scope.extends:
+        # Avoid infinite recursion by keeping track of where we have been with current_extends
+        # A common case is when multiple classes in the same hierarchy extend the same class
+        # such as Icons in the Modelica Standard Library
         if current_extends:
             if extends in current_extends:
-                # We are in the middle of processing this one, don't do it infinitely :-)
                 continue
         else:
             current_extends = set()
