@@ -869,6 +869,8 @@ class InstanceTree(ast.Tree):
         #    (error if not) and only keep one if so (to preserve function argument order)
         # 6. Components are recursively instantiated
 
+        # TODO: Can we shortcut the partial instantiation of a partial instance with a copy/modify?
+
         # 1.1. Partially instantiate the element itself and 1.2 merge modifiers
         new_class = self._instantiate_partially(
             orig_class,
