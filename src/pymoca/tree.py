@@ -772,8 +772,13 @@ def _check_import_rules(
 
 
 class InstanceTree(ast.Tree):
-    """
-    The root class of an instance tree
+    """The root class of an instance tree
+
+    :param ast_ref: The root of the Abstract Syntax Tree (AST) produced by the parser
+
+    The InstanceTree contains a reference to an `ast.Tree` produced by the parser and a
+    method to instantiate a class ready for flattening. Built-in types, functions, and
+    operators are added to the root of the InstanceTree when it is created.
     """
 
     BUILTIN_TYPES = {
@@ -833,7 +838,15 @@ class InstanceTree(ast.Tree):
         # TODO: Add built-in functions (and operators?)
 
     def instantiate(self, class_name: str) -> ast.InstanceClass:
-        """Create an instance tree used in flattening"""
+        """Create an instance tree used in flattening
+
+        :param class_name: The name of the class to instantiate
+        :return: Instantiated class tree ready for flattening
+
+        Name lookup on the returned tree may still return an `ast.Class` or an
+        `ast.InstanceClass` with its `fully_instantiated` attribute set to `False`. If
+        so, the class will need to be fully instantiated for flattening.
+        """
         class_ = find_name(class_name, self.ast_ref)
         if class_ is None:
             raise NameLookupError(f"{class_name} not found in given tree")
@@ -846,12 +859,22 @@ class InstanceTree(ast.Tree):
     def _instantiate_class(
         self,
         orig_class: Union[ast.Class, ast.InstanceClass],
-        # Does InstanceElement need a fully_instantiated boolean flag?
         modification_environment: ast.ClassModification,
-        parent: ast.Class,
-        partially=True,
+        parent: Union[ast.Class, ast.InstanceClass],
     ) -> ast.InstanceClass:
-        # Outline from spec 3.5 section 5.6.1 *Instantiation*:
+        """Instantiate a class
+
+        :param orig_class: The class to be instantiated
+        :param modification_environment: The modification environment of the class
+            instance
+        :param parent: The parent class of the class instance
+        :return: The instantiated class
+
+        Implements the instantiation rules per Modelica Language Specification version
+        3.5 section 5.6.1.
+        """
+
+        # Outline of spec 3.5 section 5.6.1 *Instantiation*:
         # Definitions
         #   - Element: Class, Component (Symbol in Pymoca), or Extends Clause
         # 1. For element itself:
@@ -903,11 +926,11 @@ class InstanceTree(ast.Tree):
             new_class.symbols[name] = instance
 
         # 2.2 Copy local contents into the element itself
-        self._copy_class_contents(new_class, copy_extends=True, partially=partially)
+        self._copy_class_contents(new_class, copy_extends=True)
 
         # 3. Instantiate extends and 4. Check extends class lookup
         new_class.extends = self._instantiate_extends(
-            new_class.extends, modification_environment, new_class, partially
+            new_class.extends, modification_environment, new_class
         )
 
         # TODO: Step 5: Check and cull elements with same name in _instantiate_class
@@ -917,8 +940,7 @@ class InstanceTree(ast.Tree):
         for symbol in new_class.symbols.values():
             self._instantiate_symbol(symbol, new_class)
 
-        if not partially:
-            new_class.fully_instantiated = True
+        new_class.fully_instantiated = True
 
         return new_class
 
@@ -927,7 +949,6 @@ class InstanceTree(ast.Tree):
         extends_list: List[ast.ExtendsClause],
         modification_environment: ast.ClassModification,
         parent: ast.InstanceClass,
-        partially=True,
     ) -> List[ast.InstanceExtends]:
         # Make sure we do not modify the passed-in list directly
         extends_list_orig = extends_list
@@ -935,7 +956,7 @@ class InstanceTree(ast.Tree):
 
         for index, extends in enumerate(extends_list):
             extends_instance = self._instantiate_extends_single(
-                extends, modification_environment, parent, partially
+                extends, modification_environment, parent
             )
             extends_list[index] = extends_instance
 
@@ -968,7 +989,6 @@ class InstanceTree(ast.Tree):
         extends: ast.ExtendsClause,
         modification_environment: ast.ClassModification,
         parent: ast.InstanceClass,
-        partially=True,
     ) -> ast.InstanceExtends:
         # 3. For each element in the extends clauses of the current element:
         #   1. Apply steps 1 and 2 to the element, replacing the extends clause with the extends instance
@@ -999,9 +1019,7 @@ class InstanceTree(ast.Tree):
             extends.class_modification,
             modification_environment,
         )
-        extends_class = self._instantiate_class(
-            extends_class, extend_mod, extends_class.parent, partially
-        )
+        extends_class = self._instantiate_class(extends_class, extend_mod, extends_class.parent)
         extends_instance = ast.InstanceExtends(
             visibility=extends.visibility,
             **extends_class.__dict__,
@@ -1066,7 +1084,6 @@ class InstanceTree(ast.Tree):
                 symbol_type,
                 symbol.modification_environment,
                 symbol_type.parent,
-                False,
             )
 
         self._copy_symbol_contents(symbol)
@@ -1310,16 +1327,12 @@ class InstanceTree(ast.Tree):
         self,
         to_class: Union[ast.InstanceClass, ast.InstanceExtends],
         copy_extends=True,
-        partially=False,
     ) -> None:
         """Shallow copy of references from original to new class"""
         from_class = to_class.ast_ref
         to_class.imports.update(from_class.imports)
         if copy_extends:
             to_class.extends += from_class.extends
-        if partially:
-            # Copy only contents needed for name lookup
-            return
         to_class.equations += from_class.equations
         to_class.initial_equations += from_class.initial_equations
         to_class.statements += from_class.statements
