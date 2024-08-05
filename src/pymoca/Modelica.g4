@@ -72,8 +72,8 @@ enumeration_literal :
 composition :
     edef=element_list
     (
-        'public' epub=element_list
-        | 'protected' epro=element_list
+        'public' epub+=element_list
+        | 'protected' epro+=element_list
         | equation_section
         | algorithm_section
     )*
