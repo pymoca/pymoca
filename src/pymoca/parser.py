@@ -148,28 +148,17 @@ class ASTListener(ModelicaListener):
         class_node.extends.append(extends_clause)
 
     def exitComposition(self, ctx: ModelicaParser.CompositionContext):
-        for clause in self.ast[ctx.edef]:
-            if isinstance(clause, ast.ComponentClause):
-                for symbol in clause.symbol_list:
-                    symbol.visibility = ast.Visibility.PUBLIC
-            elif isinstance(clause, ast.ExtendsClause):
-                clause.visibility = ast.Visibility.PUBLIC
-
-        if ctx.epub is not None:
-            for clause in self.ast[ctx.epub]:
-                if isinstance(clause, ast.ComponentClause):
-                    for symbol in clause.symbol_list:
-                        symbol.visibility = ast.Visibility.PUBLIC
-                elif isinstance(clause, ast.ExtendsClause):
-                    clause.visibility = ast.Visibility.PUBLIC
-
-        if ctx.epro is not None:
-            for clause in self.ast[ctx.epro]:
-                if isinstance(clause, ast.ComponentClause):
-                    for symbol in clause.symbol_list:
+        # Set visibility if not the default public
+        if len(ctx.epro):
+            # Flatten the list of element lists from the parser into a list of elements
+            element_list = [self.ast[e] for el in ctx.epro for e in el.element()]
+            for element in element_list:
+                if isinstance(element, ast.ComponentClause):
+                    for symbol in element.symbol_list:
                         symbol.visibility = ast.Visibility.PROTECTED
-                elif isinstance(clause, ast.ExtendsClause):
-                    clause.visibility = ast.Visibility.PROTECTED
+                elif isinstance(element, (ast.ExtendsClause, ast.Class)):
+                    element.visibility = ast.Visibility.PROTECTED
+                # Visibility does not apply to ImportClause
 
         for eqlist in [self.ast[e] for e in ctx.equation_section()]:
             if eqlist is not None:
