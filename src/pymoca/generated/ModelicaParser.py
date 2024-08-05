@@ -1553,8 +1553,9 @@ class ModelicaParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
             self.edef = None # Element_listContext
-            self.epub = None # Element_listContext
-            self.epro = None # Element_listContext
+            self._element_list = None # Element_listContext
+            self.epub = list() # of Element_listContexts
+            self.epro = list() # of Element_listContexts
             self.ext_annotation = None # AnnotationContext
             self.comp_annotation = None # AnnotationContext
 
@@ -1634,14 +1635,16 @@ class ModelicaParser ( Parser ):
                     self.state = 275
                     self.match(ModelicaParser.T__22)
                     self.state = 276
-                    localctx.epub = self.element_list()
+                    localctx._element_list = self.element_list()
+                    localctx.epub.append(localctx._element_list)
                     pass
 
                 elif la_ == 2:
                     self.state = 277
                     self.match(ModelicaParser.T__23)
                     self.state = 278
-                    localctx.epro = self.element_list()
+                    localctx._element_list = self.element_list()
+                    localctx.epro.append(localctx._element_list)
                     pass
 
                 elif la_ == 3:

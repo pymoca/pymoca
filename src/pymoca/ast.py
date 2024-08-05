@@ -641,6 +641,7 @@ class Class(Node):
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.annotation = None  # type: Optional[ClassModification]
         self.parent = None  # type: Optional[Class]
+        self.visibility = Visibility.PUBLIC  # type: Visibility
 
         # TODO: Remove hard-wired tree.find_name() when done with prototype
         self.use_find_name(False)
