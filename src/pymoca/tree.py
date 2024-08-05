@@ -313,7 +313,7 @@ def _find_name(
     search_imports: bool = True,
     search_parent: bool = True,
     search_inherited: bool = True,
-    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Internal start point for name lookup with extra parameters to control the lookup"""
     # Look for ast.Class or ast.Symbol per the MLS v3.5:
@@ -403,7 +403,7 @@ def _find_simple_name(
     search_imports: bool = True,
     search_parent: bool = True,
     search_inherited: bool = True,
-    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
 
@@ -655,7 +655,7 @@ def _find_iteration_variable(name: str, scope: ast.Class) -> Optional[ast.Symbol
 def _find_inherited(
     name: str,
     scope: ast.Class,
-    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Find simple name in inherited classes"""
     for extends in scope.extends:
@@ -669,7 +669,7 @@ def _find_inherited(
             current_extends = set()
         current_extends.add(extends)
 
-        if isinstance(extends, ast.InstanceExtends):
+        if isinstance(extends, ast.InstanceClass):
             return _find_name(
                 name,
                 extends,
@@ -702,7 +702,7 @@ def _find_inherited(
 def _find_imported(
     name: str,
     scope: ast.Class,
-    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceExtends]]] = None,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
 ) -> Optional[Union[ast.Class, ast.Symbol]]:
     """Find simple name in imports per MLS v3.5 section 13.2.1"""
     # TODO: Rewrite this to work with parser rewrite of import_clause handler.
@@ -762,8 +762,7 @@ def _check_import_rules(
         else:
             message = f"{full_name} is not in a package so can't be imported"
         raise NameLookupError(message)
-    # TODO: Remove ast.Symbol test when visibility is added to ast.Class (see grammar)
-    if isinstance(element, ast.Symbol) and element.visibility != ast.Visibility.PUBLIC:
+    if element.visibility != ast.Visibility.PUBLIC:
         raise NameLookupError(f"Import {element.name} must not be protected")
     # We test on parent and name instead of just "is" because we may have a copy of a Class
     if element.parent is scope.parent and element.name == scope.name:
@@ -949,7 +948,7 @@ class InstanceTree(ast.Tree):
         extends_list: List[ast.ExtendsClause],
         modification_environment: ast.ClassModification,
         parent: ast.InstanceClass,
-    ) -> List[ast.InstanceExtends]:
+    ) -> List[ast.InstanceClass]:
         # Make sure we do not modify the passed-in list directly
         extends_list_orig = extends_list
         extends_list = extends_list.copy()
@@ -989,7 +988,7 @@ class InstanceTree(ast.Tree):
         extends: ast.ExtendsClause,
         modification_environment: ast.ClassModification,
         parent: ast.InstanceClass,
-    ) -> ast.InstanceExtends:
+    ) -> ast.InstanceClass:
         # 3. For each element in the extends clauses of the current element:
         #   1. Apply steps 1 and 2 to the element, replacing the extends clause with the extends instance
         # 4. Lookup classes of extends and ensure it is identical to lookup result from step 3
@@ -1019,17 +1018,11 @@ class InstanceTree(ast.Tree):
             extends.class_modification,
             modification_environment,
         )
-        extends_class = self._instantiate_class(extends_class, extend_mod, extends_class.parent)
-        # Convert the InstanceClass to InstanceExtends
-        # TODO: Add visibility to InstanceClass and eliminate the need for InstanceExtends
-        extends_instance = ast.InstanceExtends(
-            visibility=extends.visibility,
-            **extends_class.__dict__,
-        )
-        for class_ in extends_instance.classes.values():
-            class_.parent = extends_instance
-        for symbol in extends_instance.symbols.values():
-            symbol.parent = extends_instance
+        extends_instance = self._instantiate_class(extends_class, extend_mod, extends_class.parent)
+        # Extends nodes are "unnamed" per the spec
+        extends_instance.name = ""
+        # Imports are not inherited
+        extends_instance.imports = OrderedDict()
 
         # TODO: Is there another way to handle `extends.class_modification`? This seems like a hack.
         # _instantiate_partially removes from extend_mod, but not original modification_environment
@@ -1104,7 +1097,7 @@ class InstanceTree(ast.Tree):
             ast.InstanceSymbol,
         ],
         modification_environment: ast.ClassModification,
-        parent: Union[ast.Class, ast.InstanceClass, ast.InstanceExtends],
+        parent: Union[ast.Class, ast.InstanceClass],
     ) -> Union[ast.InstanceClass, ast.InstanceSymbol]:
         """Instantiate class per Modelica 3.5 spec, section 5.6.1, 'The element itself'"""
         # 1. For element itself:
@@ -1142,10 +1135,10 @@ class InstanceTree(ast.Tree):
                 parent=parent,
             )
 
-            # Merge visibility
-            if hasattr(parent, "visibility"):
-                if instance.visibility > parent.visibility:
-                    instance.visibility = parent.visibility
+        # Merge visibility
+        instance.visibility = ast_ref.visibility
+        if instance.visibility > parent.visibility:
+            instance.visibility = parent.visibility
 
         # 2. Modifiers are merged for the element itself (but contained references are resolved during flattening)
         # TODO: Factor out merging/applying modifiers to separate function
@@ -1332,7 +1325,7 @@ class InstanceTree(ast.Tree):
 
     def _copy_class_contents(
         self,
-        to_class: Union[ast.InstanceClass, ast.InstanceExtends],
+        to_class: ast.InstanceClass,
         copy_extends=True,
     ) -> None:
         """Shallow copy of references from original to new class"""

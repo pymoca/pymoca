@@ -928,7 +928,7 @@ class Class(Node):
 
 class InstanceElement:
     """
-    Base class for instance elements (symbols, classes, extends).
+    Base class for instance elements (symbols, classes, and "unnamed" extends classes)
 
     This is the "partially instantiated element" in spec 3.5 section 5.6.1.4.
     Includes name for lookup and type for redeclares during instantiation.
@@ -998,24 +998,6 @@ class InstanceSymbol(InstanceElement, Symbol):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-    def __repr__(self):
-        return f"{type(self).__name__}({super().__repr__()!s})"
-
-
-class InstanceExtends(InstanceElement, Class):
-    """
-    Placeholder for extends during instantiation/expansion of the model.
-    This is the "unnamed node" referenced in the language spec.
-    """
-
-    def __init__(self, visibility: Optional[Visibility] = Visibility.PUBLIC, **kwargs):
-        self.visibility = visibility
-        super().__init__(**kwargs)
-        # "Unnamed node" per spec (name lookup takes care of it)
-        self.name = ""
-        # Imports are not inherited
-        self.imports = OrderedDict()
 
     def __repr__(self):
         return f"{type(self).__name__}({super().__repr__()!s})"
