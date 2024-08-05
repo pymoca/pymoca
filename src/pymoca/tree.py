@@ -1021,10 +1021,17 @@ class InstanceTree(ast.Tree):
             modification_environment,
         )
         extends_class = self._instantiate_class(extends_class, extend_mod, extends_class.parent)
+        # Convert the InstanceClass to InstanceExtends
+        # TODO: Add visibility to InstanceClass and eliminate the need for InstanceExtends
         extends_instance = ast.InstanceExtends(
             visibility=extends.visibility,
             **extends_class.__dict__,
         )
+        for class_ in extends_instance.classes.values():
+            class_.parent = extends_instance
+        for symbol in extends_instance.symbols.values():
+            symbol.parent = extends_instance
+
         # TODO: Is there another way to handle `extends.class_modification`? This seems like a hack.
         # _instantiate_partially removes from extend_mod, but not original modification_environment
         # Reflect changes in extend_mod back into the passed-in modification env
@@ -1060,7 +1067,7 @@ class InstanceTree(ast.Tree):
         """Instantiate given symbol"""
 
         assert isinstance(symbol, ast.InstanceSymbol)
-        assert isinstance(parent, (ast.InstanceClass, ast.InstanceExtends))
+        assert isinstance(parent, ast.InstanceClass)
 
         if symbol.name in InstanceTree.BUILTIN_TYPES:
             symbol.fully_instantiated = True
