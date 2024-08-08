@@ -842,9 +842,11 @@ class InstanceTree(ast.Tree):
         :param class_name: The name of the class to instantiate
         :return: Instantiated class tree ready for flattening
 
-        Name lookup on the returned tree may still return an `ast.Class` or an
-        `ast.InstanceClass` with its `fully_instantiated` attribute set to `False`. If
-        so, the class will need to be fully instantiated for flattening.
+        The returned class will be fully instantiated, but name lookup
+        in the instance tree may return `ast.Class` or
+        `ast.InstanceClass` with the `fully_instantiated` flag set to
+        `False`. If so, these cases will need to be fully instantiated
+        for flattening by calling this method on the class.
         """
         class_ = find_name(class_name, self.ast_ref)
         if class_ is None:
