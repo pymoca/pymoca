@@ -1090,6 +1090,8 @@ class InstanceTree(ast.Tree):
 
         self._copy_symbol_contents(symbol)
 
+        symbol.fully_instantiated = True
+
     def _instantiate_partially(
         self,
         element: Union[
