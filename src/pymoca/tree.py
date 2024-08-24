@@ -598,9 +598,20 @@ def _flatten_first_and_find_rest(
     # Why do we have to temporarily flatten the class? Flattening requires name lookup
     # and with this name lookup requires flattening. Yikes! Can it be simplified?
 
+    # Existing InstanceTree, or a new one?
+    # In case of existing, where do we know where to put the class in the tree? I.e.
+    # what do we pass as the parent to the _instantiate_class argument?
+
+    # if isinstance(first, ast.InstanceClass):
+    #     instance_tree = first.root
+    # else:
+    #     instance_tree = first.root.instance_tree
+    instance_tree = InstanceTree(first.root)
+    instance = instance_tree._instantiate_class(first, ast.ClassModification(), instance_tree)
+
     # TODO: Per spec v3.5 section 5.3.2 bullet 4, class is temporarily flattened
     # For now, we use recursive name lookup in contained elements
-    found = _find_name(rest_of_name, first, search_parent=False)
+    found = _find_name(rest_of_name, instance, search_parent=False)
 
     # Check that found meets non-package lookup requirements in spec section 5.3.2
     # The found.name test is so we only check going left to right in composite name
@@ -609,7 +620,7 @@ def _flatten_first_and_find_rest(
         found is not None
         and found.name == _first_name(rest_of_name)
         and first.type != "package"
-        and not (isinstance(found, ast.Class) and found.encapsulated)
+        and not (isinstance(found, ast.Class) ) #and found.encapsulated)
     ):
         raise NameLookupError(f"{first.name} is not a package so {found.name} must be encapsulated")
 
@@ -823,6 +834,11 @@ class InstanceTree(ast.Tree):
     def __init__(self, ast_ref: ast.Tree, **kwargs):
         # The Class AST
         self.ast_ref = ast_ref
+
+        # HACK: Add a reference to the InstanceTree to the AST
+        # Currently not needed because we make a new InstanceTree when "temporary flattening",
+        # but not sure if that works in all cases? Or maybe that's exactly as it should be?
+        self.ast_ref.instance_tree = self
 
         super().__init__(**kwargs)
         self._create_builtins()
@@ -1175,8 +1191,16 @@ class InstanceTree(ast.Tree):
             for arg in instance.modification_environment.arguments:
                 if isinstance(arg.value, ast.ElementModification):
                     for elem_class_mod in arg.value.modifications:
-                        for sub_arg in elem_class_mod.arguments:
-                            apply_modification.arguments.append(sub_arg)
+                        if isinstance(elem_class_mod, ast.ClassModification):
+                            for sub_arg in elem_class_mod.arguments:
+                                apply_modification.arguments.append(sub_arg)
+                        else:
+                            a = 1
+                            mod_arg = ast.ClassModificationArgument(
+                                scope=element,
+                                value=elem_class_mod,
+                            )
+                            raise Exception()
                 elif isinstance(arg.value, ast.ShortClassDefinition):
                     apply_modification.arguments.append(arg)
 
