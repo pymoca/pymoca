@@ -657,6 +657,36 @@ class ParseTest(unittest.TestCase):
         # self.assertEqual(flat_tree.classes["C3"].symbols["c.v1"].nominal.value, 10.0)
         # self.assertEqual(flat_tree.classes["C3"].symbols["c.v2"].nominal.value, 1000.0)
 
+    def test_extends_encapsulated_class_modification(self):
+        """Test modification of an inherited encapsulated class
+
+        The model is similar to the one in name_lookup_test.test_need_for_temporary_flattening
+        """
+        txt = """
+        package P
+            class A
+                // Doesn't have a class B itself, but gets one via C
+                extends C(B(bla=2));
+            end A;
+            class C
+                encapsulated class B
+                    constant Integer bla = 0;
+                end B;
+            end C;
+            class M
+                extends A.B;
+            end M;
+        end P;
+        """
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("P.M")
+        self.assertIsNotNone(instance)
+        bla_type = instance.extends[0].symbols["bla"].type.symbols["Integer"]
+        bla_mod = bla_type.modification_environment.arguments[-1]
+        self.assertEqual(bla_mod.value.component.name, "value")
+        self.assertEqual(bla_mod.value.modifications[-1].value, 2)
+
     def test_inheritance_symbol_modifiers(self):
         with open(os.path.join(MODEL_DIR, "Inheritance.mo"), "r") as f:
             txt = f.read()
