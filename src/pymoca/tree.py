@@ -1122,6 +1122,8 @@ class InstanceTree(ast.Tree):
             )
             instance.annotation = ast.ClassModification()
             instance.replaceable = ast_ref.replaceable
+            instance.encapsulated = ast_ref.encapsulated
+            instance.partial = ast_ref.partial
 
             # TODO: Try connecting into class tree instead of doing _instantiate_parents_partially
             # Mirror class tree for name lookup in the InstanceTree
