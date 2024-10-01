@@ -1184,8 +1184,16 @@ class InstanceTree(ast.Tree):
             for arg in instance.modification_environment.arguments:
                 if isinstance(arg.value, ast.ElementModification):
                     for elem_class_mod in arg.value.modifications:
-                        for sub_arg in elem_class_mod.arguments:
-                            apply_modification.arguments.append(sub_arg)
+                        if isinstance(elem_class_mod, ast.Primary):
+                            apply_modification.arguments.append(
+                                ast.ClassModificationArgument(
+                                    value=elem_class_mod,
+                                    scope=instance,
+                                )
+                            )
+                        else:
+                            for sub_arg in elem_class_mod.arguments:
+                                apply_modification.arguments.append(sub_arg)
                 elif isinstance(arg.value, ast.ShortClassDefinition):
                     apply_modification.arguments.append(arg)
 
