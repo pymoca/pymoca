@@ -145,7 +145,9 @@ def _codegen_model(model_folder: str, f: ca.Function, library_name: str):
         compiler_flags = ["-O2", "-fPIC"]
         linker_flags = ["-fPIC"]
     else:
-        compiler_flags = ["/O2", "/wd4101"]  # Shut up unused local variable warnings.
+        # Shut up unused local variable warnings, and use workaround for
+        # NaN-constantness bug in recent Windows SDK versions.
+        compiler_flags = ["/O2", "/wd4101", "/D_UCRT_NOISY_NAN"]
         linker_flags = ["/DLL"]
 
     # Generate C code
