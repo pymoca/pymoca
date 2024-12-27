@@ -1,4 +1,5 @@
 """Generate parser code from given grammar file"""
+
 import os
 import subprocess
 

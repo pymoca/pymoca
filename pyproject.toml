@@ -5,22 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pymoca"
 dynamic = ["version"]
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 description = "A python/modelica based simulation environment."
 keywords = ["modelica", "simulation", "compiler"]
 readme = "README.md"
-authors = [
-    { name = "Pymoca Contributors" },
-]
+authors = [{ name = "Pymoca Contributors" }]
 maintainers = [
     { name = "Jack Vreeken", email = "jack@vreeken.me" },
     { name = "Kent Rutan", email = "gs1150e@icloud.com" },
 ]
-requires-python = ">=3.8"
-dependencies = [
-    "numpy >= 1.8.2",
-    "antlr4-python3-runtime == 4.13.*",
-]
+requires-python = ">=3.9"
+dependencies = ["numpy >= 1.8.2", "antlr4-python3-runtime == 4.13.*"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -68,7 +63,7 @@ parentdir_prefix = "pymoca-"
 
 [tool.black]
 line-length = 100
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 force-exclude = '''
     (
           src/pymoca/generated
