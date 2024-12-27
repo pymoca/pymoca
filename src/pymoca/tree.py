@@ -334,9 +334,9 @@ def flatten_extends(
                 extended_orig_class.modification_environment.arguments
             )
         else:
-            extended_orig_class.symbols[
-                "__value"
-            ].class_modification = extended_orig_class.modification_environment
+            extended_orig_class.symbols["__value"].class_modification = (
+                extended_orig_class.modification_environment
+            )
 
         extended_orig_class.modification_environment = ast.ClassModification()
 
@@ -1138,9 +1138,11 @@ def expand_connectors(node: ast.Class) -> None:
                 operands = [op_spec[0] for op_spec in operand_specs]
             else:
                 operands = [
-                    op_spec[0]
-                    if op_spec[1]
-                    else ast.Expression(operator="-", operands=[op_spec[0]])
+                    (
+                        op_spec[0]
+                        if op_spec[1]
+                        else ast.Expression(operator="-", operands=[op_spec[0]])
+                    )
                     for op_spec in operand_specs
                 ]
             expr = operands[-1]

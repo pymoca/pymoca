@@ -1,6 +1,7 @@
 """
 Analysis routines for simulation output.
 """
+
 import os
 from typing import Dict, List
 

@@ -1,6 +1,7 @@
 """
 This module contiains various mathematical models for a modelica model.
 """
+
 from typing import Any, Dict, List, Union
 
 import casadi as ca

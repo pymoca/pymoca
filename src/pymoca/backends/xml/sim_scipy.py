@@ -1,6 +1,7 @@
 """
 Scipy based model simulation.
 """
+
 import time
 from typing import Dict
 
