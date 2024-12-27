@@ -50,6 +50,9 @@ sympy = ["sympy>=0.7.6.1", "scipy>=0.13.3", "jinja2>=2.10.1"]
 examples = ["jupyterlab", "matplotlib", "control>=0.9.3.post2,<=0.10.0"]
 all = ["pymoca[casadi,lxml,sympy,examples]"]
 
+[tool.setuptools.dynamic]
+version = { attr = "pymoca.__version__" }
+
 # See the docstring in versioneer.py for instructions. Note that after changing
 # this section, run `versioneer install --no-vendor`, commit the results.
 
