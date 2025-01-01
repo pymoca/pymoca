@@ -1,5 +1,4 @@
-# <img alt="Pymoca" src="branding/icons/pymocalogo.svg" height="60">
-
+# <img alt="Pymoca" src="https://raw.githubusercontent.com/pymoca/pymoca/refs/heads/master/branding/icons/pymocalogo.svg" height="60">
 A Modelica to computer algebra system (CAS) translator written in Python.
 
 [![CI](https://github.com/pymoca/pymoca/workflows/CI/badge.svg)](https://github.com/pymoca/pymoca/actions?query=workflow%3ACI)
@@ -31,7 +30,7 @@ pip install "pymoca[all]"       # All of the above
 
 Pymoca reads and understands Modelica code (`pymoca.parser`) and provides access to an internal representation of the code called an Abstract Syntax Tree or AST (`pymoca.ast`). The AST is further processed to generate output in various formats (`pymoca.backends`). The `pymoca.tree` module provides functionality to transform the AST into a form that can be more easily used by the backends to generate the target output. In particular, `pymoca.tree` provides classes and functions to convert a hierarchical, object-oriented Modelica model of connected components into a "flat" system of equations and associated variables, parameters, and constants. Pymoca error checking is not always complete or easy to understand, so it is better to develop the Modelica code with other tools and then use Pymoca for translation.
 
-The [test suite](test) contains examples showing how to use Pymoca and the subset of Modelica that it currently supports.
+The [test suite](https://github.com/pymoca/pymoca/tree/master/test) contains examples showing how to use Pymoca and the subset of Modelica that it currently supports.
 
 Here is an example using a simple spring and damper model from the test suite:
 
@@ -66,8 +65,8 @@ print(casadi_model)
 
 Some more interesting examples are in Jupyter notebooks:
 
-* [Casadi Example](test/notebooks/Casadi.ipynb)
-* [Sympy Example](test/notebooks/Spring.ipynb)
+* [Casadi Example](https://github.com/pymoca/pymoca/blob/master/test/notebooks/Casadi.ipynb)
+* [Sympy Example](https://github.com/pymoca/pymoca/blob/master/test/notebooks/Spring.ipynb)
 
 ## Roadmap
 
