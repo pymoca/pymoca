@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pymoca"
 dynamic = ["version"]
 license = { file = "LICENSE" }
-description = "A python/modelica based simulation environment."
+description = "A Modelica to computer algebra system (CAS) translator."
 keywords = ["modelica", "simulation", "compiler"]
 readme = "README.md"
 authors = [{ name = "Pymoca Contributors" }]
