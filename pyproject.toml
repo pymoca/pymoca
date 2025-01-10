@@ -2,6 +2,58 @@
 requires = ["setuptools", "versioneer[toml]==0.29"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "pymoca"
+dynamic = ["version"]
+license = { file = "LICENSE" }
+description = "A Modelica to computer algebra system (CAS) translator."
+keywords = ["modelica", "simulation", "compiler"]
+readme = "README.md"
+authors = [{ name = "Pymoca Contributors" }]
+maintainers = [
+    { name = "Jack Vreeken", email = "jack@vreeken.me" },
+    { name = "Kent Rutan", email = "gs1150e@icloud.com" },
+]
+requires-python = ">=3.9"
+dependencies = ["numpy >= 1.8.2", "antlr4-python3-runtime == 4.13.*"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Other",
+    "Topic :: Software Development",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Operating System :: MacOS",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Embedded Systems",
+]
+
+[project.urls]
+homepage = "https://github.com/pymoca/pymoca"
+
+[project.optional-dependencies]
+# Note that we need setuptools for the distutils.ccompiler dependency
+# in the CasADi backend.
+casadi = ["casadi>=3.4.0", "setuptools>=60.0.0"]
+lxml = ["lxml>=3.5.0", "scipy>=0.13.3"]
+sympy = ["sympy>=0.7.6.1, <= 1.11", "scipy>=0.13.3", "jinja2>=2.10.1"]
+examples = ["jupyterlab", "matplotlib", "control>=0.9.3.post2,<=0.10.0"]
+all = ["pymoca[casadi,lxml,sympy,examples]"]
+
+# TODO: Uncomment this when moving away from versioneer.
+# [tool.setuptools.dynamic]
+# version = { attr = "pymoca.__version__" }
+
 # See the docstring in versioneer.py for instructions. Note that after changing
 # this section, run `versioneer install --no-vendor`, commit the results.
 
