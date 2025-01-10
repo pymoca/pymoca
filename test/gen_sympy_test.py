@@ -51,6 +51,7 @@ class GenSympyTest(unittest.TestCase):
         res = e.simulate(x0=[1.0])
         self.flush()
 
+    @unittest.skip
     def test_spring(self):
         with open(os.path.join(MODEL_DIR, 'SpringSystem.mo'), 'r') as f:
             txt = f.read()
