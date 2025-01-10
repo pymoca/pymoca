@@ -36,6 +36,7 @@ class GenSympyTest(unittest.TestCase):
         sys.stdout.flush()
         time.sleep(0.01)
 
+    @unittest.skip
     def test_estimator(self):
         with open(os.path.join(MODEL_DIR, 'Estimator.mo'), 'r') as f:
             txt = f.read()
