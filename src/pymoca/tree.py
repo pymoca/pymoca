@@ -631,6 +631,10 @@ def flatten_symbols(class_: ast.InstanceClass, instance_name="") -> ast.Class:
             for flat_class_symbol in flat_sub_class.symbols.values():
                 flat_class_symbol.dimensions = flat_sym.dimensions + flat_class_symbol.dimensions
 
+                # Keep track of how deeply a symbol is nested in arrays
+                flat_class_symbol.array_depth += sum(
+                    [not (isinstance(dim, ast.Primary) and dim.value == None) for dims in flat_sym.dimensions for dim in dims])
+
             # add sub_class members symbols and equations
             flat_class.classes.update(flat_sub_class.classes)
             flat_class.symbols.update(flat_sub_class.symbols)
