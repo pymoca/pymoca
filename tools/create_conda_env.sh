@@ -13,7 +13,7 @@ conda update -q conda
 conda info -a
 conda config --add channels conda-forge
 conda create -n pymoca python=3.9 || echo "environment already created"
-conda install -n pymoca gcc jinja2 matplotlib numpy scipy sympy
+conda install -n pymoca jinja2 matplotlib numpy scipy sympy
 source activate pymoca
 # Note: casadi installed using pip since conda version currently
 # not found by setup.py
