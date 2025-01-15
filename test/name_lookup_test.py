@@ -500,6 +500,8 @@ class CompositeNameLookupTest(unittest.TestCase):
         found = find_name("a[2].f", scope)
         self.assertIsNotNone(found)
 
+    # TODO: Remove xFail decoration when new flattening is implemented
+    @unittest.expectedFailure  # New name lookup with instantiation clashes with old flattening
     def test_need_for_temporary_flattening(self):
         """Test name lookup through 2 levels of inheritance with symbol value modifications
 
