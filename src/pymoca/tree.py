@@ -1172,49 +1172,40 @@ class InstanceTree(ast.Tree):
             ]
 
         # Shift modifiers down
-        if isinstance(element, ast.Class):
-            apply_modification = ast.ClassModification()
-            for arg in instance.modification_environment.arguments:
-                if isinstance(arg.value, ast.ElementModification):
-                    for elem_class_mod in arg.value.modifications:
-                        for sub_arg in elem_class_mod.arguments:
-                            apply_modification.arguments.append(sub_arg)
-                elif isinstance(arg.value, ast.ShortClassDefinition):
-                    apply_modification.arguments.append(arg)
-
-            instance.modification_environment = apply_modification
-        elif element.name not in InstanceTree.BUILTIN_TYPES:
-            # Symbol
-            if ast_ref.class_modification:
-                sym_mod = self._append_modifications(ast_ref.class_modification)
+        if instance.name not in InstanceTree.BUILTIN_TYPES:
+            if isinstance(element, ast.Symbol) and ast_ref.class_modification:
+                mod = self._append_modifications(ast_ref.class_modification)
             else:
-                sym_mod = ast.ClassModification()
+                mod = ast.ClassModification()
+
             for arg in instance.modification_environment.arguments:
                 if isinstance(arg.value, ast.ElementModification):
                     if arg.value.component.indices != [[None]]:
                         raise ModelicaSemanticError("Subscripting modifiers is not allowed.")
-                    if len(arg.value.component.child):
-                        # Move component reference down a level and apply modification to symbol
+                    if arg.value.component.child:
+                        # Move component reference down a level and apply modification
                         # Don't stomp on original that may be used elsewhere
                         arg = copy.copy(arg)
                         arg.value = copy.copy(arg.value)
                         arg.value.component = arg.value.component.child[0]
-                        sym_mod.arguments.append(arg)
+                        mod.arguments.append(arg)
                     else:
                         for sub_arg in arg.value.modifications:
                             if isinstance(sub_arg, ast.ClassModification):
-                                sym_mod.arguments += sub_arg.arguments
+                                mod.arguments += sub_arg.arguments
                             else:
                                 # Value modification - apply to symbol
                                 # Don't stomp on original that may be used elsewhere
                                 sub_arg = copy.copy(arg)
                                 sub_arg.value = copy.copy(arg.value)
                                 sub_arg.value.component = ast.ComponentRef(name="value")
-                                sym_mod.arguments.append(sub_arg)
+                                mod.arguments.append(sub_arg)
+                elif isinstance(arg.value, ast.ShortClassDefinition):
+                    mod.arguments.append(arg)
                 else:
-                    raise UnimplementedError(f"{arg.value.__class__} symbol modification")
+                    raise UnimplementedError(f"{arg.value.__class__} modification")
 
-            instance.modification_environment = sym_mod
+            instance.modification_environment = mod
 
         # TODO: Fix modification scope. It is often *not* the instance parent as done here!
         # Modification scope should be the parent of the class, extends, or symbol declaration
