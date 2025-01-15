@@ -430,36 +430,31 @@ def _find_simple_name(
 
     # Steps 1 - 7
     current_scope = scope
+
+    # Search through enclosing scopes until we find something or hit a boundary
     while True:
-        if (
-            (
-                found := _find_local(
-                    name,
-                    current_scope,
-                )
-            )
-            or search_inherited
-            and (
-                found := _find_inherited(
-                    name,
-                    current_scope,
-                    current_extends=current_extends,
-                )
-            )
-            or search_imports
-            and (
-                found := _find_imported(
-                    name,
-                    current_scope,
-                    current_extends=current_extends,
-                )
-            )
-            or not search_parent
-            or not current_scope.parent
-            or current_scope.encapsulated
-        ):
+
+        # Steps 1-3: Try local lookup first (iteration vars, classes, symbols)
+        if found := _find_local(name, current_scope):
             break
+
+        # Step 4: Look in inherited classes if enabled
+        if search_inherited:
+            if found := _find_inherited(name, current_scope, current_extends=current_extends):
+                break
+
+        # Steps 5-6: Look in imports if enabled
+        if search_imports:
+            if found := _find_imported(name, current_scope, current_extends=current_extends):
+                break
+
+        # Step 7a: Continue unless we should stop
+        if not search_parent or not current_scope.parent or current_scope.encapsulated:
+            break
+
+        # Step 7b: Move up to parent scope and continue searching
         current_scope = current_scope.parent
+
     # If name matches a variable (a.k.a. component a.k.a. symbol) in an enclosing class,
     # it must be a `constant`.
     if (
