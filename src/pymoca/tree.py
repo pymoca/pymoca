@@ -1135,9 +1135,7 @@ class InstanceTree(ast.Tree):
             )
 
         # Merge visibility
-        instance.visibility = ast_ref.visibility
-        if instance.visibility > parent.visibility:
-            instance.visibility = parent.visibility
+        instance.visibility = min(ast_ref.visibility, parent.visibility)
 
         # Modifiers are merged for the element itself
         # TODO: Factor out merging/applying modifiers to separate function
