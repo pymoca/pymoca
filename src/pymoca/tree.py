@@ -290,6 +290,95 @@ class TreeWalker:
             pass
 
 
+class TreePath(tuple):
+    """A path to a class or symbol in a tree"""
+
+    def __new__(
+        cls, *args: Union[ast.Class, ast.Symbol, ast.ExtendsClause, "TreePath"]
+    ) -> "TreePath":
+        # Expand any TreePath arguments
+        expanded_args = []
+        for arg in args:
+            if isinstance(arg, TreePath):
+                expanded_args.extend(arg)
+            else:
+                expanded_args.append(arg)
+        return super().__new__(cls, expanded_args)
+
+    def __getitem__(self, key):
+        result = super().__getitem__(key)
+        if isinstance(key, slice):
+            return TreePath(*result)
+        return result
+
+    def __str__(self) -> str:
+        names = []
+        for element in self:
+            if isinstance(element, ast.Tree):
+                continue
+            if isinstance(element, ast.ExtendsClause):
+                names.append(f"extends({element.component.name})")
+            else:
+                names.append(element.name)
+        return CLASS_SEPARATOR.join(names)
+
+    @property
+    def path(self) -> "TreePath":
+        if len(self) > 1:
+            return self[:-1]
+        else:
+            return TreePath()
+
+    @property
+    def leaf(self) -> Union[ast.Class, ast.Symbol]:
+        return self[-1]
+
+    def append_path(self, path: "TreePath") -> "TreePath":
+        """Append path to right, removing any leading duplicated items"""
+        index = 0
+        for index, (self_element, path_element) in enumerate(zip(self, path)):
+            if self_element != path_element:
+                break
+            if index == len(self) - 1:
+                return TreePath(*path)
+            if index == len(path) - 1:
+                return TreePath(*self)
+        return TreePath(*self, *path[index:])
+
+    def splice_path(self, path: "TreePath") -> "TreePath":
+        """Slice off path after self.leaf and append to self"""
+        index = 0
+        for index, path_element in enumerate(reversed(path)):
+            if path_element == self.leaf:
+                break
+            # Just return appended paths if self.leaf not found
+            if index == len(path) - 1:
+                return self.append_path(path)
+        return TreePath(*self, *path[len(path) - index :])
+
+
+def _build_path(element: Union[ast.Class, ast.Symbol, ast.ExtendsClause]) -> TreePath:
+    """Build path to root"""
+    path = []
+    current = element
+    while current:
+        path.insert(0, current)
+        current = getattr(current, "parent", None)
+    return TreePath(*path)
+
+
+def _join_extends_paths(extends_path: TreePath, component_path: TreePath) -> TreePath:
+    """Join paths from extends lookup"""
+    assert isinstance(extends_path[-1], ast.ExtendsClause)
+    component = extends_path[-1].component
+    index = 0
+    for index, element in enumerate(reversed(component_path)):  # noqa: B007
+        if hasattr(element, "name") and element.name == component.name:
+            break
+    comp_index = len(component_path) - index
+    return TreePath(*extends_path, *component_path[comp_index:])
+
+
 def find_name(
     name: Union[str, ast.ComponentRef],
     scope: ast.Class,
