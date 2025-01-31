@@ -4,6 +4,7 @@ package TreeModel
     end TreeTypes;
     package TreeParts
         type Oak = Real(nominal=1.0);
+        type Maple = Real(nominal=2.0);
         model Trunk
             replaceable type Wood = Real;
             Wood t;
@@ -20,6 +21,6 @@ package TreeModel
         Wood w;
         TreeParts.Branch b;
         TreeParts.Leaf l(c=1);
-        extends TreeParts.Trunk;
+        extends TreeParts.Trunk(redeclare type Wood = TreeParts.Maple);
     end Tree;
 end TreeModel;

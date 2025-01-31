@@ -974,13 +974,15 @@ class InstanceTree(ast.Tree):
         `False`. If so, these cases will need to be fully instantiated
         for flattening by calling this method on the class.
         """
-        class_ = find_name(class_name, self.ast_ref)
-        if class_ is None:
+        class_path = find_name_path(class_name, self.ast_ref)
+        if not class_path:
             raise NameLookupError(f"{class_name} not found in given tree")
+        class_ = class_path.leaf
         if isinstance(class_, ast.Symbol):
             raise InstantiationError(f"Found Symbol for {class_name} but need Class to instantiate")
+        # # Spec says to instantiate the class with root (self) as parent, so that's what we do
         instance = self._instantiate_class(class_, ast.ClassModification(), self)
-        self._instantiate_parents_partially(instance)
+        self.classes[instance.name] = instance
         return instance
 
     def _instantiate_class(
@@ -1005,7 +1007,7 @@ class InstanceTree(ast.Tree):
         # Definitions
         #   - Element: Class, Component (Symbol in Pymoca), or Extends Clause
         # 1. For element itself:
-        #   1. Create an instance of the class to be instantiated ("partially instantiated element")
+        #   1. Create an instance of the element to be instantiated ("partially instantiated element")
         #   2. Modifiers are merged for the element itself (but contained references are resolved during flattening)
         #   3. Redeclare of element itself is done
         # 2. For each element (Class or Component) in the local contents of the current element:
@@ -1065,6 +1067,7 @@ class InstanceTree(ast.Tree):
         # See `parse_test.test_instantiation_function_input_order`
 
         # 6. Recursively instantiate symbols
+        # Spec says "local and inherited", but we already did inherited
         for symbol in new_class.symbols.values():
             self._instantiate_symbol(symbol, new_class)
 
@@ -1122,12 +1125,13 @@ class InstanceTree(ast.Tree):
     ) -> ast.InstanceClass:
         """Instantiate a single extends clause"""
 
-        extends_class = _find_name(extends.component, parent, search_inherited=False)
+        extends_class_path = _find_name_path(extends.component, parent, search_inherited=False)
 
-        if extends_class is None:
+        if not extends_class_path:
             raise ModelicaSemanticError(
                 f"Extends name {extends.component} not found in scope {parent.full_reference()}"
             )
+        extends_class = extends_class_path.leaf
         if isinstance(extends_class, ast.Symbol):
             raise ModelicaSemanticError(
                 f"Cannot extend a Symbol: {extends.component} in {parent.full_reference()}"
@@ -1142,12 +1146,19 @@ class InstanceTree(ast.Tree):
             raise ModelicaSemanticError(
                 f"In {full_name} extends {comp}, {comp} and parents cannot be replaceable"
             )
+        # Instantiate the path and merge modifications to children
         # TODO: Check with spec about what to do with extends.class_modification in case of redeclare
         extend_mod = self._append_modifications(
-            extends.class_modification,
-            modification_environment,
+            extends.class_modification, modification_environment
         )
-        extends_instance = self._instantiate_class(extends_class, extend_mod, extends_class.parent)
+        extends_instance_path = self._instantiate_path_partially(extends_class_path, extend_mod)
+        extends_instance = extends_instance_path.leaf
+
+        # TODO: Find a better way to handle unnamed extends instances to avoid this hack
+        # Add the children of the extends instance and fully instantiate symbols
+        extends_instance = self._instantiate_class(
+            extends_instance, extend_mod, extends_instance.parent
+        )
         # Extends nodes are "unnamed" per the spec
         extends_instance.name = ""
         # Imports are not inherited
@@ -1195,9 +1206,10 @@ class InstanceTree(ast.Tree):
             return
 
         if not isinstance(symbol.type, ast.InstanceClass):
-            symbol_type = find_name(symbol.type, parent)
-            if symbol_type is None:
+            symbol_type_path = find_name_path(symbol.type, parent)
+            if not symbol_type_path:
                 raise NameLookupError(f"{symbol.type} not found in {parent.full_reference()}")
+            symbol_type = symbol_type_path.leaf
             if isinstance(symbol_type, ast.InstanceElement):
                 extend_args = [
                     arg
@@ -1207,10 +1219,16 @@ class InstanceTree(ast.Tree):
                 symbol.modification_environment.arguments = (
                     extend_args + symbol.modification_environment.arguments
                 )
+                symbol_type_parent = symbol_type.parent
+            else:
+                instance_path = self._instantiate_path_partially(
+                    symbol_type_path.path, ast.ClassModification()
+                )
+                symbol_type_parent = instance_path.leaf
             symbol.type = self._instantiate_class(
                 symbol_type,
                 symbol.modification_environment,
-                symbol_type.parent,
+                symbol_type_parent,
             )
 
         self._copy_symbol_contents(symbol)
@@ -1251,12 +1269,6 @@ class InstanceTree(ast.Tree):
                 partial=ast_ref.partial,
             )
 
-            # TODO: Try connecting into class tree instead of doing _instantiate_parents_partially
-            # Mirror class tree for name lookup in the InstanceTree
-            # TODO: Is there a better way to maintain the path to root for all classes?
-            if not isinstance(parent, (InstanceTree, ast.InstanceClass)):
-                self._instantiate_parents_partially(instance)
-
         else:
             # TODO: Try using Symbol (and Symbol.class_modification) instead of InstanceSymbol
             instance = ast.InstanceSymbol(
@@ -1269,12 +1281,21 @@ class InstanceTree(ast.Tree):
         instance.visibility = min(ast_ref.visibility, parent.visibility)
 
         # Modifiers are merged for the element itself
-        # TODO: Factor out merging/applying modifiers to separate function
+        self._apply_modifications(instance, element, modification_environment)
+
+        return instance
+
+    def _apply_modifications(
+        self,
+        instance: Union[ast.InstanceClass, ast.InstanceSymbol],
+        element: Union[ast.Class, ast.Symbol],
+        modification_environment: ast.ClassModification,
+    ) -> None:
         # Modifiers are added in reverse priority so the last one in the list overrides previous ones
         # TODO: Would on-the-fly culling modifiers of same attribute be more efficient?
 
         # Apply modifications for this instance
-        instance.modification_environment.arguments = [
+        apply_mod_args = [
             arg
             for arg in modification_environment.arguments
             if isinstance(arg.value, ast.ComponentClause)
@@ -1287,18 +1308,17 @@ class InstanceTree(ast.Tree):
             and element.name in InstanceTree.BUILTIN_TYPES
         ]
 
-        # Remove applied arguments from merged modification_environment
-        if instance.modification_environment.arguments:
+        # Remove from passed modification_environment and add to instance
+        if apply_mod_args:
             modification_environment.arguments = [
-                arg
-                for arg in modification_environment.arguments
-                if arg not in instance.modification_environment.arguments
+                arg for arg in modification_environment.arguments if arg not in apply_mod_args
             ]
+            instance.modification_environment.arguments += apply_mod_args
 
         # Shift modifiers down
         if instance.name not in InstanceTree.BUILTIN_TYPES:
-            if isinstance(element, ast.Symbol) and ast_ref.class_modification:
-                mod = self._append_modifications(ast_ref.class_modification)
+            if isinstance(element, ast.Symbol) and instance.ast_ref.class_modification:
+                mod = self._append_modifications(instance.ast_ref.class_modification)
             else:
                 mod = ast.ClassModification()
 
@@ -1342,51 +1362,52 @@ class InstanceTree(ast.Tree):
                 new_arg.scope = instance.parent
                 instance.modification_environment.arguments[index] = new_arg
 
-        return instance
-
-    def _instantiate_parents_partially(
+    def _instantiate_path_partially(
         self,
-        class_: ast.InstanceClass,
-    ) -> None:
-        ALREADY_CALLED_VAR = "_instantiate_parents_partially_in_progress"
+        path: TreePath,
+        modification_environment: ast.ClassModification,
+    ) -> TreePath:
+        """Partially instantiate nodes in path from root to leaf and apply modifications
 
-        # Use a static variable to detect the resursion
-        if hasattr(self, ALREADY_CALLED_VAR):
-            # Continue the recursion upwards
-            self._instantiate_parents_partially_helper(class_)
-        else:
-            setattr(self, ALREADY_CALLED_VAR, True)
+        Each node in the path will point its instantiated parent, but we can't add to
+        the parent's classes or symbols dicts. This is because we may have separate
+        instances in the same node with the same name (for example the same class with
+        different modifications) which is used a the dict key.
 
-            # Call below results in a different `class_.root` than `self`
-            self._instantiate_parents_partially_helper(class_)
+        Modifications are passed down and applied to applicable children in the path. We
+        pick up class_modifications from any extends clauses in the path and pass them
+        down also."""
 
-            # And now we merge the tree. Note that we then only do this once,
-            # for the first call to this function. Also update the parent refs.
-            self.extend(class_.root)
+        parent = self
+        child_mod = self._append_modifications(modification_environment)
+        for element in path:
+            if isinstance(element, ast.Tree):
+                continue
+            if isinstance(element, ast.ExtendsClause):
+                instance = self._instantiate_extends_single(element, child_mod, parent)
+                parent.extends.append(instance)
+            else:
+                # Check for existing instance in parent that may have modifications to be merged
+                if (
+                    isinstance(element, ast.Class)
+                    and element.name in parent.classes
+                    and element.name not in InstanceTree.BUILTIN_TYPES
+                ):
+                    instance = parent.classes[element.name]
+                else:
+                    instance = self._instantiate_partially(
+                        element,
+                        child_mod,
+                        parent,
+                    )
+            parent = instance
+            child_mod = self._append_modifications(parent.modification_environment, child_mod)
 
-            delattr(self, ALREADY_CALLED_VAR)
-
-    def _instantiate_parents_partially_helper(
-        self,
-        class_: ast.InstanceClass,
-    ) -> None:
-        """Patially instantiate parents up to root and connect to given instance tree
-
-        This ensures names can be found in the instance tree.
-        """
-        instance_class = class_
-        parent_class = instance_class.ast_ref.parent
-        if parent_class is None:
-            raise ValueError(f"Parent of {instance_class.ast_ref} unexpectedly None")
-        if isinstance(parent_class, ast.Tree):
-            instance_class.parent = InstanceTree(parent_class)
-            instance_class.parent.classes[instance_class.name] = instance_class
-            return
-        parent_instance = self._instantiate_partially(
-            parent_class, ast.ClassModification(), parent_class.parent
-        )
-        instance_class.parent = parent_instance
-        parent_instance.classes[instance_class.name] = instance_class
+        # Reflect changes in child_mod back into the passed-in modification env
+        modification_environment.arguments = [
+            arg for arg in modification_environment.arguments if arg in child_mod.arguments
+        ]
+        return _build_path(parent)
 
     def _append_modifications(self, *mods: ast.ClassModification) -> ast.ClassModification:
         """Append modifications in order given"""

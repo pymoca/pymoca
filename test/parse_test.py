@@ -233,18 +233,34 @@ class ParseTest(unittest.TestCase):
             msg=f"\nFound non-instances in InstanceTree:\n{non_instances}",
         )
 
-        # Check that we merged the tree correctly when instantiating parents
-        self.assertIn("TreeModel", instance.root.classes)
-
-        tree_model = instance.root.classes["TreeModel"]
-        self.assertIn("TreeTypes", tree_model.classes)
-        self.assertIn("TreeParts", tree_model.classes)
-        self.assertIn("Tree", tree_model.classes)
-
-        tree_parts = instance.root.classes["TreeModel"].classes["TreeParts"]
-        self.assertIn("Trunk", tree_parts.classes)
-        self.assertIn("Branch", tree_parts.classes)
-        self.assertIn("Leaf", tree_parts.classes)
+        # Check that we instantiated the tree correctly
+        # First check that all symbols are present
+        self.assertListEqual(sorted(instance.symbols), ["b", "l", "w"])
+        self.assertIn("t", instance.extends[0].symbols)
+        # Check redeclare of w
+        w = instance.symbols["w"]
+        self.assertEqual(w.type.ast_ref.name, "Maple")
+        w_mod = w.type.extends[0].symbols["Real"].modification_environment.arguments[-1]
+        self.assertEqual(w_mod.value.component.name, "nominal")
+        self.assertAlmostEqual(w_mod.value.modifications[0].value, 2.0)
+        # Check redeclare of b.t
+        b_t = instance.symbols["b"].type.extends[0].symbols["t"]
+        self.assertEqual(b_t.type.ast_ref.name, "Oak")
+        b_t_mod = b_t.type.extends[0].symbols["Real"].modification_environment.arguments[-1]
+        self.assertEqual(b_t_mod.value.component.name, "nominal")
+        self.assertAlmostEqual(b_t_mod.value.modifications[0].value, 1.0)
+        # Check modification of l.c
+        l_c = instance.symbols["l"].type.symbols["c"]
+        self.assertEqual(l_c.type.extends[0].ast_ref.name, "Integer")
+        l_c_mod = l_c.type.extends[0].symbols["Integer"].modification_environment.arguments[-1]
+        self.assertEqual(l_c_mod.value.component.name, "value")
+        self.assertEqual(l_c_mod.value.modifications[0].value, 1)
+        # Check inherited symbol t redeclare
+        t = instance.extends[0].symbols["t"]
+        self.assertEqual(t.type.ast_ref.name, "Maple")
+        t_mod = t.type.extends[0].symbols["Real"].modification_environment.arguments[-1]
+        self.assertEqual(t_mod.value.component.name, "nominal")
+        self.assertAlmostEqual(t_mod.value.modifications[0].value, 2.0)
 
     @unittest.skip("Only keeping first of same names not implemented yet in instantiation")
     def test_instantiation_function_input_order(self):
