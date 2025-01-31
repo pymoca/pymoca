@@ -14,10 +14,10 @@ def _get_hatch_version():
     import os
 
     try:
+        import hatch_vcs  # noqa: F401
         from hatchling.metadata.core import ProjectMetadata
         from hatchling.plugin.manager import PluginManager
         from hatchling.utils.fs import locate_file
-        import hatch_vcs  # noqa: F401
     except ImportError:
         # Hatchling and/or hatch-vcs are not installed, so probably we are not
         # in a development environment.

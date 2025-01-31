@@ -67,14 +67,16 @@ include = [
   "/src/pymoca/backends/xml/ModelicaXML/schemas/*.xsd"
 ]
 
-[tool.black]
+[tool.ruff]
+lint.ignore = [
+    "B006", # use mutable data structures for argument defaults
+]
 line-length = 100
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
-force-exclude = '''
-    (
-          src/pymoca/generated
-        | src/pymoca/_version.py
-        | test/generated
-        | test/libraries
-    )
-'''
+lint.select = [
+    "B", # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "E", # default / pycodestyle
+    "F", # default / pyflakes
+    "I", # isort
+    "W", # pycodestyle
+]

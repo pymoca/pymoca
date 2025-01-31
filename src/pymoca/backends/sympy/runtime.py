@@ -5,9 +5,7 @@ from __future__ import division, print_function
 from typing import List
 
 import numpy as np
-
 import scipy.integrate
-
 import sympy
 
 

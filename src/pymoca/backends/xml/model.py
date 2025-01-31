@@ -28,7 +28,7 @@ class CasadiModel:
             with_jit = True
             compiler = "shell"
         else:
-            print("WARNING; running without jit. " "This may result in very slow evaluation times")
+            print("WARNING; running without jit. This may result in very slow evaluation times")
             with_jit = False
             compiler = ""
         self.func_opt = {"jit": with_jit, "compiler": compiler}

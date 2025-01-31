@@ -6,7 +6,6 @@ import os
 from typing import Dict, List
 
 import matplotlib as mpl
-
 import numpy as np
 
 if os.environ.get("DISPLAY", "") == "":

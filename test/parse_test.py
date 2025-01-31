@@ -2,7 +2,8 @@
 """
 Modelica parse Tree to AST tree.
 """
-from __future__ import absolute_import, division, print_function, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import contextlib
 import enum
@@ -18,11 +19,8 @@ import unittest
 from pathlib import Path
 
 import pymoca
-from pymoca import ast
-from pymoca import parser
-from pymoca import tree
+from pymoca import ast, parser, tree
 from pymoca.parser import DEFAULT_MODEL_CACHE_DB
-
 
 MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(MY_DIR, "models")

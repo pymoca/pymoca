@@ -2,6 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
@@ -27,7 +28,6 @@ from . import ast
 from .generated.ModelicaLexer import ModelicaLexer
 from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
-
 
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)

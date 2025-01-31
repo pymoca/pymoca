@@ -5,7 +5,6 @@ import sys
 from collections import OrderedDict, namedtuple
 
 import casadi as ca
-
 import numpy as np
 
 from ._options import _merge_default_options
@@ -194,9 +193,9 @@ class Model:
             return []
 
         symbols_mx = ca.symvar(ca.veccat(*equations))
-        assert all(
-            x.shape == (1, 1) for x in symbols_mx
-        ), "Vector/Matrix SX symbols cannot be mapped"
+        assert all(x.shape == (1, 1) for x in symbols_mx), (
+            "Vector/Matrix SX symbols cannot be mapped"
+        )
 
         f_mx = ca.Function("tmp_mx", symbols_mx, equations).expand()
         symbols_sx = [ca.SX.sym(x.name(), *x.shape) for x in symbols_mx]
@@ -1081,9 +1080,9 @@ class Model:
                     # symbols for the evaluation, we can figure out what the
                     # real dependencies are.
                     s_mx = ca.symvar(eq)
-                    assert all(
-                        x.shape == (1, 1) for x in s_mx
-                    ), "Vector/Matrix SX symbols cannot be mapped"
+                    assert all(x.shape == (1, 1) for x in s_mx), (
+                        "Vector/Matrix SX symbols cannot be mapped"
+                    )
                     f = ca.Function("tmp", s_mx, [eq]).expand()
                     s_sx = [ca.SX.sym(x.name(), *x.shape) for x in s_mx]
                     eq_sx = f.call(s_sx)[0]

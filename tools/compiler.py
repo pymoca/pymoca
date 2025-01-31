@@ -4,6 +4,7 @@
 This duplicates some things in casadi.api, but is useful for other backends
 TODO: Perhaps refactor the parts common with casadi backend
 """
+
 from __future__ import generators
 
 import argparse

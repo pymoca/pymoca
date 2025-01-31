@@ -2,6 +2,7 @@
 """
 Modelica AST definitions
 """
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
@@ -226,9 +227,7 @@ class ComponentRef(Node):
 class Expression(Node):
     def __init__(self, **kwargs):
         self.operator = None  # type: Union[str, ComponentRef]
-        self.operands = (
-            []
-        )  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.operands = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
         super().__init__(**kwargs)
 
     def __repr__(self):
@@ -239,12 +238,8 @@ class Expression(Node):
 
 class IfExpression(Node):
     def __init__(self, **kwargs):
-        self.conditions = (
-            []
-        )  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
-        self.expressions = (
-            []
-        )  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.expressions = []  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
         super().__init__(**kwargs)
 
     def __repr__(self):
@@ -255,12 +250,8 @@ class IfExpression(Node):
 
 class Equation(Node):
     def __init__(self, **kwargs):
-        self.left = (
-            None
-        )  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
-        self.right = (
-            None
-        )  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.left = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
+        self.right = None  # type: Union[Expression, Primary, ComponentRef, List[Union[Expression, Primary, ComponentRef]]]
         self.comment = ""  # type: str
         super().__init__(**kwargs)
 
@@ -271,9 +262,7 @@ class Equation(Node):
 class IfEquation(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.blocks = (
-            []
-        )  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
+        self.blocks = []  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
         self.comment = ""  # type: str
         super().__init__(**kwargs)
 
@@ -286,9 +275,7 @@ class IfEquation(Node):
 class WhenEquation(Node):
     def __init__(self, **kwargs):
         self.conditions = []  # type: List[Union[Expression, Primary, ComponentRef]]
-        self.blocks = (
-            []
-        )  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
+        self.blocks = []  # type: List[List[Union[Expression, ForEquation, ConnectClause, IfEquation]]]
         self.comment = ""  # type: str
         super().__init__(**kwargs)
 
@@ -423,9 +410,7 @@ class Symbol(Node):
         self.final = False  # type: bool
         self.inner = False  # type: bool
         self.outer = False  # type: bool
-        self.dimensions = [
-            [Primary(value=None)]
-        ]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
+        self.dimensions = [[Primary(value=None)]]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
         self.comment = ""  # type: str
         self.start = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.min = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
@@ -453,9 +438,7 @@ class ComponentClause(Node):
     def __init__(self, **kwargs):
         self.prefixes = []  # type: List[str]
         self.type = ComponentRef()  # type: ComponentRef
-        self.dimensions = [
-            [Primary(value=None)]
-        ]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
+        self.dimensions = [[Primary(value=None)]]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
         self.comment = []  # type: List[str]
         self.symbol_list = []  # type: List[Symbol]
         super().__init__(**kwargs)
@@ -517,9 +500,7 @@ class ImportClause(Node):
 class ElementModification(Node):
     def __init__(self, **kwargs):
         self.component = ComponentRef()  # type: ComponentRef
-        self.modifications = (
-            []
-        )  # type: List[Union[Primary, Expression, ClassModification, Array, ComponentRef]]
+        self.modifications = []  # type: List[Union[Primary, Expression, ClassModification, Array, ComponentRef]]
         super().__init__(**kwargs)
 
     def __repr__(self):
@@ -617,9 +598,7 @@ class Class(Node):
         self.functions = OrderedDict()  # type: OrderedDict[str, Class]
         self.initial_equations = []  # type: List[Union[Equation, ForEquation]]
         self.equations = []  # type: List[Union[Equation, ForEquation, ConnectClause]]
-        self.initial_statements = (
-            []
-        )  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
+        self.initial_statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.statements = []  # type: List[Union[AssignmentStatement, IfStatement, ForStatement]]
         self.annotation = []  # type: Union[Type[None], ClassModification]
         self.parent = None  # type: Class
@@ -650,9 +629,7 @@ class Class(Node):
                 if search_imports:
                     if component_ref.name in self.imports:
                         # First search qualified imports (most common case)
-                        import_ = self.imports[
-                            component_ref.name
-                        ]  # type: Union[ImportClause, ComponentRef]
+                        import_ = self.imports[component_ref.name]  # type: Union[ImportClause, ComponentRef]
                         if isinstance(import_, ImportClause):
                             # Expand short name
                             if component_ref.child:
