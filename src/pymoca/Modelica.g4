@@ -70,10 +70,10 @@ enumeration_literal :
 
 // B.2.2.7 ------------------------------------------------
 composition :
-    epriv=element_list
+    edef=element_list
     (
-        'public' epub=element_list
-        | 'protected' epro=element_list
+        'public' epub+=element_list
+        | 'protected' epro+=element_list
         | equation_section
         | algorithm_section
     )*

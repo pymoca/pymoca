@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Union  # noqa: F401
 
 import antlr4
 import antlr4.Parser
+from antlr4 import ParserRuleContext
 
 import pymoca
 
@@ -37,6 +38,23 @@ logger = logging.getLogger("pymoca")
 
 
 DEFAULT_MODEL_CACHE_DB = "model_txt_cache.db"
+
+
+class ModelicaSyntaxError(SyntaxError):
+    """SyntaxError built from an ANTLR context object"""
+
+    def __init__(self, message: str, ctx: ParserRuleContext, file_name: str = ""):
+        # file_name defaults to empty because our current parser takes text str only
+        line1 = ctx.start.line
+        col1 = ctx.start.column
+        line2 = ctx.stop.line
+        col2 = ctx.stop.column
+        text = ctx.start.source[1].strdata.splitlines()
+        error_text = text[line1 - 1]
+        for line in range(line1, line2):
+            error_text += text[line]
+        # last two args were were added in Python 3.10, previous will ignore
+        super().__init__(message, line1, col1, error_text, file_name, line2, col2)
 
 
 class ModelicaFile:
@@ -107,6 +125,8 @@ class ASTListener(ModelicaListener):
             type=ctx.class_prefixes().class_type().getText(),
             component=self.ast[ctx.component_reference()],
         )
+        if ctx.class_modification() is not None:
+            self.ast[ctx].class_modification = self.ast[ctx.class_modification()]
 
     def exitClass_spec_comp(self, ctx: ModelicaParser.Class_spec_compContext):
         class_node = self.class_node
@@ -128,28 +148,17 @@ class ASTListener(ModelicaListener):
         class_node.extends.append(extends_clause)
 
     def exitComposition(self, ctx: ModelicaParser.CompositionContext):
-        for clause in self.ast[ctx.epriv]:
-            if isinstance(clause, ast.ComponentClause):
-                for symbol in clause.symbol_list:
-                    symbol.visibility = ast.Visibility.PRIVATE
-            elif isinstance(clause, ast.ExtendsClause):
-                clause.visibility = ast.Visibility.PRIVATE
-
-        if ctx.epub is not None:
-            for clause in self.ast[ctx.epub]:
-                if isinstance(clause, ast.ComponentClause):
-                    for symbol in clause.symbol_list:
-                        symbol.visibility = ast.Visibility.PUBLIC
-                elif isinstance(clause, ast.ExtendsClause):
-                    clause.visibility = ast.Visibility.PUBLIC
-
-        if ctx.epro is not None:
-            for clause in self.ast[ctx.epro]:
-                if isinstance(clause, ast.ComponentClause):
-                    for symbol in clause.symbol_list:
+        # Set visibility if not the default public
+        if len(ctx.epro):
+            # Flatten the list of element lists from the parser into a list of elements
+            element_list = [self.ast[e] for el in ctx.epro for e in el.element()]
+            for element in element_list:
+                if isinstance(element, ast.ComponentClause):
+                    for symbol in element.symbol_list:
                         symbol.visibility = ast.Visibility.PROTECTED
-                elif isinstance(clause, ast.ExtendsClause):
-                    clause.visibility = ast.Visibility.PROTECTED
+                elif isinstance(element, (ast.ExtendsClause, ast.Class)):
+                    element.visibility = ast.Visibility.PROTECTED
+                # Visibility does not apply to ImportClause
 
         for eqlist in [self.ast[e] for e in ctx.equation_section()]:
             if eqlist is not None:
@@ -535,7 +544,26 @@ class ASTListener(ModelicaListener):
     def exitElement(self, ctx: ModelicaParser.ElementContext):
         self.ast[ctx] = self.ast[ctx.getChild(ctx.getAltNumber())]
 
-    # TODO: Clean this up (inheritance or different import clause classes?)
+    # TODO: Rewrite this as follows:
+    # Simple Name Lookup (the first step of name lookup) is by import name as follows:
+    # Import name of A.B.C is C, so ast.Class.imports dictionary key is C for simple name lookup.
+    # Import name of D = A.B.C is D, so D is the dictionary key and element C is the value.
+    # Import names of A.B.{C,D} are C and D, both added as keys.
+    # The special case of import A.B.* is processed during lookup (it is uncommon and may be expensive);
+    # in this case the dictionary key is "*" and the value is a list containing all of the
+    # A.B, E.F, G, ... package refs, each of which is prepended to the import name for
+    # Global Name Lookup (MLS 5.3.3). We could choose to make the Class.imports values
+    # always a list to make it homogeneous, with most cases being len() == 1,
+    # but this might make most cases slower. I'm leaning toward heterogeneous values.
+    # The Class.imports dictionary values are the fully qualified ComponentRef for
+    # Composite Name Lookup (see MLS), but imports should be skipped for this lookup.
+    # All Class.imports values are ComponentRef, or List[ComponentRef] for A.B.* type imports.
+    # Clean up the logic (inheritance or different import clause classes?, ANTLR rule labels?)
+    # Checks:
+    # 1. ast.Class.imports key is not already there (see spec 13.2.2 last bullet).
+    #    This check should be in a separate function to be used also during the just-in-time
+    #    A.B.* processing.
+    # 2. For A.B.C or A.B.*, A.B must be a package.
     def exitImport_clause(self, ctx: ModelicaParser.Import_clauseContext):
         import_clause = ast.ImportClause()
         self.ast[ctx] = import_clause
@@ -557,6 +585,7 @@ class ASTListener(ModelicaListener):
                 import_clause.unqualified = True
         if import_clause.short_name:
             # import_clause instead of comp_ref signifies short_name
+            self._check_not_already_imported(import_clause.short_name, ctx)
             self.class_node.imports[import_clause.short_name] = import_clause
         elif import_clause.unqualified:
             # Postpone processing this uncommon case until actually needed
@@ -569,10 +598,13 @@ class ASTListener(ModelicaListener):
             # Simple case, fast lookup
             for comp in import_clause.components:
                 name = comp.to_tuple()[-1]
-                # Check for name clashes
-                if name in self.class_node.imports:
-                    raise IOError(name, "already imported")
+                self._check_not_already_imported(name, ctx)
                 self.class_node.imports[name] = comp
+
+    def _check_not_already_imported(self, import_name: str, ctx: ParserRuleContext) -> None:
+        """Check for import name clashes"""
+        if import_name in self.class_node.imports:
+            raise ModelicaSyntaxError(f"{import_name} already imported", ctx)
 
     def enterExtends_clause(self, ctx: ModelicaParser.Extends_clauseContext):
         self.in_extends_clause = True
@@ -600,6 +632,7 @@ class ASTListener(ModelicaListener):
             self.ast[ctx] = self.ast[ctx.comp_elem]
         else:
             self.ast[ctx] = self.ast[ctx.class_elem]
+            self.ast[ctx].replaceable = True
 
     def enterComponent_clause(self, ctx: ModelicaParser.Component_clauseContext):
         prefixes = ctx.type_prefix().getText().split(" ")
@@ -654,14 +687,14 @@ class ASTListener(ModelicaListener):
             s.type = copy.deepcopy(clause.type)
 
     def enterComponent_declaration(self, ctx: ModelicaParser.Component_declarationContext):
-        sym = ast.Symbol(order=self.sym_count)
+        sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
         self.comp_clause.symbol_list += [sym]
 
     def enterComponent_declaration1(self, ctx: ModelicaParser.Component_declaration1Context):
-        sym = ast.Symbol(order=self.sym_count)
+        sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
         self.sym_count += 1
         self.ast[ctx] = sym
         self.symbol_node = sym
@@ -671,7 +704,7 @@ class ASTListener(ModelicaListener):
         if self.symbol_node is not None:
             self.ast[ctx] = self.symbol_node
         else:
-            sym = ast.Symbol(order=self.sym_count)
+            sym = ast.Symbol(order=self.sym_count, parent=self.class_node)
             self.sym_count += 1
             self.ast[ctx] = sym
             self.symbol_node = sym

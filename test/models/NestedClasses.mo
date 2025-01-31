@@ -7,3 +7,8 @@ end C1;
 class C2
     extends C1(Voltage(nominal=1000));
 end C2;
+
+// This class was added to also test nested symbol modification
+class C3
+    C2 c(v1(nominal=10));
+end C3;

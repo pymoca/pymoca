@@ -7,9 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import copy  # TODO
 import logging
+import math
 import sys
 from collections import OrderedDict
-from typing import Iterable, Union
+from typing import Iterable, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
@@ -22,6 +23,34 @@ logger = logging.getLogger("pymoca")
 
 # TODO Flatten function vs. conversion classes
 class ModificationTargetNotFound(Exception):
+    pass
+
+
+class ModelicaError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+        super().__init__(self)
+
+    def __str__(self) -> str:
+        return str(self.msg)
+
+    def __repr__(self) -> str:
+        return type(self).__name__ + "(" + str(self) + ")"
+
+
+class ModelicaSemanticError(ModelicaError):
+    pass
+
+
+class NameLookupError(ModelicaError):
+    pass
+
+
+class InstantiationError(ModelicaError):
+    pass
+
+
+class UnimplementedError(Exception):
     pass
 
 
@@ -209,8 +238,10 @@ class TreeWalker:
         endless recursion by skipping references to e.g. parent nodes.
         :return: True if child needs to be skipped, False otherwise.
         """
-        if (isinstance(tree, ast.Class) and child_name == "parent") or (
-            isinstance(tree, ast.ClassModificationArgument)
+        if (
+            isinstance(tree, (ast.Class, ast.Symbol))
+            and child_name == "parent"
+            or isinstance(tree, ast.ClassModificationArgument)
             and child_name in ("scope", "__deepcopy__")
         ):
             return True
@@ -257,6 +288,1065 @@ class TreeWalker:
                 self.handle_walk(listener, tree[i])
         else:
             pass
+
+
+def find_name(
+    name: Union[str, ast.ComponentRef],
+    scope: ast.Class,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Modelica name lookup on a tree of ast.Class and ast.InstanceClass starting at scope class
+
+    :param name: name to look up (can be a Class or Symbol name)
+    :param scope: scope in which to start name lookup
+
+    Implements lookup rules per Modelica Language Specification version 3.5 chapter 5,
+    see also chapter 13. This is more succinctly outlined in the "Modelica by Example"
+    book https://mbe.modelica.university/components/packages/lookup/
+    """
+
+    return _find_name(name, scope)
+
+
+def _find_name(
+    name: Union[str, ast.ComponentRef],
+    scope: ast.Class,
+    search_imports: bool = True,
+    search_parent: bool = True,
+    search_inherited: bool = True,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Internal start point for name lookup with extra parameters to control the lookup"""
+    # Look for ast.Class or ast.Symbol per the MLS v3.5:
+    # 1. Simple Name Lookup (spec 5.3.1)
+    #     0.1 Predefined types (`Real`, `Integer`, `Boolean`, `String`) (spec 4.8)
+    #     0.2 The scope itself (the given scope is the name)
+    #     1. Iteration variables
+    #     2. Classes
+    #     3. Components (Symbols in Pymoca)
+    #     4. Classes and Components from Extends Clauses
+    #     5. Qualified Import names, see 4 (but not from Extends Clauses) (spec 13.2.1)
+    #     6. Public Unqualified Imports (error if multiple are found) (spec 13.2.1)
+    #     7. Repeat 1-6 for each lexically enclosing instance scope, stopping at
+    #        `encapsulated`
+    #     unless predefined type, function, operator. If name matches a variable (a.k.a.
+    #     component, symbol) in an enclosing class, it must be a `constant`.
+    # 2. Composite Name Lookup (e.g. `A.B.C`) (spec 5.3.2)
+    #     1. `A` is looked up using Simple Name Lookup
+    #     2. If `A` is a Component:
+    #         1. `B.C` is looked up from named component elements of `A`
+    #         2. If not found and if `A.B.C` is used as a function call and `A` is a
+    #            scalar or can be
+    #         evaluated as a scalar from an array and `B` and `C` are classes, it is a
+    #         non-operator function call.
+    #     3. If `A` is a Class:
+    #         1. `A` is temporarily flattened without modifiers
+    #         2. `B.C` is looked up among named elements of temp flattened class,
+    #         but if `A` is not a package, lookup is restricted to `encapsulated` elements
+    #         only and "the class we look inside shall not be partial in a simulation
+    #         model".
+    # 3. Global Name Lookup (e.g. `.A.B.C`) (spec 5.3.3)
+    #     1. `A` is looked up in global scope. (`A` must be a class or a global constant.)
+    #     2. If `A` is a class, follow procedure 2.3.
+    # 4. Imported Name Lookup (e.g. `A.B.C`, `D = A.B.C`, `A.B.*`, or `A.B.{C,D}`) (spec
+    #    13.2.1)
+    #     1. `A` is looked up in global scope
+    #     2. `B.C` (and `B.D`) or `B.*` is looked up. `A.B` must be a package.
+    # TODO: Global name lookup
+
+    left_name, rest_of_name = _parse_str_or_ref(name)
+
+    # Lookup simple name first (the `A` part)
+    found = _find_simple_name(
+        left_name,
+        scope,
+        search_imports=search_imports,
+        search_parent=search_parent,
+        search_inherited=search_inherited,
+        current_extends=current_extends,
+    )
+
+    # Lookup rest of name (e.g. `B.C`) to complete composite name lookup
+    if found is not None and rest_of_name:
+        found = _find_rest_of_name(found, rest_of_name)
+
+    # Maintaining backward compatibility by including InstanceTree (not strictly correct)
+    # TODO: Remove InstanceTree to make spec compliant and fix test/models
+    if not found and isinstance(scope, (ast.InstanceClass, InstanceTree)):
+        # Not found in instance tree, look in class tree
+        found = _find_name(
+            name=name,
+            scope=scope.ast_ref,
+            search_imports=search_imports,
+            search_parent=search_parent,
+            search_inherited=search_inherited,
+            current_extends=current_extends,
+        )
+
+    return found
+
+
+def _parse_str_or_ref(name: Union[str, ast.ComponentRef]) -> Tuple[str, str]:
+    """Return (left_name, rest_of_name) given composite name as a str or ComponentRef"""
+    assert isinstance(name, (str, ast.ComponentRef))
+    if isinstance(name, str):
+        left_name, _, rest_of_name = name.partition(".")
+    else:
+        name_parts = name.to_tuple()
+        left_name = name_parts[0]
+        rest_of_name = ".".join(name_parts[1:])
+    return left_name, rest_of_name
+
+
+def _find_simple_name(
+    name: str,
+    scope: ast.Class,
+    search_imports: bool = True,
+    search_parent: bool = True,
+    search_inherited: bool = True,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
+
+    # 0.1 Predefined types (`Real`, `Integer`, `Boolean`, `String`) (spec 4.8)
+    # 0.2 The scope itself (the given scope is the name)
+    # 1. Iteration variables
+    # 2. Classes
+    # 3. Components (Symbols in Pymoca)
+    # 4. Classes and Components from Extends Clauses
+    # 5. Qualified Import names, see 4 (but not from Extends Clauses) (spec 13.2.1)
+    # 6. Public Unqualified Imports (error if multiple are found) (spec 13.2.1)
+    # 7. Repeat 1-6 for each lexically enclosing instance scope, stopping at `encapsulated`
+    # unless predefined type, function, operator. If name matches a variable (a.k.a. component,
+    # symbol) in an enclosing class, it must be a `constant`.
+
+    # Step 0.1: Predefined types
+    # TODO: Implement fix for #333 to ensure we don't silently override user-defined BUILTINS
+    if name in InstanceTree.BUILTIN_TYPES:
+        return scope.root.classes[name]
+
+    # Step 0.2: The scope itself
+    if scope.name == name:
+        return scope
+
+    # Steps 1 - 7
+    current_scope = scope
+
+    # Search through enclosing scopes until we find something or hit a boundary
+    while True:
+
+        # Steps 1-3: Try local lookup first (iteration vars, classes, symbols)
+        if found := _find_local(name, current_scope):
+            break
+
+        # Step 4: Look in inherited classes if enabled
+        if search_inherited:
+            if found := _find_inherited(name, current_scope, current_extends=current_extends):
+                break
+
+        # Steps 5-6: Look in imports if enabled
+        if search_imports:
+            if found := _find_imported(name, current_scope, current_extends=current_extends):
+                break
+
+        # Step 7a: Continue unless we should stop
+        if not search_parent or not current_scope.parent or current_scope.encapsulated:
+            break
+
+        # Step 7b: Move up to parent scope and continue searching
+        current_scope = current_scope.parent
+
+    # If name matches a variable (a.k.a. component a.k.a. symbol) in an enclosing class,
+    # it must be a `constant`.
+    if (
+        isinstance(found, ast.Symbol)
+        and current_scope != scope
+        and "constant" not in found.prefixes
+        and found.name not in InstanceTree.BUILTIN_TYPES
+    ):
+        raise NameLookupError("Non-constant Symbol found in enclosing class")
+
+    # If not found and we stopped at an encapsulated class,
+    # then search predefined functions and operators in global scope
+    # TODO: Add predefined functions and operators to global scope before this
+    if found is None and current_scope.encapsulated:
+        found = _find_local(name, scope.root)
+        if not isinstance(found, ast.Class) or found.type not in ("function", "operator"):
+            found = None
+
+    return found
+
+
+def _find_rest_of_name(
+    first: Union[ast.Class, ast.Symbol], rest_of_name: str
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Lookup the `B.C` part of Composite Name Lookup (`A.B.C`) (spec 5.3.2)"""
+
+    # 1. `A` is looked up using Simple Name Lookup and passed as `first` argument
+    # 2. If `A` is a Component:
+    #     1. `B.C` is looked up from named component elements of `A`
+    #     2. if not found and if `A.B.C` is used as a function call and `A` is a scalar or can be
+    #     evaluated as a scalar from an array and `B` and `C` are classes,
+    #     it is a non-operator function call.
+    # 3. If `A` is a Class:
+    #     1. `A` is temporarily flattened without modifiers
+    #     2. `B.C` is looked up among named elements of temp flattened class,
+    #     but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+    #     and "the class we look inside shall not be partial in a simulation model".
+    if isinstance(first, ast.Symbol):
+        # Find the symbol type
+        if isinstance(first.type, ast.Class):
+            type_class = first.type
+        else:
+            type_class = _find_name(first.type, first.parent)
+            if type_class is None:
+                full_ref = str(first.parent.full_reference()) + "." + first.name
+                raise NameLookupError(f"Lookup failed for type of symbol {full_ref}")
+        found = _find_composite_name_in_symbols(rest_of_name, type_class)
+        if not found:
+            # Can only find in classes if the below rules apply:
+            # 2b. if not found and if `A.B.C` is used as a function call
+            # and `A` is a scalar or can be evaluated as a scalar from an array
+            # and `B` and `C` are classes,
+            # it is a non-operator function call.
+            found = _find_composite_name_in_classes(rest_of_name, type_class)
+            if isinstance(found, ast.Class):
+                if found.type != "function":
+                    found = None
+                else:
+                    # TODO: Fix for `test_function_lookup_via_array_element` + other possibilities
+                    if first.dimensions[0][0].value is not None:
+                        raise NameLookupError(
+                            f"Array {first.name} must have subscripts to lookup function {found.name}"
+                        )
+
+    elif isinstance(first, ast.Class):
+        found = _flatten_first_and_find_rest(first, rest_of_name)
+    else:
+        raise NameLookupError(f'Found unexpected node "{first!r}" during name lookup')
+
+    return found
+
+
+def _find_composite_name_in_symbols(name: str, scope: ast.Class) -> Optional[ast.Symbol]:
+    """Search for composite name (e.g. A.B.C) in local symbols, recursively"""
+    first_name, _, next_names = name.partition(".")
+    # See spec 5.3.2 bullet 2 (emphasis mine): "If the first identifier denotes
+    # a component, the rest of the name (e.g., B or B.C) is looked up among the
+    # declared named *component* elements of the component".
+    # This can include inherited and imported components.
+    # Look up the type (Class) within the current scope if necessary
+    found = _find_name(first_name, scope, search_parent=False)
+    if isinstance(found, ast.Symbol):
+        if next_names:
+            if isinstance(found.type, ast.ComponentRef):
+                type_name = str(found.type)
+                found_type_class = _find_name(type_name, scope)
+                if found_type_class is None or isinstance(found_type_class, ast.Symbol):
+                    scope_full_reference = str(scope.full_reference())
+                    raise NameLookupError(
+                        f'Symbol type "{type_name}" not found in scope "{scope_full_reference}"'
+                    )
+            else:
+                # type is already an InstanceClass
+                found_type_class = found.type
+            # Look in symbols of the type
+            found = _find_composite_name_in_symbols(next_names, found_type_class)
+    else:
+        found = None
+    return found
+
+
+def _find_composite_name_in_classes(name: str, scope: ast.Class) -> Optional[ast.Class]:
+    """Search for composite name (e.g. A.B.C) in local classes, recursively"""
+    first_name, _, next_names = name.partition(".")
+    found = None
+    if first_name in scope.classes:
+        found = scope.classes[first_name]
+    if found and next_names:
+        found = _find_composite_name_in_classes(next_names, found)
+    return found
+
+
+def _flatten_first_and_find_rest(
+    first: ast.Class, rest_of_name: str
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Lookup the `B.C` part of Composite Name Lookup (`A.B.C`) where`A` is a Class"""
+
+    # 3. If `A` is a Class:
+    #     1. `A` is temporarily flattened without modifiers
+    #     2. `B.C` is looked up among named elements of temp flattened class,
+    #     but if `A` is not a package, lookup is restricted to `encapsulated` elements only
+    #     and "the class we look inside shall not be partial in a simulation model".
+
+    #     Checking "the class we look inside shall not be partial in a simulation model"
+    #     is left to the caller.
+
+    # Spec Section 5.3.2, 4th bullet (`A` is a class):
+    # "If the identifier denotes a class, that class is temporarily
+    # flattened (as if instantiating a component without modifiers of this
+    # class, see section 7.2.2) and using the enclosing classes of the
+    # denoted class. The rest of the name (e.g., B or B.C) is looked up
+    # among the declared named elements of the temporary flattened class. If
+    # the class does not satisfy the requirements for a package, the lookup
+    # is restricted to encapsulated elements only. The class we look inside
+    # shall not be partial in a simulation model."
+    # Why do we have to temporarily flatten the class? Flattening requires name lookup
+    # and with this name lookup requires flattening. Yikes! Can it be simplified?
+
+    # TODO: Per spec v3.5 section 5.3.2 bullet 4, class is temporarily flattened
+    # For now, we use recursive name lookup in contained elements
+    found = _find_name(rest_of_name, first, search_parent=False)
+
+    # Check that found meets non-package lookup requirements in spec section 5.3.2
+    # The found.name test is so we only check going left to right in composite name
+    # and not the other direction as we pop the recursive call stack.
+    if (
+        found is not None
+        and found.name == _first_name(rest_of_name)
+        and first.type != "package"
+        and not (isinstance(found, ast.Class) and found.encapsulated)
+    ):
+        raise NameLookupError(f"{first.name} is not a package so {found.name} must be encapsulated")
+
+    return found
+
+
+def _first_name(name: str) -> str:
+    return name.split(".")[0]
+
+
+def _find_local(
+    name: str,
+    scope: ast.Class,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Name lookup for predefined classes and contained elements"""
+
+    # 1. Iteration variables
+    # 2. Classes
+    # 3. Components (Symbols in Pymoca)
+
+    # 1. Iteration variables
+    # TODO: Refactor when handling iteration variables (it will move up one level)
+    if found := _find_iteration_variable(name, scope):
+        return found
+
+    # 2. Classes
+    if name in scope.classes:
+        return scope.classes[name]
+
+    # 3. Components (Symbols in Pymoca)
+    if name in scope.symbols:
+        return scope.symbols[name]
+
+    return None
+
+
+def _find_iteration_variable(name: str, scope: ast.Class) -> Optional[ast.Symbol]:
+    """Currently a pass"""
+    # TODO: Implement find name in iteration variables
+    return None
+
+
+def _find_inherited(
+    name: str,
+    scope: ast.Class,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Find simple name in inherited classes"""
+    for extends in scope.extends:
+        # Avoid infinite recursion by keeping track of where we have been with current_extends
+        # A common case is when multiple classes in the same hierarchy extend the same class
+        # such as Icons in the Modelica Standard Library
+        if current_extends:
+            if extends in current_extends:
+                continue
+        else:
+            current_extends = set()
+        current_extends.add(extends)
+
+        if isinstance(extends, ast.InstanceClass):
+            return _find_name(
+                name,
+                extends,
+                current_extends=current_extends,
+            )
+
+        extends_scope = _find_name(
+            extends.component,
+            scope,
+            current_extends=current_extends,
+        )
+        if extends_scope is not None:
+            if isinstance(extends_scope, ast.Symbol):
+                continue
+            found = _find_name(
+                name,
+                extends_scope,
+                search_parent=False,
+                current_extends=current_extends,
+                search_imports=False,
+            )
+            current_extends.remove(extends)
+            if found is not None:
+                return found
+        else:
+            current_extends.remove(extends)
+    return None
+
+
+def _find_imported(
+    name: str,
+    scope: ast.Class,
+    current_extends: Optional[Set[Union[ast.ExtendsClause, ast.InstanceClass]]] = None,
+) -> Optional[Union[ast.Class, ast.Symbol]]:
+    """Find simple name in imports per MLS v3.5 section 13.2.1"""
+    # TODO: Rewrite this to work with parser rewrite of import_clause handler.
+    # TODO: Can we do a scope.imports[name] = found Class or Symbol to speed up future calls?
+    # Search qualified imports (most common case)
+    if name in scope.imports:
+        import_: Union[ast.ImportClause, ast.ComponentRef] = scope.imports[name]
+        if isinstance(import_, ast.ImportClause):
+            # TODO: Handle import of multiple classes (now only does `A.B.C` for `A.B.{C,D,E}`)
+            import_ = import_.components[0]
+        found = _find_name(
+            import_,
+            scope.root,
+            search_parent=False,
+        )
+        _check_import_rules(found, scope)
+        return found
+    # Unqualified imports
+    if "*" in scope.imports:
+        c = None
+        for package_ref in scope.imports["*"].components:
+            imported_comp_ref = package_ref.concatenate(ast.ComponentRef(name=name))
+            # Search within the package
+            # Avoid infinite recursion with search_imports = False
+            c = _find_name(
+                imported_comp_ref,
+                scope.root,
+                search_imports=False,
+                search_parent=False,
+                current_extends=current_extends,
+            )
+            # TODO: Should _check_import_rules be inside `if c is not None` check? (fix in rewrite)
+            _check_import_rules(c, scope)
+            if c is not None:
+                # Store result for next lookup
+                scope.imports[name] = imported_comp_ref
+                return c
+    return None
+
+
+def _check_import_rules(
+    element: Optional[Union[ast.Class, ast.Symbol]],
+    scope: ast.Class,
+) -> None:
+    """Check import rules per the Modelica spec"""
+    if element is None:
+        return
+    # TODO: Is `not element.parent` a sufficient check for the error message? (fix in rewrite)
+    if not element.parent:
+        raise NameLookupError(f"Import {element.name} must be contained in a package")
+    if element.parent.type != "package":
+        full_name = element.name
+        if element.parent.name:
+            full_name = str(element.parent.full_reference()) + "." + full_name
+            parent = element.parent.name
+            message = f"{parent} must be a package in import {full_name}"
+        else:
+            message = f"{full_name} is not in a package so can't be imported"
+        raise NameLookupError(message)
+    if element.visibility != ast.Visibility.PUBLIC:
+        raise NameLookupError(f"Import {element.name} must not be protected")
+    # We test on parent and name instead of just "is" because we may have a copy of a Class
+    if element.parent is scope.parent and element.name == scope.name:
+        full_name = str(element.parent.full_reference()) + "." + element.name
+        raise NameLookupError(f"Import {full_name} is recursive")
+
+
+class InstanceTree(ast.Tree):
+    """The root class of an instance tree
+
+    :param ast_ref: The root of the Abstract Syntax Tree (AST) produced by the parser
+
+    The InstanceTree contains a reference to an `ast.Tree` produced by the parser and a
+    method to instantiate a class ready for flattening. Built-in types, functions, and
+    operators are added to the root of the InstanceTree when it is created.
+    """
+
+    BUILTIN_TYPES = {
+        "Real": ast.Symbol(
+            name="Real",
+            type=ast.ComponentRef(name="Real"),
+            start=ast.Primary(value=0.0),
+            min=ast.Primary(value=-math.inf),
+            max=ast.Primary(value=math.inf),
+            nominal=ast.Primary(value=None),
+            fixed=ast.Primary(value=False),  # True for parameters and constants
+            unit=ast.Primary(value=""),
+            quantity=ast.Primary(value=""),
+            displayUnit=ast.Primary(value=""),
+            # TODO: unbounded from spec is missing in Symbol
+            # TODO: stateSelect from spec is missing in Symbol
+        ),
+        "Integer": ast.Symbol(
+            name="Integer",
+            type=ast.ComponentRef(name="Integer"),
+            start=ast.Primary(value=0.0),
+            min=ast.Primary(value=-sys.maxsize),
+            max=ast.Primary(value=sys.maxsize),
+            fixed=ast.Primary(value=False),  # True for parameters and constants
+            quantity=ast.Primary(value=""),
+        ),
+        "Boolean": ast.Symbol(
+            name="Boolean",
+            type=ast.ComponentRef(name="Boolean"),
+            start=ast.Primary(value=0.0),
+            fixed=ast.Primary(value=False),  # True for parameters and constants
+            quantity=ast.Primary(value=""),
+        ),
+        "String": ast.Symbol(
+            name="String",
+            type=ast.ComponentRef(name="String"),
+            start=ast.Primary(value=0.0),
+            fixed=ast.Primary(value=False),  # True for parameters and constants
+            quantity=ast.Primary(value=""),
+        ),
+    }
+
+    def __init__(self, ast_ref: ast.Tree, **kwargs):
+        # The Class AST
+        self.ast_ref = ast_ref
+
+        super().__init__(**kwargs)
+        self._create_builtins()
+
+    def _create_builtins(self):
+        """Add builtins to root of tree"""
+        for name, symbol in self.BUILTIN_TYPES.items():
+            type_class = ast.Class(name=name, type=name, parent=self)
+            symbol.parent = type_class
+            type_class.symbols[name] = symbol
+            self.classes[name] = type_class
+        # TODO: Add built-in functions (and operators?)
+
+    def instantiate(self, class_name: str) -> ast.InstanceClass:
+        """Create an instance tree used in flattening
+
+        :param class_name: The name of the class to instantiate
+        :return: Instantiated class tree ready for flattening
+
+        The returned class will be fully instantiated, but name lookup
+        in the instance tree may return `ast.Class` or
+        `ast.InstanceClass` with the `fully_instantiated` flag set to
+        `False`. If so, these cases will need to be fully instantiated
+        for flattening by calling this method on the class.
+        """
+        class_ = find_name(class_name, self.ast_ref)
+        if class_ is None:
+            raise NameLookupError(f"{class_name} not found in given tree")
+        if isinstance(class_, ast.Symbol):
+            raise InstantiationError(f"Found Symbol for {class_name} but need Class to instantiate")
+        instance = self._instantiate_class(class_, ast.ClassModification(), self)
+        self._instantiate_parents_partially(instance)
+        return instance
+
+    def _instantiate_class(
+        self,
+        orig_class: Union[ast.Class, ast.InstanceClass],
+        modification_environment: ast.ClassModification,
+        parent: Union[ast.Class, ast.InstanceClass],
+    ) -> ast.InstanceClass:
+        """Instantiate a class
+
+        :param orig_class: The class to be instantiated
+        :param modification_environment: The modification environment of the class
+            instance
+        :param parent: The parent class of the class instance
+        :return: The instantiated class
+
+        Implements the instantiation rules per Modelica Language Specification version
+        3.5 section 5.6.1.
+        """
+
+        # Outline of spec 3.5 section 5.6.1 *Instantiation*:
+        # Definitions
+        #   - Element: Class, Component (Symbol in Pymoca), or Extends Clause
+        # 1. For element itself:
+        #   1. Create an instance of the class to be instantiated ("partially instantiated element")
+        #   2. Modifiers are merged for the element itself (but contained references are resolved during flattening)
+        #   3. Redeclare of element itself is done
+        # 2. For each element (Class or Component) in the local contents of the current element:
+        #   1. Apply step 1 to the element
+        #   2. Equations, algorithms, and annotations are copied into the component instance without merging
+        #      (but references in equations are resolved later during flattening)
+        # 3. For each element in the extends clauses of the current element:
+        #   1. Apply steps 1 and 2 to the element, replacing the extends clause with the extends instance
+        # 4. Lookup classes of extends and ensure it is identical to lookup result from step 3
+        # 5. Check that all children of the current element (including extends) with same name are identical
+        #    (error if not) and only keep one if so (to preserve function argument order)
+        # 6. Components are recursively instantiated
+
+        # TODO: Can we shortcut the partial instantiation of a partial instance with a copy/modify?
+        # TODO: Investigate reuse of instantiated elements or parts of elements (mentioned in spec)
+
+        # 1.1. Partially instantiate the element itself and 1.2 merge modifiers
+        new_class = self._instantiate_partially(
+            orig_class,
+            modification_environment,
+            parent,
+        )
+
+        # 1.3. Redeclare of element itself is done
+        self._apply_class_redeclares(new_class, modification_environment)
+
+        # 2.1 Partially instantiate local classes and symbols
+        if isinstance(orig_class, ast.InstanceClass) and not orig_class.fully_instantiated:
+            from_class = new_class.ast_ref
+        else:
+            from_class = orig_class
+        for name, class_ in from_class.classes.items():
+            instance = self._instantiate_partially(
+                class_,
+                modification_environment,
+                new_class,
+            )
+            new_class.classes[name] = instance
+
+        for name, symbol in from_class.symbols.items():
+            instance = self._instantiate_partially(
+                symbol,
+                modification_environment,
+                new_class,
+            )
+            new_class.symbols[name] = instance
+
+        # 2.2 Copy local contents into the element itself
+        self._copy_class_contents(new_class, copy_extends=True)
+
+        # 3. Instantiate extends and 4. Check extends class lookup
+        new_class.extends = self._instantiate_extends(
+            new_class.extends, modification_environment, new_class
+        )
+
+        # TODO: Step 5: Check and cull elements with same name in _instantiate_class
+        # See `parse_test.test_instantiation_function_input_order`
+
+        # 6. Recursively instantiate symbols
+        for symbol in new_class.symbols.values():
+            self._instantiate_symbol(symbol, new_class)
+
+        new_class.fully_instantiated = True
+
+        return new_class
+
+    def _instantiate_extends(
+        self,
+        extends_list: List[ast.ExtendsClause],
+        modification_environment: ast.ClassModification,
+        parent: ast.InstanceClass,
+    ) -> List[ast.InstanceClass]:
+        """Instantiate extends clauses"""
+
+        # Make sure we do not modify the passed-in list directly
+        extends_list_orig = extends_list
+        extends_list = extends_list.copy()
+
+        for index, extends in enumerate(extends_list):
+            extends_instance = self._instantiate_extends_single(
+                extends, modification_environment, parent
+            )
+            extends_list[index] = extends_instance
+
+        # Check we do not extend from any symbols/classes inherited
+        extends_names = {
+            _parse_str_or_ref(e.component)[0]: str(e.component) for e in extends_list_orig
+        }
+
+        for extends_name, extends_component_ref in extends_names.items():
+            if extends_name in self.BUILTIN_TYPES:
+                # Built-in classes contain a symbol with the same name (which
+                # would cause an error). Note that this is an implementation
+                # detail where we differ a little from the spec at the moment.
+                continue
+            for other_class in extends_list:
+                other_names = {
+                    *other_class.ast_ref.symbols.keys(),
+                    *other_class.ast_ref.classes.keys(),
+                }
+                if extends_name in other_names:
+                    raise ModelicaSemanticError(
+                        f"Cannot extend '{parent.full_reference()}' with '{extends_component_ref}'; "
+                        f"'{extends_name}' also exists in names inherited from '{other_class.ast_ref.name}'"
+                    )
+
+        return extends_list
+
+    def _instantiate_extends_single(
+        self,
+        extends: ast.ExtendsClause,
+        modification_environment: ast.ClassModification,
+        parent: ast.InstanceClass,
+    ) -> ast.InstanceClass:
+        """Instantiate a single extends clause"""
+
+        extends_class = _find_name(extends.component, parent, search_inherited=False)
+
+        if extends_class is None:
+            raise ModelicaSemanticError(
+                f"Extends name {extends.component} not found in scope {parent.full_reference()}"
+            )
+        if isinstance(extends_class, ast.Symbol):
+            raise ModelicaSemanticError(
+                f"Cannot extend a Symbol: {extends.component} in {parent.full_reference()}"
+            )
+        if str(extends_class.full_reference()) == str(parent.full_reference()):
+            raise ModelicaSemanticError(
+                f"Cannot extend class '{extends_class.full_reference()}' with itself"
+            )
+        if self._is_transitively_replaceable(extends_class):
+            comp = extends_class.name
+            full_name = extends_class.parent.full_reference()
+            raise ModelicaSemanticError(
+                f"In {full_name} extends {comp}, {comp} and parents cannot be replaceable"
+            )
+        # TODO: Check with spec about what to do with extends.class_modification in case of redeclare
+        extend_mod = self._append_modifications(
+            extends.class_modification,
+            modification_environment,
+        )
+        extends_instance = self._instantiate_class(extends_class, extend_mod, extends_class.parent)
+        # Extends nodes are "unnamed" per the spec
+        extends_instance.name = ""
+        # Imports are not inherited
+        extends_instance.imports = OrderedDict()
+
+        # TODO: Is there another way to handle `extends.class_modification`? This seems like a hack.
+        # _instantiate_partially removes from extend_mod, but not original modification_environment
+        # Reflect changes in extend_mod back into the passed-in modification env
+        modification_environment.arguments = [
+            arg for arg in modification_environment.arguments if arg in extend_mod.arguments
+        ]
+
+        if extends_instance.type in InstanceTree.BUILTIN_TYPES:
+            if len(parent.extends) > 1:
+                raise ModelicaSemanticError(
+                    "When extending a built-in class (Real, Integer, ...) "
+                    "you cannot extend other classes as well"
+                )
+
+        # TODO: Step 4 Check class lookup before and after extends
+
+        return extends_instance
+
+    def _is_transitively_replaceable(self, class_: ast.Class) -> bool:
+        while True:
+            if class_.replaceable:
+                return True
+            class_ = class_.parent
+            if isinstance(class_, ast.Tree):
+                break
+        return False
+
+    def _instantiate_symbol(
+        self,
+        symbol: ast.InstanceSymbol,
+        parent: ast.InstanceClass,
+    ) -> None:
+        """Instantiate given symbol"""
+
+        assert isinstance(symbol, ast.InstanceSymbol)
+        assert isinstance(parent, ast.InstanceClass)
+
+        if symbol.name in InstanceTree.BUILTIN_TYPES:
+            symbol.fully_instantiated = True
+            return
+
+        if not isinstance(symbol.type, ast.InstanceClass):
+            symbol_type = find_name(symbol.type, parent)
+            if symbol_type is None:
+                raise NameLookupError(f"{symbol.type} not found in {parent.full_reference()}")
+            if isinstance(symbol_type, ast.InstanceElement):
+                extend_args = [
+                    arg
+                    for arg in symbol_type.modification_environment.arguments
+                    if not isinstance(arg.value, ast.ShortClassDefinition)
+                ]
+                symbol.modification_environment.arguments = (
+                    extend_args + symbol.modification_environment.arguments
+                )
+            symbol.type = self._instantiate_class(
+                symbol_type,
+                symbol.modification_environment,
+                symbol_type.parent,
+            )
+
+        self._copy_symbol_contents(symbol)
+
+        symbol.fully_instantiated = True
+
+    def _instantiate_partially(
+        self,
+        element: Union[
+            ast.Class,
+            ast.Symbol,
+            ast.InstanceClass,
+            ast.InstanceSymbol,
+        ],
+        modification_environment: ast.ClassModification,
+        parent: Union[ast.Class, ast.InstanceClass],
+    ) -> Union[ast.InstanceClass, ast.InstanceSymbol]:
+        """Partially instantiate a class or symbol, apply modifiers, and set visibility"""
+
+        #  Create an instance of the class to be instantiated ("partially instantiated element")
+        if isinstance(element, ast.InstanceElement):
+            ast_ref = element.ast_ref
+            # Merge element modifications into environment
+            modification_environment.arguments = (
+                element.modification_environment.arguments + modification_environment.arguments
+            )
+        else:
+            ast_ref = element
+
+        if isinstance(element, ast.Class):
+            instance = ast.InstanceClass(
+                name=element.name,
+                ast_ref=ast_ref,
+                parent=parent,
+                annotation=ast.ClassModification(),
+                replaceable=ast_ref.replaceable,
+                encapsulated=ast_ref.encapsulated,
+                partial=ast_ref.partial,
+            )
+
+            # TODO: Try connecting into class tree instead of doing _instantiate_parents_partially
+            # Mirror class tree for name lookup in the InstanceTree
+            # TODO: Is there a better way to maintain the path to root for all classes?
+            if not isinstance(parent, (InstanceTree, ast.InstanceClass)):
+                self._instantiate_parents_partially(instance)
+
+        else:
+            # TODO: Try using Symbol (and Symbol.class_modification) instead of InstanceSymbol
+            instance = ast.InstanceSymbol(
+                name=element.name,
+                ast_ref=ast_ref,
+                parent=parent,
+            )
+
+        # Merge visibility
+        instance.visibility = min(ast_ref.visibility, parent.visibility)
+
+        # Modifiers are merged for the element itself
+        # TODO: Factor out merging/applying modifiers to separate function
+        # Modifiers are added in reverse priority so the last one in the list overrides previous ones
+        # TODO: Would on-the-fly culling modifiers of same attribute be more efficient?
+
+        # Apply modifications for this instance
+        instance.modification_environment.arguments = [
+            arg
+            for arg in modification_environment.arguments
+            if isinstance(arg.value, ast.ComponentClause)
+            and arg.value.type.name == element.name
+            or isinstance(arg.value, ast.ElementModification)
+            and arg.value.component.name == element.name
+            or isinstance(arg.value, ast.ShortClassDefinition)
+            and arg.value.name == element.name
+            or isinstance(element, ast.Symbol)
+            and element.name in InstanceTree.BUILTIN_TYPES
+        ]
+
+        # Remove applied arguments from merged modification_environment
+        if instance.modification_environment.arguments:
+            modification_environment.arguments = [
+                arg
+                for arg in modification_environment.arguments
+                if arg not in instance.modification_environment.arguments
+            ]
+
+        # Shift modifiers down
+        if instance.name not in InstanceTree.BUILTIN_TYPES:
+            if isinstance(element, ast.Symbol) and ast_ref.class_modification:
+                mod = self._append_modifications(ast_ref.class_modification)
+            else:
+                mod = ast.ClassModification()
+
+            for arg in instance.modification_environment.arguments:
+                if isinstance(arg.value, ast.ElementModification):
+                    if arg.value.component.indices != [[None]]:
+                        raise ModelicaSemanticError("Subscripting modifiers is not allowed.")
+                    if arg.value.component.child:
+                        # Move component reference down a level and apply modification
+                        # Don't stomp on original that may be used elsewhere
+                        arg = copy.copy(arg)
+                        arg.value = copy.copy(arg.value)
+                        arg.value.component = arg.value.component.child[0]
+                        mod.arguments.append(arg)
+                    else:
+                        for sub_arg in arg.value.modifications:
+                            if isinstance(sub_arg, ast.ClassModification):
+                                mod.arguments += sub_arg.arguments
+                            else:
+                                # Value modification - apply to symbol
+                                # Don't stomp on original that may be used elsewhere
+                                sub_arg = copy.copy(arg)
+                                sub_arg.value = copy.copy(arg.value)
+                                sub_arg.value.component = ast.ComponentRef(name="value")
+                                mod.arguments.append(sub_arg)
+                elif isinstance(arg.value, ast.ShortClassDefinition):
+                    mod.arguments.append(arg)
+                else:
+                    raise UnimplementedError(f"{arg.value.__class__} modification")
+
+            instance.modification_environment = mod
+
+        # TODO: Fix modification scope. It is often *not* the instance parent as done here!
+        # Modification scope should be the parent of the class, extends, or symbol declaration
+
+        # Set modification argument scope now that we have an instance
+        for index, arg in enumerate(instance.modification_environment.arguments):
+            if arg.scope is None:
+                # Make a copy so we don't change original AST or same arg used elsewhere
+                new_arg = copy.copy(arg)
+                new_arg.scope = instance.parent
+                instance.modification_environment.arguments[index] = new_arg
+
+        return instance
+
+    def _instantiate_parents_partially(
+        self,
+        class_: ast.InstanceClass,
+    ) -> None:
+        ALREADY_CALLED_VAR = "_instantiate_parents_partially_in_progress"
+
+        # Use a static variable to detect the resursion
+        if hasattr(self, ALREADY_CALLED_VAR):
+            # Continue the recursion upwards
+            self._instantiate_parents_partially_helper(class_)
+        else:
+            setattr(self, ALREADY_CALLED_VAR, True)
+
+            # Call below results in a different `class_.root` than `self`
+            self._instantiate_parents_partially_helper(class_)
+
+            # And now we merge the tree. Note that we then only do this once,
+            # for the first call to this function. Also update the parent refs.
+            self.extend(class_.root)
+
+            delattr(self, ALREADY_CALLED_VAR)
+
+    def _instantiate_parents_partially_helper(
+        self,
+        class_: ast.InstanceClass,
+    ) -> None:
+        """Patially instantiate parents up to root and connect to given instance tree
+
+        This ensures names can be found in the instance tree.
+        """
+        instance_class = class_
+        parent_class = instance_class.ast_ref.parent
+        if parent_class is None:
+            raise ValueError(f"Parent of {instance_class.ast_ref} unexpectedly None")
+        if isinstance(parent_class, ast.Tree):
+            instance_class.parent = InstanceTree(parent_class)
+            instance_class.parent.classes[instance_class.name] = instance_class
+            return
+        parent_instance = self._instantiate_partially(
+            parent_class, ast.ClassModification(), parent_class.parent
+        )
+        instance_class.parent = parent_instance
+        parent_instance.classes[instance_class.name] = instance_class
+
+    def _append_modifications(self, *mods: ast.ClassModification) -> ast.ClassModification:
+        """Append modifications in order given"""
+        combined_modification = ast.ClassModification()
+        for mod in mods:
+            combined_modification.arguments += mod.arguments
+        return combined_modification
+
+    def _apply_class_redeclares(
+        self,
+        element: ast.InstanceClass,
+        modification_environment: ast.ClassModification,
+    ) -> bool:
+        """Apply redeclare if any and remove from environment"""
+
+        redeclare = None
+        for arg in element.modification_environment.arguments:
+            if not arg.redeclare:
+                continue
+            if isinstance(arg.value, ast.ShortClassDefinition) and arg.value.name == element.name:
+                redeclare = arg
+                break
+        if redeclare:
+            # TODO: Remove isinstance check when Symbol.replaceable is added
+            if isinstance(element, ast.Class) and not element.replaceable:
+                raise ModelicaSemanticError(
+                    f"Redeclaring {element.full_reference()} that is not replaceable"
+                )
+            scope_class = redeclare.scope
+            assert scope_class, "Redeclare scope should have been set by now"
+            redeclare_name = redeclare.value.component
+            redeclare_class = find_name(redeclare_name, scope_class)
+            if redeclare_class is None:
+                raise NameLookupError(
+                    f"Redeclare class {redeclare_name} not found"
+                    f" in scope {scope_class.full_reference()}"
+                )
+            if isinstance(redeclare_class, ast.Symbol):
+                raise ModelicaSemanticError(
+                    f"Redeclaring class {element.name}"
+                    f" with a component ({redeclare_name})"
+                    f" in scope {scope_class.full_reference()}"
+                )
+            element.ast_ref = (
+                redeclare_class.ast_ref
+                if isinstance(redeclare_class, ast.InstanceClass)
+                else redeclare_class
+            )
+            element.modification_environment.arguments.remove(redeclare)
+            modification_environment.arguments = (
+                redeclare.value.class_modification.arguments + modification_environment.arguments
+            )
+
+        return True if redeclare else False
+
+    def _copy_class_contents(
+        self,
+        to_class: ast.InstanceClass,
+        copy_extends=True,
+    ) -> None:
+        """Shallow copy of references from original to new class"""
+        from_class = to_class.ast_ref
+        to_class.imports.update(from_class.imports)
+        if copy_extends:
+            to_class.extends += from_class.extends
+        to_class.equations += from_class.equations
+        to_class.initial_equations += from_class.initial_equations
+        to_class.statements += from_class.statements
+        to_class.initial_statements += from_class.initial_statements
+        if isinstance(from_class.annotation, ast.ClassModification):
+            to_class.annotation.arguments += from_class.annotation.arguments
+        to_class.functions.update(from_class.functions)
+        to_class.comment = from_class.comment
+
+    def _copy_symbol_contents(self, to_symbol: ast.InstanceSymbol) -> None:
+        """Shallow copy of references from original to new symbol"""
+        from_symbol = to_symbol.ast_ref
+        for attr_name in (
+            name
+            for name in from_symbol.__dict__
+            if name
+            not in (
+                "name",
+                "type",
+                "visibility",
+                "ATTRIBUTES",
+                "class_modification",
+                "parent",
+            )
+        ):
+            setattr(to_symbol, attr_name, getattr(from_symbol, attr_name))
 
 
 def flatten_extends(
@@ -306,10 +1396,11 @@ def flatten_extends(
             c.modification_environment.arguments
         )
 
-        # set visibility
+        # set visibility and parent
         for sym in extended_orig_class.symbols.values():
             if sym.visibility > extends.visibility:
                 sym.visibility = extends.visibility
+            sym.parent = extended_orig_class
 
     extended_orig_class.imports.update(orig_class.imports)
     extended_orig_class.classes.update(orig_class.classes)

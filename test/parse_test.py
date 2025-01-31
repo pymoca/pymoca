@@ -59,6 +59,51 @@ def modify_version(version_type: WorkDirState):
         pymoca.__version__ = pymoca_version
 
 
+def check_instance_tree_is_all_instances(instance):
+    """Check that all pertinent nodes in tree are instances.
+
+    We exclude the BUILTIN_TYPES that are added to the InstanceTree root.
+
+    Return list of ones that are not."""
+
+    class InstanceTreeListener(tree.TreeListener):
+        def __init__(self):
+            self.non_instances = []
+            super().__init__()
+
+        def exitClass(self, node):
+            self.non_instances.append(node)
+
+        def exitSymbol(self, node):
+            self.non_instances.append(node)
+
+        def exitExtendsClause(self, node):
+            self.non_instances.append(node)
+
+        def exitTree(self, node):
+            self.non_instances.append(node)
+
+    class InstanceTreeWalker(tree.TreeWalker):
+        def skip_child(self, node: ast.Node, child_name: str) -> bool:
+            if (
+                isinstance(node, (ast.InstanceElement, tree.InstanceTree))
+                and child_name == "ast_ref"
+            ):
+                return True
+            return super().skip_child(node, child_name)
+
+    listener = InstanceTreeListener()
+    walker = InstanceTreeWalker()
+    walker.walk(listener, instance.root)
+
+    # Remove BUILTIN_TYPES that we expect to find at root
+    not_builtins = [
+        i for i in listener.non_instances if i.name not in tree.InstanceTree.BUILTIN_TYPES
+    ]
+
+    return not_builtins
+
+
 class ParseTest(unittest.TestCase):
     """
     Parse test
@@ -170,29 +215,462 @@ class ParseTest(unittest.TestCase):
         #     raise IOError('{:s} != {:s}'.format(str(names), str(names_set)))
         self.flush()
 
+    def test_instantiation_tree(self):
+        with open(os.path.join(MODEL_DIR, "InstantiationTree.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("TreeModel.Tree")
+        self.assertIsNotNone(instance)
+
+        # Check that we have a fully connected InstanceTree with only Instances (except BUILTINS)
+        non_instances = check_instance_tree_is_all_instances(instance.root)
+
+        self.assertEqual(
+            0,
+            len(non_instances),
+            msg=f"\nFound non-instances in InstanceTree:\n{non_instances}",
+        )
+
+        # Check that we merged the tree correctly when instantiating parents
+        self.assertIn("TreeModel", instance.root.classes)
+
+        tree_model = instance.root.classes["TreeModel"]
+        self.assertIn("TreeTypes", tree_model.classes)
+        self.assertIn("TreeParts", tree_model.classes)
+        self.assertIn("Tree", tree_model.classes)
+
+        tree_parts = instance.root.classes["TreeModel"].classes["TreeParts"]
+        self.assertIn("Trunk", tree_parts.classes)
+        self.assertIn("Branch", tree_parts.classes)
+        self.assertIn("Leaf", tree_parts.classes)
+
+    @unittest.skip("Only keeping first of same names not implemented yet in instantiation")
+    def test_instantiation_function_input_order(self):
+        """Check that only first definitions of inputs are used in function instantiation."""
+        txt = """
+            package P
+              function A
+                input Real a;
+                input Real b;
+              end A;
+
+              function B
+                extends A;
+                input Real b; // Should be discarded as 2nd instance of b
+                input Real a; // Should be discarded as 2nd instance of a
+              end B;
+
+              function C
+                input Real b;
+                input Real a;
+                extends A;    // Should be discarded as 2nd instances of a and b
+              end C;
+
+              function D
+                input Real a; // Should be kept
+                extends A;    // a should be discarded and b kept from this
+                input Real b; // Should be discarded as 2nd instance of b
+              end D;
+            end P;
+        """
+
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        # Our current implementation does not maintain perfect declaration order because
+        # during parsing we store the declarations from the Modelica code in separate
+        # symbols and extends dictionaries. To maintain order we need to store the
+        # declarations in one list or ordered dictionary containing both symbols and
+        # extends. The checks below are intended to fail until we have implemented this.
+        # TODO: Remove above comments when we have implemented maintaining declaration order
+
+        # TODO: Ensure the checks below are correct when we have an implementation
+        instance = instance_tree.instantiate("P.B")
+        self.assertEqual(("a", "b"), tuple(instance.extends[0].symbols))
+        self.assertNotIn("b", instance.symbols)
+        self.assertNotIn("a", instance.symbols)
+
+        instance = instance_tree.instantiate("P.C")
+        self.assertEqual(("b", "a"), tuple(instance.symbols))
+        self.assertNotIn("a", instance.extends[0].symbols)
+        self.assertNotIn("b", instance.extends[0].symbols)
+
+        instance = instance_tree.instantiate("P.D")
+        self.assertIn("a", instance.symbols)
+        self.assertNotIn("b", instance.symbols)
+        self.assertNotIn("a", instance.extends[0].symbols)
+        self.assertIn("b", instance.extends[0].symbols)
+
+    # TODO: Add additional tests for child name culling
+    # See in Modelica Language Spec v3.5:
+    # * Section 5.6.1.4 Steps of Instantiation, under "The inherited contents of the element"
+    # * Section 4.3 Declaration Order and Usage before Declaration
+    # * Chapter 12
+    # Tests to add:
+    # - function output order
+    # - intermixed funtion input and output declarations
+    # - default on one function argument but not the other with the same name - error?
+    # - records used as arguments to external functions
+    # - instances with same name but different type
+    # - instances with same name, same type, but different prefixes
+    # - instances with same name, same type, but with modifications of differing components
+    # - instances with same name, same type, but with modifications of same comps, different values
+    # - instances with same name, same type, but different redeclarations
+    # - ...?
+
     def test_inheritance(self):
         with open(os.path.join(MODEL_DIR, "InheritanceInstantiation.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("C2")
+        self.assertIsNotNone(instance)
+
+        bcomp1_b = instance.symbols["bcomp1"].type.extends[0].symbols["b"]
+        bcomp1_b_type = bcomp1_b.type.symbols["Integer"]
+        bcomp1_b_mod = bcomp1_b_type.modification_environment.arguments[-1].value
+        self.assertEqual(bcomp1_b_mod.component.name, "value")
+        bcomp1_b_value = bcomp1_b_mod.modifications[-1].value
+        self.assertEqual(bcomp1_b_value, 3)
+
+        bcomp3_a = instance.symbols["bcomp3"].type.extends[0].extends[0].symbols["a"]
+        bcomp3_a_type = bcomp3_a.type.symbols["Real"]
+        bcomp3_a_mod = bcomp3_a_type.modification_environment.arguments[-1].value
+        self.assertEqual(bcomp3_a_mod.component.name, "value")
+        bcomp3_a_value = bcomp3_a_mod.modifications[-1].value
+        self.assertEqual(bcomp3_a_value, 1)
+
+        bcomp3_b = instance.symbols["bcomp3"].type.extends[0].extends[0].symbols["b"]
+        bcomp3_b_type = bcomp3_b.type.symbols["Integer"]
+        bcomp3_b_mod = bcomp3_b_type.modification_environment.arguments[-1].value
+        self.assertEqual(bcomp3_b_mod.component.name, "value")
+        bcomp3_b_value = bcomp3_b_mod.modifications[-1].value
+        self.assertEqual(bcomp3_b_value, 2)
+
+        # TODO: Update after new flattening is implemented
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="C2"))
 
         self.assertEqual(flat_tree.classes["C2"].symbols["bcomp1.b"].value.value, 3.0)
         self.assertEqual(flat_tree.classes["C2"].symbols["bcomp3.a"].value.value, 1.0)
         self.assertEqual(flat_tree.classes["C2"].symbols["bcomp3.b"].value.value, 2.0)
 
+    def test_inheritance_resistor(self):
+        with open(os.path.join(MODEL_DIR, "InheritanceInstantiationResistor.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        # Tests that only depend on instantiation, not flattening
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("P.M")
+        self.assertIsNotNone(instance)
+
+        p = instance.extends[0].extends[0].symbols["p"]
+        p_v = p.type.symbols["v"]
+        p_v_modification = p_v.type.extends[0].symbols["Real"].modification_environment
+        for arg in p_v_modification.arguments:
+            if arg.value.component.name == "nominal":
+                p_v_nominal = arg.value.modifications[0].value
+            if arg.value.component.name == "max":
+                p_v_max = arg.value.modifications[0].value
+        self.assertEqual(p_v_nominal, 1)
+        self.assertEqual(p_v_max, 3.0)
+
+        n = instance.extends[0].extends[0].symbols["n"]
+        n_v = n.type.symbols["v"]
+        n_v_modification = n_v.type.extends[0].symbols["Real"].modification_environment
+        for arg in n_v_modification.arguments:
+            if arg.value.component.name == "nominal":
+                n_v_nominal = arg.value.modifications[0].value
+            if arg.value.component.name == "max":
+                n_v_max = arg.value.modifications[0].value
+        self.assertEqual(n_v_nominal, 2)
+        self.assertEqual(n_v_max, 3.0)
+
+        # TODO: Update after new flattening is implemented (uncomment below)
+        # This fails with Pymoca 0.10 flattening
+        # flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("P.M"))
+        # self.assertEqual(flat_tree.classes["P.M"].symbols["p.v"].nominal.value, 1.0)
+        # self.assertEqual(flat_tree.classes["P.M"].symbols["p.v"].max.value, 3.0)
+        # self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].nominal.value, 2.0)
+        # self.assertEqual(flat_tree.classes["P.M"].symbols["n.v"].max.value, 3.0)
+
+    def test_inheritance_instantiation(self):
+        with open(os.path.join(MODEL_DIR, "RecursiveInstantiation.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        # Test parse that b modification to redeclare A contains the p=1 modification
+        b_mod = ast_tree.classes["M"].symbols["b"].class_modification
+        self.assertIsNotNone(b_mod)
+        redeclare_mod = b_mod.arguments[0].value.class_modification
+        self.assertEqual(len(redeclare_mod.arguments), 1)
+        self.assertEqual(redeclare_mod.arguments[0].value.component.name, "p")
+        self.assertEqual(redeclare_mod.arguments[0].value.modifications[0].value, 1)
+
+        # Test instantiation for inheritance, modifications, redeclares including scope
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("M")
+        self.assertIn("b", instance.symbols)
+        b_type = instance.symbols["b"].type
+        self.assertIn("a", b_type.symbols)
+        a_type = b_type.symbols["a"].type
+        self.assertEqual(a_type.ast_ref.name, "D", "model A not properly redeclared in b")
+        self.assertIn("p", a_type.symbols)
+        p = a_type.symbols["p"]
+        self.assertIn("parameter", p.prefixes)
+        self.assertTrue(isinstance(p.type, ast.InstanceClass), "b.a.p not properly instantiated")
+        self.assertEqual(p.type.name, "E")
+        self.assertEqual(len(p.type.extends), 1, "b.a.p extends not properly instantiated")
+        self.assertEqual(p.type.extends[0].type, "Integer", "b.a.p incorrect type E scope")
+        p_int_symbol = p.type.extends[0].symbols["Integer"]
+        p_int_symbol_modification = p_int_symbol.modification_environment.arguments[0]
+        p_int_symbol_value = p_int_symbol_modification.value.modifications[0].value
+        self.assertEqual(p_int_symbol_value, 1, "b.a.p=1 modification not applied")
+        self.assertEqual(len(a_type.extends), 1, "b.a extends not properly instantiated")
+        a_extends_D_extends_C = a_type.extends[0]
+        self.assertIn("e", a_extends_D_extends_C.symbols)
+        b_a_e = a_extends_D_extends_C.symbols["e"]
+        e_type = b_a_e.type
+        self.assertEqual(len(e_type.extends), 1, "b.a.e extends not properly instantiated")
+        self.assertEqual(e_type.extends[0].type, "Real", "b.a.e incorrect type E scope")
+
+        # TODO: Update after new flattening is implemented (uncomment below)
+        # This fails with Pymoca 0.10 flattening
+
+        # flat_tree = tree.flatten(instance_tree, ast.ComponentRef.from_string("M"))
+
+        # self.assertEqual(flat_tree.classes["M"].symbols["b.a.e"].type.name, "Real")
+        # self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].type.name, "Integer")
+        # self.assertEqual(flat_tree.classes["M"].symbols["b.a.p"].value.value, 1)
+
+    def test_class_and_symbol_visibility(self):
+        """Test that class and symbol visibility are set correctly"""
+
+        txt = """
+            class A
+                protected
+                class B
+                    parameter Real x, y, z;
+                end B;
+                B b;
+
+                public
+                class C
+                    extends B;
+                end C;
+                C c, d;
+
+                protected
+                parameter Real v;
+            end A;
+        """
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("A")
+        # Test visibility of the class
+        self.assertEqual(ast.Visibility.PROTECTED, instance.classes["B"].visibility)
+        # Test that we propagate visibility to symbols in the class
+        for symbol in instance.symbols["b"].type.symbols.values():
+            self.assertEqual(ast.Visibility.PROTECTED, symbol.visibility)
+
+        # Test for protected visibility in inherited symbols in a public class
+        for symbol in instance.symbols["c"].type.extends[0].symbols.values():
+            self.assertEqual(ast.Visibility.PROTECTED, symbol.visibility)
+
+        # Test interleaved visibility declarations
+        self.assertEqual(ast.Visibility.PROTECTED, instance.symbols["b"].visibility)
+        self.assertEqual(ast.Visibility.PUBLIC, instance.symbols["c"].visibility)
+        self.assertEqual(ast.Visibility.PUBLIC, instance.symbols["d"].visibility)
+        self.assertEqual(ast.Visibility.PROTECTED, instance.symbols["v"].visibility)
+
+    def test_extends_lookup_not_in_extended(self):
+        """
+        Check that we do not find 'model B' in the unnamed node 'A' in the
+        following model. We also check that the order of inheritance does not
+        matter for the error message.
+        """
+        txt = """
+        model A
+            model B
+                parameter Real x = 1.0;
+            end B;
+            parameter Real y = 2.0;
+        end A;
+
+        model C
+            extends {};
+            extends {};
+        end C;
+        """
+
+        for extends_1, extends_2 in [("A", "B"), ("B", "A")]:
+            ast_tree = parser.parse(txt.format(extends_1, extends_2))
+            instance_tree = tree.InstanceTree(ast_tree)
+
+            with self.assertRaisesRegex(
+                tree.ModelicaSemanticError, "Extends name B not found in scope C"
+            ):
+                instance = instance_tree.instantiate("C")  # noqa: F841
+
+    def test_error_extends_class_also_extended_name_simple(self):
+        """
+        Check that we are not allowed to inherit from `model B`, because a
+        symbol with the same name is inherited from `model A`. We also check
+        that the order of inheritance does not matter for the error message.
+        """
+        txt = """
+        model A
+            parameter Real B = 1.0;
+            parameter Real y = 2.0;
+        end A;
+
+        model B
+            parameter Real x = 1.0;
+        end B;
+
+        model C
+            extends {};
+            extends {};
+        end C;
+        """
+
+        for extends_1, extends_2 in [("A", "B")]:
+            ast_tree = parser.parse(txt.format(extends_1, extends_2))
+            instance_tree = tree.InstanceTree(ast_tree)
+
+            with self.assertRaisesRegex(
+                tree.ModelicaSemanticError,
+                "Cannot extend 'C' with 'B'; 'B' also exists in names inherited from 'A'",
+            ):
+                instance = instance_tree.instantiate("C")  # noqa: F841
+
+    def test_error_extends_class_also_extended_name_of_self(self):
+        """
+        Check that we are not allowed to inherit from `model A`, because a
+        symbol with the same name is inherited from `model A`.
+        """
+        txt = """
+        model A
+            parameter Real A = 1.0;
+            parameter Real y = 2.0;
+        end A;
+
+        model C
+            extends A;
+        end C;
+        """
+
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError,
+            "Cannot extend 'C' with 'A'; 'A' also exists in names inherited from 'A'",
+        ):
+            instance = instance_tree.instantiate("C")  # noqa: F841
+
+    def test_error_extends_class_also_extended_name_nested(self):
+        """
+        Check that we are not allowed to inherit from `model B.C`, because a
+        symbol with the the name 'B' is inherited from `model A`. We also check
+        that the order of inheritance does not matter for the error message.
+        """
+        txt = """
+        model A
+            parameter Real B = 1.0;
+            parameter Real y = 2.0;
+        end A;
+
+        package B
+            model C
+                parameter Real x = 1.0;
+            end C;
+        end B;
+
+        model D
+            extends {};
+            extends {};
+        end D;
+        """
+
+        for extends_1, extends_2 in [("A", "B.C"), ("B.C", "A")]:
+            ast_tree = parser.parse(txt.format(extends_1, extends_2))
+            instance_tree = tree.InstanceTree(ast_tree)
+
+            with self.assertRaisesRegex(
+                tree.ModelicaSemanticError,
+                "Cannot extend 'D' with 'B.C'; 'B' also exists in names inherited from 'A'",
+            ):
+                instance = instance_tree.instantiate("D")  # noqa: F841
+
     def test_nested_classes(self):
         with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("C2")
+        self.assertIsNotNone(instance)
+
+        c2_v1 = instance.extends[0].symbols["v1"].type.extends[0].symbols["Real"]
+        c2_v1_mod = c2_v1.modification_environment.arguments[-1].value
+        self.assertEqual(c2_v1_mod.component.name, "nominal")
+        self.assertEqual(c2_v1_mod.modifications[0].value, 1000)
+
+        c2_v2 = instance.extends[0].symbols["v1"].type.extends[0].symbols["Real"]
+        c2_v2_mod = c2_v2.modification_environment.arguments[-1].value
+        self.assertEqual(c2_v2_mod.component.name, "nominal")
+        self.assertEqual(c2_v2_mod.modifications[0].value, 1000)
+
+        # TODO: Update after new flattening is implemented
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="C2"))
 
         self.assertEqual(flat_tree.classes["C2"].symbols["v1"].nominal.value, 1000.0)
         self.assertEqual(flat_tree.classes["C2"].symbols["v2"].nominal.value, 1000.0)
 
+    def test_nested_symbol_modifier(self):
+        with open(os.path.join(MODEL_DIR, "NestedClasses.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("C3")
+        self.assertIsNotNone(instance)
+
+        c3_v1_type = instance.symbols["c"].type.extends[0].symbols["v1"].type
+        c3_v1 = c3_v1_type.extends[0].symbols["Real"]
+        c3_v1_mod = c3_v1.modification_environment.arguments[-1].value
+        self.assertEqual(c3_v1_mod.component.name, "nominal")
+        self.assertEqual(c3_v1_mod.modifications[0].value, 10)
+
+        # TODO: Update after new flattening is implemented
+        # This fails with Pymoca 0.10 flattening:
+        # IndexError: Processing failed for symbol "C3.c": list index out of range
+        # flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="C3"))
+
+        # self.assertEqual(flat_tree.classes["C3"].symbols["c.v1"].nominal.value, 10.0)
+        # self.assertEqual(flat_tree.classes["C3"].symbols["c.v2"].nominal.value, 1000.0)
+
     def test_inheritance_symbol_modifiers(self):
         with open(os.path.join(MODEL_DIR, "Inheritance.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("Sub")
+        self.assertIsNotNone(instance)
+        x_type = instance.extends[0].symbols["x"].type.symbols["Real"]
+        x_mod = x_type.modification_environment.arguments[0]
+        self.assertEqual(x_mod.value.component.name, "max")
+        self.assertEqual(x_mod.value.modifications[0].value, 30.0)
+
+        # TODO: Update when new flattening is implemented
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="Sub"))
 
         self.assertEqual(flat_tree.classes["Sub"].symbols["x"].max.value, 30.0)
@@ -201,6 +679,17 @@ class ParseTest(unittest.TestCase):
         with open(os.path.join(MODEL_DIR, "ExtendsModification.mo"), "r") as f:
             txt = f.read()
         ast_tree = parser.parse(txt)
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("MainModel")
+        self.assertIsNotNone(instance)
+        e_HQ_H = instance.symbols["e"].type.extends[0].extends[0].symbols["HQ"].type.symbols["H"]
+        H_mod = e_HQ_H.type.symbols["Real"].modification_environment.arguments[0].value
+        self.assertEqual(H_mod.component.name, "min")
+        min_mod = H_mod.modifications[0]
+        self.assertEqual(min_mod.name, "H_b")
+
+        # TODO: Update when new flattening is implemented
         flat_tree = tree.flatten(ast_tree, ast.ComponentRef(name="MainModel"))
 
         self.assertEqual(flat_tree.classes["MainModel"].symbols["e.HQ.H"].min.name, "e.H_b")
@@ -280,6 +769,17 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+
+        instance = instance_tree.instantiate("E")
+        self.assertIsNotNone(instance)
+
+        E_c_x = instance.extends[0].symbols["c"].type.extends[0].symbols["x"]
+        mod = E_c_x.type.symbols["Real"].modification_environment.arguments[0].value
+        self.assertEqual(mod.component.name, "nominal")
+        self.assertEqual(mod.modifications[0].value, 2)
+
+        # TODO: Update when new flatting is implemented
         class_name = "E"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -292,6 +792,13 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("ChannelZ")
+        self.assertIsNotNone(instance)
+
+        self.assertIn("Z", instance.extends[0].symbols["down"].type.symbols)
+
+        # TODO: Update when new flattening is implemented
         class_name = "ChannelZ"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -304,6 +811,15 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("ChannelZ")
+        self.assertIsNotNone(instance)
+
+        c_type = instance.symbols["c"].type
+        self.assertIn("Z", c_type.symbols["up"].type.symbols)
+        self.assertIn("A", c_type.symbols["down"].type.symbols)
+
+        # TODO: Update when new flattening is implemented
         class_name = "ChannelZ"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -317,6 +833,14 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("ChannelZ")
+        self.assertIsNotNone(instance)
+
+        c_type = instance.symbols["c"].type
+        self.assertIn("Z", c_type.symbols["up"].type.symbols)
+        self.assertIn("A", c_type.symbols["down"].type.symbols)
+        # TODO: Update when new flattening is implemented
         class_name = "ChannelZ"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -330,6 +854,13 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError, "In D extends C, C and parents cannot be replaceable"
+        ):
+            instance = instance_tree.instantiate("E")  # noqa: F841
+
+        # TODO: Update when new flattening is implemented (remove flattening)
         class_name = "E"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -337,6 +868,17 @@ class ParseTest(unittest.TestCase):
 
         self.assertIn("z.y", flat_tree.classes["E"].symbols)
         self.assertEqual(flat_tree.classes["E"].symbols["z.y"].nominal.value, 2.0)
+
+    def test_redeclare_nonreplaceable(self):
+        with open(os.path.join(MODEL_DIR, "RedeclareNonReplaceable.mo"), "r") as f:
+            txt = f.read()
+        ast_tree = parser.parse(txt)
+
+        instance_tree = tree.InstanceTree(ast_tree)
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError, "Redeclaring D.C that is not replaceable"
+        ):
+            instance = instance_tree.instantiate("E")  # noqa: F841
 
     def test_redeclare_nested(self):
         with open(os.path.join(MODEL_DIR, "RedeclareNestedClass.mo.fail_parse"), "r") as f:
@@ -350,6 +892,16 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("P.M")
+        self.assertIsNotNone(instance)
+
+        at_m = instance.extends[0].symbols["at"].type.symbols["m"].type.symbols["Real"]
+        m_mod = at_m.modification_environment.arguments[0]
+        self.assertEqual(m_mod.value.component.name, "value")
+        self.assertEqual(m_mod.value.modifications[0].value, 0)
+
+        # TODO: Update when new flattening is implemented
         class_name = "P.M"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -362,6 +914,16 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("b")
+        self.assertIsNotNone(instance)
+        # Since b extends a and a has no symbols, new instantiation stops there
+        # Instead we will check for the redeclare being applied correctly
+        b_m_mod = instance.extends[0].classes["m"].modification_environment.arguments[0]
+        self.assertEqual(b_m_mod.value.name, "m")
+        self.assertEqual(b_m_mod.value.component.name, "m2")
+
+        # TODO: Update when new flattening is implemented
         class_name = "b"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -375,6 +937,18 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("ScopeTest")
+        self.assertIsNotNone(instance)
+        p_sym = instance.symbols["p"].type.symbols["Real"]
+        p_sym_mod = p_sym.modification_environment.arguments[0]
+        self.assertEqual(p_sym_mod.value.component.name, "value")
+        self.assertEqual(p_sym_mod.value.modifications[0].value, 1.0)
+        nc_p_sym = instance.symbols["nc"].type.symbols["p"].type.symbols["Real"]
+        nc_p_mod = nc_p_sym.modification_environment.arguments[0]
+        self.assertEqual(nc_p_mod.value.modifications[0].name, "p")
+
+        # TODO: Update when new flattening is implemented
         class_name = "ScopeTest"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -387,6 +961,19 @@ class ParseTest(unittest.TestCase):
             txt = f.read()
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate("A")
+        self.assertIsNotNone(instance)
+
+        dummy = instance.extends[0].symbols["dummy_parameter"].type.extends[0].symbols["Real"]
+        dummy_value_mod = dummy.modification_environment.arguments[0]
+        self.assertEqual(dummy_value_mod.value.component.name, "unit")
+        self.assertEqual(dummy_value_mod.value.modifications[0].value, "m/s")
+        dummy_value_mod = dummy.modification_environment.arguments[-1]
+        self.assertEqual(dummy_value_mod.value.component.name, "value")
+        self.assertEqual(dummy_value_mod.value.modifications[0].value, 10.0)
+
+        # TODO: Update when new flattening is implemented
         class_name = "A"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -403,6 +990,13 @@ class ParseTest(unittest.TestCase):
 
         ast_tree = parser.parse(txt)
 
+        instance_tree = tree.InstanceTree(ast_tree)
+        with self.assertRaisesRegex(
+            tree.ModelicaSemanticError, "Cannot extend class 'A' with itself"
+        ):
+            instance = instance_tree.instantiate("A")  # noqa: F841
+
+        # TODO: Update when new flattening is implemented
         class_name = "A"
         comp_ref = ast.ComponentRef.from_string(class_name)
 
@@ -650,6 +1244,43 @@ class ParseTest(unittest.TestCase):
             "Modelica/Electrical/Analog/Basic/OpAmp.mo",
         )
         model_name = "Modelica.Electrical.Analog.Basic.OpAmp"
+
+        instance_tree = tree.InstanceTree(library_tree)
+        instance = instance_tree.instantiate(model_name)
+        self.assertIsNotNone(instance)
+
+        # Check that we have a fully connected InstanceTree with only Instances (except BUILTINS)
+        non_instances = check_instance_tree_is_all_instances(instance.root)
+
+        self.assertEqual(
+            0,
+            len(non_instances),
+            msg=f"\nFound non-instances in InstanceTree:\n{non_instances}",
+        )
+
+        self.assertIn("i", instance.symbols["in_p"].type.symbols)
+        in_p_i = instance.symbols["in_p"].type.symbols["i"]
+        in_p_i_mod_args = (
+            in_p_i.type.extends[0].extends[0].symbols["Real"].modification_environment.arguments
+        )
+        for arg in in_p_i_mod_args:
+            if arg.value.component.name == "unit":
+                self.assertEqual(arg.value.modifications[0].value, "A")
+            if arg.value.component.name == "quantity":
+                self.assertEqual(arg.value.modifications[0].value, "ElectricCurrent")
+
+        self.assertIn("vin", instance.symbols)
+        vin = instance.symbols["vin"]
+        vin_mod_args = (
+            vin.type.extends[0].extends[0].symbols["Real"].modification_environment.arguments
+        )
+        for arg in vin_mod_args:
+            if arg.value.component.name == "unit":
+                self.assertEqual(arg.value.modifications[0].value, "V")
+            if arg.value.component.name == "quantity":
+                self.assertEqual(arg.value.modifications[0].value, "ElectricPotential")
+
+        # # TODO: Update when new flattening is implemented
         flat_class = ast.ComponentRef.from_string(model_name)
         flat_tree = tree.flatten(library_tree, flat_class)
         symbols = flat_tree.classes[model_name].symbols
@@ -674,6 +1305,34 @@ class ParseTest(unittest.TestCase):
             "Modelica/Electrical/Analog/Interfaces.mo",
         )
         model_name = "Modelica.Electrical.Analog.Interfaces.TwoPort"
+
+        instance_tree = tree.InstanceTree(library_tree)
+        instance = instance_tree.instantiate(model_name)
+        self.assertIsNotNone(instance)
+
+        self.assertIn("i", instance.symbols["p1"].type.symbols)
+        p1_i = instance.symbols["p1"].type.symbols["i"]
+        p1_i_mod_args = (
+            p1_i.type.extends[0].extends[0].symbols["Real"].modification_environment.arguments
+        )
+        for arg in p1_i_mod_args:
+            if arg.value.component.name == "unit":
+                self.assertEqual(arg.value.modifications[0].value, "A")
+            if arg.value.component.name == "quantity":
+                self.assertEqual(arg.value.modifications[0].value, "ElectricCurrent")
+
+        self.assertIn("v1", instance.symbols)
+        v1 = instance.symbols["v1"]
+        v1_mod_args = (
+            v1.type.extends[0].extends[0].symbols["Real"].modification_environment.arguments
+        )
+        for arg in v1_mod_args:
+            if arg.value.component.name == "unit":
+                self.assertEqual(arg.value.modifications[0].value, "V")
+            if arg.value.component.name == "quantity":
+                self.assertEqual(arg.value.modifications[0].value, "ElectricPotential")
+
+        # TODO: Update when new flattening is implemented
         flat_class = ast.ComponentRef.from_string(model_name)
         flat_tree = tree.flatten(library_tree, flat_class)
         symbols = flat_tree.classes[model_name].symbols
@@ -696,6 +1355,22 @@ class ParseTest(unittest.TestCase):
             "Modelica/Mechanics/Rotational/Interfaces/PartialAbsoluteSensor.mo",
         )
         model_name = "Modelica.Mechanics.Rotational.Interfaces.PartialAbsoluteSensor"
+        instance_tree = tree.InstanceTree(library_tree)
+        instance = instance_tree.instantiate(model_name)
+        self.assertIsNotNone(instance)
+
+        self.assertIn("flange", instance.symbols)
+        phi = instance.symbols["flange"].type.extends[0].symbols["phi"]
+        phi_mod_args = phi.type.extends[0].symbols["Real"].modification_environment.arguments
+        for arg in phi_mod_args:
+            if arg.value.component.name == "unit":
+                self.assertEqual(arg.value.modifications[0].value, "rad")
+            if arg.value.component.name == "displayUnit":
+                self.assertEqual(arg.value.modifications[0].value, "deg")
+            if arg.value.component.name == "quantity":
+                self.assertEqual(arg.value.modifications[0].value, "Angle")
+
+        # TODO: Update when new flattening is implemented
         flat_class = ast.ComponentRef.from_string(model_name)
         flat_tree = tree.flatten(library_tree, flat_class)
         symbols = flat_tree.classes[model_name].symbols
@@ -734,6 +1409,40 @@ class ParseTest(unittest.TestCase):
             end A;
         """
         ast_tree = parser.parse(txt)
+        class_name = "A.D"
+
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate(class_name)
+        self.assertIsNotNone(instance)
+        c_y = (
+            instance.extends[0]
+            .symbols["c"]
+            .type.symbols["y"]
+            .type.extends[0]
+            .extends[0]
+            .symbols["Integer"]
+        )
+        c_y_mod = c_y.modification_environment.arguments[-1]
+        self.assertEqual(c_y_mod.value.component.name, "value")
+        self.assertEqual(c_y_mod.value.modifications[0].value, 3)
+
+        class_name = "A.E"
+        instance_tree = tree.InstanceTree(ast_tree)
+        instance = instance_tree.instantiate(class_name)
+        d_c_y = (
+            instance.symbols["d"]
+            .type.extends[0]
+            .symbols["c"]
+            .type.symbols["y"]
+            .type.extends[0]
+            .extends[0]
+            .symbols["Integer"]
+        )
+        d_c_y_mod = d_c_y.modification_environment.arguments[-1]
+        self.assertEqual(d_c_y_mod.value.component.name, "value")
+        self.assertEqual(d_c_y_mod.value.modifications[0].value, 4)
+
+        # TODO: Update when new flattening is implemented
         class_name = "A.D"
         comp_ref = ast.ComponentRef.from_string(class_name)
         flat_tree = tree.flatten(ast_tree, comp_ref)
