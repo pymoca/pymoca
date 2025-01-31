@@ -1119,9 +1119,11 @@ class InstanceTree(ast.Tree):
                 name=element.name,
                 ast_ref=ast_ref,
                 parent=parent,
+                annotation=ast.ClassModification(),
+                replaceable=ast_ref.replaceable,
+                encapsulated=ast_ref.encapsulated,
+                partial=ast_ref.partial,
             )
-            instance.annotation = ast.ClassModification()
-            instance.replaceable = ast_ref.replaceable
 
             # TODO: Try connecting into class tree instead of doing _instantiate_parents_partially
             # Mirror class tree for name lookup in the InstanceTree
