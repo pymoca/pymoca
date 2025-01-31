@@ -68,6 +68,7 @@ pymoca/version.py
 .vscode/
 
 # virtual environments
+.venv/
 venv/
 venv3/
 
@@ -81,3 +82,6 @@ tmp*.o
 *.orig
 *.pymoca_cache
 test/generated/
+
+# uv
+uv.lock

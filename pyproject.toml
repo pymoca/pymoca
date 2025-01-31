@@ -50,6 +50,19 @@ sympy = ["sympy>=0.7.6.1", "scipy>=0.13.3", "jinja2>=2.10.1"]
 examples = ["jupyterlab", "matplotlib", "control>=0.9.3.post2,<=0.10.0"]
 all = ["pymoca[casadi,lxml,sympy,examples]"]
 
+[dependency-groups]
+dev = [
+    "pre-commit>=3.3.0",
+    "hatchling >= 1.26.3",
+    "hatch-vcs >= 0.4.0",
+    "tox >= 4.18.0",
+    {include-group = "tests"},
+]
+tests = [
+    "pytest >= 8.2.0",
+    "pytest-cov >= 6.0.0",
+]
+
 [tool.hatch.version]
 source = "vcs"
 
