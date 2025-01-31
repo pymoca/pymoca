@@ -370,7 +370,7 @@ def _find_name(
         found = _find_rest_of_name(found, rest_of_name)
 
     # Maintaining backward compatibility by including InstanceTree (not strictly correct)
-    # TODO: (0.11) Remove InstanceTree to make spec compliant and fix test/models
+    # TODO: Remove InstanceTree to make spec compliant and fix test/models
     if not found and isinstance(scope, (ast.InstanceClass, InstanceTree)):
         # Not found in instance tree, look in class tree
         found = _find_name(
