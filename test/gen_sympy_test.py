@@ -2,6 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
@@ -10,9 +11,7 @@ import time
 import unittest
 
 import pymoca.backends.sympy.generator as gen_sympy
-from pymoca import ast
-from pymoca import parser
-from pymoca import tree
+from pymoca import ast, parser, tree
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_DIR = os.path.join(TEST_DIR, "models")

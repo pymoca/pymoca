@@ -5,7 +5,6 @@ eventual generated model, everything should should be ca.MX.
 """
 
 import casadi as ca
-
 import numpy as np
 
 

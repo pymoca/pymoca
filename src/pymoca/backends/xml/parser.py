@@ -3,7 +3,6 @@ from collections import OrderedDict
 from typing import Union
 
 import casadi as ca
-
 from lxml import etree
 
 from .model import HybridDae
@@ -261,8 +260,7 @@ class ModelListener:
             vr = getattr(dae, right)
             if vl.shape != vr.shape:
                 raise ValueError(
-                    "{:s} and {:s} must have the same shape:"
-                    "\n{:s}: {:s}\t{:s}: {:s}".format(
+                    "{:s} and {:s} must have the same shape:\n{:s}: {:s}\t{:s}: {:s}".format(
                         left, right, left, str(dae.f_m), right, str(dae.m)
                     )
                 )
@@ -274,8 +272,9 @@ class ModelListener:
         n_var = dae.x.shape[0] + dae.m.shape[0] + dae.y.shape[0]
         if n_eq != n_var:
             raise ValueError(
-                "must have equal number of equations "
-                "{:d} and unknowns {:d}\n:{:s}".format(n_eq, n_var, str(dae))
+                "must have equal number of equations {:d} and unknowns {:d}\n:{:s}".format(
+                    n_eq, n_var, str(dae)
+                )
             )
         self.scope_stack.pop()
 

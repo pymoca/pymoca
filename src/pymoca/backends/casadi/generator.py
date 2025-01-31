@@ -6,7 +6,6 @@ from collections import OrderedDict, deque, namedtuple
 from typing import Dict, Iterable, Union
 
 import casadi as ca
-
 import numpy as np
 
 from pymoca import ast
@@ -15,7 +14,6 @@ from pymoca.tree import TreeListener, TreeWalker, flatten
 from ._options import _merge_default_options
 from .model import DelayArgument, Model, StringVariable, Variable
 from .mtensor import _MTensor, _new_mx
-
 
 logger = logging.getLogger("pymoca")
 
@@ -500,9 +498,9 @@ class Generator(TreeListener):
 
                     # Make the symbol with the appropriate size, and replace the old symbol with the new one.
                     orig_symbol = _new_mx(k.name(), *res.size())
-                    assert (
-                        res.size1() == 1 or res.size2() == 1
-                    ), "Slicing does not yet work with 2-D indices"
+                    assert res.size1() == 1 or res.size2() == 1, (
+                        "Slicing does not yet work with 2-D indices"
+                    )
                     indices = slice(None, None)
 
                     model_input = next(x for x in self.model.inputs if x.symbol.name() == k.name())
@@ -827,9 +825,9 @@ class Generator(TreeListener):
             return ca.mtimes(J(deps), ca.vertcat(*der_deps))
 
     def get_indexed_symbol(self, tree, s):
-        assert (
-            len([dim for shape in s._modelica_shape for dim in shape if dim is not None]) <= 2
-        ), "Dimensions higher than two are not yet supported"
+        assert len([dim for shape in s._modelica_shape for dim in shape if dim is not None]) <= 2, (
+            "Dimensions higher than two are not yet supported"
+        )
 
         assert len(s._modelica_shape) >= len(tree.indices)
 

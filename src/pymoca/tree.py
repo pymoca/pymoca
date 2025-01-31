@@ -334,9 +334,9 @@ def flatten_extends(
                 extended_orig_class.modification_environment.arguments
             )
         else:
-            extended_orig_class.symbols["__value"].class_modification = (
-                extended_orig_class.modification_environment
-            )
+            extended_orig_class.symbols[
+                "__value"
+            ].class_modification = extended_orig_class.modification_environment
 
         extended_orig_class.modification_environment = ast.ClassModification()
 
@@ -860,9 +860,9 @@ def modify_symbol(sym: ast.Symbol, scope: ast.InstanceClass) -> None:
     for class_mod_argument in apply_args:
         argument = class_mod_argument.value
 
-        assert isinstance(
-            argument, ast.ElementModification
-        ), "Found redeclaration modification which should already have been handled."
+        assert isinstance(argument, ast.ElementModification), (
+            "Found redeclaration modification which should already have been handled."
+        )
 
         # TODO: Strip all non-symbol stuff.
         if argument.component.name not in ast.Symbol.ATTRIBUTES:
@@ -890,9 +890,9 @@ class SymbolModificationApplier(TreeListener):
 
     def exitSymbol(self, tree: ast.Symbol):
         if not isinstance(tree.type, ast.ComponentRef):
-            assert (
-                tree.class_modification is None
-            ), "Found symbol modification on non-elementary type in instance tree."
+            assert tree.class_modification is None, (
+                "Found symbol modification on non-elementary type in instance tree."
+            )
         elif tree.class_modification is not None:
             if tree.class_modification.arguments:
                 modify_symbol(tree, self.scope)

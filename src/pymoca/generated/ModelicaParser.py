@@ -1,8 +1,8 @@
 # Generated from Modelica.g4 by ANTLR 4.13.1
 # encoding: utf-8
-from antlr4 import *
-from io import StringIO
 import sys
+
+from antlr4 import *
 
 if sys.version_info[1] > 5:
     from typing import TextIO
@@ -9095,7 +9095,7 @@ class ModelicaParser(Parser):
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while (((_la) & ~0x3F) == 0 and ((1 << _la) & 16380) != 0) or (
-                (((_la - 81)) & ~0x3F) == 0 and ((1 << (_la - 81)) & 11) != 0
+                ((_la - 81) & ~0x3F) == 0 and ((1 << (_la - 81)) & 11) != 0
             ):
                 self.state = 159
                 self.stored_definition_class()
@@ -10127,7 +10127,7 @@ class ModelicaParser(Parser):
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3F) == 0 and ((1 << _la) & 216173881626607616) != 0) or (
-                (((_la - 71)) & ~0x3F) == 0 and ((1 << (_la - 71)) & 1966265) != 0
+                ((_la - 71) & ~0x3F) == 0 and ((1 << (_la - 71)) & 1966265) != 0
             ):
                 self.state = 313
                 self.expression_list()
@@ -10182,7 +10182,7 @@ class ModelicaParser(Parser):
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while (((_la) & ~0x3F) == 0 and ((1 << _la) & 545666383868) != 0) or (
-                (((_la - 81)) & ~0x3F) == 0 and ((1 << (_la - 81)) & 379) != 0
+                ((_la - 81) & ~0x3F) == 0 and ((1 << (_la - 81)) & 379) != 0
             ):
                 self.state = 318
                 self.element()
@@ -10873,7 +10873,7 @@ class ModelicaParser(Parser):
             if ((_la) & ~0x3F) == 0 and ((1 << _la) & 120259084288) != 0:
                 self.state = 417
                 _la = self._input.LA(1)
-                if not ((((_la) & ~0x3F) == 0 and ((1 << _la) & 120259084288) != 0)):
+                if not (((_la) & ~0x3F) == 0 and ((1 << _la) & 120259084288) != 0):
                     self._errHandler.recoverInline(self)
                 else:
                     self._errHandler.reportMatch(self)
@@ -11398,7 +11398,7 @@ class ModelicaParser(Parser):
             self.state = 470
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la - 26)) & ~0x3F) == 0 and ((1 << (_la - 26)) & -8556839292003942399) != 0:
+            if ((_la - 26) & ~0x3F) == 0 and ((1 << (_la - 26)) & -8556839292003942399) != 0:
                 self.state = 469
                 self.argument_list()
 
@@ -14160,7 +14160,7 @@ class ModelicaParser(Parser):
                         self.state = 790
                         localctx.op = self._input.LT(1)
                         _la = self._input.LA(1)
-                        if not ((((_la) & ~0x3F) == 0 and ((1 << _la) & 8070450532516364288) != 0)):
+                        if not (((_la) & ~0x3F) == 0 and ((1 << _la) & 8070450532516364288) != 0):
                             localctx.op = self._errHandler.recoverInline(self)
                         else:
                             self._errHandler.reportMatch(self)
@@ -14182,7 +14182,7 @@ class ModelicaParser(Parser):
                         self.state = 793
                         localctx.op = self._input.LT(1)
                         _la = self._input.LA(1)
-                        if not (((((_la - 56)) & ~0x3F) == 0 and ((1 << (_la - 56)) & 387) != 0)):
+                        if not (((_la - 56) & ~0x3F) == 0 and ((1 << (_la - 56)) & 387) != 0):
                             localctx.op = self._errHandler.recoverInline(self)
                         else:
                             self._errHandler.reportMatch(self)
@@ -14204,7 +14204,7 @@ class ModelicaParser(Parser):
                         self.state = 796
                         localctx.op = self._input.LT(1)
                         _la = self._input.LA(1)
-                        if not (((((_la - 65)) & ~0x3F) == 0 and ((1 << (_la - 65)) & 63) != 0)):
+                        if not (((_la - 65) & ~0x3F) == 0 and ((1 << (_la - 65)) & 63) != 0):
                             localctx.op = self._errHandler.recoverInline(self)
                         else:
                             self._errHandler.reportMatch(self)
@@ -14904,7 +14904,7 @@ class ModelicaParser(Parser):
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3F) == 0 and ((1 << _la) & 216173881626615808) != 0) or (
-                (((_la - 71)) & ~0x3F) == 0 and ((1 << (_la - 71)) & 1966265) != 0
+                ((_la - 71) & ~0x3F) == 0 and ((1 << (_la - 71)) & 1966265) != 0
             ):
                 self.state = 867
                 self.function_arguments()
@@ -15267,7 +15267,7 @@ class ModelicaParser(Parser):
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             if (((_la) & ~0x3F) == 0 and ((1 << _la) & 216173881626607616) != 0) or (
-                (((_la - 71)) & ~0x3F) == 0 and ((1 << (_la - 71)) & 1966265) != 0
+                ((_la - 71) & ~0x3F) == 0 and ((1 << (_la - 71)) & 1966265) != 0
             ):
                 self.state = 908
                 self.expression()

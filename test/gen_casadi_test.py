@@ -2,6 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
@@ -10,7 +11,6 @@ import re
 import unittest
 
 import casadi as ca
-
 import numpy as np
 
 import pymoca.backends.casadi.generator as gen_casadi
@@ -24,7 +24,6 @@ from pymoca.backends.casadi.model import (
     StringVariable,
     Variable,
 )
-
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "models")
 
@@ -2316,9 +2315,7 @@ class GenCasadiTest(unittest.TestCase):
         try:
             casadi_model = gen_casadi.generate(ast_tree, "B")  # noqa: F841
         except Exception as e:
-            assert (
-                e.args[0] == "Dimension 2 of definition and " "value for symbol a.y differs: 4 != 3"
-            )
+            assert e.args[0] == "Dimension 2 of definition and value for symbol a.y differs: 4 != 3"
             return
 
         self.assertFalse(True, "No exception raised on wrong dimensionality.")

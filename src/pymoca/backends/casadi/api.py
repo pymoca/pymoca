@@ -8,7 +8,6 @@ from enum import IntEnum
 from typing import Dict
 
 import casadi as ca
-
 import numpy as np
 
 from pymoca import __version__

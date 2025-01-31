@@ -2,6 +2,7 @@
 """
 Modelica parse Tree to AST tree.
 """
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
@@ -10,6 +11,7 @@ import logging
 import os
 import pickle
 import platform
+import re
 import sqlite3
 import time
 from collections import OrderedDict, deque
@@ -26,7 +28,6 @@ from . import ast
 from .generated.ModelicaLexer import ModelicaLexer
 from .generated.ModelicaListener import ModelicaListener
 from .generated.ModelicaParser import ModelicaParser
-
 
 # TODO
 #  - Named function arguments (note that either all have to be named, or none)
@@ -999,7 +1000,7 @@ def parse(
 
     # Do not use caching if we have a dirty work tree, as the source
     # code can't be uniquely identified.
-    if pymoca_version.endswith(".dirty"):
+    if re.search(r"[\.\+]d\d{8}$", pymoca_version):
         logger.debug("Bypassing cache because working directory is dirty")
         return _parse(txt)
 

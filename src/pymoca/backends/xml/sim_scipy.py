@@ -6,9 +6,7 @@ import time
 from typing import Dict
 
 import casadi as ca
-
 import numpy as np
-
 import scipy.integrate
 
 from .model import HybridOde
@@ -24,9 +22,7 @@ def sim(model: HybridOde, options: Dict = None, user_callback=None) -> Dict[str,
       f(t, x, y, m, p, c) -> ret   (ret < 0 means abort)
     """
     if model.f_x_rhs.shape[0] < 1:
-        raise ValueError(
-            "there are no ODE equations to simulate, " "check that the model is explicit"
-        )
+        raise ValueError("there are no ODE equations to simulate, check that the model is explicit")
 
     ic = {}
     for f in ["x", "y", "m", "p"]:
