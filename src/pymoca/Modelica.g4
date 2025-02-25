@@ -522,7 +522,7 @@ annotation :
     ;
 
 //=========================================================
-// Keywords
+// Lexer rules (token names must start with uppercase)
 //=========================================================
 EACH : 'each';
 PARTIAL : 'partial';
@@ -543,9 +543,9 @@ COMMENT :
 WS  :   [ \r\n\t]+ -> skip ; // toss out whitespace
 
 //=========================================================
-// Fragments
+// Lexer fragments (not tokens)
 //=========================================================
-fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+;
+fragment Q_IDENT : '\'' ( Q_CHAR | S_ESCAPE)+ '\'';
 fragment NONDIGIT : [_a-zA-Z];
 fragment S_CHAR : [\u0000-\u00FF];
 fragment Q_CHAR : NONDIGIT | DIGIT | [!#$%&()*+,-./:;<>=?@[\]^{}| ];

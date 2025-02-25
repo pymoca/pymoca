@@ -750,6 +750,47 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(flat_tree.classes[class_name].equations[0].left.name, "d.c.y")
         self.assertEqual(flat_tree.classes[class_name].equations[0].right.value, 4)
 
+    def test_basemodelica_scalarized(self):
+        """Test parsing BaseModelica example with scalar varables"""
+        ast_tree = self.parse_file(os.path.join(MODEL_DIR, "BaseModelicaScalarized.mo"))
+        self.assertIsNotNone(ast_tree)
+        class_name = "'ManglingTest'"
+        comp_ref = ast.ComponentRef.from_string(class_name)
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+        # Check a few things, by no means exhaustive
+        symbol = flat_tree.classes[class_name].symbols["'root.mm[1].p'"]
+        self.assertEqual(2.0, symbol.value.value)
+        self.assertIn("parameter", symbol.prefixes)
+        found_y_equation = False
+        for eqn in flat_tree.classes[class_name].equations:
+            if isinstance(eqn.left, ast.Symbol) and eqn.left.name == "'y'":
+                self.assertEqual(eqn.right.name, "'root.m.x'")
+                found_y_equation = True
+                break
+        self.assertTrue(found_y_equation)
+
+    def test_basemodelica_hierarchical(self):
+        """Test parsing BaseModelica example with array variables"""
+        ast_tree = self.parse_file(os.path.join(MODEL_DIR, "BaseModelicaHierarchical.mo"))
+        self.assertIsNotNone(ast_tree)
+        class_name = "'ManglingTest'"
+        comp_ref = ast.ComponentRef.from_string(class_name)
+        flat_tree = tree.flatten(ast_tree, comp_ref)
+        pass
+        # Check a few things, by no means exhaustive
+        symbol = flat_tree.classes[class_name].symbols["'root'.'mm'.'p'"]
+        dimensions = [dim.value for [dim] in symbol.dimensions]
+        self.assertListEqual([None, 2, None], dimensions)
+        values = [val.value for val in symbol.value.values]
+        self.assertListEqual([2.0, 3.0], values)
+        found_y_equation = False
+        for eqn in flat_tree.classes[class_name].equations:
+            if isinstance(eqn.left, ast.Symbol) and eqn.left.name == "'y'":
+                self.assertEqual(eqn.right.name, "'root'.'m'.'x'")
+                found_y_equation = True
+                break
+        self.assertTrue(found_y_equation)
+
     def test_parse_cache_hit(self):
         """Test caching of models"""
 
