@@ -1046,6 +1046,9 @@ def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = Non
     component_ref = ast.ComponentRef.from_string(model_name)
     ast_walker = GeneratorWalker()
     flat_tree = flatten(ast_tree, component_ref)
+    # If we matched a package, descend into model class of the same name
+    if flat_tree.classes[model_name].type=='package':
+        return generate(ast_tree, model_name + "." + model_name, options)
     casadi_gen = Generator(flat_tree, model_name, options)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model
