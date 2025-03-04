@@ -270,8 +270,14 @@ class Generator(TreeListener):
             src = ca.linspace(a, b, n_steps)
         elif op == "fill" and n_operands == 2:
             val = self.get_mx(tree.operands[0])
+            if isinstance(tree.operands[0].value,str):
+                val = tree.operands[0].value
+            val = self.get_mx(tree.operands[0])
             n_row = self.get_integer(tree.operands[1])
-            src = val * ca.DM.ones(n_row)
+            if isinstance(val, str):
+                src = val * n_row
+            else:
+                src = val * ca.DM.ones(n_row)
         elif op == "fill" and n_operands == 3:
             val = self.get_mx(tree.operands[0])
             n_row = self.get_integer(tree.operands[1])
