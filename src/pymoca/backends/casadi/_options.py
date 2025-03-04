@@ -28,6 +28,7 @@ def _get_default_options():
         "detect_aliases": False,
         "allow_derivative_aliases": True,
         "reduce_affine_expression": False,
+        "basemodelica": False,
     }
 
 

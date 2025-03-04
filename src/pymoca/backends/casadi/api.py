@@ -105,18 +105,32 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     # compiling.
     from pymoca import parser
 
+    basemodelica_extension = ".basemodelica.mo"
+
     # Load folders
     tree = None
-    for folder in [model_folder] + compiler_options["library_folders"]:
-        for root, _dir, files in os.walk(folder, followlinks=True):
-            for item in fnmatch.filter(files, "*.mo"):
-                logger.info("Parsing {}".format(item))
-
-                with open(os.path.join(root, item), "r", encoding="utf-8") as f:
+    if compiler_options["basemodelica"]:
+        for root, _dir, files in os.walk(model_folder, followlinks=True):
+            for item in fnmatch.filter(files, "*"+basemodelica_extension):
+                with open(os.path.join(model_folder, item), "r", encoding="utf-8") as f:
                     if tree is None:
                         tree = parser.parse(f.read())
                     else:
                         tree.extend(parser.parse(f.read()))
+        if tree is None:
+            raise FileNotFoundError("Compiler option 'basemodelica' specified, but no *{} files found".format(basemodelica_extension))
+    else:
+        for folder in [model_folder] + compiler_options["library_folders"]:
+            for root, _dir, files in os.walk(folder, followlinks=True):
+                for item in fnmatch.filter(files, "*.mo"):
+                    if item.endswith(basemodelica_extension): continue
+                    logger.info("Parsing {}".format(item))
+
+                    with open(os.path.join(root, item), "r", encoding="utf-8") as f:
+                        if tree is None:
+                            tree = parser.parse(f.read())
+                        else:
+                            tree.extend(parser.parse(f.read()))
 
     # Compile
     logger.info("Generating CasADi model")
