@@ -38,6 +38,19 @@ logger = logging.getLogger("pymoca")
 
 DEFAULT_MODEL_CACHE_DB = "model_txt_cache.db"
 
+def downquote(s):
+    """
+    Defined in https://github.com/modelica/ModelicaSpecification/blob/MCP/0031/RationaleMCP/0031/name-mapping.md
+    """
+    if s.startswith("'") and s.endswith("'"):
+        return s[1:-1]
+    return s
+
+def get_ident_text(ctx):
+    IDENT = ctx.IDENT()
+    if isinstance(IDENT,list):
+        IDENT = IDENT[0]
+    return downquote(IDENT.getText())
 
 class ModelicaFile:
     def __init__(self, **kwargs):
@@ -103,19 +116,19 @@ class ASTListener(ModelicaListener):
 
     def exitShort_class_definition(self, ctx):
         self.ast[ctx] = ast.ShortClassDefinition(
-            name=ctx.IDENT().getText(),
+            name=get_ident_text(ctx),
             type=ctx.class_prefixes().class_type().getText(),
             component=self.ast[ctx.component_reference()],
         )
 
     def exitClass_spec_comp(self, ctx: ModelicaParser.Class_spec_compContext):
         class_node = self.class_node
-        class_node.name = ctx.IDENT()[0].getText()
+        class_node.name = get_ident_text(ctx)
         class_node.comment = self.ast[ctx.string_comment()]
 
     def exitClass_spec_base(self, ctx: ModelicaParser.Class_spec_baseContext):
         class_node = self.class_node
-        class_node.name = ctx.IDENT().getText()
+        class_node.name = get_ident_text(ctx)
         class_node.comment = self.ast[ctx.comment()]
 
         if ctx.class_modification() is not None:
@@ -420,7 +433,7 @@ class ASTListener(ModelicaListener):
 
     def exitFor_index(self, ctx):
         self.ast[ctx] = ast.ForIndex(
-            name=ctx.IDENT().getText(), expression=self.ast[ctx.expression()]
+            name=get_ident_text(ctx), expression=self.ast[ctx.expression()]
         )
 
     def exitFor_indices(self, ctx: ModelicaParser.For_indicesContext):
@@ -473,7 +486,7 @@ class ASTListener(ModelicaListener):
         #    self.class_node.symbols[comp_name].prefixes += ['state']
 
     def exitType_specifier_element(self, ctx: ModelicaParser.Type_specifier_elementContext):
-        self.ast[ctx] = ast.ComponentRef(name=ctx.IDENT().getText(), indices=[[None]], child=[])
+        self.ast[ctx] = ast.ComponentRef(name=get_ident_text(ctx), indices=[[None]], child=[])
 
     def exitType_specifier(self, ctx: ModelicaParser.Type_specifierContext):
         for element in reversed([self.ast[x] for x in ctx.type_specifier_element()]):
@@ -488,7 +501,7 @@ class ASTListener(ModelicaListener):
             indices = [[self.ast[x] for x in ctx.array_subscripts().subscript()]]
         else:
             indices = [[None]]
-        self.ast[ctx] = ast.ComponentRef(name=ctx.IDENT().getText(), indices=indices, child=[])
+        self.ast[ctx] = ast.ComponentRef(name=get_ident_text(ctx), indices=indices, child=[])
 
     def exitComponent_reference(self, ctx: ModelicaParser.Component_referenceContext):
         for element in reversed([self.ast[x] for x in ctx.component_reference_element()]):
@@ -541,7 +554,7 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = import_clause
         import_clause.components = [self.ast[ctx.component_reference()]]
         if ctx.IDENT() is not None:
-            import_clause.short_name = ctx.IDENT().getText()
+            import_clause.short_name = get_ident_text(ctx)
         else:
             import_list = ctx.import_list()
             if import_list is not None:
@@ -550,7 +563,7 @@ class ASTListener(ModelicaListener):
                 # Skip the comma separators in import_list.children
                 for ident in import_list.children[::2]:
                     qualified_name = package_name.concatenate(
-                        package_name.from_string(ident.getText())
+                        package_name.from_string(downquote(ident.getText()))
                     )
                     import_clause.components.append(qualified_name)
             elif ctx.getChildCount() > 3:
@@ -689,7 +702,7 @@ class ASTListener(ModelicaListener):
         dimensions = None
         if self.comp_clause.dimensions is not None:
             dimensions = self.comp_clause.dimensions
-        sym.name = ctx.IDENT().getText()
+        sym.name = get_ident_text(ctx)
         sym.dimensions = dimensions
         sym.prefixes = self.comp_clause.prefixes
         sym.type = self.comp_clause.type
