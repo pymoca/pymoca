@@ -112,7 +112,7 @@ class OdeModel:
         ss_subs.update(self.c0)
 
         # create f (dynamics) lambda function
-        f_lam = sympy.lambdify((self.t, x_sym, u_sym), self.f.subs(ss_subs))
+        f_lam = sympy.lambdify((self.t, x_sym, u_sym), sympy.flatten(self.f.subs(ss_subs)))
         res = np.array(f_lam(0, np.zeros(len(self.x)), np.zeros(len(self.u))), dtype=float)
         if len(res) != len(self.x):
             raise IOError("f doesn't return correct size", res, self.x)
