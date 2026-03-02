@@ -91,8 +91,8 @@ class OdeModel:
         ss_subs.update({self.u[i]: u0[i] for i in range(len(self.u))})
         ss_subs.update(self.p0)
         ss_subs.update(self.c0)
-        for i in range(len(ss)):
-            ss_eval += [np.matrix(ss[i].subs(ss_subs)).astype(float)]
+        for s in ss:
+            ss_eval += [np.array(s.subs(ss_subs)).astype(float)]
         return ss_eval
 
     def simulate(
