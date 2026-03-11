@@ -29,7 +29,6 @@ from .generated.ModelicaParser import ModelicaParser
 
 
 # TODO
-#  - Named function arguments (note that either all have to be named, or none)
 #  - Make sure slice indices (eventually) evaluate to integers
 
 
@@ -290,22 +289,26 @@ class ASTListener(ModelicaListener):
     def exitStatement_component_reference(
         self, ctx: ModelicaParser.Statement_component_referenceContext
     ):
-        self.ast[ctx] = ast.AssignmentStatement(
-            left=[self.ast[ctx.component_reference()]],
-            right=self.ast[ctx.expression()],
-        )
+        if ctx.expression() is not None:
+            self.ast[ctx] = ast.AssignmentStatement(
+                left=[self.ast[ctx.component_reference()]],
+                right=self.ast[ctx.expression()],
+            )
+        else:
+            args = self.ast[ctx.function_call_args().function_arguments()]
+            self.ast[ctx] = ast.Expression(
+                operator=self.ast[ctx.component_reference()],
+                operands=args[:-1],
+                named_operands=args[-1],
+            )
 
     def exitStatement_component_function(
         self, ctx: ModelicaParser.Statement_component_functionContext
     ):
         all_comp_refs = [self.ast[x] for x in ctx.component_reference()]
-
+        args = self.ast[ctx.function_call_args().function_arguments()]
         right = ast.Expression(
-            operator=all_comp_refs[-1],
-            operands=[
-                self.ast[x.expression()]
-                for x in ctx.function_call_args().function_arguments().function_argument()
-            ],
+            operator=all_comp_refs[-1], operands=args[:-1], named_operands=args[-1]
         )
 
         self.ast[ctx] = ast.AssignmentStatement(left=all_comp_refs[:-1], right=right)
@@ -449,23 +452,22 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = ast.Primary(value=True)
 
     def exitPrimary_function(self, ctx: ModelicaParser.Primary_functionContext):
-        # TODO: Could possible be cleaner if we let the expression in the ast bubble up.
-        #       E.g. self.ast[x] below, instead of self.ast[x.expression].
+        args = ctx.function_call_args().function_arguments()
+        if args:
+            operands = self.ast[args][:-1]
+            named_operands = self.ast[args][-1]
+        else:
+            operands = []
+            named_operands = {}
         self.ast[ctx] = ast.Expression(
             operator=self.ast[ctx.component_reference()],
-            operands=[
-                self.ast[x.expression()]
-                for x in ctx.function_call_args().function_arguments().function_argument()
-            ],
+            operands=operands,
+            named_operands=named_operands,
         )
 
     def exitPrimary_derivative(self, ctx: ModelicaParser.Primary_derivativeContext):
         self.ast[ctx] = ast.Expression(
-            operator="der",
-            operands=[
-                self.ast[x.expression()]
-                for x in ctx.function_call_args().function_arguments().function_argument()
-            ],
+            operator="der", operands=self.ast[ctx.function_call_args().function_arguments()][:-1]
         )
         # TODO 'state' is not a standard prefix;  disable this for now as it does not work
         # when differentiating states defined in superclasses.
@@ -509,19 +511,47 @@ class ASTListener(ModelicaListener):
         if len(self.ast[ctx]) == 1:
             self.ast[ctx] = self.ast[ctx][0]
 
-    def exitPrimary_function_arguments(self, ctx: ModelicaParser.Primary_function_argumentsContext):
+    def exitPrimary_expression_list(self, ctx: ModelicaParser.Primary_expression_listContext):
+        outer_list = []
+        for expression_list in ctx.expression_list():
+            inner_list = []
+            for expression in expression_list.expression():
+                inner_list.append(self.ast[expression.simple_expression()])
+            outer_list.append(inner_list)
+        self.ast[ctx] = outer_list
+
+    def exitPrimary_array(self, ctx: ModelicaParser.Primary_arrayContext):
         # TODO: This does not support for generators yet.
         #       Only expressions are supported, e.g. {1.0, 2.0, 3.0}.
-        v = [self.ast[x.expression()] for x in ctx.function_arguments().function_argument()]
+        v = [self.ast[x] for x in ctx.array_arguments().expression()]
         self.ast[ctx] = ast.Array(values=v)
 
+    def exitNamed_arguments(self, ctx: ModelicaParser.Named_argumentsContext):
+        self.ast[ctx] = {
+            x.IDENT().getText(): self.ast[x.function_argument()] for x in ctx.named_argument()
+        }
+
+    def exitFunction_arguments_list(self, ctx: ModelicaParser.Function_arguments_listContext):
+        # Unpack the arguments list
+        # Would like to have ANTLR handle this, but Modelica grammar makes it difficult
+        func_args = []
+        named_args = {}
+        child = ctx.function_arguments_non_first()
+        while child:
+            arg = child.function_argument()
+            if arg:
+                func_args.append(self.ast[arg])
+            arg = child.named_arguments()
+            if arg:
+                named_args.update(self.ast[arg])
+            child = child.function_arguments_non_first()
+        func_args.append(named_args)
+        self.ast[ctx] = func_args
+
     def exitEquation_function(self, ctx: ModelicaParser.Equation_functionContext):
+        args = self.ast[ctx.function_call_args().function_arguments()]
         self.ast[ctx] = ast.Function(
-            name=ctx.name().getText(),
-            arguments=[
-                self.ast[x.expression()]
-                for x in ctx.function_call_args().function_arguments().function_argument()
-            ],
+            name=ctx.name().getText(), arguments=args[:-1], named_args=args[-1]
         )
 
     def exitEquation_when(self, ctx: ModelicaParser.Equation_whenContext):

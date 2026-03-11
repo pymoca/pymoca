@@ -633,6 +633,45 @@ class ParseTest(unittest.TestCase):
         with self.assertRaises(ast.ClassNotFoundError):
             flat_ast = tree.flatten(library_ast, flat_class)  # noqa: F841
 
+    def test_function_call_named_arguments(self):
+        library_ast = self.parse_dir_files(
+            COMPLIANCE_DIR, "Icons.mo", "Functions/Calls/CallNamedArguments.mo"
+        )
+        model_name = "ModelicaCompliance.Functions.Calls.CallNamedArguments"
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        A = flat_ast.classes[model_name].equations[0].right.named_operands["A"]
+        for val in range(1, 5):
+            self.assertEqual(A.values[val - 1].value, val)
+        x = flat_ast.classes[model_name].equations[0].right.named_operands["x"]
+        self.assertEqual(x.value, 21)
+
+    def test_function_call_named_and_positional_arguments(self):
+        library_ast = self.parse_dir_files(
+            COMPLIANCE_DIR, "Icons.mo", "Functions/Calls/CallNamedAndPositionalArguments.mo"
+        )
+        model_name = "ModelicaCompliance.Functions.Calls.CallNamedAndPositionalArguments"
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        A = flat_ast.classes[model_name].equations[0].right.operands[0]
+        for val in range(1, 5):
+            self.assertEqual(A.values[val - 1].value, val)
+        x = flat_ast.classes[model_name].equations[0].right.named_operands["x"]
+        self.assertEqual(x.value, 21)
+
+    def test_function_call_named_arguments_assignment(self):
+        library_ast = self.parse_dir_files(
+            COMPLIANCE_DIR, "Icons.mo", "Functions/Calls/CallNamedArgumentsAssignment.mo"
+        )
+        model_name = "ModelicaCompliance.Functions.Calls.CallNamedArgumentsAssignment"
+        flat_class = ast.ComponentRef.from_string(model_name)
+        flat_ast = tree.flatten(library_ast, flat_class)
+        A = flat_ast.classes[model_name].statements[0].right.named_operands["A"]
+        for val in range(1, 5):
+            self.assertEqual(A.values[val - 1].value, val)
+        x = flat_ast.classes[model_name].statements[0].right.named_operands["x"]
+        self.assertEqual(x.value, 21)
+
     # Tests using the Modelica Standard Library
     def test_msl_opamp_units(self):
         """Test import from Modelica Standard Library 4.0.0 using SI.Units

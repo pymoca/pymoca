@@ -229,11 +229,14 @@ class Expression(Node):
         self.operands = (
             []
         )  # type: List[Union[Expression, Primary, ComponentRef, Array, IfExpression]]
+        self.named_operands = (
+            {}
+        )  # type: Dict[str, Union[Expression, Primary, ComponentRef, Array, IfExpression]]
         super().__init__(**kwargs)
 
     def __repr__(self):
-        return "{}(operator={!r}, operands={!r})".format(
-            type(self).__name__, self.operator, self.operands
+        return "{}(operator={!r}, operands={!r}), named_operands={!r}".format(
+            type(self).__name__, self.operator, self.operands, self.named_operands
         )
 
 
@@ -388,6 +391,7 @@ class Function(Node):
     def __init__(self, **kwargs):
         self.name = ""  # type: str
         self.arguments = []  # type: List[Union[Expression, Primary, ComponentRef, Array]]
+        self.named_args = {}  # type: Dict[str, Union[Expression, Primary, ComponentRef, Array]]
         self.comment = ""  # type: str
         super().__init__(**kwargs)
 

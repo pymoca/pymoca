@@ -1,5 +1,6 @@
 grammar Modelica;
 // TODO: Update to MLS 3.5 (this appears to be 3.3.0)
+// See "MLS 3.5" in comments for some of these updates
 //=========================================================
 //  B.2.1 Stored Definition - Within
 //=========================================================
@@ -431,6 +432,7 @@ expr :
     ;
 
 // B.2.7.4 ------------------------------------------------
+// primary_array is from MLS 3.5
 // TODO: Figure out what an output_expression_list is (i.e. find an example).
 primary :
     UNSIGNED_NUMBER                                     # primary_unsigned_number
@@ -443,7 +445,7 @@ primary :
     | component_reference                               # primary_component_reference
     | '(' output_expression_list ')'                    # primary_output_expression_list
     | '[' expression_list (';' expression_list)* ']'    # primary_expression_list
-    | '{' function_arguments '}'                        # primary_function_arguments
+    | '{' array_arguments '}'                           # primary_array
     | 'end'                                             # primary_end
     ;
 
@@ -467,10 +469,38 @@ function_call_args :
     ;
 
 // B.2.7.8 ------------------------------------------------
+// Changed in MLS 3.5, but spec grammar seems overly complicated
+// so we are using a mix of old and new.
+// Original MLS 3.5 grammar
+// function_arguments :
+//     expression (',' function_arguments_non_first | 'for' for_indices)?
+//     | function_partial_application (',' function_arguments_non_first)?
+//     | named_arguments
+//     ;
+
 function_arguments :
-    function_argument (',' function_argument | 'for' for_indices)*
-    | named_arguments
+    expression 'for' for_indices    # function_arguments_reduction_expression
+    | function_arguments_non_first  # function_arguments_list
     ;
+
+function_arguments_non_first :
+   function_argument (',' function_arguments_non_first)?
+   | named_arguments
+   ;
+
+// Original MLS 3.5 grammar
+// array_arguments :
+//    expression (',' array_arguments_non_first | 'for' for_indices)*
+//    ;
+
+// array_arguments_non_first :
+//    expression (',' array_arguments_non_first)*
+//    ;
+
+// Per https://github.com/sjoelund/ModelicaSpecification/tree/new-grammar-file
+array_arguments :
+   expression ((',' expression)* | 'for' for_indices)
+   ;
 
 // B.2.7.9 ------------------------------------------------
 named_arguments : named_argument (',' named_argument)*
@@ -481,10 +511,16 @@ named_argument : IDENT '=' function_argument
     ;
 
 // B.2.7.11 ------------------------------------------------
+// Changed in MLS 3.5: name -> type_specifier
+// MLS 3.5 factored out this rule, but leave it alone for now:
+// function_partial_application
+//   : 'function' type_specifier '(' named_arguments? ')'
+//   ;
+
 function_argument :
-    'function' name '(' named_arguments? ')'    # argument_function
-    | expression                                # argument_expression
-    ;
+    'function' type_specifier '(' named_arguments? ')'    # argument_function
+    | expression                                          # argument_expression
+   ;
 
 // B.2.7.12 ------------------------------------------------
 output_expression_list :

@@ -494,8 +494,8 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by ModelicaParser#primary_function_arguments.
-    def visitPrimary_function_arguments(self, ctx:ModelicaParser.Primary_function_argumentsContext):
+    # Visit a parse tree produced by ModelicaParser#primary_array.
+    def visitPrimary_array(self, ctx:ModelicaParser.Primary_arrayContext):
         return self.visitChildren(ctx)
 
 
@@ -524,8 +524,23 @@ class ModelicaVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by ModelicaParser#function_arguments.
-    def visitFunction_arguments(self, ctx:ModelicaParser.Function_argumentsContext):
+    # Visit a parse tree produced by ModelicaParser#function_arguments_reduction_expression.
+    def visitFunction_arguments_reduction_expression(self, ctx:ModelicaParser.Function_arguments_reduction_expressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#function_arguments_list.
+    def visitFunction_arguments_list(self, ctx:ModelicaParser.Function_arguments_listContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#function_arguments_non_first.
+    def visitFunction_arguments_non_first(self, ctx:ModelicaParser.Function_arguments_non_firstContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by ModelicaParser#array_arguments.
+    def visitArray_arguments(self, ctx:ModelicaParser.Array_argumentsContext):
         return self.visitChildren(ctx)
 
 

@@ -881,12 +881,12 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by ModelicaParser#primary_function_arguments.
-    def enterPrimary_function_arguments(self, ctx:ModelicaParser.Primary_function_argumentsContext):
+    # Enter a parse tree produced by ModelicaParser#primary_array.
+    def enterPrimary_array(self, ctx:ModelicaParser.Primary_arrayContext):
         pass
 
-    # Exit a parse tree produced by ModelicaParser#primary_function_arguments.
-    def exitPrimary_function_arguments(self, ctx:ModelicaParser.Primary_function_argumentsContext):
+    # Exit a parse tree produced by ModelicaParser#primary_array.
+    def exitPrimary_array(self, ctx:ModelicaParser.Primary_arrayContext):
         pass
 
 
@@ -935,12 +935,39 @@ class ModelicaListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by ModelicaParser#function_arguments.
-    def enterFunction_arguments(self, ctx:ModelicaParser.Function_argumentsContext):
+    # Enter a parse tree produced by ModelicaParser#function_arguments_reduction_expression.
+    def enterFunction_arguments_reduction_expression(self, ctx:ModelicaParser.Function_arguments_reduction_expressionContext):
         pass
 
-    # Exit a parse tree produced by ModelicaParser#function_arguments.
-    def exitFunction_arguments(self, ctx:ModelicaParser.Function_argumentsContext):
+    # Exit a parse tree produced by ModelicaParser#function_arguments_reduction_expression.
+    def exitFunction_arguments_reduction_expression(self, ctx:ModelicaParser.Function_arguments_reduction_expressionContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#function_arguments_list.
+    def enterFunction_arguments_list(self, ctx:ModelicaParser.Function_arguments_listContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#function_arguments_list.
+    def exitFunction_arguments_list(self, ctx:ModelicaParser.Function_arguments_listContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#function_arguments_non_first.
+    def enterFunction_arguments_non_first(self, ctx:ModelicaParser.Function_arguments_non_firstContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#function_arguments_non_first.
+    def exitFunction_arguments_non_first(self, ctx:ModelicaParser.Function_arguments_non_firstContext):
+        pass
+
+
+    # Enter a parse tree produced by ModelicaParser#array_arguments.
+    def enterArray_arguments(self, ctx:ModelicaParser.Array_argumentsContext):
+        pass
+
+    # Exit a parse tree produced by ModelicaParser#array_arguments.
+    def exitArray_arguments(self, ctx:ModelicaParser.Array_argumentsContext):
         pass
 
 
