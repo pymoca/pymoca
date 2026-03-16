@@ -426,6 +426,7 @@ class Symbol(Node):
         self.dimensions = [
             [Primary(value=None)]
         ]  # type: List[List[Union[Expression, Primary, ComponentRef]]]
+        self.array_depth = 0
         self.comment = ""  # type: str
         self.start = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]
         self.min = Primary(value=None)  # type: Union[Expression, Primary, ComponentRef, Array]

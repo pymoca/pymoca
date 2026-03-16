@@ -262,7 +262,14 @@ class Generator(TreeListener):
             src = self.get_mx(tree.operands[0]).T
         elif op == "sum" and n_operands == 1:
             v = self.get_mx(tree.operands[0])
-            src = ca.sum1(v)
+            if v.numel() == 0:
+                src = ca.DM(0.0)
+            elif self.current_array_depth == 0:
+                src = ca.sum1(v)
+            elif self.current_array_depth == 1:
+                src = ca.sum2(v)
+            else:
+                raise Exception("Unsupported array depth={} for sum().".format(self.current_array_depth))
         elif op == "linspace" and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
@@ -416,6 +423,19 @@ class Generator(TreeListener):
             src = ca.if_else(cond, expr1, src, True)
 
         self.src[tree] = src
+
+    def exitComponentRef(self, tree: ast.ComponentRef):
+        try:
+            mx = self.get_mx(tree)
+        except KeyError:
+            return
+        if not hasattr(mx, "_array_depth"):
+            return
+
+        # Keep track of how deep we are in a (potentially nested) array of components.
+        # Depending on how deep we are, the sum() operator acts on either the first
+        # or on the second dimension of CasADi matrices.
+        self.current_array_depth = mx._array_depth
 
     def exitEquation(self, tree):
         logger.debug("exitEquation")
@@ -757,6 +777,7 @@ class Generator(TreeListener):
         # Make a notion of the original shape, as MX is always 2D (even for 1D symbols),
         # and for nested classes we want to remember at which symbols to place indices.
         s._modelica_shape = tuple([tuple(var_shape) for var_shape in shape])
+        s._array_depth = tree.array_depth
 
         self.nodes[self.current_class][tree.name] = s
         return s
@@ -791,6 +812,7 @@ class Generator(TreeListener):
                     # ca.symvar call strips the _modelica_shape field from the MX variable,
                     # therefore we need to find the original MX to get the modelica shape.
                     der_s._modelica_shape = self.nodes[self.current_class][s.name()]._modelica_shape
+                    der_s._array_depth = self.nodes[self.current_class][s.name()]._array_depth
                     self.derivative[s.name()] = der_s
                     self.nodes[self.current_class][der_s.name()] = der_s
                     return der_s
@@ -804,6 +826,7 @@ class Generator(TreeListener):
             if dep.name() not in self.derivative:
                 der_dep = _new_mx("der({})".format(dep.name()), dep.size())
                 der_dep._modelica_shape = self.nodes[self.current_class][dep.name()]._modelica_shape
+                der_dep._array_depth = self.nodes[self.current_class][dep.name()]._array_depth
                 self.derivative[dep.name()] = der_dep
                 self.nodes[self.current_class][der_dep.name()] = der_dep
                 return der_dep[slice_info["start"] : slice_info["stop"] : slice_info["step"]]
