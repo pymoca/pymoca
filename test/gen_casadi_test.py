@@ -3308,6 +3308,25 @@ def test_function_dedup_name_dot_free():
     assert func.name() == "Branch_f"
 
 
+def test_array_of_component_refs_in_modification():
+    """Array literal elements that are component references compile (issue #353)."""
+    txt = """
+        model ArrayOfRefs
+          parameter Real x[2] = {1, 2};
+          Real y[2](min = {x[1], x[2]});
+        equation
+          y = x;
+        end ArrayOfRefs;
+    """
+    ast_tree = parser.parse(txt)
+    casadi_model = gen_casadi.generate(ast_tree, "ArrayOfRefs")
+
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [ca.vertcat(*y.min)])
+    np.testing.assert_array_equal(np.array(F(ca.DM([3, 4]))).flatten(), [3.0, 4.0])
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

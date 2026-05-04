@@ -225,7 +225,7 @@ class Generator(TreeListener):
         self.entered_classes.pop()
 
     def exitArray(self, tree):
-        self.src[tree] = [self.src[e] for e in tree.values]
+        self.src[tree] = [self.get_mx(e) for e in tree.values]
 
     def exitPrimary(self, tree):
         self.src[tree] = tree.value
