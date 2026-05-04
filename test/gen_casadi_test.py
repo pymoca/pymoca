@@ -3327,6 +3327,28 @@ def test_array_of_component_refs_in_modification():
     np.testing.assert_array_equal(np.array(F(ca.DM([3, 4]))).flatten(), [3.0, 4.0])
 
 
+def test_for_array_in_modification():
+    """Array comprehension {expr for i in range} in a modification compiles (issue #353)."""
+    with open(os.path.join(MODEL_DIR, "ForArrayModification.mo"), "r") as f:
+        txt = f.read()
+    ast_tree = parser.parse(txt)
+    casadi_model = gen_casadi.generate(ast_tree, "ForArrayModification")
+
+    H_var = next(v for v in casadi_model.alg_states if v.symbol.name().startswith("H"))
+    H_b = next(p for p in casadi_model.parameters if p.symbol.name().startswith("H_b"))
+
+    # min has 5 elements: 1 from first literal array, 3 from comprehension, 1 from last
+    min_expr = H_var.min
+    assert min_expr.shape == (5, 1)
+
+    H_b_vals = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    F = ca.Function("f", [H_b.symbol], [min_expr])
+    result = np.array(F(ca.DM(H_b_vals))).flatten()
+
+    expected = [max(H_b_vals[:2]), *(max(H_b_vals[i : i + 3]) for i in range(3)), max(H_b_vals[3:])]
+    np.testing.assert_array_equal(result, expected)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

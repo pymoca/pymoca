@@ -2098,6 +2098,154 @@ def test_equation_inlines_constant_never_instantiated():
     assert g_n.value == 9.80665
 
 
+def _subscript(cref):
+    """Return the single subscript of a one-dimensional ComponentRef."""
+    (index,) = cref.indices[0]
+    return index
+
+
+def test_for_array_in_modification_unrolled():
+    """A modification comprehension unrolls to an Array of substituted bodies (MLS 10.4.1)."""
+    flat = parse_and_flatten_model("ForArrayModification.mo", "ForArrayModification")
+
+    # min = cat(1, {..}, {max(H_b[i], max(H_b[i + 1], H_b[i + 2])) for i in 1:n - 2}, {..})
+    cat = flat.symbols["H"].min
+    assert cat.operator.to_tuple() == ("cat",)
+    unrolled = cat.operands[2]
+    assert isinstance(unrolled, ast.Array)
+
+    # The stop bound `n - 2` folds to 3, so the iterator runs 1, 2, 3.
+    assert [_subscript(el.operands[0]).value for el in unrolled.values] == [1, 2, 3]
+
+    # `i + 1` and `i + 2` keep their operator, only `i` is replaced.
+    for i, el in enumerate(unrolled.values, start=1):
+        for offset, operand in enumerate(el.operands[1].operands, start=1):
+            index = _subscript(operand)
+            assert index.operator == "+"
+            assert [o.value for o in index.operands] == [i, offset]
+
+    # Literal array neighbors in the same cat() are left untouched.
+    assert [_subscript(o).value for o in cat.operands[1].values[0].operands] == [1, 2]
+
+
+def test_for_array_range_bounds_resolved_by_name_lookup():
+    """Range bounds given as component references resolve to their declared values."""
+    flat = _flatten_inline(
+        """
+    model M
+        constant Integer lo = 2;
+        parameter Integer hi = 4;
+        Real a[3](min = {2 * i for i in lo:hi});
+        Real b[2, 2](min = {{i, i + 1} for i in 1:2});
+    end M;""",
+        "M",
+    )
+    a_min = flat.symbols["a"].min
+    assert [el.operands[1].value for el in a_min.values] == [2, 3, 4]
+
+    b_min = flat.symbols["b"].min
+    assert [row.values[0].value for row in b_min.values] == [1, 2]
+    assert [row.values[1].operands[0].value for row in b_min.values] == [1, 2]
+
+
+def test_for_array_stepped_range():
+    """A stepped range yields start + m * step up to stop (MLS 10.4.3)."""
+    flat = _flatten_inline(
+        """
+    model M
+        parameter Integer n = 5;
+        Real a[3](min = {i for i in 1:2:n});
+        Real b[2](min = {i for i in 1:2:4});
+        Real c[3](min = {i for i in 3:-1:1});
+        Real d[3](min = {i for i in 1.0:0.5:2.0});
+    end M;""",
+        "M",
+    )
+    assert [el.value for el in flat.symbols["a"].min.values] == [1, 3, 5]
+    assert [el.value for el in flat.symbols["b"].min.values] == [1, 3]
+    assert [el.value for el in flat.symbols["c"].min.values] == [3, 2, 1]
+    assert [el.value for el in flat.symbols["d"].min.values] == [1.0, 1.5, 2.0]
+
+
+def test_for_array_iterator_in_any_node():
+    """The iterator is substituted inside if-expressions, slices and nested comprehensions."""
+    flat = _flatten_inline(
+        """
+    model M
+        parameter Real x[4] = {1, 2, 3, 4};
+        Real a[3](min = {if i > 1 then i else 0 for i in 1:3});
+        Real b[3](min = {sum(x[i:i + 1]) for i in 1:3});
+        Real c[2](min = {{i * j for j in 1:i} for i in 1:2});
+    end M;""",
+        "M",
+    )
+    a_min = flat.symbols["a"].min
+    assert [el.conditions[0].operands[0].value for el in a_min.values] == [1, 2, 3]
+    assert [el.expressions[0].value for el in a_min.values] == [1, 2, 3]
+
+    b_min = flat.symbols["b"].min
+    slices = [_subscript(el.operands[0]) for el in b_min.values]
+    assert [sl.start.value for sl in slices] == [1, 2, 3]
+    assert [sl.stop.operands[0].value for sl in slices] == [1, 2, 3]
+
+    c_min = flat.symbols["c"].min
+    assert [[el.operands[1].value for el in row.values] for row in c_min.values] == [[1], [1, 2]]
+
+
+def test_for_array_unknown_range_not_unrolled():
+    """A comprehension with an unevaluable range is kept as is and its functions still found."""
+    ast_tree = parser.parse(
+        """
+    model M
+        function f
+            input Real u;
+            output Real y;
+        algorithm
+            y := 2 * u;
+        end f;
+        parameter Real x[:] = {1, 2, 3};
+        parameter Integer n = size(x, 1);
+        Real a[3](min = {f(i) for i in 1:n});
+    end M;"""
+    )
+    # Not _flatten_inline: resolving a function call in a modification rewrites the
+    # parsed AST, for a plain array just as much as for a comprehension.
+    flat = tree.flatten_class(ast_tree, "M")
+    assert isinstance(flat.symbols["a"].min, ast.ForArray)
+    assert "M.f" in flat.functions
+
+
+def test_for_array_unsupported_range():
+    """An implicit or array-valued iterator range is reported as unsupported (MLS 10.4.1)."""
+    for range_ in ("", " in k"):
+        with pytest.raises(NotImplementedError, match="range of iterator i"):
+            _flatten_inline(
+                f"""
+    model M
+        parameter Integer k[2] = {{1, 3}};
+        parameter Real x[3] = {{1, 2, 3}};
+        Real a[2](min = {{x[i] for i{range_}}});
+    end M;""",
+                "M",
+            )
+
+
+@pytest.mark.xfail(
+    raises=NotImplementedError,
+    reason="comprehensions over several iterators are not yet unrolled (MLS 10.4.1)",
+)
+def test_for_array_multiple_iterators():
+    """A comprehension over two iterators unrolls to their cartesian product."""
+    flat = _flatten_inline(
+        """
+    model M
+        Real a[6](min = {i * j for i in 1:2, j in 1:3});
+    end M;""",
+        "M",
+    )
+    assert [el.value for el in flat.symbols["a"].min.values] == [1, 2, 3, 2, 4, 6]
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
