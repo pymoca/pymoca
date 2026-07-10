@@ -73,7 +73,7 @@ print(casadi_model)
 Some more interesting examples are in Jupyter notebooks:
 
 * [Casadi Example](https://github.com/pymoca/pymoca/blob/master/test/notebooks/Casadi.ipynb)
-* [Sympy Example](https://github.com/pymoca/pymoca/blob/master/test/notebooks/Spring.ipynb)
+* [Sympy Example](https://github.com/pymoca/pymoca/blob/master/test/notebooks/SpringTest.ipynb)
 
 ## Roadmap
 
