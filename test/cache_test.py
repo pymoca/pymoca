@@ -334,6 +334,75 @@ def test_corrupt_cache_file(caplog):
             )
 
 
+def test_locked_cache_db(caplog, monkeypatch):
+    """Test that lock contention during cache setup falls back to uncached parsing"""
+
+    txt = """
+        model A
+          parameter Real x, y;
+        equation
+          der(y) = x;
+        end A;
+    """
+
+    with modify_version(WorkDirState.CLEAN), tempfile.TemporaryDirectory() as tmpdirname:
+        full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+
+        def raise_locked(conn, cache_expiration_days):
+            raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(parser, "_initialize_cache_db", raise_locked)
+
+        with caplog.at_level(logging.DEBUG, logger="pymoca"):
+            tree = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+        assert tree.classes["A"] is not None
+        # A locked database must not be mistaken for a corrupt one and deleted
+        assert not any("corrupt" in r.message for r in caplog.records)
+        assert any("locked" in r.message for r in caplog.records)
+        assert full_db_path.exists()
+
+        # Initialization is retried and succeeds once the lock clears
+        monkeypatch.undo()
+        _ = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+        conn = sqlite3.connect(full_db_path)
+        assert conn.execute("SELECT COUNT(*) FROM models").fetchone()[0] == 1
+        conn.close()
+
+
+def test_corrupt_cache_file_undeletable(caplog, monkeypatch):
+    """Test that a corrupt cache file that cannot be removed falls back to
+    uncached parsing (on Windows, files opened by other processes cannot be
+    deleted)"""
+
+    txt = """
+        model A
+          parameter Real x, y;
+        equation
+          der(y) = x;
+        end A;
+    """
+
+    with modify_version(WorkDirState.CLEAN), tempfile.TemporaryDirectory() as tmpdirname:
+        full_db_path = Path(tmpdirname) / DEFAULT_MODEL_CACHE_DB
+        corrupt_content = "This is not a valid SQLite database file"
+        with open(full_db_path, "w") as f:
+            f.write(corrupt_content)
+
+        def raise_permission_error(path):
+            raise PermissionError(f"The process cannot access the file: {path}")
+
+        monkeypatch.setattr(parser.os, "remove", raise_permission_error)
+
+        with caplog.at_level(logging.DEBUG, logger="pymoca"):
+            tree = parser.parse(txt, model_cache_folder=Path(tmpdirname))
+
+        assert tree.classes["A"] is not None
+        assert any("Model cache database is corrupt" in r.message for r in caplog.records)
+        assert any("parsing without cache" in r.message for r in caplog.records)
+        assert full_db_path.read_text() == corrupt_content
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

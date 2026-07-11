@@ -1521,7 +1521,6 @@ def parse(
         ModelicaSyntaxError: If there is a syntax error in the Modelica code.
         FileNotFoundError: If the specified cache folder does not exist.
         OSError: If there is an error creating the cache folder.
-        sqlite3.DatabaseError: If the cache database file is corrupt.
 
     """
     modelica_file = parse_text(
@@ -1571,6 +1570,15 @@ def parse_text(
     if full_db_path not in _initialized_dbs:
         try:
             _initialize_cache_db(conn, cache_expiration_days)
+        except sqlite3.OperationalError:
+            # Transient contention, not corruption: SQLITE_BUSY/SQLITE_LOCKED
+            # map to OperationalError, and opening a WAL database uses a fixed
+            # internal retry loop (not the busy timeout), so parallel workers
+            # racing at startup can hit "database is locked". Skip the cache
+            # for this parse; initialization is retried on the next one.
+            logger.debug("Model cache database is locked, parsing without cache")
+            conn.close()
+            return _parse_text(txt, trace=trace)
         except sqlite3.DatabaseError:
             # A corrupt or truncated cache file surfaces as a DatabaseError on
             # first access. Recreating it is far cheaper than the full-file
@@ -1579,14 +1587,25 @@ def parse_text(
             # test runs.
             logger.warning("Model cache database is corrupt, recreating...")
             conn.close()
-            for suffix in ("", "-wal", "-shm"):
-                try:
-                    os.remove(f"{full_db_path}{suffix}")
-                except FileNotFoundError:
-                    pass
-
-            conn = sqlite3.connect(full_db_path, isolation_level=None, timeout=30)
-            _initialize_cache_db(conn, cache_expiration_days)
+            try:
+                for suffix in ("", "-wal", "-shm"):
+                    try:
+                        os.remove(f"{full_db_path}{suffix}")
+                    except FileNotFoundError:
+                        pass
+                conn = sqlite3.connect(full_db_path, isolation_level=None, timeout=30)
+                _initialize_cache_db(conn, cache_expiration_days)
+            except OSError:
+                # On Windows the files cannot be removed while another process
+                # has them open. Skip the cache for this parse rather than
+                # break every concurrent worker by deleting files under them.
+                logger.debug("Cannot recreate model cache database, parsing without cache")
+                return _parse_text(txt, trace=trace)
+            except sqlite3.DatabaseError:
+                # Another process may be recreating the database concurrently.
+                logger.debug("Model cache database is unusable, parsing without cache")
+                conn.close()
+                return _parse_text(txt, trace=trace)
 
         cursor = conn.cursor()
         _initialized_dbs.add(full_db_path)
