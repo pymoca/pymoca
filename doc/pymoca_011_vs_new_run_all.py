@@ -23,7 +23,7 @@ Usage examples::
     # Set up the environments but skip notebook execution.
     doc/pymoca_011_vs_new_run_all.py --no-execute
 
-Run this script with any Python >= 3.9 (e.g. the head venv's interpreter or the
+Run this script with any supported Python (e.g. the head venv's interpreter or the
 system python3).  It manages its own subprocesses; the driver Python is *not*
 used inside the clone.
 """
@@ -349,7 +349,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _resolve_python(requested) -> str:  # str | None, 3.9-compatible
+def _resolve_python(requested) -> str:
     if requested:
         return requested
     for candidate in ("python3.14", "python3"):

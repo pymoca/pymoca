@@ -14,7 +14,7 @@ maintainers = [
     { name = "Jack Vreeken", email = "jack@vreeken.me" },
     { name = "Kent Rutan", email = "gs1150e@icloud.com" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = ["numpy >= 1.8.2", "antlr4-python3-runtime == 4.13.*"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -55,11 +55,7 @@ examples = ["jupyterlab", "matplotlib", "control>=0.9.3.post2,<=0.10.0"]
 # running several tests per worker. forked runs each MSL model in its own subprocess
 # so memory is reclaimed between models; it is fork-only, so it is omitted on Windows,
 # where the MSL CLI's per-task workers provide the same bounding cross-platform.
-test = [
-    "pytest",
-    "pytest-xdist",
-    "pytest-forked; platform_system != 'Windows'",
-]
+test = ["pytest", "pytest-xdist", "pytest-forked; platform_system != 'Windows'"]
 all = ["pymoca[casadi,lxml,sympy,examples]"]
 
 # TODO: Uncomment this when moving away from versioneer.
@@ -82,10 +78,14 @@ xfail_strict = true
 addopts = "-m 'not msl'"
 
 [tool.pyright]
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 pythonPlatform = "All"
 include = ["src/pymoca"]
-ignore = ["src/pymoca/generated", "src/pymoca/_version.py", "src/pymoca/backends"]
+ignore = [
+    "src/pymoca/generated",
+    "src/pymoca/_version.py",
+    "src/pymoca/backends",
+]
 useLibraryCodeForTypes = true
 reportMissingImports = true
 reportMissingTypeStubs = false
