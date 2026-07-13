@@ -26,6 +26,17 @@ def pytest_configure(config):
     # mark (warning, or error under --strict-markers) when forked isn't installed.
     config.addinivalue_line("markers", "forked: run each test in a forked subprocess")
 
+    # pyproject.toml's addopts deselects msl-marked tests by default (they're slow
+    # and require the MSL submodule). msl_examples_test.py is excluded from normal
+    # collection above, so it is only ever collected when named explicitly; in that
+    # case the default "-m 'not msl'" is redundant and would silently deselect
+    # every test it collects. Drop it so `pytest test/msl_examples_test.py` runs
+    # the msl tests without also requiring `-m msl` on the command line.
+    if config.option.markexpr == "not msl" and any(
+        "msl_examples_test.py" in arg for arg in config.args
+    ):
+        config.option.markexpr = ""
+
 
 @pytest.hookimpl(optionalhook=True)
 def pytest_xdist_auto_num_workers(config):
