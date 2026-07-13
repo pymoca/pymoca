@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import gc
 import os
-import resource
 import sys
 import time
 import traceback
 import warnings
 from multiprocessing import Pool
+
+try:
+    import resource  # Unix only; Windows workers report peak RSS as unavailable.
+except ImportError:
+    resource = None  # type: ignore[assignment]
 
 from pymoca import parser
 from pymoca import tree
@@ -145,14 +149,16 @@ def _worker_init(
         _worker_tree = parser.modelicapath_to_tree([msl4_base_dir])
 
 
-def _peak_rss_mb() -> float:
-    """Process peak resident set size in MB.
+def _peak_rss_mb() -> float | None:
+    """Process peak resident set size in MB, or None where `resource` is unavailable (Windows).
 
     ru_maxrss is a process-lifetime high-water mark, so this is per-model only
     when the process is short-lived: the parallel non-reuse-tree path recycles
     each worker after one model (maxtasksperchild=1). In serial mode or with
     --reuse-tree the process is long-lived and the peak spans many models.
     """
+    if resource is None:
+        return None
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     # Linux reports ru_maxrss in kB; macOS/BSD reports bytes.
     return peak / 1024.0 if sys.platform == "linux" else peak / 1024.0 / 1024.0
@@ -267,7 +273,8 @@ def process_every_MSL_example(
     try:
         for status, message, elapsed, peak_rss in results:
             done += 1
-            suffix = f"  [{elapsed:.2f}s {peak_rss:.0f}MB]"
+            rss_str = f"{peak_rss:.0f}MB" if peak_rss is not None else "N/A"
+            suffix = f"  [{elapsed:.2f}s {rss_str}]"
             print(message + suffix, flush=True)
             print(f"[{done}/{total_models}]", end="\r", file=sys.stderr, flush=True)
             if status == "success":
