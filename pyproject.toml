@@ -55,7 +55,7 @@ examples = ["jupyterlab", "matplotlib", "control>=0.9.3.post2,<=0.10.0"]
 # running several tests per worker. forked runs each MSL model in its own subprocess
 # so memory is reclaimed between models; it is fork-only, so it is omitted on Windows,
 # where the MSL CLI's per-task workers provide the same bounding cross-platform.
-test = ["pytest", "pytest-xdist", "pytest-forked; platform_system != 'Windows'"]
+test = ["pytest", "pytest-xdist", "pytest-forked; platform_system != 'Windows'", "psutil"]
 all = ["pymoca[casadi,lxml,sympy,examples]"]
 
 # TODO: Uncomment this when moving away from versioneer.

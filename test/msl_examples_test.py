@@ -15,9 +15,11 @@ import warnings
 from multiprocessing import Pool
 
 try:
-    import resource  # Unix only; Windows workers report peak RSS as unavailable.
+    import resource  # Unix only.
 except ImportError:
     resource = None  # type: ignore[assignment]
+
+import psutil  # Cross-platform peak-RSS fallback, used only where `resource` is unavailable.
 
 from pymoca import parser
 from pymoca import tree
@@ -149,19 +151,22 @@ def _worker_init(
         _worker_tree = parser.modelicapath_to_tree([msl4_base_dir])
 
 
-def _peak_rss_mb() -> float | None:
-    """Process peak resident set size in MB, or None where `resource` is unavailable (Windows).
+def _peak_rss_mb() -> float:
+    """Process peak resident set size in MB.
 
     ru_maxrss is a process-lifetime high-water mark, so this is per-model only
     when the process is short-lived: the parallel non-reuse-tree path recycles
     each worker after one model (maxtasksperchild=1). In serial mode or with
     --reuse-tree the process is long-lived and the peak spans many models.
     """
-    if resource is None:
-        return None
-    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    # Linux reports ru_maxrss in kB; macOS/BSD reports bytes.
-    return peak / 1024.0 if sys.platform == "linux" else peak / 1024.0 / 1024.0
+    if resource is not None:
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # Linux reports ru_maxrss in kB; macOS/BSD reports bytes.
+        return peak / 1024.0 if sys.platform == "linux" else peak / 1024.0 / 1024.0
+    # Windows: resource is unavailable. psutil's memory_info().peak_wset is the
+    # Windows-specific peak working set, unlike its cross-platform .rss field
+    # (current, not peak).
+    return psutil.Process().memory_info().peak_wset / 1024.0 / 1024.0
 
 
 def _process_one(model_name: str) -> tuple:
@@ -273,8 +278,7 @@ def process_every_MSL_example(
     try:
         for status, message, elapsed, peak_rss in results:
             done += 1
-            rss_str = f"{peak_rss:.0f}MB" if peak_rss is not None else "N/A"
-            suffix = f"  [{elapsed:.2f}s {rss_str}]"
+            suffix = f"  [{elapsed:.2f}s {peak_rss:.0f}MB]"
             print(message + suffix, flush=True)
             print(f"[{done}/{total_models}]", end="\r", file=sys.stderr, flush=True)
             if status == "success":
