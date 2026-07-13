@@ -232,7 +232,8 @@ def process_every_MSL_example(
     reuse_tree: bool = False,
     translator: str | None = None,
     options: dict | None = None,
-):
+) -> int:
+    """Run every selected model and return the number of failures."""
     model_names = _discover_model_names()
     if filters:
         model_names = [n for n in model_names if any(f in n for f in filters)]
@@ -284,6 +285,7 @@ def process_every_MSL_example(
     verb = "translating" if translator == "casadi" else "flattening"
     print("==================================================================================")
     print(f"Success {verb} {num_success} of {total} ({pct:.2f}%)  wall time: {wall_elapsed:.1f}s")
+    return num_error
 
 
 if __name__ == "__main__":
@@ -347,7 +349,7 @@ if __name__ == "__main__":
     if args.define and not args.translator:
         ap.error("-D/--define requires -t/--translator")
 
-    process_every_MSL_example(
+    num_error = process_every_MSL_example(
         jobs=args.jobs,
         filters=args.filters,
         omits=args.omits,
@@ -355,4 +357,4 @@ if __name__ == "__main__":
         translator=args.translator,
         options=cli_options,
     )
-    sys.exit(0)
+    sys.exit(1 if num_error else 0)
