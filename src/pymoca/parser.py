@@ -877,6 +877,10 @@ class ASTListener(ModelicaListener):
             if ctx in self.ast:
                 element.child = [self.ast[ctx]]
             self.ast[ctx] = element
+        # A leading dot means global name lookup (MLS 5.3.3); represent it as an
+        # empty-name head element so str() round-trips (".A.B") and lookup can detect it
+        if ctx.getChild(0).getText() == ".":  # type: ignore[union-attr]
+            self.ast[ctx] = ast.ComponentRef(name="", child=[self.ast[ctx]])
 
     def exitComponent_reference_element(
         self, ctx: ModelicaParser.Component_reference_elementContext

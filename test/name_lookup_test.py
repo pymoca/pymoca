@@ -566,6 +566,30 @@ def test_global_name_shadowed_by_local():
     assert get_flat_symbol_value(flat, "y") == 222
 
 
+def test_global_type_name():
+    """Checks that a leading-dot type specifier resolves from the global scope
+    even when a local class shadows the first identifier (MLS 5.3.3)"""
+    ast = pymoca.parser.parse(
+        """
+        package Top
+          type T = Real;
+        end Top;
+        package Q
+          package Top
+            type T = Integer;
+          end Top;
+          model M
+            .Top.T x;
+            Top.T y;
+          end M;
+        end Q;
+        """
+    )
+    flat = flatten_compliance_model(ast, "Q.M")
+    assert flat.symbols["x"].type.name == "Real"
+    assert flat.symbols["y"].type.name == "Integer"
+
+
 def test_global_name_find_name():
     """Checks that find_name resolves a leading-dot name from the root scope"""
     ast = pymoca.parser.parse(
