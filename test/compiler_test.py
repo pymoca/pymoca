@@ -210,6 +210,44 @@ def test_casadi_modelicapath_qualified_name():
     assert os.path.exists(outfile)
 
 
+def test_explicit_file_shadows_modelicapath(tmp_path):
+    """An explicit positional file shadows a MODELICAPATH library class of the same
+    top-level name entirely (MLS 3.5 §13.3); a second positional file sharing that
+    name still merges normally with the first explicit file."""
+    lib_dir = tmp_path / "lib"
+    lib_dir.mkdir()
+    (lib_dir / "Widget.mo").write_text("model Widget\n  Real libraryOnly = 1;\nend Widget;\n")
+
+    explicit = tmp_path / "Widget.mo"
+    explicit.write_text("model Widget\n  Real explicitOnly = 2;\nend Widget;\n")
+
+    outdir = tmp_path / "out"
+    run_compiler(
+        "-p " + str(lib_dir) + " -m Widget --stage flatten -o " + str(outdir) + " " + str(explicit)
+    )
+    data = json.loads((outdir / "Widget.flatten.json").read_text())
+    assert "explicitOnly" in data["symbols"]
+    assert "libraryOnly" not in data["symbols"]
+
+    # Two positional files sharing a `within` prefix still merge with each other.
+    part_a = tmp_path / "PartA.mo"
+    part_a.write_text("within Combo;\nmodel PartA\nend PartA;\n")
+    part_b = tmp_path / "PartB.mo"
+    part_b.write_text("within Combo;\nmodel PartB\nend PartB;\n")
+    combo_pkg = tmp_path / "Combo.mo"
+    combo_pkg.write_text("package Combo\nend Combo;\n")
+
+    outdir2 = tmp_path / "out2"
+    run_compiler(
+        "-m Combo --stage flatten -o "
+        + str(outdir2)
+        + " "
+        + " ".join([str(combo_pkg), str(part_a), str(part_b)])
+    )
+    data2 = json.loads((outdir2 / "Combo.flatten.json").read_text())
+    assert {"PartA", "PartB"} <= set(data2["classes"].keys())
+
+
 def test_sympy_options_good():
     "SymPy options that should produce good output"
     # Run examples on default Spring model

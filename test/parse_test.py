@@ -506,9 +506,10 @@ def test_lazyparse_remove_class(tmp_path):
     assert isinstance(pkg, parser.LazyParseClass)  # parse never fired
 
 
-def test_lazyparse_extend_overlapping_dirs(tmp_path):
-    """modelicapath_to_tree merges two roots with the same top-level package name,
-    including recursively merging sub-packages with the same name."""
+def test_modelicapath_first_root_wins(tmp_path):
+    """modelicapath_to_tree loads a colliding top-level name entirely from the first
+    root that offers it; a later root's version of that name is never consulted
+    (MLS 3.5 §13.3)."""
     d1, d2 = tmp_path / "d1", tmp_path / "d2"
     for d in (d1, d2):
         d.mkdir()
@@ -519,18 +520,91 @@ def test_lazyparse_extend_overlapping_dirs(tmp_path):
     (d1 / "Modelica" / "Units" / "package.mo").write_text("package Units\nend Units;")
     (d2 / "Modelica" / "Math").mkdir()
     (d2 / "Modelica" / "Math" / "package.mo").write_text("package Math\nend Math;")
-    # Same sub-package name in both roots: exercises the recursive _extend branch
-    for d in (d1, d2):
-        (d / "Modelica" / "Icons").mkdir()
-        (d / "Modelica" / "Icons" / "package.mo").write_text("package Icons\nend Icons;")
 
     merged = parser.modelicapath_to_tree(dirs=[d1 / "Modelica", d2 / "Modelica"])
     modelica = merged.classes["Modelica"]
-    # Disjoint sub-packages merged; overlapping sub-package deduplicated
-    assert "Units" in vars(modelica)["classes"]
-    assert "Math" in vars(modelica)["classes"]
-    assert "Icons" in vars(modelica)["classes"]
     assert isinstance(modelica, parser.LazyParseClass)  # parse never fired
+    assert tree.find_name(merged, "Modelica.Units") is not None
+    assert tree.find_name(merged, "Modelica.Math") is None
+    # Winning stub came entirely from root1
+    assert vars(modelica)["path"].parent.parent == d1
+
+
+def test_modelicapath_ordered_disjoint(tmp_path):
+    """Non-colliding top-level names from multiple roots all resolve."""
+    d1, d2 = tmp_path / "d1", tmp_path / "d2"
+    d1.mkdir()
+    d2.mkdir()
+    (d1 / "Foo").mkdir()
+    (d1 / "Foo" / "package.mo").write_text("package Foo\nend Foo;")
+    (d2 / "Bar").mkdir()
+    (d2 / "Bar" / "package.mo").write_text("package Bar\nend Bar;")
+
+    merged = parser.modelicapath_to_tree(dirs=[d1, d2])
+    assert "Foo" in merged.classes
+    assert "Bar" in merged.classes
+
+
+def test_modelicapath_nonstructured_shadows_structured(tmp_path):
+    """A bare top-level .mo file in the winning root shadows a same-named structured
+    package (package.mo directory) in a later root."""
+    d1, d2 = tmp_path / "d1", tmp_path / "d2"
+    d1.mkdir()
+    d2.mkdir()
+    (d1 / "A.mo").write_text("model A\nend A;")
+    (d2 / "A").mkdir()
+    (d2 / "A" / "package.mo").write_text("package A\nend A;")
+
+    merged = parser.modelicapath_to_tree(dirs=[d1, d2])
+    a = merged.classes["A"]
+    assert isinstance(a, parser.LazyParseClass)
+    assert vars(a)["path"] == d1 / "A.mo"
+
+
+def test_lazyparse_extend(tmp_path):
+    """LazyParseClass._extend / _update_parent_refs work when the stub is the
+    receiver of Tree.extend, without firing a parse."""
+    pkg_dir = tmp_path / "Pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "package.mo").write_text("package Pkg\nend Pkg;")
+    stub_tree = parser.modelicapath_to_tree(dirs=[pkg_dir])
+    pkg_stub = stub_tree.classes["Pkg"]
+    assert isinstance(pkg_stub, parser.LazyParseClass)
+
+    other = ast.Class(name="Other")
+    child = ast.Class(name="Child")
+    other.add_class(child)
+
+    pkg_stub._extend(other)
+    pkg_stub._update_parent_refs()
+
+    assert isinstance(pkg_stub, parser.LazyParseClass)  # parse never fired
+    assert "Child" in vars(pkg_stub)["classes"]
+    assert vars(pkg_stub)["classes"]["Child"].parent is pkg_stub
+
+
+def test_explicit_shadows_library_stub(tmp_path):
+    """An explicit top-level class extended into a MODELICAPATH tree replaces a
+    same-named library stub wholesale; a second explicit file with the same
+    top-level name merges normally with the first (not the stub)."""
+    pkg_dir = tmp_path / "A"
+    pkg_dir.mkdir()
+    (pkg_dir / "package.mo").write_text("package A\n  model Original\n  end Original;\nend A;")
+    modelicapath_tree = parser.modelicapath_to_tree(dirs=[tmp_path])
+    assert isinstance(modelicapath_tree.classes["A"], parser.LazyParseClass)
+
+    explicit1 = parser.parse("within A;\nmodel Patched\nend Patched;\n")
+    modelicapath_tree.extend(explicit1)
+    a = modelicapath_tree.classes["A"]
+    assert not isinstance(a, parser.LazyParseClass)
+    assert "Patched" in a.classes
+    assert "Original" not in a.classes
+
+    explicit2 = parser.parse("within A;\nmodel Patched2\nend Patched2;\n")
+    modelicapath_tree.extend(explicit2)
+    a = modelicapath_tree.classes["A"]
+    assert "Patched" in a.classes
+    assert "Patched2" in a.classes
 
 
 def test_lazyparse_reparents_symbols(tmp_path):

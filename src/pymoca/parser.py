@@ -265,12 +265,33 @@ def dir_to_tree(dir_: Path) -> ast.Tree:
     return root_tree
 
 
+class ModelicaPathTree(ast.Tree):
+    """Tree of MODELICAPATH roots, where top-level names loaded via `extend` shadow
+    (rather than merge with) same-named LazyParseClass stubs (MLS 3.5 §13.3): an
+    explicit top-level class replaces a library stub wholesale, since the roots
+    contribute whole classes, not partial content to be unioned."""
+
+    def _extend(self, other: ast.Class) -> None:
+        for class_name, other_class in other.classes.items():
+            existing = self.classes.get(class_name)
+            if existing is None:
+                self.classes[class_name] = other_class
+            elif isinstance(existing, LazyParseClass):
+                # Explicit class shadows the library stub entirely, per §13.3.
+                self.remove_class(existing)
+                self.add_class(other_class)
+            else:
+                # Non-stub collision (e.g. two positional files sharing a `within`
+                # prefix): merge normally so they still synthesize one package.
+                existing._extend(other_class)
+
+
 def modelicapath_to_tree(dirs: list[str | Path]) -> ast.Tree:
     """Return ast.Tree for all directories in dirs list
 
     TODO: Add version handling (spec 18.8.3, 18.8.4)
     """
-    modelicapath_tree = ast.Tree(name="root", type="MODELICAPATH")
+    modelicapath_tree = ModelicaPathTree(name="root", type="MODELICAPATH")
     for dir_ in dirs:
         # Accept str or Path argument
         dir_ = Path(str(dir_))
@@ -278,7 +299,13 @@ def modelicapath_to_tree(dirs: list[str | Path]) -> ast.Tree:
         if not dir_.is_dir():
             raise ModelicaPathError(f"MODELICAPATH contains non-directory: {dir_}")
         dir_tree = dir_to_tree(dir_)
-        modelicapath_tree.extend(dir_tree)
+        # First root offering a top-level name wins (MLS 3.5 §13.3): later roots are
+        # never consulted for that name, and nothing below the top level is merged.
+        # Do NOT replace this with modelicapath_tree.extend(dir_tree) -- that recursively
+        # unions same-named top-level packages across roots, which is non-conforming.
+        for cls in list(dir_tree.classes.values()):
+            if cls.name not in modelicapath_tree.classes:
+                modelicapath_tree.add_class(cls)
     return modelicapath_tree
 
 

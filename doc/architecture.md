@@ -432,6 +432,44 @@ on demand (as `instantiate_in_place` does elsewhere) rather than read the `ast.C
 For unmodified top-level classes the two are normally equivalent, so the root fallback is
 kept as a shortcut. A `TODO` tracks removing `InstanceTree` from the check.
 
+### MODELICAPATH Precedence (MLS 3.5 §13.3)
+
+§13.3 treats MODELICAPATH roots as an **ordered list**: a top-level name is resolved by
+the first root that contains it, and the class is loaded entirely from that root - no
+merging, no fall-through to later roots. `parser.modelicapath_to_tree` implements this as
+a first-wins union at top-level name granularity: for each root's tree, a top-level class
+name is added only if no earlier root already contributed a class of that name. Because
+each root's tree is built of `LazyParseClass` stubs (parsing is lazy per-file), this
+first-wins policy at stub-assembly time is observationally equivalent to a "load the whole
+class from the winning root" semantics - nothing below the top level is ever merged across
+roots. Same-named libraries in later roots are simply shadowed by the first root's
+version.
+
+The CLI builds the MODELICAPATH tree before parsing explicit positional files
+(`compiler.py`'s `_run_pipeline` calls `modelicapath_to_tree` then `parse_all`, which
+`extend`s each parsed file into that tree). `modelicapath_to_tree` returns a
+`ModelicaPathTree` (a `Tree` subclass in `parser.py`) whose `_extend` override makes an
+explicit top-level class **shadow a same-named library stub entirely**, rather than
+merging with it: when a name collides with an unparsed `LazyParseClass`, the stub is
+removed and replaced outright. Collisions with an already-explicit (non-stub) top-level
+class still merge recursively, so multiple positional files sharing a `within` prefix
+continue to synthesize one package. This matches §13.3: MODELICAPATH is consulted only
+on a miss against the unnamed top-level scope built from directly-loaded files.
+
+One user-visible consequence: because pymoca synthesizes a top-level package for a
+`within` prefix, `pymoca -p /msl patched/Continuous.mo` now hides all of MSL rather than
+patching one class inside it. This is a spec-conforming regression from the old merge
+behavior, not a bug - MLS 13.2.2 requires a `within` file to live inside its library's
+own directory, so CLI-patching a single library file via a positional argument was never
+a spec-defined scenario to begin with.
+
+**Deferred structural direction.** Precedence is currently a merge policy applied once,
+at `modelicapath_to_tree` assembly time. A more structural design - roots kept as an
+ordered chain of lazy loaders, consulted directly from `_name_lookup` so precedence is
+enforced by construction rather than by a one-time merge pass - would make the ordering
+unregressable by construction and is the intended future direction, but is not
+implemented now.
+
 ### Composite-Name Lookup & Lazy Instantiation
 
 The spec defines instantiation (5.6.1, including partial instantiation), composite-name
