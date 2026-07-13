@@ -886,66 +886,37 @@ def test_generate_value_equations_ref_rhs_flattened():
     assert rhs.name == "sub.a", f"Expected flat ref 'sub.a', got {rhs.name!r}"
 
 
-def test_generate_value_equations_skipped_when_explicit_equation_exists():
-    """An inherited modification value does not duplicate an explicit equation for it.
+def test_generate_value_equations_not_skipped_when_explicit_equation_exists():
+    """An inherited modification value equation coexists with an explicit equation for it.
 
     `extends SubTree(t = 2)` overrides SubTree's declaration equation (MLS "Declaration
-    Equations"), but Tree's own explicit equation for `t` is what should determine it —
-    not a second, conflicting equation generated from the modification. Checked with the
-    variable on either side of the equation (`t = 3;` and `3 = t;`).
-    """
-    for t_equation in ("t = 3", "3 = t"):
-        flat = _flatten_inline(
-            f"""
-        model SubTree
-            Integer t = 1;
-        end SubTree;
-        model Tree
-            extends SubTree(t = 2);
-        equation
-            {t_equation};
-        end Tree;""",
-            "Tree",
-        )
-        t_eqs = [
-            eq
-            for eq in flat.equations
-            if isinstance(eq, ast.Equation)
-            and (
-                (isinstance(eq.left, ast.ComponentRef) and eq.left.name == "t")
-                or (isinstance(eq.right, ast.ComponentRef) and eq.right.name == "t")
-            )
-        ]
-        assert (
-            len(t_eqs) == 1
-        ), f"{t_equation!r}: expected exactly one equation for t, got {t_eqs!r}"
-        # Modification value retained on the symbol rather than cleared to the sentinel
-        assert flat.symbols["t"].value == 2, f"{t_equation!r}: expected t.value == 2"
-
-
-def test_generate_value_equations_not_skipped_for_var_equals_var():
-    """A `y = x;`-shaped equation must not suppress either symbol's own value equation.
-
-    Neither side is unambiguously "bound" by such an equation (causality is a later
-    matching concern), so both x and y should still get their modification-derived
-    equations rather than one being silently dropped.
+    Equations"), giving `t = 2`. Modelica equations are simultaneous (MLS 8.1/4.4): an
+    equation-section equation does not override a declaration/modification equation, it
+    is just another equation of the flat system. So both `t = 2` and Tree's own explicit
+    equation must be emitted, even though the resulting system is over-determined.
     """
     flat = _flatten_inline(
         """
-    model M
-        Real x = 1.0;
-        Real y = 2.0;
+    model SubTree
+        Integer t = 1;
+    end SubTree;
+    model Tree
+        extends SubTree(t = 2);
     equation
-        y = x;
-    end M;""",
-        "M",
+        t = 3;
+    end Tree;""",
+        "Tree",
     )
-    eq_names = {
-        eq.left.name
+    t_eqs = [
+        eq
         for eq in flat.equations
-        if isinstance(eq, ast.Equation) and isinstance(eq.left, ast.ComponentRef)
-    }
-    assert "x" in eq_names, "x should still get its own value equation"
+        if isinstance(eq, ast.Equation)
+        and (
+            (isinstance(eq.left, ast.ComponentRef) and eq.left.name == "t")
+            or (isinstance(eq.right, ast.ComponentRef) and eq.right.name == "t")
+        )
+    ]
+    assert len(t_eqs) == 2, f"Expected both equations for t, got {t_eqs!r}"
 
 
 def test_builtin_redeclare_replaceable_propagated():

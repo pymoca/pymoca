@@ -1103,22 +1103,6 @@ def _evaluate_parameter_values(flat_class: InstanceClass) -> None:
             sym.value = folded
 
 
-def _has_direct_equation(flat_class: InstanceClass, flat_name: str) -> bool:
-    """Does flat_class already have an explicit equation-section binding for flat_name?"""
-    for eq in flat_class.equations:
-        if not isinstance(eq, ast.Equation):
-            continue
-        for side, other in ((eq.left, eq.right), (eq.right, eq.left)):
-            if (
-                isinstance(side, ast.ComponentRef)
-                and not side.child
-                and side.name == flat_name
-                and not isinstance(other, ast.ComponentRef)
-            ):
-                return True
-    return False
-
-
 def _generate_value_equations(flat_class: InstanceClass) -> None:
     """Convert resolved value modifications to equations (MLS 5.6.2 step 1.4).
 
@@ -1126,9 +1110,7 @@ def _generate_value_equations(flat_class: InstanceClass) -> None:
     emit an equation  sym = value  and clear sym.value to the sentinel.
 
     Parameters and constants retain their .value as a declaration binding
-    (used by backends as the constant/parameter value). Similarly, a symbol
-    already bound by an explicit equation-section equation also retains its
-    .value rather than getting a redundant equation.
+    (used by backends as the constant/parameter value).
 
     ComponentRef operands that remain in source scope (when expression
     evaluation failed) are flattened to dot-separated names by
@@ -1141,8 +1123,6 @@ def _generate_value_equations(flat_class: InstanceClass) -> None:
         if value is None or (isinstance(value, ast.Primary) and value.value is None):
             continue
         if _NON_EQUATION_PREFIXES & set(sym.prefixes):
-            continue
-        if _has_direct_equation(flat_class, flat_name):
             continue
 
         rhs = copy.deepcopy(_to_ast_value(value))
