@@ -52,10 +52,15 @@ lxml = ["lxml>=3.5.0", "scipy>=0.13.3"]
 sympy = ["sympy>=0.7.6.1", "scipy>=0.13.3", "jinja2>=2.10.1"]
 examples = ["jupyterlab", "matplotlib", "control>=0.9.3.post2,<=0.10.0"]
 # Test/dev tooling. xdist parallelizes the suite and surfaces shared-state bugs by
-# running several tests per worker. forked runs each MSL model in its own subprocess
-# so memory is reclaimed between models; it is fork-only, so it is omitted on Windows,
-# where the MSL CLI's per-task workers provide the same bounding cross-platform.
-test = ["pytest", "pytest-xdist", "pytest-forked; platform_system != 'Windows'", "psutil"]
+# running several tests per worker. forked (opt-in via --forked) boxes each MSL model
+# in its own subprocess so memory is reclaimed between models. Windows does not have
+# forked. The MSL CLI's per-task workers bound memory instead.
+test = [
+    "pytest",
+    "pytest-xdist",
+    "pytest-forked; platform_system != 'Windows'",
+    "psutil",
+]
 all = ["pymoca[casadi,lxml,sympy,examples]"]
 
 # TODO: Uncomment this when moving away from versioneer.
