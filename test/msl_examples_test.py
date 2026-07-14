@@ -36,13 +36,35 @@ KNOWN_MISSING_FEATURES = {
     "stream connectors": "Unsupported connector variable prefixes ['stream']",
 }
 
+# Fast CI smoke subset (msl_smoke marker): one known-green model per Modelica
+# sub-package, chosen from per-model timings, plus two canonical Blocks examples.
+MSL_SMOKE_MODELS = frozenset(
+    {
+        "Modelica.Blocks.Examples.BusUsage",
+        "Modelica.Blocks.Examples.PID_Controller",
+        "Modelica.Clocked.Examples.Systems.Utilities.ComponentsMixingUnit."
+        "MixingUnitWithContinuousControl",
+        "Modelica.ComplexBlocks.Examples.TestConversionBlock",
+        "Modelica.Electrical.Digital.Examples.DFFREGSRH",
+        "Modelica.Fluid.Examples.ControlledTankSystem.Utilities.NormalOperation",
+        "Modelica.Magnetic.FluxTubes.Examples.Utilities.TranslatoryArmatureAndStopper",
+        "Modelica.Math.Random.Examples.GenerateRandomNumbers",
+        "Modelica.Mechanics.Translational.Examples.Utilities.SpringDamperNoRelativeStates",
+        "Modelica.Media.Examples.SolveOneNonlinearEquation.InverseIncompressible_sh_T",
+        "Modelica.StateGraph.Examples.Utilities.Source",
+        "Modelica.Thermal.HeatTransfer.Examples.Utilities.Conduction",
+        "Modelica.Utilities.Examples.WriteRealMatrixToFile",
+    }
+)
+
 # ---------------------------------------------------------------------------
 # Discovery
 # ---------------------------------------------------------------------------
 
-# Parsed MSL tree, built once at import by _discover_model_names and shared by
-# every test in the process (forked children inherit it copy-on-write).
-_msl_tree = None
+# MSL tree of lazy-parse stubs, built once at import and shared by every test
+# in the process (forked children inherit it copy-on-write). Building the tree
+# is cheap; walking it in _discover_model_names parses every MSL package file.
+_msl_tree = parser.modelicapath_to_tree([MSL4_BASE_DIR]) if MSL4_AVAILABLE else None
 
 
 def _discover_model_names() -> list[str]:
@@ -54,8 +76,7 @@ def _discover_model_names() -> list[str]:
     direct file-based children.  Only model/block classes are collected;
     packages are traversed but never added (packages cannot be flattened).
     """
-    global _msl_tree
-    parsed = _msl_tree = parser.modelicapath_to_tree([MSL4_BASE_DIR])
+    parsed = _msl_tree
     names: list[str] = []
 
     def walk(cls, path: list[str], in_examples: bool) -> None:
@@ -110,8 +131,22 @@ def msl_tree():
     gc.collect()
 
 
+def _parametrize_model_names() -> list:
+    """All discovered model names, with MSL_SMOKE_MODELS carrying the msl_smoke mark."""
+    if os.environ.get("MSL_SMOKE_ONLY"):
+        # Skip discovery so only the packages the smoke models need get parsed.
+        # A typo in MSL_SMOKE_MODELS fails that test's flatten, so CI stays red.
+        return [pytest.param(n, marks=pytest.mark.msl_smoke) for n in sorted(MSL_SMOKE_MODELS)]
+    names = _discover_model_names()
+    missing = MSL_SMOKE_MODELS - set(names)
+    assert not missing, f"MSL_SMOKE_MODELS not in discovered models: {sorted(missing)}"
+    return [
+        pytest.param(n, marks=pytest.mark.msl_smoke) if n in MSL_SMOKE_MODELS else n for n in names
+    ]
+
+
 @pytest.mark.msl
-@pytest.mark.parametrize("model_name", _discover_model_names() if MSL4_AVAILABLE else [])
+@pytest.mark.parametrize("model_name", _parametrize_model_names() if MSL4_AVAILABLE else [])
 def test_msl_example(model_name, msl_tree):
     try:
         flat_instance = tree.flatten_class(msl_tree, model_name)

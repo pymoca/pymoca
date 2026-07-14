@@ -22,6 +22,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "compliance: ModelicaCompliance test")
     config.addinivalue_line("markers", "flattening: Flattening level compliance test")
     config.addinivalue_line("markers", "msl: MSL examples pipeline test")
+    config.addinivalue_line(
+        "markers", "msl_smoke: fast MSL example subset run in CI as a smoke check"
+    )
     # pytest-forked provides this marker; register it too so it isn't an unknown
     # mark (warning, or error under --strict-markers) when forked isn't installed.
     config.addinivalue_line("markers", "forked: run each test in a forked subprocess")
