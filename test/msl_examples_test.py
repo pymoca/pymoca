@@ -40,6 +40,10 @@ KNOWN_MISSING_FEATURES = {
 # Discovery
 # ---------------------------------------------------------------------------
 
+# Parsed MSL tree, built once at import by _discover_model_names and shared by
+# every test in the process (forked children inherit it copy-on-write).
+_msl_tree = None
+
 
 def _discover_model_names() -> list[str]:
     """Return sorted qualified names of every model/block inside an Examples
@@ -50,7 +54,8 @@ def _discover_model_names() -> list[str]:
     direct file-based children.  Only model/block classes are collected;
     packages are traversed but never added (packages cannot be flattened).
     """
-    parsed = parser.modelicapath_to_tree([MSL4_BASE_DIR])
+    global _msl_tree
+    parsed = _msl_tree = parser.modelicapath_to_tree([MSL4_BASE_DIR])
     names: list[str] = []
 
     def walk(cls, path: list[str], in_examples: bool) -> None:
@@ -75,7 +80,7 @@ def _discover_model_names() -> list[str]:
 # gc.collect() CPython's allocator never shrinks the process, so without forking
 # consecutive models accumulate multiple GB of resident memory. pytest-forked is
 # fork-only, so on Windows the suite runs in-process (see _warn_if_unforked); the
-# bounded cross-platform path is the CLI's per-task workers. Harmless either way when
+# bounded cross-platform path is the CLI's --fresh-tree per-task workers. Harmless either way when
 # MSL tests are deselected, which is the default (-m 'not msl').
 _FORK_AVAILABLE = hasattr(os, "fork")
 pytestmark = [pytest.mark.skipif(not MSL4_AVAILABLE, reason="MSL-4.0.x submodule not initialized")]
@@ -89,18 +94,19 @@ def _warn_if_unforked():
     if not _FORK_AVAILABLE:
         warnings.warn(
             "MSL tests run in-process without fork: memory grows across models. "
-            "For bounded memory, run: python test/msl_examples_test.py -j N",
+            "For bounded memory, run: python test/msl_examples_test.py -j N --fresh-tree",
             stacklevel=2,
         )
 
 
-# Use scope="session" to reuse one tree (should be faster, but currently too memory-hungry)
+# Yield the shared import-time tree: flattening never mutates the parsed AST
+# (guarded by the pickle checks in conftest_parse), so tests can reuse one tree.
 @pytest.fixture(scope="function")
 def msl_tree():
-    yield parser.modelicapath_to_tree([MSL4_BASE_DIR])
+    yield _msl_tree
     # Flattening builds large cyclic InstanceClass graphs that reference counting
-    # alone can't reclaim. Force a collection between models so xdist workers don't
-    # accumulate multiple GB of cyclic garbage (mirrors gc.collect() in _process_one).
+    # alone can't reclaim. Force a collection between models so in-process runs
+    # don't accumulate cyclic garbage (mirrors gc.collect() in _process_one).
     gc.collect()
 
 
@@ -154,9 +160,9 @@ def _peak_rss_mb() -> float:
     """Process peak resident set size in MB.
 
     ru_maxrss is a process-lifetime high-water mark, so this is per-model only
-    when the process is short-lived: the parallel non-reuse-tree path recycles
+    when the process is short-lived: the parallel --fresh-tree path recycles
     each worker after one model (maxtasksperchild=1). In serial mode or with
-    --reuse-tree the process is long-lived and the peak spans many models.
+    the default tree reuse the process is long-lived and the peak spans many models.
     """
     if resource is not None:
         peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -171,9 +177,9 @@ def _peak_rss_mb() -> float:
 def _process_one(model_name: str) -> tuple:
     """Process one model; return (status, message, elapsed_s, peak_rss_mb).
 
-    peak_rss_mb is the whole process's peak RSS. With maxtasksperchild=1 each
-    worker handles one model, so the peak reflects the tree parse plus that
-    model; heavy models read above the ~constant tree baseline.
+    peak_rss_mb is the whole process's peak RSS. With --fresh-tree
+    (maxtasksperchild=1) each worker handles one model, so the peak reflects the
+    tree parse plus that model; heavy models read above the ~constant tree baseline.
     """
     verb = "translating" if _translator == "casadi" else "flattening"
     worker_tree = _worker_tree
@@ -228,8 +234,8 @@ def _process_one(model_name: str) -> tuple:
 
 
 def _default_jobs() -> int:
-    # Parallel by default now that per-worker recycling bounds memory; peak scales
-    # with the worker count (one model per worker). Leave a quarter of the CPUs free
+    # Parallel by default; peak memory scales with the worker count (one parsed
+    # tree per worker). Leave a quarter of the CPUs free
     # for other work, matching the xdist policy in conftest. Pass -j 1 for a serial
     # in-process run when reproducing ordering-dependent bugs.
     return max(1, (os.cpu_count() or 1) * 3 // 4)
@@ -239,7 +245,7 @@ def process_every_MSL_example(
     jobs: int = 1,
     filters: list | None = None,
     omits: list | None = None,
-    reuse_tree: bool = False,
+    reuse_tree: bool = True,
     translator: str | None = None,
     options: dict | None = None,
 ) -> int:
@@ -262,8 +268,8 @@ def process_every_MSL_example(
     else:
         # maxtasksperchild=1 recycles each worker after one model, returning its
         # memory to the OS — the cross-platform (spawn or fork) equivalent of the
-        # pytest --forked path. --reuse-tree opts out of recycling to keep the parsed
-        # tree warm across models, trading memory for speed as documented.
+        # pytest --forked path. Tree reuse (the default) opts out of recycling to
+        # keep the parsed tree warm across models, trading memory for speed.
         pool = Pool(
             processes=jobs,
             initializer=_worker_init,
@@ -327,10 +333,11 @@ if __name__ == "__main__":
         help="skip models whose name contains PATTERN (repeatable, OR logic; applied after --filter)",
     )
     ap.add_argument(
-        "--reuse-tree",
+        "--fresh-tree",
         action="store_true",
         default=False,
-        help="reuse a single parsed tree across all models (faster, but uses more memory)",
+        help="parse a fresh tree per model and recycle each worker afterward "
+        "to bound memory (default reuses one parsed tree per worker)",
     )
     ap.add_argument(
         "-t",
@@ -363,7 +370,7 @@ if __name__ == "__main__":
         jobs=args.jobs,
         filters=args.filters,
         omits=args.omits,
-        reuse_tree=args.reuse_tree,
+        reuse_tree=not args.fresh_tree,
         translator=args.translator,
         options=cli_options,
     )
