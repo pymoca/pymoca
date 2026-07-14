@@ -131,7 +131,11 @@ def _parametrize_model_names() -> list:
 
 
 @pytest.mark.msl
-@pytest.mark.parametrize("model_name", _parametrize_model_names() if MSL4_AVAILABLE else [])
+# The __main__ guard keeps CLI startup (e.g. --help) from paying the full MSL
+# parse that discovery triggers. The CLI discovers after argparse instead.
+@pytest.mark.parametrize(
+    "model_name", _parametrize_model_names() if MSL4_AVAILABLE and __name__ != "__main__" else []
+)
 def test_msl_example(model_name, msl_tree):
     try:
         flat_instance = tree.flatten_class(msl_tree, model_name)
