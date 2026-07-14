@@ -30,8 +30,11 @@ MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MSL4_BASE_DIR = os.path.join(MY_DIR, "libraries", "MSL-4.0.x")
 MSL4_AVAILABLE = os.path.isfile(os.path.join(MSL4_BASE_DIR, "Modelica", "package.mo"))
 
-# Maps model name → reason string for models known to fail.
-KNOWN_FAILURES = {}
+# Known-missing feature to error signature map to xfail
+KNOWN_MISSING_FEATURES = {
+    "ExternalObject": "Extends name ExternalObject not found",
+    "stream connectors": "Unsupported connector variable prefixes ['stream']",
+}
 
 # ---------------------------------------------------------------------------
 # Discovery
@@ -61,16 +64,6 @@ def _discover_model_names() -> list[str]:
 
     walk(parsed, [], False)
     return sorted(names)
-
-
-def _build_params():
-    params = []
-    for name in _discover_model_names():
-        marks = []
-        if name in KNOWN_FAILURES:
-            marks.append(pytest.mark.xfail(reason=KNOWN_FAILURES[name]))
-        params.append(pytest.param(name, id=name, marks=marks))
-    return params
 
 
 # ---------------------------------------------------------------------------
@@ -112,9 +105,15 @@ def msl_tree():
 
 
 @pytest.mark.msl
-@pytest.mark.parametrize("model_name", _build_params() if MSL4_AVAILABLE else [])
+@pytest.mark.parametrize("model_name", _discover_model_names() if MSL4_AVAILABLE else [])
 def test_msl_example(model_name, msl_tree):
-    flat_instance = tree.flatten_class(msl_tree, model_name)
+    try:
+        flat_instance = tree.flatten_class(msl_tree, model_name)
+    except Exception as exc:
+        for feature, signature in KNOWN_MISSING_FEATURES.items():
+            if signature in str(exc):
+                pytest.xfail(f"{feature} not supported yet")
+        raise
     assert flat_instance is not None
 
 
