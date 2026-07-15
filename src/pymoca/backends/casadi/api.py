@@ -100,30 +100,55 @@ class InvalidCacheError(Exception):
 
 
 def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]):
-    # Importing the antlr4 (generated modules) is rather slow. Avoid for this
-    # ~100 ms startup overhead for cached models by importing only when
-    # compiling.
-    from pymoca import parser
+    if compiler_options["lazy_libraries"]:
+        # Library folders become a MODELICAPATH tree of stubs, each of which parses
+        # its .mo file only when a contained class is accessed during instantiation.
+        # Only the files actually referenced by the model are read, so a full
+        # Modelica Standard Library can be supplied without parsing all of it.
+        # Requires a spec-compliant on-disk layout: every package directory holds a
+        # package.mo (MLS 3.5 section 13.4).
+        from pymoca import parser
 
-    # Load folders
-    tree = None
-    for folder in [model_folder] + compiler_options["library_folders"]:
-        for root, _dir, files in os.walk(folder, followlinks=True):
-            for item in fnmatch.filter(files, "*.mo"):
-                logger.info("Parsing {}".format(item))
-
-                with open(os.path.join(root, item), "r", encoding="utf-8") as f:
-                    try:
-                        parsed = parser.parse(f.read())
-                    except NotImplementedError as exc:
-                        logger.warning("Skipping %s: %s", item, exc)
-                        continue
-                    if tree is None:
-                        tree = parsed
-                    else:
-                        tree.extend(parsed)
+        tree = parser.modelicapath_to_tree(compiler_options["library_folders"])
+        # The model folder is not a library; parse its files eagerly and merge them.
+        tree = _parse_folder(model_folder, into=tree)
+    else:
+        tree = None
+        for folder in [model_folder] + compiler_options["library_folders"]:
+            tree = _parse_folder(folder, into=tree)
 
     return generate_model(tree, model_name, compiler_options)
+
+
+def _parse_folder(folder: str, into):
+    """Parse every .mo file in a folder and merge the results into an existing tree.
+
+    :param folder: Folder to walk for ``*.mo`` files.
+    :param into: Tree to merge into; if ``None``, it is initialised from the first
+        parsed file.
+
+    Files pymoca does not support are skipped with a warning.
+    """
+    # Importing the antlr4 (generated modules) is rather slow. Avoid this ~100 ms
+    # startup overhead for cached models by importing only when compiling.
+    from pymoca import parser
+
+    tree = into
+    for root, _dir, files in os.walk(folder, followlinks=True):
+        for item in fnmatch.filter(files, "*.mo"):
+            logger.info("Parsing {}".format(item))
+
+            with open(os.path.join(root, item), "r", encoding="utf-8") as f:
+                try:
+                    parsed = parser.parse(f.read())
+                except NotImplementedError as exc:
+                    logger.warning("Skipping %s: %s", item, exc)
+                    continue
+                if tree is None:
+                    tree = parsed
+                else:
+                    tree.extend(parsed)
+    return tree
 
 
 def generate_model(
