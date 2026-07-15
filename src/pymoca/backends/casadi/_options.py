@@ -9,6 +9,7 @@ def _get_default_options():
     return {
         "library_folders": [],
         "lazy_libraries": False,
+        "parse_annotations": True,
         "verbose": False,
         "check_balanced": True,
         "mtime_check": True,

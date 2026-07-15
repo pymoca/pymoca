@@ -152,9 +152,10 @@ class LazyParseClass(ast.Class):
         }
     )
 
-    def __init__(self, path: Path | None = None, **kwargs):
+    def __init__(self, path: Path | None = None, strip_annotations: bool = False, **kwargs):
         super().__init__(**kwargs)
         self.path: Path | None = path
+        self.strip_annotations: bool = strip_annotations
 
     def __getattribute__(self, name: str) -> Any:
         if name in LazyParseClass._ATTRS_NEEDING_PARSE:
@@ -164,7 +165,10 @@ class LazyParseClass(ast.Class):
     # Use vars(self) to bypass __getattribute__ and avoid triggering parse during tree assembly.
     def _parse_in_place(self) -> None:
         my = vars(self)
-        file = parse_text(my["path"].read_text(encoding="utf-8"))
+        file = parse_text(
+            my["path"].read_text(encoding="utf-8"),
+            strip_annotations=my["strip_annotations"],
+        )
         parsed_class = file.classes[my["name"]]
         # Capture any directory-package sub-stubs added by the filesystem walk before
         # the update overwrites .classes with the parsed content.
@@ -220,32 +224,42 @@ class LazyParseClass(ast.Class):
             c._update_parent_refs()
 
 
-def _path_to_class(path: Path) -> ast.Class | None:
+def _path_to_class(path: Path, strip_annotations: bool = False) -> ast.Class | None:
     """Transform a filesystem path into a LazyParseClass"""
     if path.is_dir():
         try:
             package = next(path.glob("package.mo"))
-            return LazyParseClass(path=package, name=path.parts[-1], type="package")
+            return LazyParseClass(
+                path=package,
+                name=path.parts[-1],
+                type="package",
+                strip_annotations=strip_annotations,
+            )
         except StopIteration:
             # Directories must contain a package.mo file (per Modelica spec)
             return None
     elif path.is_file():
         if path.suffix != ".mo" or path.stem == "package":
             return None
-        return LazyParseClass(path=path, name=path.stem, type=_file_class_type(path))
+        return LazyParseClass(
+            path=path,
+            name=path.stem,
+            type=_file_class_type(path),
+            strip_annotations=strip_annotations,
+        )
     else:
         # Ignore anything else in MODELICAPATH
         return None
 
 
-def _dir_to_tree(dir_: Path, parent: ast.Class) -> None:
+def _dir_to_tree(dir_: Path, parent: ast.Class, strip_annotations: bool = False) -> None:
     """Recursively walk a filesystem directory tree to a LazyParseClass tree"""
-    if dir_class := _path_to_class(dir_.resolve()):
+    if dir_class := _path_to_class(dir_.resolve(), strip_annotations=strip_annotations):
         parent.add_class(dir_class)
         for path in dir_.iterdir():
             if path.is_dir():
-                _dir_to_tree(path, dir_class)
-            elif child_class := _path_to_class(path.resolve()):
+                _dir_to_tree(path, dir_class, strip_annotations=strip_annotations)
+            elif child_class := _path_to_class(path.resolve(), strip_annotations=strip_annotations):
                 dir_class.add_class(child_class)
     else:
         # dir_ is a MODELICAPATH root (no package.mo) — add its children directly to parent.
@@ -253,15 +267,15 @@ def _dir_to_tree(dir_: Path, parent: ast.Class) -> None:
         # are packages are all loaded as siblings under the parent tree.
         for path in sorted(dir_.iterdir()):
             if path.is_dir():
-                _dir_to_tree(path, parent)
-            elif child_class := _path_to_class(path.resolve()):
+                _dir_to_tree(path, parent, strip_annotations=strip_annotations)
+            elif child_class := _path_to_class(path.resolve(), strip_annotations=strip_annotations):
                 parent.add_class(child_class)
 
 
-def dir_to_tree(dir_: Path) -> ast.Tree:
+def dir_to_tree(dir_: Path, strip_annotations: bool = False) -> ast.Tree:
     """Transform a MODELICAPATH directory into a Tree with LazyParseClass children"""
     root_tree = ast.Tree()
-    _dir_to_tree(dir_, root_tree)
+    _dir_to_tree(dir_, root_tree, strip_annotations=strip_annotations)
     return root_tree
 
 
@@ -286,8 +300,11 @@ class ModelicaPathTree(ast.Tree):
                 existing._extend(other_class)
 
 
-def modelicapath_to_tree(dirs: list[str | Path]) -> ast.Tree:
+def modelicapath_to_tree(dirs: list[str | Path], strip_annotations: bool = False) -> ast.Tree:
     """Return ast.Tree for all directories in dirs list
+
+    When strip_annotations is True, each stub drops ``annotation(...)`` clause bodies
+    as it is parsed on first access.
 
     TODO: Add version handling (spec 18.8.3, 18.8.4)
     """
@@ -298,7 +315,7 @@ def modelicapath_to_tree(dirs: list[str | Path]) -> ast.Tree:
         dir_.resolve()
         if not dir_.is_dir():
             raise ModelicaPathError(f"MODELICAPATH contains non-directory: {dir_}")
-        dir_tree = dir_to_tree(dir_)
+        dir_tree = dir_to_tree(dir_, strip_annotations=strip_annotations)
         # First root offering a top-level name wins (MLS 3.5 §13.3): later roots are
         # never consulted for that name, and nothing below the top level is merged.
         # Do NOT replace this with modelicapath_tree.extend(dir_tree) -- that recursively
@@ -1310,6 +1327,93 @@ class ModelicaParserErrorListener(ErrorListener):
         raise ModelicaSyntaxError(msg, info)
 
 
+def _strip_annotations(text: str) -> str:
+    """Remove ``annotation( ... )`` clause bodies from Modelica source.
+
+    Replaces each with ``annotation()`` so every grammar position stays valid, while
+    respecting string literals and comments so parentheses inside them are not
+    miscounted. Annotations carry only documentation and graphics, which the CasADi
+    backend skips and downstream consumers do not read, so removing them lets the lexer
+    skip large documentation strings.
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    keyword = "annotation"
+
+    def _is_ident_char(ch: str) -> bool:
+        return ch.isalnum() or ch == "_"
+
+    def _skip_string(pos: int) -> int:
+        """Return index just past the string literal starting at text[pos] == '\"'."""
+        pos += 1
+        while pos < n:
+            if text[pos] == "\\":
+                pos += 2
+                continue
+            if text[pos] == '"':
+                return pos + 1
+            pos += 1
+        return pos
+
+    while i < n:
+        ch = text[i]
+        if ch == '"':
+            end = _skip_string(i)
+            out.append(text[i:end])
+            i = end
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            end = text.find("\n", i)
+            end = n if end == -1 else end
+            out.append(text[i:end])
+            i = end
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            end = text.find("*/", i + 2)
+            end = n if end == -1 else end + 2
+            out.append(text[i:end])
+            i = end
+            continue
+        if (
+            ch == "a"
+            and text.startswith(keyword, i)
+            and (i == 0 or not _is_ident_char(text[i - 1]))
+        ):
+            j = i + len(keyword)
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j < n and text[j] == "(":
+                depth = 0
+                p = j
+                while p < n:
+                    c = text[p]
+                    if c == '"':
+                        p = _skip_string(p)
+                        continue
+                    if c == "/" and p + 1 < n and text[p + 1] == "/":
+                        nl = text.find("\n", p)
+                        p = n if nl == -1 else nl
+                        continue
+                    if c == "/" and p + 1 < n and text[p + 1] == "*":
+                        close = text.find("*/", p + 2)
+                        p = n if close == -1 else close + 2
+                        continue
+                    if c == "(":
+                        depth += 1
+                    elif c == ")":
+                        depth -= 1
+                        if depth == 0:
+                            p += 1
+                            break
+                    p += 1
+                out.append("annotation()")
+                i = p
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _parse_text(text: str, trace: bool) -> ModelicaFile:
     """Parse Modelica code given in text, return ModelicaFile"""
     input_stream = antlr4.InputStream(text)
@@ -1519,6 +1623,7 @@ def parse(
     cache_expiration_days: int = 30,
     always_update_last_hit: bool = False,
     bypass_cache: bool = False,
+    strip_annotations: bool = False,
 ) -> ast.Tree:
     """
     Parse the Modelica code given in text and return the Abstract Syntax Tree (AST).
@@ -1544,6 +1649,10 @@ def parse(
             time is only updated if it is more than a day old. Default is False.
         bypass_cache (bool, optional): If True, the cache is bypassed and the parsing is
             performed directly. Default is False.
+        strip_annotations (bool, optional): If True, ``annotation(...)`` clause bodies
+            are removed before parsing. Annotations are documentation and graphics that
+            pymoca does not interpret, so removing them speeds up parsing of files with
+            large documentation strings. Default is False.
 
     Returns:
         ast.Tree: The AST of the parsed Modelica code
@@ -1561,6 +1670,7 @@ def parse(
         cache_expiration_days=cache_expiration_days,
         always_update_last_hit=always_update_last_hit,
         bypass_cache=bypass_cache,
+        strip_annotations=strip_annotations,
     )
     return file_to_tree(modelica_file)
 
@@ -1574,8 +1684,14 @@ def parse_text(
     cache_expiration_days: int = 30,
     always_update_last_hit: bool = False,
     bypass_cache: bool = False,
+    strip_annotations: bool = False,
 ) -> ModelicaFile:
     """Parse the Modelica code given in text and return the parsed ModelicaFile."""
+    # Strip before hashing so the cache keys on the text that is actually parsed:
+    # stripped and unstripped sources map to distinct entries.
+    if strip_annotations:
+        txt = _strip_annotations(txt)
+
     if bypass_cache:
         return _parse_text(txt, trace=trace)
 
