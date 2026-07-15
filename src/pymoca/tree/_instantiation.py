@@ -203,10 +203,20 @@ def _instantiate_class(
             and orig_class is not new_class
             and orig_class.instantiation_state >= InstantiationState.PARTIAL
         )
+        # Late import avoids a parser <-> tree import cycle.
+        from ..parser import LazyParseClass
+
         classes_source = (
             list(orig_class.classes.values()) if reuse_orig else list(from_class.classes.values())
         )
         for class_ in classes_source:
+            # A child that is still an unparsed MODELICAPATH stub is instantiated
+            # lazily on first lookup (name lookup falls back to the class tree for
+            # not-yet-instantiated children) rather than here. This keeps a scope
+            # like a full Modelica Standard Library from parsing every sibling
+            # subpackage just to resolve one of them.
+            if isinstance(class_, LazyParseClass):
+                continue
             _create_partial_instance(
                 class_,
                 modification_environment,
