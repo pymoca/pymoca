@@ -659,13 +659,21 @@ def _rewrite_cref_in_place(
     name_flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
-) -> None:
+) -> ast.Primary | None:
     """Resolve a ComponentRef to its flat name in place, including its index expressions.
 
     Array indices (e.g. the `n` in `x[n]`) are themselves ComponentRef/Expression
     operands that reference symbols in `scope`, so they need the same flat-name
     rewrite as the ref they index into.
+
+    Returns a Primary to substitute for `cref` when it resolves to an (unindexed)
+    constant: constant values are inlined during flattening (MLS 5.6.2), so such a
+    reference does not get a flat name of its own -- it may not even end up
+    anywhere in the flattened tree (e.g. a global library constant that is never
+    instantiated as a component). Returns None when `cref` was rewritten (or left
+    unchanged) in place.
     """
+    resolved: InstanceClass | InstanceSymbol | None = None
     try:
         resolved = _resolve_name(
             cref,
@@ -680,22 +688,40 @@ def _rewrite_cref_in_place(
         cref.child = []
     except Exception:
         pass  # leave un-resolvable refs (builtins, for-indices) unchanged
+
+    if (
+        cref.indices == [[None]]
+        and isinstance(resolved, InstanceSymbol)
+        and "constant" in resolved.prefixes
+    ):
+        const_val = _get_constant_value(resolved)
+        if isinstance(const_val, ast.Primary) and const_val.value is not None:
+            return const_val
+
     for dim_list in cref.indices:
-        for idx in dim_list:
+        for i, idx in enumerate(dim_list):
             if isinstance(idx, ast.ComponentRef):
-                _rewrite_cref_in_place(idx, scope, flat_class, name_flat_class, guard, opts)
+                replacement = _rewrite_cref_in_place(
+                    idx, scope, flat_class, name_flat_class, guard, opts
+                )
+                if replacement is not None:
+                    dim_list[i] = replacement
             elif isinstance(idx, ast.Expression):
                 _rewrite_expression_crefs(idx, scope, flat_class, name_flat_class, guard, opts)
             elif isinstance(idx, ast.Slice):
-                for bound in (idx.start, idx.stop, idx.step):
+                for attr in ("start", "stop", "step"):
+                    bound = getattr(idx, attr)
                     if isinstance(bound, ast.ComponentRef):
-                        _rewrite_cref_in_place(
+                        replacement = _rewrite_cref_in_place(
                             bound, scope, flat_class, name_flat_class, guard, opts
                         )
+                        if replacement is not None:
+                            setattr(idx, attr, replacement)
                     elif isinstance(bound, ast.Expression):
                         _rewrite_expression_crefs(
                             bound, scope, flat_class, name_flat_class, guard, opts
                         )
+    return None
 
 
 def _rewrite_expression_crefs(
@@ -706,9 +732,13 @@ def _rewrite_expression_crefs(
     guard: RecursionGuard,
     opts: LookupOptions,
 ) -> None:
-    for operand in expr.operands:
+    for i, operand in enumerate(expr.operands):
         if isinstance(operand, ast.ComponentRef):
-            _rewrite_cref_in_place(operand, scope, flat_class, name_flat_class, guard, opts)
+            replacement = _rewrite_cref_in_place(
+                operand, scope, flat_class, name_flat_class, guard, opts
+            )
+            if replacement is not None:
+                expr.operands[i] = replacement
         elif isinstance(operand, ast.Expression):
             _rewrite_expression_crefs(operand, scope, flat_class, name_flat_class, guard, opts)
 

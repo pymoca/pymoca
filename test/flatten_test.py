@@ -341,7 +341,10 @@ def test_flattening_typed_var_from_package_constant():
     assert isinstance(eq, ast.Equation)
     assert eq.left.name == "distance_m"
     assert eq.right.operator == "*"
-    assert eq.right.operands[0].name == "Package.KM_TO_M"
+    # The constant is inlined rather than kept as a reference (MLS v3.5 section 5.6.2)
+    assert isinstance(eq.right.operands[0], ast.Primary)
+    assert eq.right.operands[0].value == 1000.0
+    assert eq.right.operands[1].name == "distance_km"
 
 
 def test_extends_order():
@@ -1673,6 +1676,34 @@ def test_constant_via_composite_name_lookup_resolves_dimension():
     )
     (dim,) = flat.symbols["x"].dimensions
     assert dim[0].value == 3
+
+
+def test_modification_expression_inlines_constant_operand():
+    """A constant operand (never itself instantiated as a component) in an
+    unfoldable modification expression is inlined as a literal, not just
+    renamed like a regular ComponentRef operand (MLS 5.6.2)."""
+    flat = _flatten_inline(
+        """
+    package Constants
+        constant Real D2R = 0.017453292519943295;
+    end Constants;
+    model Inner
+        Real x;
+    end Inner;
+    model Holder
+        Real rotation_deg;
+        Inner c(x = Constants.D2R * rotation_deg);
+    end Holder;
+    model M
+        Holder h;
+    end M;""",
+        "M",
+    )
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "h.c.x"]
+    d2r, rotation_deg = eq.right.operands
+    assert isinstance(d2r, ast.Primary)
+    assert d2r.value == 0.017453292519943295
+    assert rotation_deg.name == "h.rotation_deg"
 
 
 if __name__ == "__main__":

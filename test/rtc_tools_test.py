@@ -257,19 +257,15 @@ RTC_TOOLS_SMOKE_CASES = frozenset(
 
 # Reasons shared by several cases. A fix commit that does not clear a case
 # still moves it on to whatever error it hits next.
-_UNINLINED_CONSTANT = (
-    "a constant operand in a modification expression is renamed like a component instead of "
-    "being inlined, leaving Deltares.Constants.D2R unresolved"
-)
 _DOTTED_FUNCTION_NAME = (
     "a CasADi function is named from its instance path, and CasADi rejects the dotted name"
 )
 
 FLATTEN_XFAIL: dict[str, str] = {
-    "cascading_channels__example": _UNINLINED_CONSTANT,
-    "channel_pulse__example": _UNINLINED_CONSTANT,
-    "channel_wave_damping__example_local_control": _UNINLINED_CONSTANT,
-    "channel_wave_damping__example_optimization": _UNINLINED_CONSTANT,
+    "cascading_channels__example": _DOTTED_FUNCTION_NAME,
+    "channel_pulse__example": _DOTTED_FUNCTION_NAME,
+    "channel_wave_damping__example_local_control": _DOTTED_FUNCTION_NAME,
+    "channel_wave_damping__example_optimization": _DOTTED_FUNCTION_NAME,
     "goal_programming__example": _DOTTED_FUNCTION_NAME,
     "mixed_integer__example": _DOTTED_FUNCTION_NAME,
 }
