@@ -972,6 +972,14 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             # Flatten using new pipeline — discovers nested function calls
             flat_func = _create_partial_flat_instance(func_instance)
+            # _create_partial_flat_instance names the class from func_instance's own
+            # instance-path ancestry (e.g. "Example.orifice.smooth_switch" for a
+            # function alias local to a component's class). full_name is the
+            # deduplicated class-relative name already used as this function's
+            # dict key and call-site reference; keep .name consistent with that,
+            # since a per-instance name isn't a valid identifier for backends
+            # that require one (CasADi function names cannot contain dots).
+            flat_func.name = full_name
             _flatten_instance(func_instance, flat_func)
 
             # Merge nested discoveries back

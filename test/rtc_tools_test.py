@@ -257,17 +257,16 @@ RTC_TOOLS_SMOKE_CASES = frozenset(
 
 # Reasons shared by several cases. A fix commit that does not clear a case
 # still moves it on to whatever error it hits next.
-_DOTTED_FUNCTION_NAME = (
-    "a CasADi function is named from its instance path, and CasADi rejects the dotted name"
+_EQUATION_CONSTANT = (
+    "a constant referenced directly in an equation is not inlined, and it has no flat symbol "
+    "to rename to, leaving Deltares unresolved"
 )
 
 FLATTEN_XFAIL: dict[str, str] = {
-    "cascading_channels__example": _DOTTED_FUNCTION_NAME,
-    "channel_pulse__example": _DOTTED_FUNCTION_NAME,
-    "channel_wave_damping__example_local_control": _DOTTED_FUNCTION_NAME,
-    "channel_wave_damping__example_optimization": _DOTTED_FUNCTION_NAME,
-    "goal_programming__example": _DOTTED_FUNCTION_NAME,
-    "mixed_integer__example": _DOTTED_FUNCTION_NAME,
+    "cascading_channels__example": _EQUATION_CONSTANT,
+    "channel_pulse__example": _EQUATION_CONSTANT,
+    "channel_wave_damping__example_local_control": _EQUATION_CONSTANT,
+    "channel_wave_damping__example_optimization": _EQUATION_CONSTANT,
 }
 
 # Provisional: seeded from an out-of-tree benchmark of these examples against

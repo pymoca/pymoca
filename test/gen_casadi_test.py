@@ -15,7 +15,8 @@ import casadi as ca
 import numpy as np
 
 import pymoca.backends.casadi.generator as gen_casadi
-from pymoca import parser
+from pymoca import ast, parser, tree
+from pymoca.backends.casadi._options import _merge_default_options
 from pymoca.backends.casadi.alias_relation import AliasRelation
 from pymoca.backends.casadi.api import CachedModel, InvalidCacheError, load_model, transfer_model
 from pymoca.backends.casadi.model import (
@@ -3304,6 +3305,42 @@ def test_model_folder_class_shadows_modelicapath(monkeypatch):
         # The library's Lib is shadowed whole, so its Extra is not reachable either
         with pytest.raises(ModelicaSemanticError, match="not found in scope"):
             transfer_model(model_dir, "UsesExtra", options)
+
+
+def test_function_dedup_name_dot_free():
+    """A function short-class-definition local to a component's class, shared by
+    multiple component instances, gets one CasADi Function under a dot-free,
+    class-relative name -- not a per-instance-path name."""
+    txt = """
+    function G
+        input Real x;
+        output Real y;
+    algorithm
+        y := x * 2;
+    end G;
+
+    model Branch
+        function f = G;
+        Real a;
+        Real b;
+    equation
+        a = f(b);
+    end Branch;
+
+    model M
+        Branch b1;
+        Branch b2;
+    end M;
+    """
+    ast_tree = parser.parse(txt)
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("M"))
+    generator = gen_casadi.Generator(flat_tree, "M", _merge_default_options(None))
+    gen_casadi.GeneratorWalker().walk(generator, flat_tree)
+
+    # Shared (deduplicated) across b1.f and b2.f, not one Function per instance.
+    assert list(generator.functions.keys()) == ["Branch.f"]
+    (func,) = generator.functions.values()
+    assert func.name() == "Branch_f"
 
 
 if __name__ == "__main__":
