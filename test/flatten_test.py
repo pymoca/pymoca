@@ -1607,6 +1607,26 @@ def test_alias_type_input_output_prefix_preserved():
     assert "output" in flat.symbols["y"].prefixes
 
 
+def test_alias_type_array_dimensions_propagated():
+    """Array dims on an alias-typed variable reach its flattened builtin leaf
+    (MLS 5.6.2 step 1.3), including the n=0 case that previously produced a
+    spurious scalar free variable instead of a zero-length array."""
+    flat = _flatten_inline(
+        """
+    model M
+        type Flow = Real;
+        input Flow u[3];
+        parameter Integer n = 0;
+        input Flow v[n];
+    end M;""",
+        "M",
+    )
+    (dim_u,) = flat.symbols["u"].dimensions
+    assert dim_u[0].value == 3
+    (dim_v,) = flat.symbols["v"].dimensions
+    assert dim_v[0].value == 0
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
