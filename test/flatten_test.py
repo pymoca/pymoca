@@ -1726,6 +1726,30 @@ def test_constant_resolved_through_type_alias_extends_chain():
     assert eq.right.value == pytest.approx(19.6133)
 
 
+def test_equation_inlines_constant_never_instantiated():
+    """A global library constant referenced directly in an equation body (not
+    a modification) is inlined even though it is never itself instantiated as
+    a component and so has no flat symbol to rename to (MLS 5.6.2)."""
+    flat = _flatten_inline(
+        """
+    package Constants
+        constant Real g_n = 9.80665;
+    end Constants;
+    model M
+        Real theta;
+        Real y;
+    equation
+        y = theta * Constants.g_n;
+    end M;""",
+        "M",
+    )
+    (eq,) = flat.equations
+    theta, g_n = eq.right.operands
+    assert theta.name == "theta"
+    assert isinstance(g_n, ast.Primary)
+    assert g_n.value == 9.80665
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
