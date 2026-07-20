@@ -1028,7 +1028,9 @@ class Generator(TreeListener):
         output_expr = ca.substitute(
             [values[output] for output in outputs], tmp, [values[t] for t in tmp]
         )
-        func = ca.Function(tree.name, inputs, output_expr)
+        # function_name is a fully qualified Modelica class name (dot-separated),
+        # which CasADi does not accept as a Function name.
+        func = ca.Function(function_name.replace(".", "_"), inputs, output_expr)
         self.functions[function_name] = func
 
         return func
