@@ -1515,18 +1515,20 @@ _VALUE_ATTRS = (
 )
 
 
-def _get_constant_value(isym: InstanceSymbol):
-    """Extract the resolved constant value from an InstanceSymbol, or None if unavailable."""
-    if "constant" not in isym.prefixes:
+def _find_builtin_value_modification(type_class) -> ast.Primary | None:
+    """Find a "value" modification on the builtin leaf of type_class, if any.
+
+    For a symbol typed directly as a builtin, the leaf is type_class's own
+    same-named synthetic member. For a type that is itself an alias one or more
+    levels removed from a builtin (e.g. `type Accel = Real(...)`), that synthetic
+    member instead lives inside the alias's own unnamed extends chain; ast_ref.name
+    (not the blanked .name of an unnamed extends instance) identifies it there.
+    """
+    if not isinstance(type_class, InstanceClass):
         return None
-    # Check if value was already resolved
-    if isym.value is not None and not (
-        isinstance(isym.value, ast.Primary) and isym.value.value is None
-    ):
-        return isym.value
-    # Look in the type class's builtin symbol modification for the value
-    if isinstance(isym.type, InstanceClass) and isym.type.name in InstanceTree.BUILTIN_TYPES:
-        builtin_sym = isym.type.symbols.get(isym.type.name)
+    ast_name = type_class.ast_ref.name if type_class.ast_ref is not None else type_class.name
+    if ast_name in InstanceTree.BUILTIN_TYPES:
+        builtin_sym = type_class.symbols.get(ast_name)
         if isinstance(builtin_sym, InstanceSymbol):
             for arg in builtin_sym.modification_environment.arguments:
                 if (
@@ -1537,7 +1539,23 @@ def _get_constant_value(isym: InstanceSymbol):
                     mod_val = arg.value.modifications[0]
                     if isinstance(mod_val, ast.Primary):
                         return mod_val
+    for ext in type_class.extends:
+        found = _find_builtin_value_modification(ext)
+        if found is not None:
+            return found
     return None
+
+
+def _get_constant_value(isym: InstanceSymbol):
+    """Extract the resolved constant value from an InstanceSymbol, or None if unavailable."""
+    if "constant" not in isym.prefixes:
+        return None
+    # Check if value was already resolved
+    if isym.value is not None and not (
+        isinstance(isym.value, ast.Primary) and isym.value.value is None
+    ):
+        return isym.value
+    return _find_builtin_value_modification(isym.type)
 
 
 def _to_ast_value(val):
