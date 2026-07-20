@@ -264,7 +264,10 @@ def _flatten_instance(
                 (p for p in _VARIABILITY_ORDER if p in flat_symbol.prefixes), None
             )
             for sym_name in new_sym_names:
-                if sym_name.startswith(flat_name_prefix):
+                if sym_name == flat_name:
+                    # A collapsed builtin leaf has no array-ness of its own
+                    flat_class.symbols[sym_name].dimensions = outer_dims
+                elif sym_name.startswith(flat_name_prefix):
                     sym = flat_class.symbols[sym_name]
                     sym.dimensions = outer_dims + sym.dimensions
                     # Propagate outer variability to structured-component elements;
