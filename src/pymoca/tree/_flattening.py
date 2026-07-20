@@ -1889,12 +1889,28 @@ class ComponentRefFlattener(TreeListener):
         if self.depth > self.cutoff_depth:
             return
 
-        # Compose flatted name
-        new_name = self.instance_prefix + tree.name
+        # Compose the flattened name both without and with the instance prefix.
+        raw_name = tree.name
+        prefixed_name = self.instance_prefix + tree.name
         c = tree
         while len(c.child) > 0:
             c = c.child[0]
-            new_name += "." + c.name
+            raw_name += "." + c.name
+            prefixed_name += "." + c.name
+
+        # A reference already resolved to its final flat name earlier in the
+        # pipeline (e.g. an outer-scope symbol substituted into a nested
+        # component's modification, per MLS 5.6.2 point B) must not be
+        # re-prefixed: doing so can collide with an unrelated symbol that
+        # happens to share the nested instance's own local name (e.g. a
+        # value of "theta" resolved for "storage.theta" would wrongly
+        # rename to "storage.theta" itself). Prefer the raw name whenever
+        # it already resolves; only reinterpret it as local (and prefix it)
+        # when it doesn't.
+        if raw_name in self.container.symbols and self.inside_modification == 0:
+            new_name = raw_name
+        else:
+            new_name = prefixed_name
 
         # If the flattened name exists in the container, use it.
         # Otherwise, skip this reference.

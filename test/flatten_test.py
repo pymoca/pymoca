@@ -1472,6 +1472,30 @@ def test_outer_component_resolves_to_inner():
     assert eq_map["c.u"].name == "T"
 
 
+def test_modification_referencing_outer_same_named_symbol():
+    """A modification value naming an outer-scope symbol that shares the nested
+    component's own local name must resolve to the outer symbol, not itself.
+
+    `storage.theta`'s value modification (`theta = theta`) resolves the RHS to
+    the flat name "theta" (the outer parameter). A later pass that re-derives
+    flat names from a component's instance prefix must not blindly re-prefix
+    an already-flat reference, or it collides with the nested symbol's own
+    name and becomes self-referential.
+    """
+    flat = _flatten_inline(
+        """
+    model Inner
+        parameter Real theta;
+    end Inner;
+    model Outer
+        parameter Real theta;
+        Inner storage(theta = theta);
+    end Outer;""",
+        "Outer",
+    )
+    assert flat.symbols["storage.theta"].value.name == "theta"
+
+
 @pytest.mark.xfail(reason="conditional component declarations are not yet evaluated (MLS 4.4.5)")
 def test_conditional_component_removed():
     """A component whose condition is false is removed from the flat model (MLS 4.4.5)."""
