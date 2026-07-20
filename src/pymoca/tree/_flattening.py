@@ -313,7 +313,7 @@ def _flatten_instance(
         )
 
     # 1.7 Resolve references in equations and algorithms
-    _collect_and_resolve_equations(instance, flat_class, prefix)
+    _collect_and_resolve_equations(instance, flat_class, prefix, guard=guard, opts=opts)
 
     # Steps 1.9, 2, and 3 are done outside the recursion in the caller
 
@@ -674,26 +674,39 @@ def _rewrite_cref_in_place(
     unchanged) in place.
     """
     resolved: InstanceClass | InstanceSymbol | None = None
-    try:
-        resolved = _resolve_name(
-            cref,
-            scope,
-            flat_class,
-            name_flat_class=name_flat_class,
-            guard=guard,
-            opts=opts,
-        )
-        assert resolved.name is not None
-        cref.name = resolved.name
-        cref.child = []
-    except Exception:
-        pass  # leave un-resolvable refs (builtins, for-indices) unchanged
+    if not cref.child and cref.name in flat_class.symbols:
+        # Already a fully flattened name (e.g. resolved earlier by
+        # _EquationRefResolver): re-resolving via `scope` would look up this
+        # post-flattening name there, not the original pre-flattening one, and
+        # could silently produce a wrong (if different) result. Nothing to do.
+        pass
+    else:
+        try:
+            resolved = _resolve_name(
+                cref,
+                scope,
+                flat_class,
+                name_flat_class=name_flat_class,
+                guard=guard,
+                opts=opts,
+            )
+            assert resolved.name is not None
+            cref.name = resolved.name
+            cref.child = []
+        except Exception:
+            pass  # leave un-resolvable refs (builtins, for-indices) unchanged
 
     if (
         cref.indices == [[None]]
         and isinstance(resolved, InstanceSymbol)
         and "constant" in resolved.prefixes
+        and cref.name not in flat_class.symbols
     ):
+        # Only inline when the rename above didn't land on a symbol actually present
+        # in the flattened tree (e.g. a global library constant never instantiated as
+        # a component). A constant that does get its own flat symbol keeps referencing
+        # it by name instead, since some backends key off that reference (e.g. alias
+        # detection matching a simple `x = c` equation).
         const_val = _get_constant_value(resolved)
         if isinstance(const_val, ast.Primary) and const_val.value is not None:
             return const_val
@@ -891,10 +904,59 @@ def _is_inner_connector(ref: ast.ComponentRef, instance: InstanceClass) -> bool:
     return True
 
 
+def _inline_equation_side(
+    node,
+    scope: InstanceClass,
+    flat_class: InstanceClass,
+    guard: RecursionGuard,
+    opts: LookupOptions,
+):
+    """Inline any constant ComponentRefs left unrewritten by _EquationRefResolver.
+
+    _EquationRefResolver only renames a reference that matches a known flat symbol;
+    a global library constant that is never itself instantiated as a component (e.g.
+    Deltares.Constants.g_n used directly in an equation) is left untouched. Per MLS
+    5.6.2 constants must be inlined, so resolve and substitute any that remain.
+    Equation.left/.right may be a list (multi-output function call target).
+    """
+    if isinstance(node, list):
+        return [_inline_equation_side(item, scope, flat_class, guard, opts) for item in node]
+    if isinstance(node, ast.ComponentRef):
+        replacement = _rewrite_cref_in_place(node, scope, flat_class, flat_class, guard, opts)
+        return replacement if replacement is not None else node
+    if isinstance(node, ast.Expression):
+        _rewrite_expression_crefs(node, scope, flat_class, flat_class, guard, opts)
+    return node
+
+
+def _inline_equation_constants(
+    node,
+    scope: InstanceClass,
+    flat_class: InstanceClass,
+    guard: RecursionGuard,
+    opts: LookupOptions,
+) -> None:
+    """Recursively inline constants throughout an equation, including inside
+    for/if/when bodies (ConnectClause and other node types are left alone)."""
+    if isinstance(node, ast.Equation):
+        node.left = _inline_equation_side(node.left, scope, flat_class, guard, opts)
+        node.right = _inline_equation_side(node.right, scope, flat_class, guard, opts)
+    elif isinstance(node, ast.ForEquation):
+        for sub in node.equations:
+            _inline_equation_constants(sub, scope, flat_class, guard, opts)
+    elif isinstance(node, (ast.IfEquation, ast.WhenEquation)):
+        for block in node.blocks:
+            for item in block:
+                _inline_equation_constants(item, scope, flat_class, guard, opts)
+
+
 def _collect_and_resolve_equations(
     instance: InstanceClass,
     flat_class: InstanceClass,
     prefix: str,
+    *,
+    guard: RecursionGuard,
+    opts: LookupOptions,
 ) -> None:
     """Deep-copy equations from *instance*, resolve refs, append to *flat_class*."""
     walker = TreeWalker()
@@ -922,6 +984,7 @@ def _collect_and_resolve_equations(
             walker.walk(func_resolver, eq_copy)
             resolver.reset()
             walker.walk(resolver, eq_copy)
+            _inline_equation_constants(eq_copy, instance, flat_class, guard, opts)
         flat_class.equations.append(eq_copy)
 
     for eq in initial_equations:
@@ -929,6 +992,7 @@ def _collect_and_resolve_equations(
         walker.walk(func_resolver, eq_copy)
         resolver.reset()
         walker.walk(resolver, eq_copy)
+        _inline_equation_constants(eq_copy, instance, flat_class, guard, opts)
         flat_class.initial_equations.append(eq_copy)
 
     for stmt in statements:
