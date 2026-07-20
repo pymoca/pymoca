@@ -1654,6 +1654,27 @@ def test_modification_expression_rescopes_array_index():
     assert index.name == "h.n"
 
 
+def test_constant_via_composite_name_lookup_resolves_dimension():
+    """A constant reached through a nested package (composite name lookup,
+    instantiated by _resolve_name rather than the normal flatten walk) resolves
+    its declared value when used as an array dimension, e.g. a fill()/ones()
+    size argument."""
+    flat = _flatten_inline(
+        """
+    package Lib
+        package Sub
+            constant Integer k = 3;
+        end Sub;
+    end Lib;
+    model M
+        Real x[Lib.Sub.k];
+    end M;""",
+        "M",
+    )
+    (dim,) = flat.symbols["x"].dimensions
+    assert dim[0].value == 3
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

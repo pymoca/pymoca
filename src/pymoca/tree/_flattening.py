@@ -359,10 +359,20 @@ def _resolve_dimensions(
                     guard=guard,
                     opts=opts,
                 )
-                if isinstance(resolved, InstanceSymbol) and isinstance(
-                    resolved.value, (int, float)
-                ):
-                    dim_list[i] = ast.Primary(value=int(resolved.value))
+                if isinstance(resolved, InstanceSymbol):
+                    val = resolved.value
+                    if isinstance(val, ast.Primary):
+                        val = val.value
+                    if not isinstance(val, (int, float)):
+                        # Name lookup for composite refs (e.g. a constant reached
+                        # through a nested package) may return a partially
+                        # instantiated symbol whose value was never folded;
+                        # dig out the declared literal instead.
+                        const_val = _get_constant_value(resolved)
+                        if isinstance(const_val, ast.Primary):
+                            val = const_val.value
+                    if isinstance(val, (int, float)):
+                        dim_list[i] = ast.Primary(value=int(val))
             elif isinstance(elem, ast.Expression):
                 try:
                     result = _resolve_expression(
@@ -1405,7 +1415,16 @@ def _resolve_name(
     element.parent_instance = flat_class
     element.parent = flat_class
     if is_symbol:
-        flat_class.symbols[flat_name] = cast(InstanceSymbol, element)  # type: ignore[assignment]
+        # A symbol reached via composite name lookup (e.g. a constant inside a
+        # nested package) is instantiated here rather than through the normal
+        # _flatten_instance walk, so _resolve_modification_attribute never ran
+        # on it and .value is still the unresolved sentinel. Back-fill it now
+        # so consumers (dimensions, expressions) see the declared literal.
+        symbol = cast(InstanceSymbol, element)
+        const_val = _get_constant_value(symbol)
+        if const_val is not None:
+            symbol.value = const_val
+        flat_class.symbols[flat_name] = symbol  # type: ignore[assignment]
     else:
         flat_class.classes[flat_name] = cast(InstanceClass, element)  # type: ignore[assignment]
 
