@@ -1077,18 +1077,30 @@ def _apply_modifications(
     # TODO: Would on-the-fly culling modifiers of same attribute be more efficient?
 
     # Find args from given modification_environment that apply to this instance
-    apply_mod_args = [
-        arg
-        for arg in modification_environment.arguments
-        if isinstance(arg.value, ast.ComponentClause)
-        and instance.name in (arg.value.type.name, arg.value.symbol_list[0].name)
-        or isinstance(arg.value, ast.ElementModification)
-        and instance.name == arg.value.component.name
-        or isinstance(arg.value, ast.ShortClassDefinition)
-        and instance.name == arg.value.name
-        or isinstance(instance, ast.Symbol)
-        and instance.name in InstanceTree.BUILTIN_TYPES
-    ]
+    name = instance.name
+    is_builtin = name in InstanceTree.BUILTIN_TYPES
+    if is_builtin and isinstance(instance, ast.Symbol):
+        # A builtin-typed symbol *is* the value, so every modification applies to it
+        apply_mod_args = list(modification_environment.arguments)
+    else:
+        is_builtin_class = is_builtin and isinstance(instance, InstanceClass)
+        apply_mod_args = [
+            arg
+            for arg in modification_environment.arguments
+            if (
+                isinstance(arg.value, ast.ComponentClause)
+                and name in (arg.value.type.name, arg.value.symbol_list[0].name)
+            )
+            or (
+                isinstance(arg.value, ast.ElementModification)
+                and (
+                    name == arg.value.component.name
+                    # Handle cases like `type A = Real(...); constant A g = 9.8;`
+                    or (is_builtin_class and arg.value.component.name == "value")
+                )
+            )
+            or (isinstance(arg.value, ast.ShortClassDefinition) and name == arg.value.name)
+        ]
 
     # Remove from given modification_environment and add to instance
     if apply_mod_args:
