@@ -1626,6 +1626,33 @@ def test_alias_type_array_dimensions_propagated():
     assert dim_v[0].value == 0
 
 
+def test_modification_expression_rescopes_array_index():
+    """A ComponentRef used as an array index inside an unfoldable modification
+    expression is rescoped to its flat name too, not just the ref it indexes
+    into (MLS 5.6.2 point B)."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        Real x;
+    end Inner;
+    model Holder
+        parameter Integer n = 2;
+        Real b[3](min = 0);
+        Inner c(x = max(b[1], b[n]));
+    end Holder;
+    model M
+        Holder h;
+    end M;""",
+        "M",
+    )
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "h.c.x"]
+    b_1, b_n = eq.right.operands  # max(b[1], b[n])
+    assert b_1.name == "h.b"
+    assert b_n.name == "h.b"
+    (index,) = b_n.indices[0]
+    assert index.name == "h.n"
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
