@@ -244,20 +244,6 @@ RTC_TOOLS_SMOKE_CASES = frozenset(
     {"simulation_with_custom_equations__simple_model", "basic__example"}
 )
 
-# Reasons shared by several cases. A fix commit that does not clear a case
-# still moves it on to whatever error it hits next.
-_EQUATION_CONSTANT = (
-    "a constant referenced directly in an equation is not inlined, and it has no flat symbol "
-    "to rename to, leaving Deltares unresolved"
-)
-
-FLATTEN_XFAIL: dict[str, str] = {
-    "cascading_channels__example": _EQUATION_CONSTANT,
-    "channel_pulse__example": _EQUATION_CONSTANT,
-    "channel_wave_damping__example_local_control": _EQUATION_CONSTANT,
-    "channel_wave_damping__example_optimization": _EQUATION_CONSTANT,
-}
-
 NUMERIC_XFAIL = {
     "basic__example": "the V_storage trajectory does not reproduce the reference export",
     "goal_programming__example": "solver reports INFEASIBLE under this pymoca version",
@@ -277,7 +263,7 @@ pytestmark = [
 
 
 @pytest.mark.parametrize(
-    "case", build_params(CASES, FLATTEN_XFAIL, RTC_TOOLS_SMOKE_CASES, pytest.mark.rtc_tools_smoke)
+    "case", build_params(CASES, {}, RTC_TOOLS_SMOKE_CASES, pytest.mark.rtc_tools_smoke)
 )
 def test_flatten_structure(case: LibraryCase):
     model = compile_case(case)
