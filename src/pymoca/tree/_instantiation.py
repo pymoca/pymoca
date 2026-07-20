@@ -1088,6 +1088,14 @@ def _apply_modifications(
         and instance.name == arg.value.name
         or isinstance(instance, ast.Symbol)
         and instance.name in InstanceTree.BUILTIN_TYPES
+        # A bare "(value=X)" on a symbol whose type is an alias one level removed
+        # from a builtin (e.g. `type Accel = Real(...); constant Accel g = 9.8;`)
+        # must reach the alias's own unnamed extends-to-builtin instance, the same
+        # way it reaches a builtin-typed symbol's synthetic same-named member above.
+        or isinstance(instance, InstanceClass)
+        and instance.name in InstanceTree.BUILTIN_TYPES
+        and isinstance(arg.value, ast.ElementModification)
+        and arg.value.component.name == "value"
     ]
 
     # Remove from given modification_environment and add to instance

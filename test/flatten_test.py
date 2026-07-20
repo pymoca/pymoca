@@ -1706,6 +1706,27 @@ def test_modification_expression_inlines_constant_operand():
     assert rotation_deg.name == "h.rotation_deg"
 
 
+def test_constant_resolved_through_type_alias_extends_chain():
+    """A constant whose type is an alias one level removed from a builtin
+    (e.g. Modelica.Units.SI.Acceleration-style types) has its declared value
+    threaded through the alias's own unnamed extends, not just direct-builtin
+    typed constants."""
+    flat = _flatten_inline(
+        """
+    package Constants
+        type Accel = Real(unit="m/s2");
+        constant Accel g_n = 9.80665;
+    end Constants;
+    model M
+        Real y = Constants.g_n * 2;
+    end M;""",
+        "M",
+    )
+    (eq,) = flat.equations
+    assert isinstance(eq.right, ast.Primary)
+    assert eq.right.value == pytest.approx(19.6133)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
