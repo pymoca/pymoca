@@ -257,21 +257,20 @@ RTC_TOOLS_SMOKE_CASES = frozenset(
 
 # Reasons shared by several cases. A fix commit that does not clear a case
 # still moves it on to whatever error it hits next.
-_UNRESOLVED_INDEX = (
-    "an array index inside a modification expression is not rescoped, leaving the enclosing "
-    "class's n_level_nodes unresolved"
-)
 _ONES_NONE = (
     "a constant array size reached through composite name lookup stays unresolved, so the "
     "generated ones() call gets None"
 )
+_UNINLINED_CONSTANT = (
+    "a constant operand in a modification expression is renamed like a component instead of "
+    "being inlined, leaving Deltares.Constants.D2R unresolved"
+)
 
-# Every reservoir model passes; only the channel-flow models remain.
 FLATTEN_XFAIL: dict[str, str] = {
-    "cascading_channels__example": _UNRESOLVED_INDEX,
-    "channel_pulse__example": _UNRESOLVED_INDEX,
-    "channel_wave_damping__example_local_control": _UNRESOLVED_INDEX,
-    "channel_wave_damping__example_optimization": _UNRESOLVED_INDEX,
+    "cascading_channels__example": _ONES_NONE,
+    "channel_pulse__example": _UNINLINED_CONSTANT,
+    "channel_wave_damping__example_local_control": _UNINLINED_CONSTANT,
+    "channel_wave_damping__example_optimization": _UNINLINED_CONSTANT,
     "goal_programming__example": _ONES_NONE,
     "mixed_integer__example": _ONES_NONE,
 }

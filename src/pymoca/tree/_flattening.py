@@ -642,6 +642,52 @@ def _flatten_expression_crefs(
     return result
 
 
+def _rewrite_cref_in_place(
+    cref: ast.ComponentRef,
+    scope: InstanceClass,
+    flat_class: InstanceClass,
+    name_flat_class: InstanceClass,
+    guard: RecursionGuard,
+    opts: LookupOptions,
+) -> None:
+    """Resolve a ComponentRef to its flat name in place, including its index expressions.
+
+    Array indices (e.g. the `n` in `x[n]`) are themselves ComponentRef/Expression
+    operands that reference symbols in `scope`, so they need the same flat-name
+    rewrite as the ref they index into.
+    """
+    try:
+        resolved = _resolve_name(
+            cref,
+            scope,
+            flat_class,
+            name_flat_class=name_flat_class,
+            guard=guard,
+            opts=opts,
+        )
+        assert resolved.name is not None
+        cref.name = resolved.name
+        cref.child = []
+    except Exception:
+        pass  # leave un-resolvable refs (builtins, for-indices) unchanged
+    for dim_list in cref.indices:
+        for idx in dim_list:
+            if isinstance(idx, ast.ComponentRef):
+                _rewrite_cref_in_place(idx, scope, flat_class, name_flat_class, guard, opts)
+            elif isinstance(idx, ast.Expression):
+                _rewrite_expression_crefs(idx, scope, flat_class, name_flat_class, guard, opts)
+            elif isinstance(idx, ast.Slice):
+                for bound in (idx.start, idx.stop, idx.step):
+                    if isinstance(bound, ast.ComponentRef):
+                        _rewrite_cref_in_place(
+                            bound, scope, flat_class, name_flat_class, guard, opts
+                        )
+                    elif isinstance(bound, ast.Expression):
+                        _rewrite_expression_crefs(
+                            bound, scope, flat_class, name_flat_class, guard, opts
+                        )
+
+
 def _rewrite_expression_crefs(
     expr: ast.Expression,
     scope: InstanceClass,
@@ -652,20 +698,7 @@ def _rewrite_expression_crefs(
 ) -> None:
     for operand in expr.operands:
         if isinstance(operand, ast.ComponentRef):
-            try:
-                resolved = _resolve_name(
-                    operand,
-                    scope,
-                    flat_class,
-                    name_flat_class=name_flat_class,
-                    guard=guard,
-                    opts=opts,
-                )
-                assert resolved.name is not None
-                operand.name = resolved.name
-                operand.child = []
-            except Exception:
-                pass  # leave un-resolvable refs (builtins, for-indices) unchanged
+            _rewrite_cref_in_place(operand, scope, flat_class, name_flat_class, guard, opts)
         elif isinstance(operand, ast.Expression):
             _rewrite_expression_crefs(operand, scope, flat_class, name_flat_class, guard, opts)
 
