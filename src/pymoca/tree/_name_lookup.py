@@ -28,6 +28,21 @@ _PREDEFINED_NAMES = (
 )
 
 
+class IterationVariable:
+    """Marker result for a for-loop iteration variable (MLS 5.3.1 step 1).
+
+    Deliberately not an ``ast.Symbol``/``InstanceElement``: an iteration variable
+    is never declared, instantiated, or given a flat name -- it is local to the
+    loop body and referenced by its own bare name in the flattened output (MLS
+    11.2.2). Callers that only care about "is this resolvable to a real element"
+    can treat a miss and an ``IterationVariable`` alike; callers that need to
+    leave the reference as-is (e.g. equation flattening) check for this type.
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+
+
 def find_name(
     scope: ast.Class,
     name: str | ast.ComponentRef,
@@ -107,7 +122,14 @@ def _find_name(
     # lookup in extends clauses. Once the first name is found, the rest of the
     # composite name should use normal lookup including inherited elements.
     if found is not None and rest_of_name:
-        found = _find_rest_of_name(found, rest_of_name, guard, replace(opts, search_inherited=True))
+        if isinstance(found, IterationVariable):
+            # A loop index is a scalar local to the loop body (MLS 11.2.2), so it
+            # is terminal: it can never be the `A` of a composite `A.B.C`.
+            found = None
+        else:
+            found = _find_rest_of_name(
+                found, rest_of_name, guard, replace(opts, search_inherited=True)
+            )
 
     # Whole-search fallback to the lexical class tree (ast_ref) for instance scopes
     # whose parent chain does not reach the root - classes temporarily flattened for
@@ -132,7 +154,10 @@ def _find_name(
         assert isinstance(ast_ref, ast.Class), "InstanceClass/InstanceTree.ast_ref must be a Class"
         found = _find_name(ast_ref, name, guard, opts)
 
-    return found
+    # An IterationVariable reaches a caller only when that caller declared one in
+    # opts. Equation flattening is the only one that does, and it checks for the
+    # type; every other caller is typed against the elements it can actually see.
+    return cast("ast.Class | ast.Symbol | None", found)
 
 
 def _parse_str_or_ref(name: str | ast.ComponentRef) -> tuple[str, str]:
@@ -189,10 +214,17 @@ def _find_simple_name(
     name: str,
     guard: RecursionGuard,
     opts: LookupOptions,
-) -> ast.Class | ast.Symbol | None:
+) -> ast.Class | ast.Symbol | IterationVariable | None:
     """Lookup name per Modelica spec 3.5 section 5.3.1 Simple Name Lookup"""
 
     # Step numbers below refer to part 1 of the outline in _find_name.
+
+    # Step 1: iteration variables take precedence over everything else and are
+    # not tied to any particular enclosing scope in the walk below -- an active
+    # for-loop index shadows a same-named class member regardless of how many
+    # scopes up that member lives (MLS 5.3.1, 11.2.2).
+    if found := _find_iteration_variable(name, opts):
+        return found
 
     current_scope = scope
 
@@ -496,12 +528,12 @@ def _find_local(
     scope: ast.Class,
     name: str,
 ) -> ast.Class | ast.Symbol | None:
-    """Name lookup for predefined classes and contained elements"""
+    """Name lookup for predefined classes and contained elements.
 
-    # 1. Iteration variables
-    # TODO: Refactor when handling iteration variables (it will move up one level)
-    if found := _find_iteration_variable(scope, name):
-        return found
+    Iteration variables (MLS 5.3.1 step 1) are handled one level up, in
+    _find_simple_name, before this per-scope walk begins: an iteration variable
+    is not tied to any particular enclosing scope the way classes/components are.
+    """
 
     # 2. Classes
     if found := _find_local_class(scope, name):
@@ -538,9 +570,16 @@ def _find_local_class(scope: ast.Class, name: str) -> ast.Class | None:
     return None
 
 
-def _find_iteration_variable(scope: ast.Class, name: str) -> ast.Symbol | None:
-    """Currently a pass"""
-    # TODO: Implement find name in iteration variables
+def _find_iteration_variable(name: str, opts: LookupOptions) -> IterationVariable | None:
+    """Look up *name* as an active for-loop iteration variable (MLS 5.3.1 step 1).
+
+    Iteration variables carry no declaration to search (they are for-loop index
+    identifiers, not components), so this checks the set of names currently in
+    scope from an enclosing for-loop (populated onto ``opts`` by equation/
+    statement flattening) rather than walking any class's members.
+    """
+    if name in opts.iteration_variables:
+        return IterationVariable(name)
     return None
 
 

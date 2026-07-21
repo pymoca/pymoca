@@ -110,6 +110,11 @@ class LookupOptions:
     search_inherited: bool = True
     check_encapsulated: bool = True
     evaluate_parameters: bool = False
+    # Names bound as for-loop iteration variables in the equation/statement body
+    # currently being resolved (MLS 5.3.1 step 1, highest lookup precedence -- an
+    # iteration variable shadows any same-named class member for the loop's extent).
+    # Empty outside equation/statement resolution, so lookup is unaffected elsewhere.
+    iteration_variables: frozenset[str] = frozenset()
     # Mutable set shared by reference across a single inherited-scope traversal to prevent
     # exponential re-visits of the same scope in diamond inheritance hierarchies.
     # Keyed by (name, id(scope)).  Not included in equality/hash.

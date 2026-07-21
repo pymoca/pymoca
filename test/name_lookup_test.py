@@ -1049,6 +1049,33 @@ def test_unqualified_import_priority():
     assert get_flat_symbol_value(flat, "d.y") == 4.0
 
 
+def test_iteration_variable_precedence():
+    """An iteration variable outranks a same-named component (MLS 5.3.1 step 1,
+    11.2.2): with "i" active as an iteration variable, looking up "i" must return
+    the IterationVariable marker, not the component. An empty iteration_variables
+    set (the default for every other caller) must leave lookup unaffected."""
+    from pymoca.tree import LookupOptions, RecursionGuard
+    from pymoca.tree._name_lookup import IterationVariable, _find_name
+
+    ast = pymoca.parser.parse(
+        """
+        model M
+          Real i;
+        end M;
+        """
+    )
+    scope = ast.classes["M"]
+    guard = RecursionGuard()
+
+    found = _find_name(scope, "i", guard, LookupOptions(iteration_variables=frozenset({"i"})))
+    assert isinstance(found, IterationVariable)
+    assert found.name == "i"
+
+    found = _find_name(scope, "i", guard, LookupOptions())
+    assert isinstance(found, pymoca.ast.Symbol)
+    assert not isinstance(found, IterationVariable)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

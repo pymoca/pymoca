@@ -33,7 +33,7 @@ from ._instantiation import (
     instantiate,
 )
 from ._listener import TreeListener, TreeWalker, logger
-from ._name_lookup import _find_name
+from ._name_lookup import IterationVariable, _find_name
 from .instance import (
     InstanceClass,
     InstanceElement,
@@ -1427,7 +1427,7 @@ def _resolve_name(
     guard: RecursionGuard,
     opts: LookupOptions,
     name_flat_class: InstanceClass | None = None,
-) -> InstanceClass | InstanceSymbol:
+) -> InstanceClass | InstanceSymbol | IterationVariable:
     """Resolve a name reference and return a flat-named element.
 
     Two contexts govern resolution, which usually coincide but can differ for
@@ -1491,10 +1491,18 @@ def _resolve_name(
         scope,
         name,
         guard,
-        LookupOptions(instantiate_in_place=opts.instantiate_in_place),
+        LookupOptions(
+            instantiate_in_place=opts.instantiate_in_place,
+            iteration_variables=opts.iteration_variables,
+        ),
     )
     if found is None:
         raise ModelicaSemanticError(f"Unable to resolve {name} in scope {scope.full_name}")
+
+    if isinstance(found, IterationVariable):
+        # Not a declared element: no instantiation, flat name, or registration
+        # applies (MLS 11.2.2) -- the reference stays as its own bare local name.
+        return found
 
     is_symbol = isinstance(found, ast.Symbol)
 
