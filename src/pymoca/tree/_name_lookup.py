@@ -57,7 +57,7 @@ def _find_name(
     """Internal start point for name lookup with extra parameters to control the lookup"""
     # Look for ast.Class or ast.Symbol per the MLS v3.5:
     # 1. Simple Name Lookup (spec 5.3.1)
-    #     1. Iteration variables
+    #     1. Iteration variables (handled during flattening, never reach lookup)
     #     2. Classes
     #     3. Components (Symbols in Pymoca)
     #     4. Classes and Components from Extends Clauses
@@ -202,7 +202,7 @@ def _find_simple_name(
         if opts.instantiate_in_place:
             current_scope = _instantiate_class_if_needed_for_lookup(current_scope, guard, opts)
 
-        # Steps 1-3: Try local lookup first (iteration vars, classes, symbols)
+        # Steps 2-3: Try local lookup first (classes, symbols)
         if found := _find_local(current_scope, name):
             break
 
@@ -498,11 +498,6 @@ def _find_local(
 ) -> ast.Class | ast.Symbol | None:
     """Name lookup for predefined classes and contained elements"""
 
-    # 1. Iteration variables
-    # TODO: Refactor when handling iteration variables (it will move up one level)
-    if found := _find_iteration_variable(scope, name):
-        return found
-
     # 2. Classes
     if found := _find_local_class(scope, name):
         return found
@@ -535,12 +530,6 @@ def _find_local_class(scope: ast.Class, name: str) -> ast.Class | None:
         assert isinstance(ast_ref, ast.Class), "InstanceClass/InstanceTree.ast_ref must be a Class"
         if name in ast_ref.classes:
             return ast_ref.classes[name]
-    return None
-
-
-def _find_iteration_variable(scope: ast.Class, name: str) -> ast.Symbol | None:
-    """Currently a pass"""
-    # TODO: Implement find name in iteration variables
     return None
 
 

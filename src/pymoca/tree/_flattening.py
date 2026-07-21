@@ -639,6 +639,27 @@ def _flatten_expression_crefs(
     return result
 
 
+def _composite_flat_name(prefix: str, cref: ast.ComponentRef) -> str:
+    """Compose the flat name `prefix.name.child1.child2...` for a ComponentRef."""
+    return f"{prefix}.{cref}" if prefix else str(cref)
+
+
+def _collapse_to_flat_name(ref: ast.ComponentRef, prefix: str) -> None:
+    """Rename a ComponentRef to its composite flat name, collapsing its children.
+
+    Indices of the collapsed children move onto the ref itself, so `a.b[i]`
+    becomes a single ref named `prefix.a.b` indexed by `i`.
+    """
+    name = _composite_flat_name(prefix, ref)
+    c = ref
+    while c.child:
+        assert len(c.child) <= 1
+        c = c.child[0]
+        ref.indices = ref.indices + c.indices
+    ref.name = name
+    ref.child = []
+
+
 def _rewrite_cref_in_place(
     cref: ast.ComponentRef,
     scope: InstanceClass,
@@ -646,6 +667,8 @@ def _rewrite_cref_in_place(
     name_flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    prefix: str | None = None,
+    iteration_variables: frozenset[str] = frozenset(),
 ) -> ast.Primary | None:
     """Resolve a ComponentRef to its flat name in place, including its index expressions.
 
@@ -657,13 +680,24 @@ def _rewrite_cref_in_place(
     unchanged) in place.
     """
     resolved: InstanceClass | InstanceSymbol | None = None
-    if not cref.child and cref.name in flat_class.symbols:
-        # Already a fully flattened name (e.g. resolved earlier by
-        # _EquationRefResolver): re-resolving via `scope` would look up this
-        # post-flattening name there, not the original pre-flattening one, and
-        # could silently produce a wrong (if different) result. Nothing to do.
-        pass
-    else:
+    need_resolve = True
+    if cref.name in iteration_variables:
+        # A for-loop index is local to the loop body (MLS 11.2.2): never a flat
+        # symbol or a constant, and unknown to name lookup, so leave it as-is.
+        need_resolve = False
+    elif prefix is not None and _composite_flat_name(prefix, cref) in flat_class.symbols:
+        # Innermost binding wins (MLS 5.3.1): the flattened instance's own member
+        # beats a same-named symbol of an enclosing instance.
+        _collapse_to_flat_name(cref, prefix)
+        need_resolve = False
+    elif not cref.child and cref.name in flat_class.symbols:
+        # Already a fully flattened name (e.g. resolved earlier by another pass):
+        # re-resolving via `scope` would look up this post-flattening name there,
+        # not the original pre-flattening one, and could silently produce a wrong
+        # (if different) result. Nothing to do.
+        need_resolve = False
+
+    if need_resolve:
         try:
             resolved = _resolve_name(
                 cref,
@@ -677,7 +711,7 @@ def _rewrite_cref_in_place(
             cref.name = resolved.name
             cref.child = []
         except Exception:
-            pass  # leave un-resolvable refs (builtins, for-indices) unchanged
+            pass  # leave un-resolvable refs (builtins, functions) unchanged
 
     # A constant with its own flat symbol keeps its name: backend alias
     # detection matches a simple `x = c` equation.
@@ -692,28 +726,9 @@ def _rewrite_cref_in_place(
             return const_val
 
     for dim_list in cref.indices:
-        for i, idx in enumerate(dim_list):
-            if isinstance(idx, ast.ComponentRef):
-                replacement = _rewrite_cref_in_place(
-                    idx, scope, flat_class, name_flat_class, guard, opts
-                )
-                if replacement is not None:
-                    dim_list[i] = replacement
-            elif isinstance(idx, ast.Expression):
-                _rewrite_expression_crefs(idx, scope, flat_class, name_flat_class, guard, opts)
-            elif isinstance(idx, ast.Slice):
-                for attr in ("start", "stop", "step"):
-                    bound = getattr(idx, attr)
-                    if isinstance(bound, ast.ComponentRef):
-                        replacement = _rewrite_cref_in_place(
-                            bound, scope, flat_class, name_flat_class, guard, opts
-                        )
-                        if replacement is not None:
-                            setattr(idx, attr, replacement)
-                    elif isinstance(bound, ast.Expression):
-                        _rewrite_expression_crefs(
-                            bound, scope, flat_class, name_flat_class, guard, opts
-                        )
+        _rewrite_operand_list(
+            dim_list, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
+        )
     return None
 
 
@@ -724,16 +739,123 @@ def _rewrite_expression_crefs(
     name_flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    prefix: str | None = None,
+    iteration_variables: frozenset[str] = frozenset(),
 ) -> None:
-    for i, operand in enumerate(expr.operands):
-        if isinstance(operand, ast.ComponentRef):
-            replacement = _rewrite_cref_in_place(
-                operand, scope, flat_class, name_flat_class, guard, opts
+    _rewrite_operand_list(
+        expr.operands,
+        scope,
+        flat_class,
+        name_flat_class,
+        guard,
+        opts,
+        prefix,
+        iteration_variables,
+    )
+
+
+def _rewrite_operand_list(
+    operands: list,
+    scope: InstanceClass,
+    flat_class: InstanceClass,
+    name_flat_class: InstanceClass,
+    guard: RecursionGuard,
+    opts: LookupOptions,
+    prefix: str | None = None,
+    iteration_variables: frozenset[str] = frozenset(),
+) -> None:
+    """Rewrite in place every ComponentRef found in a list of expression operands."""
+    for i, operand in enumerate(operands):
+        operands[i] = _rewrite_operand(
+            operand, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
+        )
+
+
+def _rewrite_operand(
+    operand,
+    scope: InstanceClass,
+    flat_class: InstanceClass,
+    name_flat_class: InstanceClass,
+    guard: RecursionGuard,
+    opts: LookupOptions,
+    prefix: str | None = None,
+    iteration_variables: frozenset[str] = frozenset(),
+):
+    """Rewrite the ComponentRefs of a single expression operand in place.
+
+    Returns the operand, or the Primary replacing it when it names an inlined
+    constant (see _rewrite_cref_in_place).
+    """
+    if isinstance(operand, ast.ComponentRef):
+        replacement = _rewrite_cref_in_place(
+            operand, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
+        )
+        return operand if replacement is None else replacement
+    if isinstance(operand, list):
+        # Multi-output function call target, or an assignment statement's targets.
+        _rewrite_operand_list(
+            operand, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
+        )
+    elif isinstance(operand, ast.Expression):
+        _rewrite_operand_list(
+            operand.operands,
+            scope,
+            flat_class,
+            name_flat_class,
+            guard,
+            opts,
+            prefix,
+            iteration_variables,
+        )
+    elif isinstance(operand, ast.Array):
+        _rewrite_operand_list(
+            operand.values,
+            scope,
+            flat_class,
+            name_flat_class,
+            guard,
+            opts,
+            prefix,
+            iteration_variables,
+        )
+    elif isinstance(operand, ast.IfExpression):
+        _rewrite_operand_list(
+            operand.conditions,
+            scope,
+            flat_class,
+            name_flat_class,
+            guard,
+            opts,
+            prefix,
+            iteration_variables,
+        )
+        _rewrite_operand_list(
+            operand.expressions,
+            scope,
+            flat_class,
+            name_flat_class,
+            guard,
+            opts,
+            prefix,
+            iteration_variables,
+        )
+    elif isinstance(operand, ast.Slice):
+        for attr in ("start", "stop", "step"):
+            setattr(
+                operand,
+                attr,
+                _rewrite_operand(
+                    getattr(operand, attr),
+                    scope,
+                    flat_class,
+                    name_flat_class,
+                    guard,
+                    opts,
+                    prefix,
+                    iteration_variables,
+                ),
             )
-            if replacement is not None:
-                expr.operands[i] = replacement
-        elif isinstance(operand, ast.Expression):
-            _rewrite_expression_crefs(operand, scope, flat_class, name_flat_class, guard, opts)
+    return operand
 
 
 def _resolve_expression(
@@ -775,35 +897,13 @@ class _EquationRefResolver(TreeListener):
         self.cutoff_depth = sys.maxsize
         super().__init__()
 
-    def reset(self):
-        self.depth = 0
-        self.cutoff_depth = sys.maxsize
-
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
         if self.depth > self.cutoff_depth:
             return
 
-        # Compose candidate flat name: prefix.name.child1.child2...
-        if self.prefix:
-            new_name = self.prefix + "." + tree.name
-        else:
-            new_name = tree.name
-        c = tree
-        while len(c.child) > 0:
-            assert len(c.child) <= 1
-            c = c.child[0]
-            new_name += "." + c.name
-
-        if new_name in self.flat_class.symbols:
-            tree.name = new_name
-            # Merge child indices into parent
-            c = tree
-            while len(c.child) > 0:
-                assert len(c.child) <= 1
-                c = c.child[0]
-                tree.indices += c.indices
-            tree.child = []
+        if _composite_flat_name(self.prefix, tree) in self.flat_class.symbols:
+            _collapse_to_flat_name(tree, self.prefix)
         else:
             # Not a known symbol — leave alone (builtin, function, for-index, etc.)
             self.cutoff_depth = self.depth
@@ -834,21 +934,6 @@ class _FunctionCallResolver(TreeListener):
         full_name = found.full_name
         tree.operator = full_name
         self.functions[full_name] = found
-
-
-def _flatten_connect_ref(ref: ast.ComponentRef, prefix: str) -> None:
-    """Flatten a connect clause ComponentRef by prepending prefix and collapsing children."""
-    parts = [ref.name]
-    c = ref
-    indices = ref.indices
-    while len(c.child) > 0:
-        assert len(c.child) <= 1
-        c = c.child[0]
-        parts.append(c.name)
-        indices = indices + c.indices
-    ref.name = prefix + "." + ".".join(parts) if prefix else ".".join(parts)
-    ref.indices = indices
-    ref.child = []
 
 
 def _find_local_or_inherited_symbol(instance: InstanceClass, name: str) -> InstanceSymbol | None:
@@ -891,6 +976,8 @@ def _inline_equation_side(
     flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    prefix: str | None = None,
+    iteration_variables: frozenset[str] = frozenset(),
 ) -> ast.ComponentRef | ast.Primary: ...
 
 
@@ -901,6 +988,8 @@ def _inline_equation_side(
     flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    prefix: str | None = None,
+    iteration_variables: frozenset[str] = frozenset(),
 ) -> _OperandT: ...
 
 
@@ -910,44 +999,141 @@ def _inline_equation_side(
     flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    prefix: str | None = None,
+    iteration_variables: frozenset[str] = frozenset(),
 ):
-    """Inline any constant ComponentRefs left unrewritten by _EquationRefResolver.
+    """Resolve every ComponentRef in an equation/statement operand to its flat
+    name in place (fast path or full name resolution, see _rewrite_cref_in_place),
+    inlining any that reference a constant never instantiated as a flat symbol
+    (e.g. a package constant used directly) per MLS 5.6.2.
 
-    _EquationRefResolver only renames a reference that matches a known flat symbol;
-    a global library constant that is never itself instantiated as a component (e.g.
-    a package constant used directly in an equation) is left untouched. Per MLS
-    5.6.2 constants must be inlined, so resolve and substitute any that remain.
-    Equation.left/.right may be a list (multi-output function call target).
+    The operand is returned rather than only mutated because a bare ComponentRef
+    naming a constant is replaced outright, by an ast.Primary holding its value.
+    Every slot this is assigned back to accepts a Primary, bar an assignment
+    statement's own targets, which can never name a constant.
     """
-    if isinstance(node, list):
-        return [_inline_equation_side(item, scope, flat_class, guard, opts) for item in node]
-    if isinstance(node, ast.ComponentRef):
-        replacement = _rewrite_cref_in_place(node, scope, flat_class, flat_class, guard, opts)
-        return replacement if replacement is not None else node
-    if isinstance(node, ast.Expression):
-        _rewrite_expression_crefs(node, scope, flat_class, flat_class, guard, opts)
-    return node
+    return _rewrite_operand(
+        node, scope, flat_class, flat_class, guard, opts, prefix, iteration_variables
+    )
 
 
-def _inline_equation_constants(
+def _enter_for_indices(
+    indices,
+    scope: InstanceClass,
+    flat_class: InstanceClass,
+    prefix: str,
+    guard: RecursionGuard,
+    opts: LookupOptions,
+    iteration_variables: frozenset[str],
+) -> frozenset[str]:
+    """Resolve a for-loop's own range expressions and return the set for its body.
+
+    A range (`1:n` in `for i in 1:n loop`) is never in scope of its own index, but
+    a later for-index is shorthand for a nested loop, so its range sees the
+    indices before it (MLS 11.2.2).
+    """
+    for idx in indices:
+        idx.expression = _inline_equation_side(
+            idx.expression, scope, flat_class, guard, opts, prefix, iteration_variables
+        )
+        iteration_variables = iteration_variables | {idx.name}
+    return iteration_variables
+
+
+def _resolve_equation_refs(
     node,
     scope: InstanceClass,
     flat_class: InstanceClass,
+    prefix: str,
     guard: RecursionGuard,
     opts: LookupOptions,
+    iteration_variables: frozenset[str] = frozenset(),
 ) -> None:
-    """Recursively inline constants throughout an equation, including inside
-    for/if/when bodies (ConnectClause and other node types are left alone)."""
+    """Recursively resolve ComponentRefs throughout an equation to their flat
+    names, inlining constants along the way, including inside for/if/when bodies."""
     if isinstance(node, ast.Equation):
-        node.left = _inline_equation_side(node.left, scope, flat_class, guard, opts)
-        node.right = _inline_equation_side(node.right, scope, flat_class, guard, opts)
+        node.left = _inline_equation_side(
+            node.left, scope, flat_class, guard, opts, prefix, iteration_variables
+        )
+        node.right = _inline_equation_side(
+            node.right, scope, flat_class, guard, opts, prefix, iteration_variables
+        )
+    elif isinstance(node, ast.Function):
+        _rewrite_operand_list(
+            node.arguments, scope, flat_class, flat_class, guard, opts, prefix, iteration_variables
+        )
+    elif isinstance(node, ast.ConnectClause):
+        _collapse_to_flat_name(node.left, prefix)
+        _collapse_to_flat_name(node.right, prefix)
     elif isinstance(node, ast.ForEquation):
+        iteration_variables = _enter_for_indices(
+            node.indices, scope, flat_class, prefix, guard, opts, iteration_variables
+        )
         for sub in node.equations:
-            _inline_equation_constants(sub, scope, flat_class, guard, opts)
+            _resolve_equation_refs(sub, scope, flat_class, prefix, guard, opts, iteration_variables)
     elif isinstance(node, (ast.IfEquation, ast.WhenEquation)):
+        node.conditions = [
+            _inline_equation_side(cond, scope, flat_class, guard, opts, prefix, iteration_variables)
+            for cond in node.conditions
+        ]
+        for block in node.blocks:
+            for i, item in enumerate(block):
+                if isinstance(item, ast.Expression):
+                    block[i] = _inline_equation_side(
+                        item, scope, flat_class, guard, opts, prefix, iteration_variables
+                    )
+                else:
+                    _resolve_equation_refs(
+                        item, scope, flat_class, prefix, guard, opts, iteration_variables
+                    )
+
+
+def _resolve_statement_refs(
+    node,
+    scope: InstanceClass,
+    flat_class: InstanceClass,
+    prefix: str,
+    guard: RecursionGuard,
+    opts: LookupOptions,
+    iteration_variables: frozenset[str] = frozenset(),
+) -> None:
+    """Recursively resolve ComponentRefs throughout an algorithm statement to
+    their flat names, mirroring _resolve_equation_refs for equations."""
+    if isinstance(node, ast.AssignmentStatement):
+        # An assignment target names a variable, never a constant, so it is only
+        # ever rewritten in place, never replaced by a literal.
+        node.left = _inline_equation_side(
+            node.left, scope, flat_class, guard, opts, prefix, iteration_variables
+        )
+        node.right = _inline_equation_side(
+            node.right, scope, flat_class, guard, opts, prefix, iteration_variables
+        )
+    elif isinstance(node, ast.ForStatement):
+        iteration_variables = _enter_for_indices(
+            node.indices, scope, flat_class, prefix, guard, opts, iteration_variables
+        )
+        for sub in node.statements:
+            _resolve_statement_refs(
+                sub, scope, flat_class, prefix, guard, opts, iteration_variables
+            )
+    elif isinstance(node, (ast.IfStatement, ast.WhenStatement)):
+        node.conditions = [
+            _inline_equation_side(cond, scope, flat_class, guard, opts, prefix, iteration_variables)
+            for cond in node.conditions
+        ]
         for block in node.blocks:
             for item in block:
-                _inline_equation_constants(item, scope, flat_class, guard, opts)
+                _resolve_statement_refs(
+                    item, scope, flat_class, prefix, guard, opts, iteration_variables
+                )
+    elif isinstance(node, ast.WhileStatement):
+        node.condition = _inline_equation_side(
+            node.condition, scope, flat_class, guard, opts, prefix, iteration_variables
+        )
+        for item in node.statements:
+            _resolve_statement_refs(
+                item, scope, flat_class, prefix, guard, opts, iteration_variables
+            )
 
 
 def _collect_and_resolve_equations(
@@ -960,7 +1146,6 @@ def _collect_and_resolve_equations(
 ) -> None:
     """Deep-copy equations from *instance*, resolve refs, append to *flat_class*."""
     walker = TreeWalker()
-    resolver = _EquationRefResolver(flat_class, prefix)
     func_resolver = _FunctionCallResolver(instance, flat_class.functions)
 
     # Snapshot lists before iteration to avoid mutation issues if the
@@ -978,35 +1163,29 @@ def _collect_and_resolve_equations(
             eq_copy._left_inner = _is_inner_connector(cast(ast.ComponentRef, eq.left), instance)
             eq_copy._right_inner = _is_inner_connector(cast(ast.ComponentRef, eq.right), instance)
             # Manually flatten connect refs (connector names aren't in flat_class.symbols)
-            _flatten_connect_ref(eq_copy.left, prefix)
-            _flatten_connect_ref(eq_copy.right, prefix)
+            _collapse_to_flat_name(eq_copy.left, prefix)
+            _collapse_to_flat_name(eq_copy.right, prefix)
         else:
             walker.walk(func_resolver, eq_copy)
-            resolver.reset()
-            walker.walk(resolver, eq_copy)
-            _inline_equation_constants(eq_copy, instance, flat_class, guard, opts)
+            _resolve_equation_refs(eq_copy, instance, flat_class, prefix, guard, opts)
         flat_class.equations.append(eq_copy)
 
     for eq in initial_equations:
         eq_copy = copy.deepcopy(eq)
         walker.walk(func_resolver, eq_copy)
-        resolver.reset()
-        walker.walk(resolver, eq_copy)
-        _inline_equation_constants(eq_copy, instance, flat_class, guard, opts)
+        _resolve_equation_refs(eq_copy, instance, flat_class, prefix, guard, opts)
         flat_class.initial_equations.append(eq_copy)
 
     for stmt in statements:
         stmt_copy = copy.deepcopy(stmt)
         walker.walk(func_resolver, stmt_copy)
-        resolver.reset()
-        walker.walk(resolver, stmt_copy)
+        _resolve_statement_refs(stmt_copy, instance, flat_class, prefix, guard, opts)
         flat_class.statements.append(stmt_copy)
 
     for stmt in initial_statements:
         stmt_copy = copy.deepcopy(stmt)
         walker.walk(func_resolver, stmt_copy)
-        resolver.reset()
-        walker.walk(resolver, stmt_copy)
+        _resolve_statement_refs(stmt_copy, instance, flat_class, prefix, guard, opts)
         flat_class.initial_statements.append(stmt_copy)
 
 
