@@ -659,12 +659,17 @@ def _rewrite_cref_in_place(
     name_flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    skip_names: frozenset[str] = frozenset(),
 ) -> ast.Primary | None:
     """Resolve a ComponentRef to its flat name in place, including its index expressions.
 
     Array indices (e.g. the `n` in `x[n]`) are themselves ComponentRef/Expression
     operands that reference symbols in `scope`, so they need the same flat-name
     rewrite as the ref they index into.
+
+    `skip_names` holds names (e.g. enclosing for-loop indices) that are known in
+    advance to never be a flat symbol or a global constant, so name resolution --
+    expensive, and guaranteed to fail or be a no-op for these -- is skipped outright.
 
     Returns a Primary to substitute for `cref` when it resolves to an (unindexed)
     constant: constant values are inlined during flattening (MLS 5.6.2), so such a
@@ -674,11 +679,13 @@ def _rewrite_cref_in_place(
     unchanged) in place.
     """
     resolved: InstanceClass | InstanceSymbol | None = None
-    if not cref.child and cref.name in flat_class.symbols:
+    if not cref.child and (cref.name in flat_class.symbols or cref.name in skip_names):
         # Already a fully flattened name (e.g. resolved earlier by
-        # _EquationRefResolver): re-resolving via `scope` would look up this
-        # post-flattening name there, not the original pre-flattening one, and
-        # could silently produce a wrong (if different) result. Nothing to do.
+        # _EquationRefResolver), or a known local name (e.g. a for-loop index)
+        # that can never be a flat symbol or constant: re-resolving via `scope`
+        # would look up this post-flattening/local name there, not the original
+        # pre-flattening one, and could silently produce a wrong (if different)
+        # result. Nothing to do.
         pass
     else:
         try:
@@ -715,24 +722,26 @@ def _rewrite_cref_in_place(
         for i, idx in enumerate(dim_list):
             if isinstance(idx, ast.ComponentRef):
                 replacement = _rewrite_cref_in_place(
-                    idx, scope, flat_class, name_flat_class, guard, opts
+                    idx, scope, flat_class, name_flat_class, guard, opts, skip_names
                 )
                 if replacement is not None:
                     dim_list[i] = replacement
             elif isinstance(idx, ast.Expression):
-                _rewrite_expression_crefs(idx, scope, flat_class, name_flat_class, guard, opts)
+                _rewrite_expression_crefs(
+                    idx, scope, flat_class, name_flat_class, guard, opts, skip_names
+                )
             elif isinstance(idx, ast.Slice):
                 for attr in ("start", "stop", "step"):
                     bound = getattr(idx, attr)
                     if isinstance(bound, ast.ComponentRef):
                         replacement = _rewrite_cref_in_place(
-                            bound, scope, flat_class, name_flat_class, guard, opts
+                            bound, scope, flat_class, name_flat_class, guard, opts, skip_names
                         )
                         if replacement is not None:
                             setattr(idx, attr, replacement)
                     elif isinstance(bound, ast.Expression):
                         _rewrite_expression_crefs(
-                            bound, scope, flat_class, name_flat_class, guard, opts
+                            bound, scope, flat_class, name_flat_class, guard, opts, skip_names
                         )
     return None
 
@@ -744,16 +753,19 @@ def _rewrite_expression_crefs(
     name_flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    skip_names: frozenset[str] = frozenset(),
 ) -> None:
     for i, operand in enumerate(expr.operands):
         if isinstance(operand, ast.ComponentRef):
             replacement = _rewrite_cref_in_place(
-                operand, scope, flat_class, name_flat_class, guard, opts
+                operand, scope, flat_class, name_flat_class, guard, opts, skip_names
             )
             if replacement is not None:
                 expr.operands[i] = replacement
         elif isinstance(operand, ast.Expression):
-            _rewrite_expression_crefs(operand, scope, flat_class, name_flat_class, guard, opts)
+            _rewrite_expression_crefs(
+                operand, scope, flat_class, name_flat_class, guard, opts, skip_names
+            )
 
 
 def _resolve_expression(
@@ -910,6 +922,7 @@ def _inline_equation_side(
     flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    skip_names: frozenset[str] = frozenset(),
 ):
     """Inline any constant ComponentRefs left unrewritten by _EquationRefResolver.
 
@@ -918,14 +931,22 @@ def _inline_equation_side(
     Deltares.Constants.g_n used directly in an equation) is left untouched. Per MLS
     5.6.2 constants must be inlined, so resolve and substitute any that remain.
     Equation.left/.right may be a list (multi-output function call target).
+
+    `skip_names` (enclosing for-loop indices) short-circuits resolution attempts
+    that are guaranteed to be pointless -- see `_rewrite_cref_in_place`.
     """
     if isinstance(node, list):
-        return [_inline_equation_side(item, scope, flat_class, guard, opts) for item in node]
+        return [
+            _inline_equation_side(item, scope, flat_class, guard, opts, skip_names)
+            for item in node
+        ]
     if isinstance(node, ast.ComponentRef):
-        replacement = _rewrite_cref_in_place(node, scope, flat_class, flat_class, guard, opts)
+        replacement = _rewrite_cref_in_place(
+            node, scope, flat_class, flat_class, guard, opts, skip_names
+        )
         return replacement if replacement is not None else node
     if isinstance(node, ast.Expression):
-        _rewrite_expression_crefs(node, scope, flat_class, flat_class, guard, opts)
+        _rewrite_expression_crefs(node, scope, flat_class, flat_class, guard, opts, skip_names)
     return node
 
 
@@ -935,19 +956,30 @@ def _inline_equation_constants(
     flat_class: InstanceClass,
     guard: RecursionGuard,
     opts: LookupOptions,
+    skip_names: frozenset[str] = frozenset(),
 ) -> None:
     """Recursively inline constants throughout an equation, including inside
-    for/if/when bodies (ConnectClause and other node types are left alone)."""
+    for/if/when bodies (ConnectClause and other node types are left alone).
+
+    A for-loop's own index names accumulate into `skip_names` for its body: an
+    index can never be a flat symbol or a global constant (MLS 11.2.2), so name
+    resolution for it is worse than useless -- name lookup walks the instance
+    tree via `scope`, which has no notion of a loop-local index at all, making
+    every such attempt pay full price only to fail or no-op.
+    """
     if isinstance(node, ast.Equation):
-        node.left = _inline_equation_side(node.left, scope, flat_class, guard, opts)
-        node.right = _inline_equation_side(node.right, scope, flat_class, guard, opts)
+        node.left = _inline_equation_side(node.left, scope, flat_class, guard, opts, skip_names)
+        node.right = _inline_equation_side(
+            node.right, scope, flat_class, guard, opts, skip_names
+        )
     elif isinstance(node, ast.ForEquation):
+        skip_names = skip_names | {idx.name for idx in node.indices}
         for sub in node.equations:
-            _inline_equation_constants(sub, scope, flat_class, guard, opts)
+            _inline_equation_constants(sub, scope, flat_class, guard, opts, skip_names)
     elif isinstance(node, (ast.IfEquation, ast.WhenEquation)):
         for block in node.blocks:
             for item in block:
-                _inline_equation_constants(item, scope, flat_class, guard, opts)
+                _inline_equation_constants(item, scope, flat_class, guard, opts, skip_names)
 
 
 def _collect_and_resolve_equations(

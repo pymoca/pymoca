@@ -1496,6 +1496,39 @@ def test_modification_referencing_outer_same_named_symbol():
     assert flat.symbols["storage.theta"].value.name == "theta"
 
 
+def test_for_loop_index_left_unresolved_alongside_constant_inlining():
+    """A for-loop index must stay as-is, not be looked up as a symbol or constant.
+
+    Per MLS 11.2.2 a for-index is local to the loop body and shadows any
+    outer declaration of the same name, so it can never resolve to a flat
+    symbol or a global constant; the equation-constant-inlining walk must
+    recognize this and leave it untouched rather than attempting (and always
+    failing at) full name resolution for it. Also exercises that a genuine
+    global constant used in the same equation still gets inlined correctly
+    alongside the index.
+    """
+    flat = _flatten_inline(
+        """
+    package Constants
+        constant Real k = 2.5;
+    end Constants;
+    model M
+        Real x[3];
+    equation
+        for i in 1:3 loop
+            x[i] = i * Constants.k;
+        end for;
+    end M;""",
+        "M",
+    )
+    for_eq = flat.equations[0]
+    assert for_eq.indices[0].name == "i"
+    inner_eq = for_eq.equations[0]
+    assert inner_eq.left.indices[0][0].name == "i"
+    assert inner_eq.right.operands[0].name == "i"
+    assert inner_eq.right.operands[1].value == 2.5
+
+
 @pytest.mark.xfail(reason="conditional component declarations are not yet evaluated (MLS 4.4.5)")
 def test_conditional_component_removed():
     """A component whose condition is false is removed from the flat model (MLS 4.4.5)."""
