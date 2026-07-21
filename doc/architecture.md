@@ -259,7 +259,8 @@ The legacy `tree.flatten()` routes directly to this (in `__init__.py`).
 - **1.6** Recurse into non-simple type symbols, propagate outer symbol's prefixes (e.g.
   `parameter`) and dimensions to the leaf builtin symbol
 - **1.7** `_collect_and_resolve_equations()` - resolve `ComponentRef`s to flat instance
-  names, discover function calls
+  names by name lookup in the instance scope, inlining constants that get no flat
+  symbol of their own, and discover function calls
 - **1.8** Recurse into unnamed extends instances (their symbols/equations are appended
   after the locals already inserted in 1.1-1.7)
 - **1.9** `_check_all_references_valid()` is a TODO stub
@@ -276,7 +277,7 @@ After `_flatten_instance()` returns, `flatten_instance()` runs in order:
 - **1.9** `_check_all_references_valid()` - TODO stub
 - **3** `_process_transitions()` - TODO stub
 - **2** `_generate_connect_equations()` - connect expansion, skipped when
-  `expand_connect=False`. Uses `_flatten_connect_ref`, `_is_inner_connector`
+  `expand_connect=False`. Uses `_collapse_to_flat_name`, `_is_inner_connector`
 
 `flatten_to_tree()` converts the `InstanceClass` result back to a backward-compatible
 `ast.Tree` via `_instance_to_ast_class` / `_instance_to_ast_symbol` /
@@ -690,21 +691,10 @@ fully-populated connector symbols.
 - `_evaluate_conditional_declarations` (MLS 5.6.2 step 1.2)
 - `_process_transitions` (MLS 5.6.2 step 3)
 - `_check_all_references_valid` (MLS 5.6.2 step 1.9)
-- Equation `ComponentRef` resolution (MLS 5.6.2 step 1.7) is string-prefix rewriting,
-  not name lookup: `_EquationRefResolver` tests `prefix + name` against
-  `flat_class.symbols`, so refs to enclosing-scope constants stay unresolved, and a
-  ref that should resolve to an enclosing-scope constant or a for-loop index is
-  silently captured by a same-named flat symbol when one exists at that prefix.
-  The fix must live in `_collect_and_resolve_equations`, where the instance scope
-  is still in hand - the flat output carries no per-equation scope provenance, so
-  a post-hoc pass over the flat class cannot resolve a bare enclosing-scope name.
-  `_resolve_name` already does exactly this (resolve in scope, register into the
-  flat class under a flat name) for modification values
 - Record modifications in `_resolve_modifications`
 - `ExpressionEvaluator` - partial implementation, uses an operator-dispatch table (no
   `eval()`)
 - Built-in functions/operators not yet added to `InstanceTree`
-- Iteration variables in name lookup (`for i = i:i+3`)
 - Type compatibility / constraining-type / prefix preservation for redeclares (`TODO`
   markers in `_instantiation.py`)
 - `final` and `each` on modification arguments: parsed but silently discarded, so

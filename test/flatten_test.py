@@ -1472,6 +1472,227 @@ def test_outer_component_resolves_to_inner():
     assert eq_map["c.u"].name == "T"
 
 
+def test_equation_ref_prefers_own_member_over_outer_same_named_symbol():
+    """A bare name in a nested component's equation binds to that component's
+    own member, not to a same-named symbol of the enclosing model (MLS 5.3.1)."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        Real x;
+    equation
+        x = 1.0;
+    end Inner;
+    model Outer
+        Real x;
+        Inner c;
+    equation
+        x = 2.0;
+    end Outer;""",
+        "Outer",
+    )
+    eq_map = {eq.left.name: eq.right.value for eq in flat.equations}
+    assert eq_map == {"c.x": 1.0, "x": 2.0}
+
+
+def test_for_loop_index_not_shadowed_by_same_named_member():
+    """A for-loop index wins over a same-named component member inside its own
+    body (MLS 5.3.1 step 1, 11.2.2), while a reference to the member outside
+    the loop still resolves to the member."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        Real x[3];
+        Real i;
+    equation
+        i = 1.0;
+        for i in 1:3 loop
+            x[i] = i;
+        end for;
+    end Inner;
+    model Outer
+        Inner c;
+    end Outer;""",
+        "Outer",
+    )
+    member_eq, for_eq = flat.equations
+    assert member_eq.left.name == "c.i"
+    inner_eq = for_eq.equations[0]
+    assert inner_eq.left.indices[0][0].name == "i"
+    assert inner_eq.right.name == "i"
+
+
+def test_for_loop_index_not_shadowed_by_same_named_member_in_algorithm():
+    """Statement-path counterpart of the equation collision test above: an
+    algorithm's for-loop index must win over a same-named component member."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        Real i;
+        Real y[3];
+    algorithm
+        i := 1.0;
+        for i in 1:3 loop
+            y[i] := i;
+        end for;
+    end Inner;
+    model Outer
+        Inner c;
+    end Outer;""",
+        "Outer",
+    )
+    member_stmt, for_stmt = flat.statements
+    assert member_stmt.left[0].name == "c.i"
+    inner_stmt = for_stmt.statements[0]
+    assert inner_stmt.left[0].indices[0][0].name == "i"
+    assert inner_stmt.right.name == "i"
+
+
+def test_for_loop_index_named_like_type_keeps_composite_lookup():
+    """A for-loop index shadows only names written in the loop body (MLS 5.3.1
+    step 1), not the internal type-name lookups that resolving a composite
+    reference performs: with the index named like `c`'s record type, `Pkg.c.v`
+    must still resolve (and inline, as a constant) inside the loop body."""
+    flat = _flatten_inline(
+        """
+    package Pkg
+      record R
+        constant Real v = 1.5;
+      end R;
+      constant R c;
+    end Pkg;
+    model M
+      Real z[3];
+    equation
+      for R in 1:3 loop
+        z[R] = Pkg.c.v;
+      end for;
+    end M;""",
+        "M",
+    )
+    inner_eq = flat.equations[0].equations[0]
+    assert inner_eq.left.indices[0][0].name == "R"
+    assert inner_eq.right.value == 1.5
+
+
+def test_if_equation_condition_resolved_to_flat_name():
+    """An if-equation's own conditions are ref-resolved like its branches."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        Real x;
+        Real y;
+    equation
+        x = 2.0;
+        if x > 0 then
+            y = 1.0;
+        else
+            y = 0.0;
+        end if;
+    end Inner;
+    model Outer
+        Inner c;
+    end Outer;""",
+        "Outer",
+    )
+    if_eq = next(eq for eq in flat.equations if isinstance(eq, ast.IfEquation))
+    cond = if_eq.conditions[0]
+    assert cond.operands[0].name == "c.x"
+
+
+def test_for_equation_range_bound_resolved_to_flat_name():
+    """A for-equation's own range bounds are ref-resolved like its body."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        parameter Integer n = 3;
+        Real y[3];
+    equation
+        for i in 1:n loop
+            y[i] = i;
+        end for;
+    end Inner;
+    model Outer
+        Inner c;
+    end Outer;""",
+        "Outer",
+    )
+    for_eq = next(eq for eq in flat.equations if isinstance(eq, ast.ForEquation))
+    assert for_eq.indices[0].expression.stop.name == "c.n"
+
+
+def test_nested_connect_refs_get_instance_prefix():
+    """A connect clause inside an if-equation body has its connector refs prefixed
+    with the enclosing component's instance path, like a top-level connect."""
+    flat = _flatten_inline(
+        """
+    connector C = Real;
+    model Inner
+        parameter Boolean use = true;
+        C a;
+        C b;
+    equation
+        if use then
+            connect(a, b);
+        end if;
+    end Inner;
+    model Outer
+        Inner c;
+    end Outer;""",
+        "Outer",
+    )
+    if_eq = next(eq for eq in flat.equations if isinstance(eq, ast.IfEquation))
+    (connect,) = if_eq.blocks[0]
+    assert (connect.left.name, connect.right.name) == ("c.a", "c.b")
+
+
+def test_function_call_arguments_resolved_to_flat_names():
+    """Arguments of an equation-level function call inside a nested component
+    resolve to the component's own members, like any other equation operand."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        Real x;
+        Real y;
+    equation
+        x = 1.0;
+        assert(x > 0, "positive");
+        when x > 2 then
+            reinit(y, x);
+        end when;
+    end Inner;
+    model Outer
+        Inner c;
+    end Outer;""",
+        "Outer",
+    )
+    assert_call, when_eq = [eq for eq in flat.equations if not isinstance(eq, ast.Equation)]
+    assert assert_call.arguments[0].operands[0].name == "c.x"
+    (reinit_call,) = when_eq.blocks[0]
+    assert [arg.name for arg in reinit_call.arguments] == ["c.y", "c.x"]
+
+
+def test_later_for_index_range_sees_earlier_index():
+    """In `for i in ..., j in 1:i`, the later range binds to the earlier loop
+    index, not to a same-named member of the component (MLS 11.2.2)."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        parameter Integer i = 5;
+        Real z[3, 3];
+    equation
+        for i in 1:3, j in 1:i loop
+            z[i, j] = 1.0;
+        end for;
+    end Inner;
+    model Outer
+        Inner c;
+    end Outer;""",
+        "Outer",
+    )
+    for_eq = next(eq for eq in flat.equations if isinstance(eq, ast.ForEquation))
+    assert for_eq.indices[1].expression.stop.name == "i"
+
+
 @pytest.mark.xfail(reason="conditional component declarations are not yet evaluated (MLS 4.4.5)")
 def test_conditional_component_removed():
     """A component whose condition is false is removed from the flat model (MLS 4.4.5)."""
