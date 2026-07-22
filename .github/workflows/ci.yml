@@ -109,4 +109,15 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
+          # Auto-generated commit/PR list, appended below the summary below.
           generate_release_notes: true
+          # Prepended above the auto-generated notes.
+          body: |
+            ## Highlights
+
+            <!-- Summarize the major user-facing improvements in this release,
+                 then edit as needed and click Publish. -->
+            - _TODO: fill in the highlights before publishing._
+          # Create as a draft so the highlights can be edited before the
+          # release is made public. Publish manually from the GitHub UI.
+          draft: true
