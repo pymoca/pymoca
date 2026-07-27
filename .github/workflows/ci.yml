@@ -85,7 +85,7 @@ jobs:
           files: ./coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  deploy:
+  build:
     needs: test
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}
@@ -99,13 +99,48 @@ jobs:
           python-version: "3.14"
       - run: |
           python -m pip install --upgrade pip
-          pip install build twine
-      - env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          python -m build
-          twine upload dist/*
+          pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+
+  testpypi-deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ contains(github.ref_name, '.dev') }}
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/pymoca
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, '.dev') }}
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pymoca
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
