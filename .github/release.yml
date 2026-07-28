@@ -1,0 +1,36 @@
+# Configuration for GitHub's automatically generated release notes.
+# https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+#
+# Merged PRs are sorted into the sections below by their labels. A PR lands in
+# the first category whose labels it matches, so order matters. The final
+# "Other Changes" catch-all ("*") ensures an unlabeled PR is still listed.
+changelog:
+  exclude:
+    labels:
+      - ignore
+    authors:
+      - dependabot
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: Features
+      labels:
+        - enhancement
+        - feature
+    - title: Bug Fixes
+      labels:
+        - bug
+        - fix
+    - title: Performance
+      labels:
+        - performance
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other Changes
+      labels:
+        - "*"
