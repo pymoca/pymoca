@@ -12,6 +12,9 @@ on:
     # Every Wednesday at 6:06 UTC
     - cron: "6 6 * * 3"
 
+permissions:
+  contents: read
+
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
@@ -85,7 +88,7 @@ jobs:
           files: ./coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  deploy:
+  build:
     needs: test
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}
@@ -99,14 +102,97 @@ jobs:
           python-version: "3.14"
       - run: |
           python -m pip install --upgrade pip
-          pip install build twine
-      - env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+          pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+
+  # Gate for both deploy jobs, so a tag with no release notes fails before
+  # anything is published. Independent of the test matrix to report early.
+  changelog:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+      # The section runs from its "## <version>" heading to the next "## "
+      # heading.
+      - name: Extract release summary from CHANGELOG
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          python -m build
-          twine upload dist/*
+          # A dev or rc tag checks the section for the release it leads up to.
+          # Strip both dotted (0.12.0.rc1) and PEP 440 canonical (0.12.0rc1) forms.
+          version="${REF_NAME%%.dev*}"
+          version="${version%%dev*}"
+          version="${version%%.rc*}"
+          version="${version%%rc*}"
+          awk -v ver="$version" '
+            !found && index($0, "## " ver) == 1 && substr($0, length(ver) + 4, 1) ~ /^ *$/ {
+              found = 1
+              next
+            }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-summary.md
+          if [ ! -s release-summary.md ]; then
+            echo "::error file=CHANGELOG.md::No release notes section for $version"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-summary
+          path: release-summary.md
+
+  testpypi-deploy:
+    needs: [build, changelog]
+    runs-on: ubuntu-latest
+    if: ${{ contains(github.ref_name, 'dev') }}
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/pymoca
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  deploy:
+    needs: [build, changelog]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, 'dev') }}
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pymoca
+    permissions:
+      id-token: write # PyPI trusted publishing
+      contents: write # Create the GitHub release
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-summary
+      - uses: pypa/gh-action-pypi-publish@release/v1
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
+          # Auto-generated PR/commit list, appended to the CHANGELOG summary.
           generate_release_notes: true
+          body_path: release-summary.md
+          # Keep a release candidate from displacing the latest stable release.
+          prerelease: ${{ contains(github.ref_name, 'rc') }}
