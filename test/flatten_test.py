@@ -1589,6 +1589,24 @@ def test_modelica_error_pickle_roundtrip():
     assert str(copy.deepcopy(err)) == "some message"
 
 
+def test_alias_type_input_output_prefix_preserved():
+    """input/output prefixes on an alias-typed variable reach its flattened
+    builtin leaf, not just final/inner/outer (MLS 5.6.2 step 1.3)."""
+    flat = _flatten_inline(
+        """
+    model M
+        type Flow = Real;
+        input Flow u;
+        output Flow y;
+    equation
+        y = u;
+    end M;""",
+        "M",
+    )
+    assert "input" in flat.symbols["u"].prefixes
+    assert "output" in flat.symbols["y"].prefixes
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

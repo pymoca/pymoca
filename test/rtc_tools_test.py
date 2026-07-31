@@ -257,36 +257,36 @@ RTC_TOOLS_SMOKE_CASES = frozenset(
 
 # Reasons shared by several cases. A fix commit that does not clear a case
 # still moves it on to whatever error it hits next.
-_DROPPED_CAUSALITY = (
-    "input/output prefixes are dropped for alias-typed variables, so the declared inputs and "
-    "outputs flatten to alg_states"
-)
 _LOST_ARRAY_DIMS = (
     "array dimensions are lost when a derived type collapses to its builtin leaf, so an "
     "array-typed signal flattens to a scalar"
+)
+_SPURIOUS_FREE_VAR = (
+    "a zero-length array dimension flattens to a scalar free variable instead of an empty "
+    "array"
 )
 _ONES_NONE = (
     "a constant array size reached through composite name lookup stays unresolved, so the "
     "generated ones() call gets None"
 )
 
-# Every case but one stops on one of the three defects above.
+# Causality survives; the zero-length array dimension is what is left.
 FLATTEN_XFAIL: dict[str, str] = {
-    "basic__example": _DROPPED_CAUSALITY,
+    "basic__example": _SPURIOUS_FREE_VAR,
     "cascading_channels__example": _LOST_ARRAY_DIMS,
     "channel_pulse__example": _LOST_ARRAY_DIMS,
     "channel_wave_damping__example_local_control": _LOST_ARRAY_DIMS,
     "channel_wave_damping__example_optimization": _LOST_ARRAY_DIMS,
-    "ensemble__example": _DROPPED_CAUSALITY,
-    "fallback_option__example": _DROPPED_CAUSALITY,
-    "fallback_option__example_with_gp": _DROPPED_CAUSALITY,
+    "ensemble__example": _SPURIOUS_FREE_VAR,
+    "fallback_option__example": _SPURIOUS_FREE_VAR,
+    "fallback_option__example_with_gp": _SPURIOUS_FREE_VAR,
     "goal_programming__example": _ONES_NONE,
-    "integrator_delay__example": _DROPPED_CAUSALITY,
-    "lookup_table__example": _DROPPED_CAUSALITY,
+    "integrator_delay__example": _SPURIOUS_FREE_VAR,
+    "lookup_table__example": _SPURIOUS_FREE_VAR,
     "mixed_integer__example": _ONES_NONE,
-    "pumped_hydropower_system__example": _DROPPED_CAUSALITY,
-    "simulation__example": _DROPPED_CAUSALITY,
-    "single_reservoir__single_reservoir": _DROPPED_CAUSALITY,
+    "pumped_hydropower_system__example": _SPURIOUS_FREE_VAR,
+    "simulation__example": _SPURIOUS_FREE_VAR,
+    "single_reservoir__single_reservoir": _SPURIOUS_FREE_VAR,
 }
 
 # Provisional: seeded from an out-of-tree benchmark of these examples against

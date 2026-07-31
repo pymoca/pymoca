@@ -272,11 +272,17 @@ def _flatten_instance(
                     if outer_variability is not None:
                         _apply_outer_variability(sym, outer_variability)
 
-            # Propagate outer symbol prefixes and replaceable to the leaf builtin symbol
+            # Propagate outer symbol prefixes and replaceable to the leaf builtin
+            # symbol. input/output are included: for a simple/derived type the
+            # leaf *is* the variable, so its declared causality must be preserved
+            # (e.g. `input Modelica.Units.SI.VolumeFlowRate u`, where the type is
+            # a short class definition aliasing Real). Connector-local input/output
+            # has already been stripped for nested symbols above (the `if prefix:`
+            # guard), so it never reaches here to be wrongly re-applied.
             inner_sym = flat_class.symbols.get(flat_name)
             if inner_sym is not None and flat_name in new_sym_names:
                 for pfx in flat_symbol.prefixes:
-                    if pfx not in ("input", "output") and pfx not in inner_sym.prefixes:
+                    if pfx not in inner_sym.prefixes:
                         inner_sym.prefixes.insert(0, pfx)
                 inner_sym.replaceable = flat_symbol.replaceable
                 inner_sym.final = flat_symbol.final
