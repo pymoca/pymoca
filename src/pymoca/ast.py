@@ -192,6 +192,12 @@ class ComponentRef(Node):
         self.name: str = ""
         self.indices: list[list[Expression | Slice | Primary | ComponentRef | None]] = [[None]]
         self.child: list[ComponentRef] = []
+        # True once name holds a final flattened (dot-separated) reference.
+        # Set by the flattening passes when they rewrite a source-form name;
+        # later passes must leave a resolved ref as-is rather than re-scope it
+        # (a raw local name and an already-flat outer name can be spelled
+        # identically, so name membership alone cannot distinguish them).
+        self.resolved: bool = False
         super().__init__(**kwargs)
 
     def __repr__(self) -> str:

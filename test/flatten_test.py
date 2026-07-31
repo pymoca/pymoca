@@ -1546,6 +1546,57 @@ def test_attribute_expr_prefers_own_member_over_outer_same_named_symbol():
     assert start.operands[1].name == "c.a"
 
 
+def test_sibling_modification_referencing_outer_same_named_symbol():
+    """An outer-scope ref resolved into a *sibling* symbol's modification must
+    not be re-prefixed to the same-named sibling: `storage.b`'s value names the
+    outer `theta`, and `storage.theta`'s value expression does too -- neither
+    may rebind to `storage.theta` just because that flat symbol exists. Only
+    resolved-ness tracking can tell this apart from a raw local name, so this
+    exercises the ComponentRef.resolved flag through the full pipeline."""
+    ast_tree = parser.parse(
+        """
+    model Inner
+        parameter Real theta;
+        parameter Real b;
+    end Inner;
+    model Outer
+        parameter Real theta = 0.3;
+        Inner storage(theta = 2 * theta, b = theta);
+    end Outer;"""
+    )
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("Outer"))
+    symbols = flat_tree.classes["Outer"].symbols
+    assert symbols["storage.b"].value.name == "theta"
+    assert symbols["storage.theta"].value.operands[1].name == "theta"
+
+
+def test_value_equation_keeps_resolved_outer_ref():
+    """The value-equation pass (MLS 5.6.2 step 1.4) must not re-prefix an
+    already-resolved outer-scope ref in a generated equation's right-hand
+    side: `storage.b`'s modification names the outer `theta`, so the emitted
+    equation is `storage.b = theta`, not `storage.b = storage.theta`."""
+    ast_tree = parser.parse(
+        """
+    model Inner
+        Real theta;
+        Real b;
+    end Inner;
+    model Outer
+        Real theta;
+        Inner storage(b = theta);
+    equation
+        theta = 0.3;
+        storage.theta = 1.0;
+    end Outer;"""
+    )
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("Outer"))
+    eqs = {
+        eq.left.name: getattr(eq.right, "name", getattr(eq.right, "value", None))
+        for eq in flat_tree.classes["Outer"].equations
+    }
+    assert eqs == {"storage.b": "theta", "storage.theta": 1.0, "theta": 0.3}
+
+
 def test_for_loop_index_left_unresolved_alongside_constant_inlining():
     """A for-loop index must stay as-is, not be looked up as a symbol or constant.
 

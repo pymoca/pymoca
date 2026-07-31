@@ -702,30 +702,32 @@ def _rewrite_cref_in_place(
     resolved: InstanceClass | InstanceSymbol | IterationVariable | None = None
     need_resolve = True
     fast_name = _composite_flat_name(prefix, cref) if prefix is not None else None
-    if not cref.child and cref.name in opts.iteration_variables:
+    if cref.resolved:
+        # Already rewritten to its final flat name by an earlier pass (e.g. a
+        # value expression resolved during modification application and later
+        # re-walked as part of a generated equation): re-resolving via `scope`
+        # would look up this post-flattening name there, not the original
+        # pre-flattening one, and could silently produce a wrong (if
+        # different) result. Nothing to do.
+        need_resolve = False
+    elif not cref.child and cref.name in opts.iteration_variables:
         # For-loop iteration variable (MLS 11.2.2): never a flat symbol or a
         # global constant, so resolving it is worse than useless -- name lookup
         # has no notion of it outside `opts`, so it would either fail expensively
         # or (worse) collide with a same-named member. Leave it exactly as-is.
         need_resolve = False
     elif fast_name is not None and fast_name in flat_class.symbols:
-        # Checked before the already-flat fallback below: a bare name in an
-        # equation/statement body always denotes the innermost binding (MLS
-        # 5.3.1), so when the instance being flattened has a member of this
-        # name, that member wins over any same-named symbol of an enclosing
-        # instance that happens to already be in flat_class.symbols.
+        # A bare name in an equation/statement body always denotes the
+        # innermost binding (MLS 5.3.1), so when the instance being flattened
+        # has a member of this name, that member wins over any same-named
+        # symbol of an enclosing instance already in flat_class.symbols.
         c = cref
         while c.child:
             c = c.child[0]
             cref.indices = cref.indices + c.indices
         cref.name = fast_name
         cref.child = []
-        need_resolve = False
-    elif not cref.child and cref.name in flat_class.symbols:
-        # Already a fully flattened name (e.g. resolved earlier by another pass):
-        # re-resolving via `scope` would look up this post-flattening name there,
-        # not the original pre-flattening one, and could silently produce a wrong
-        # (if different) result. Nothing to do.
+        cref.resolved = True
         need_resolve = False
 
     if need_resolve:
@@ -741,6 +743,7 @@ def _rewrite_cref_in_place(
             assert resolved.name is not None
             cref.name = resolved.name
             cref.child = []
+            cref.resolved = True
         except Exception:
             pass  # leave un-resolvable refs (builtins, functions) unchanged
 
@@ -886,6 +889,14 @@ class _EquationRefResolver(TreeListener):
         if self.depth > self.cutoff_depth:
             return
 
+        if tree.resolved:
+            # Already holds its final flat name (e.g. an outer-scope symbol
+            # resolved into a modification value, MLS 5.6.2 point B); its
+            # spelling may coincide with a raw local name, so re-prefixing
+            # would bind it to the wrong symbol. Index expressions still get
+            # visited by the walker and carry their own resolved flags.
+            return
+
         # Compose candidate flat name: prefix.name.child1.child2...
         if self.prefix:
             new_name = self.prefix + "." + tree.name
@@ -906,6 +917,7 @@ class _EquationRefResolver(TreeListener):
                 c = c.child[0]
                 tree.indices += c.indices
             tree.child = []
+            tree.resolved = True
         else:
             # Not a known symbol — leave alone (builtin, function, for-index, etc.)
             self.cutoff_depth = self.depth
@@ -1874,7 +1886,10 @@ def _to_ast_value(val):
         const_val = _get_constant_value(val)
         if const_val is not None:
             return const_val
-        return ast.ComponentRef(name=val.name)
+        # An InstanceSymbol here came out of name resolution, so its name is
+        # already the final flat name -- mark the ref so later passes don't
+        # re-scope it (it may be spelled like a raw local name of a sibling).
+        return ast.ComponentRef(name=val.name, resolved=True)
     if isinstance(val, (int, float, bool, str)) or val is None:
         return ast.Primary(value=val)
     return val
@@ -2038,7 +2053,7 @@ def flatten_to_tree(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Tree:
                 setattr(sym, attr, copy.deepcopy(val))
         if sym.dimensions:
             sym.dimensions = copy.deepcopy(sym.dimensions)
-        w.walk(ComponentRefFlattener(flat_class, prefix, current_symbol=sym_name), sym)
+        w.walk(ComponentRefFlattener(flat_class, prefix), sym)
     for sym_name, ct in connector_types.items():
         flat_class.symbols[sym_name]._connector_type = ct
 
@@ -2078,13 +2093,9 @@ class ComponentRefFlattener(TreeListener):
     one of the equations contains a derivative of the symbol)
     """
 
-    def __init__(self, container: ast.Class, instance_prefix: str, current_symbol: str = ""):
+    def __init__(self, container: ast.Class, instance_prefix: str):
         self.container = container
         self.instance_prefix = instance_prefix
-        # Flat name of the symbol whose attributes are being walked, so a ref
-        # whose prefixed interpretation would be the symbol itself (a
-        # self-reference) can fall back to the raw already-flat name instead.
-        self.current_symbol = current_symbol
         self.depth = 0
         self.cutoff_depth = sys.maxsize
         self.inside_modification = 0  # We do flatten component references in modifications
@@ -2103,34 +2114,21 @@ class ComponentRefFlattener(TreeListener):
         if self.depth > self.cutoff_depth:
             return
 
-        # Compose the flattened name both without and with the instance prefix.
-        raw_name = tree.name
-        prefixed_name = self.instance_prefix + tree.name
+        if tree.resolved:
+            # Already holds its final flat name from an earlier flattening
+            # pass (e.g. an outer-scope symbol substituted into a nested
+            # component's modification, MLS 5.6.2 point B). Its spelling may
+            # coincide with a raw local name (even the walked symbol's own),
+            # so re-prefixing would bind it to the wrong symbol. Leave it,
+            # letting the walker still visit its index expressions.
+            return
+
+        # Compose flatted name
+        new_name = self.instance_prefix + tree.name
         c = tree
         while len(c.child) > 0:
             c = c.child[0]
-            raw_name += "." + c.name
-            prefixed_name += "." + c.name
-
-        # The prefixed (innermost-scope) interpretation wins by default, per
-        # normal Modelica lookup: a local name in an attribute expression
-        # denotes the component's own member even when an enclosing scope has
-        # a same-named symbol. The one exception is a reference already
-        # resolved to its final flat name earlier in the pipeline (e.g. an
-        # outer-scope symbol substituted into a nested component's
-        # modification, per MLS 5.6.2 point B) whose re-prefixed form would
-        # collide with the very symbol being walked (e.g. a value of "theta"
-        # resolved for "storage.theta" re-prefixing to "storage.theta"
-        # itself): a symbol never references itself in its own attributes, so
-        # such a self-reference must instead be the raw already-flat name.
-        if (
-            prefixed_name == self.current_symbol
-            and raw_name in self.container.symbols
-            and self.inside_modification == 0
-        ):
-            new_name = raw_name
-        else:
-            new_name = prefixed_name
+            new_name += "." + c.name
 
         # If the flattened name exists in the container, use it.
         # Otherwise, skip this reference.
@@ -2146,6 +2144,7 @@ class ComponentRefFlattener(TreeListener):
                 c = c.child[0]
                 tree.indices += c.indices
             tree.child = []
+            tree.resolved = True
         else:
             # The component was not found in the container.  We leave this
             # reference alone.
