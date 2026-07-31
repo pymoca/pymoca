@@ -701,11 +701,25 @@ def _rewrite_cref_in_place(
     """
     resolved: InstanceClass | InstanceSymbol | IterationVariable | None = None
     need_resolve = True
+    fast_name = _composite_flat_name(prefix, cref) if prefix is not None else None
     if not cref.child and cref.name in opts.iteration_variables:
         # For-loop iteration variable (MLS 11.2.2): never a flat symbol or a
         # global constant, so resolving it is worse than useless -- name lookup
         # has no notion of it outside `opts`, so it would either fail expensively
         # or (worse) collide with a same-named member. Leave it exactly as-is.
+        need_resolve = False
+    elif fast_name is not None and fast_name in flat_class.symbols:
+        # Checked before the already-flat fallback below: a bare name in an
+        # equation/statement body always denotes the innermost binding (MLS
+        # 5.3.1), so when the instance being flattened has a member of this
+        # name, that member wins over any same-named symbol of an enclosing
+        # instance that happens to already be in flat_class.symbols.
+        c = cref
+        while c.child:
+            c = c.child[0]
+            cref.indices = cref.indices + c.indices
+        cref.name = fast_name
+        cref.child = []
         need_resolve = False
     elif not cref.child and cref.name in flat_class.symbols:
         # Already a fully flattened name (e.g. resolved earlier by another pass):
@@ -713,16 +727,6 @@ def _rewrite_cref_in_place(
         # not the original pre-flattening one, and could silently produce a wrong
         # (if different) result. Nothing to do.
         need_resolve = False
-    elif prefix is not None:
-        fast_name = _composite_flat_name(prefix, cref)
-        if fast_name in flat_class.symbols:
-            c = cref
-            while c.child:
-                c = c.child[0]
-                cref.indices = cref.indices + c.indices
-            cref.name = fast_name
-            cref.child = []
-            need_resolve = False
 
     if need_resolve:
         try:
@@ -2034,7 +2038,7 @@ def flatten_to_tree(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Tree:
                 setattr(sym, attr, copy.deepcopy(val))
         if sym.dimensions:
             sym.dimensions = copy.deepcopy(sym.dimensions)
-        w.walk(ComponentRefFlattener(flat_class, prefix), sym)
+        w.walk(ComponentRefFlattener(flat_class, prefix, current_symbol=sym_name), sym)
     for sym_name, ct in connector_types.items():
         flat_class.symbols[sym_name]._connector_type = ct
 
@@ -2074,9 +2078,13 @@ class ComponentRefFlattener(TreeListener):
     one of the equations contains a derivative of the symbol)
     """
 
-    def __init__(self, container: ast.Class, instance_prefix: str):
+    def __init__(self, container: ast.Class, instance_prefix: str, current_symbol: str = ""):
         self.container = container
         self.instance_prefix = instance_prefix
+        # Flat name of the symbol whose attributes are being walked, so a ref
+        # whose prefixed interpretation would be the symbol itself (a
+        # self-reference) can fall back to the raw already-flat name instead.
+        self.current_symbol = current_symbol
         self.depth = 0
         self.cutoff_depth = sys.maxsize
         self.inside_modification = 0  # We do flatten component references in modifications
@@ -2104,16 +2112,22 @@ class ComponentRefFlattener(TreeListener):
             raw_name += "." + c.name
             prefixed_name += "." + c.name
 
-        # A reference already resolved to its final flat name earlier in the
-        # pipeline (e.g. an outer-scope symbol substituted into a nested
-        # component's modification, per MLS 5.6.2 point B) must not be
-        # re-prefixed: doing so can collide with an unrelated symbol that
-        # happens to share the nested instance's own local name (e.g. a
-        # value of "theta" resolved for "storage.theta" would wrongly
-        # rename to "storage.theta" itself). Prefer the raw name whenever
-        # it already resolves; only reinterpret it as local (and prefix it)
-        # when it doesn't.
-        if raw_name in self.container.symbols and self.inside_modification == 0:
+        # The prefixed (innermost-scope) interpretation wins by default, per
+        # normal Modelica lookup: a local name in an attribute expression
+        # denotes the component's own member even when an enclosing scope has
+        # a same-named symbol. The one exception is a reference already
+        # resolved to its final flat name earlier in the pipeline (e.g. an
+        # outer-scope symbol substituted into a nested component's
+        # modification, per MLS 5.6.2 point B) whose re-prefixed form would
+        # collide with the very symbol being walked (e.g. a value of "theta"
+        # resolved for "storage.theta" re-prefixing to "storage.theta"
+        # itself): a symbol never references itself in its own attributes, so
+        # such a self-reference must instead be the raw already-flat name.
+        if (
+            prefixed_name == self.current_symbol
+            and raw_name in self.container.symbols
+            and self.inside_modification == 0
+        ):
             new_name = raw_name
         else:
             new_name = prefixed_name

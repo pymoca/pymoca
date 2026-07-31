@@ -1496,6 +1496,56 @@ def test_modification_referencing_outer_same_named_symbol():
     assert flat.symbols["storage.theta"].value.name == "theta"
 
 
+def test_equation_ref_prefers_own_member_over_outer_same_named_symbol():
+    """A bare name in a nested component's equation binds to that component's
+    own member, not to a same-named symbol of the enclosing model (MLS 5.3.1
+    innermost-scope-first): Inner's `x = 1.0` must flatten to `c.x = 1.0` even
+    though the enclosing model's own `x` is already a flat symbol when Inner's
+    equations are resolved."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        Real x;
+    equation
+        x = 1.0;
+    end Inner;
+    model Outer
+        Real x;
+        Inner c;
+    equation
+        x = 2.0;
+    end Outer;""",
+        "Outer",
+    )
+    eq_map = {eq.left.name: eq.right.value for eq in flat.equations}
+    assert eq_map == {"c.x": 1.0, "x": 2.0}
+
+
+def test_attribute_expr_prefers_own_member_over_outer_same_named_symbol():
+    """A local name in a symbol's attribute expression binds to the component's
+    own member, not to a same-named symbol of the enclosing model: `c.b`'s
+    unfoldable start expression `2 * a` must reference `c.a`, not the outer
+    `a`. Complements test_modification_referencing_outer_same_named_symbol,
+    where the raw name must win because the prefixed form would be the very
+    symbol being defined (a self-reference). Uses the full tree.flatten
+    pipeline: attribute-expression refs are resolved by its final
+    ComponentRefFlattener pass, not by flatten_instance."""
+    ast_tree = parser.parse(
+        """
+    model Inner
+        Real a;
+        Real b(start = 2 * a, fixed = false);
+    end Inner;
+    model Outer
+        Real a;
+        Inner c;
+    end Outer;"""
+    )
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("Outer"))
+    start = flat_tree.classes["Outer"].symbols["c.b"].start
+    assert start.operands[1].name == "c.a"
+
+
 def test_for_loop_index_left_unresolved_alongside_constant_inlining():
     """A for-loop index must stay as-is, not be looked up as a symbol or constant.
 
