@@ -276,7 +276,7 @@ def _flatten_instance(
             inner_sym = flat_class.symbols.get(flat_name)
             if inner_sym is not None and flat_name in new_sym_names:
                 for pfx in flat_symbol.prefixes:
-                    if pfx not in ("input", "output") and pfx not in inner_sym.prefixes:
+                    if pfx not in inner_sym.prefixes:
                         inner_sym.prefixes.insert(0, pfx)
                 inner_sym.replaceable = flat_symbol.replaceable
                 inner_sym.final = flat_symbol.final
