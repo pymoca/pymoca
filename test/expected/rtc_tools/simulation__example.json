@@ -1,0 +1,35 @@
+{
+  "alg_states": [],
+  "alg_states_count": 0,
+  "constants": [],
+  "constants_count": 0,
+  "der_states": [
+    "der(storage.V)"
+  ],
+  "der_states_count": 1,
+  "equations_count": 1,
+  "initial_equations_count": 0,
+  "inputs": [
+    "P_control",
+    "Q_in",
+    "storage_V_target"
+  ],
+  "inputs_count": 3,
+  "outputs": [
+    "Q_release",
+    "storage_V"
+  ],
+  "outputs_count": 2,
+  "parameters": [
+    "inflow.Q_nominal",
+    "outfall.Q_nominal",
+    "storage.Q_nominal",
+    "storage.n_QForcing",
+    "storage_V_init"
+  ],
+  "parameters_count": 5,
+  "states": [
+    "storage.V"
+  ],
+  "states_count": 1
+}

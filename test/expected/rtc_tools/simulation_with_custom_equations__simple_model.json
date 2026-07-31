@@ -1,0 +1,24 @@
+{
+  "alg_states": [],
+  "alg_states_count": 0,
+  "constants": [],
+  "constants_count": 0,
+  "der_states": [
+    "der(x)"
+  ],
+  "der_states_count": 1,
+  "equations_count": 0,
+  "initial_equations_count": 0,
+  "inputs": [],
+  "inputs_count": 0,
+  "outputs": [
+    "x"
+  ],
+  "outputs_count": 1,
+  "parameters": [],
+  "parameters_count": 0,
+  "states": [
+    "x"
+  ],
+  "states_count": 1
+}

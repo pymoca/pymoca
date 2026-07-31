@@ -64,6 +64,22 @@ jobs:
           pip install tox
       - run: tox -e msl-smoke
 
+  rtc-tools-smoke:
+    needs: pre-commit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install tox
+      - run: tox -e rtc-tools-smoke
+
   coverage:
     needs: test
     runs-on: ubuntu-latest

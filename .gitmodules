@@ -12,3 +12,9 @@
 	path = test/libraries/MSL-3.2.3
 	url = https://github.com/modelica/ModelicaStandardLibrary.git
 	branch = maint/3.2.3
+[submodule "test/libraries/rtc-tools"]
+	path = test/libraries/rtc-tools
+	url = https://github.com/rtc-tools/rtc-tools.git
+[submodule "test/libraries/rtc-tools-channel-flow"]
+	path = test/libraries/rtc-tools-channel-flow
+	url = https://github.com/Deltares/rtc-tools-channel-flow.git
