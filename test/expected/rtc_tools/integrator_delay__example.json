@@ -1,0 +1,31 @@
+{
+  "alg_states": [],
+  "constants": [],
+  "der_states": [
+    "der(integrator.V)"
+  ],
+  "equations_count": 1,
+  "initial_equations_count": 0,
+  "inputs": [
+    "Q_control",
+    "Q_in",
+    "Q_out",
+    "_pymoca_delay_0[1,1]"
+  ],
+  "outputs": [
+    "V_integrator"
+  ],
+  "parameters": [
+    "control_inflow.Q_nominal",
+    "delay_component.Q_nominal",
+    "delay_hours",
+    "external_inflow.Q_nominal",
+    "integrator.Q_nominal",
+    "integrator.n_QForcing",
+    "integrator.n_QLateral",
+    "outflow.Q_nominal"
+  ],
+  "states": [
+    "integrator.V"
+  ]
+}

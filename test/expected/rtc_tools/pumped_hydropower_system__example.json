@@ -1,0 +1,65 @@
+{
+  "alg_states": [
+    "Outflow.QIn.Q",
+    "PumpCost",
+    "PumpPower",
+    "ReservoirPower",
+    "SystemGeneratingRevenue",
+    "TotalGeneratingPower",
+    "TotalSystemPower",
+    "TotalSystemRevenue",
+    "TurbinePower",
+    "Turbine_is_on"
+  ],
+  "constants": [],
+  "der_states": [
+    "der(LowerBasin.V)",
+    "der(UpperBasin.V)"
+  ],
+  "equations_count": 11,
+  "initial_equations_count": 0,
+  "inputs": [
+    "Inflow_Q",
+    "PumpFlow",
+    "ReservoirSpillFlow",
+    "ReservoirTurbineFlow",
+    "TurbineFlow",
+    "cost_perP"
+  ],
+  "outputs": [
+    "PumpCost",
+    "PumpPower",
+    "ReservoirPower",
+    "SystemGeneratingRevenue",
+    "TotalGeneratingPower",
+    "TotalSystemPower",
+    "TotalSystemRevenue",
+    "TotalSystemRevenueSum",
+    "TurbinePower",
+    "V_LowerBasin",
+    "V_UpperBasin"
+  ],
+  "parameters": [
+    "Inflow.Q_nominal",
+    "LowerBasin.Q_nominal",
+    "LowerBasin.n_QForcing",
+    "LowerBasin.n_QLateral",
+    "Outflow.Q_nominal",
+    "Pump.Q_nominal",
+    "Turbine.Q_nominal",
+    "UpperBasin.Q_nominal",
+    "UpperBasin.n_QForcing",
+    "efficiency_pump",
+    "efficiency_reservoir",
+    "efficiency_turbine",
+    "fix_dH_pump",
+    "fix_dH_reservoir",
+    "fix_dH_turbine",
+    "gravity",
+    "rho"
+  ],
+  "states": [
+    "LowerBasin.V",
+    "UpperBasin.V"
+  ]
+}

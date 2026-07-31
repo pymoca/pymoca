@@ -102,7 +102,10 @@ def _discover_model_names() -> list[str]:
 # whose --forked workers bound memory on any platform. Forking is opt-in, not the
 # default, because fork() from a multi-threaded xdist worker is deadlock-prone
 # (DeprecationWarning under Python 3.12+).
-pytestmark = [pytest.mark.skipif(not MSL4_AVAILABLE, reason="MSL-4.0.x submodule not initialized")]
+pytestmark = [
+    pytest.mark.library,
+    pytest.mark.skipif(not MSL4_AVAILABLE, reason="MSL-4.0.x submodule not initialized"),
+]
 
 
 # Yield the shared import-time tree: flattening never mutates the parsed AST

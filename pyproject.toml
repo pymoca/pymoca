@@ -80,7 +80,7 @@ parentdir_prefix = "pymoca-"
 
 [tool.pytest.ini_options]
 xfail_strict = true
-addopts = "-m 'not msl'"
+addopts = "-m 'not library'"
 
 [tool.pyright]
 pythonVersion = "3.10"

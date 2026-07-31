@@ -1,0 +1,23 @@
+{
+  "alg_states": [],
+  "constants": [],
+  "der_states": [
+    "der(storage.V)"
+  ],
+  "equations_count": 1,
+  "initial_equations_count": 0,
+  "inputs": [
+    "Q_in",
+    "Q_release"
+  ],
+  "outputs": [],
+  "parameters": [
+    "inflow.Q_nominal",
+    "outfall.Q_nominal",
+    "storage.Q_nominal",
+    "storage.n_QForcing"
+  ],
+  "states": [
+    "storage.V"
+  ]
+}

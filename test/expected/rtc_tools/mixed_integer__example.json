@@ -1,0 +1,43 @@
+{
+  "alg_states": [
+    "level.HQ.Q",
+    "orifice.dH",
+    "pump.HQUp.H",
+    "pump.dH",
+    "storage.HQ.Q"
+  ],
+  "constants": [],
+  "der_states": [
+    "der(storage.V)"
+  ],
+  "equations_count": 6,
+  "initial_equations_count": 0,
+  "inputs": [
+    "H_sea",
+    "Q_in",
+    "Q_orifice",
+    "Q_pump",
+    "is_downhill"
+  ],
+  "outputs": [
+    "sea_level",
+    "storage_level"
+  ],
+  "parameters": [
+    "discharge.upwind",
+    "orifice.Q_nominal",
+    "orifice.head_option",
+    "orifice.theta",
+    "pump.Q_nominal",
+    "pump.head_option",
+    "pump.theta",
+    "storage.A",
+    "storage.H_b",
+    "storage.Q_nominal",
+    "storage.n_QForcing",
+    "storage.theta"
+  ],
+  "states": [
+    "storage.V"
+  ]
+}
