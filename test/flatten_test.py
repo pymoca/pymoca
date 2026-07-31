@@ -1420,6 +1420,7 @@ def test_div_builtin_in_dimension():
     assert "b.buf[1]" in flat.symbols or "b.buf" in flat.symbols
 
 
+@pytest.mark.library
 @pytest.mark.msl
 @pytest.mark.skipif(
     not os.path.isfile(os.path.join(MSL4_DIR, "Modelica", "package.mo")),
