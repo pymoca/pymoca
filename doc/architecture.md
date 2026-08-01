@@ -460,9 +460,11 @@ class from the winning root" semantics - nothing below the top level is ever mer
 roots. Same-named libraries in later roots are simply shadowed by the first root's
 version.
 
-The CLI builds the MODELICAPATH tree before parsing explicit positional files
-(`compiler.py`'s `_run_pipeline` calls `modelicapath_to_tree` then `parse_all`, which
-`extend`s each parsed file into that tree). `modelicapath_to_tree` returns a
+Both entry points build the MODELICAPATH tree before parsing explicit files: the CLI in
+`compiler.py`'s `_run_pipeline` (`modelicapath_to_tree` then `parse_all`, which `extend`s
+each parsed file into that tree), and the CasADi backend in `api.py`'s `_compile_model`
+(the same call, then each file parsed out of the model folder and `library_folders`
+`extend`ed into it). `modelicapath_to_tree` returns a
 `ModelicaPathTree` (a `Tree` subclass in `parser.py`) whose `_extend` override makes an
 explicit top-level class **shadow a same-named library stub entirely**, rather than
 merging with it: when a name collides with an unparsed `LazyParseClass`, the stub is
