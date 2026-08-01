@@ -116,6 +116,8 @@ def test_bad_argument_combinations():
         # 2) Give a file instead of a directory for output Path
         # 3) Give a Modelica file that does not exist
         (" ".join(("-t casadi -m Spring -D eggs -o", SPRING_MODEL, "spam")), 3),
+        # 1) MODELICAPATH entry is a file, not a directory
+        ("-m Spring -p " + SPRING_MODEL, 1),
     ]
     for args, expected_errors in bad_options:
         errors = run_compiler(args, check_errors=False)
