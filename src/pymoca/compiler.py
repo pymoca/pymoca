@@ -345,30 +345,6 @@ def validate_args(argp: MyArgumentParser, args, modelicapath_env: str) -> None:
             log.info("No translator specified (-t), flattening model only")
 
 
-def build_modelica_path(args, modelicapath_env: str) -> tuple[list[Path], int]:
-    """Resolve MODELICAPATH from -p args and environment variable.
-
-    Returns: (list of valid dirs, error count)
-    """
-    raw_paths: list[Path] = []
-    for mparg in args.path + [modelicapath_env]:
-        for path_str in mparg.split(os.pathsep):
-            if path_str:
-                raw_paths.append(Path(path_str))
-    modelica_path: list[Path] = []
-    errors = 0
-    for path in raw_paths:
-        if not path.is_dir():
-            log.error('Invalid MODELICAPATH directory: "%s"', path)
-            errors += 1
-        else:
-            modelica_path.append(path)
-    if not modelica_path and (args.path or modelicapath_env):
-        log.error("No valid MODELICAPATH directories given")
-        errors += 1
-    return modelica_path, errors
-
-
 def build_define_options(args) -> tuple[dict, int]:
     """Parse -D NAME=VALUE args into a translator options dict.
 
@@ -411,7 +387,7 @@ def _run_pipeline(args, modelica_path: list[Path], stage: Stage, options: dict) 
     """Parse files then run each model through the new pipeline up to stage"""
     import pymoca.parser
 
-    library_ast = pymoca.parser.modelicapath_to_tree(dirs=modelica_path)  # type: ignore[arg-type]
+    library_ast = pymoca.parser.modelicapath_to_tree(dirs=modelica_path)
     modelica_files, error_files = parse_all(args.PATHNAME, library_ast)
 
     errors = 0
@@ -451,10 +427,19 @@ def main(argv: list[str] | None = None) -> int:
     else:
         log.setLevel(logging.DEBUG)
 
-    modelicapath_env = os.getenv("MODELICAPATH", default="")
+    import pymoca.parser
+
+    modelicapath_env = os.getenv(pymoca.parser.MODELICAPATH_ENV_VAR, default="")
     validate_args(argp, args, modelicapath_env)  # may call sys.exit(2)
 
-    modelica_path, errors = build_modelica_path(args, modelicapath_env)
+    modelica_path: list[Path] = []
+    errors = 0
+    try:
+        modelica_path = pymoca.parser.resolve_modelicapath(args.path)
+    except pymoca.parser.ModelicaPathError as err:
+        log.error("%s", err)
+        errors += 1
+
     options, opt_errors = build_define_options(args)
     errors += opt_errors
 
