@@ -16,6 +16,7 @@ import sqlite3
 import sys
 import time
 from collections import OrderedDict, deque
+from collections.abc import Iterable
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, cast as _cast
@@ -286,18 +287,70 @@ class ModelicaPathTree(ast.Tree):
                 existing._extend(other_class)
 
 
-def modelicapath_to_tree(dirs: list[str | Path]) -> ast.Tree:
-    """Return ast.Tree for all directories in dirs list
+MODELICAPATH_ENV_VAR = "MODELICAPATH"
+
+
+def _split_modelicapath(
+    modelicapath: str | os.PathLike | Iterable[str | os.PathLike] | None,
+) -> list[Path]:
+    """Split a MODELICAPATH specification into a list of directory paths.
+
+    Accepts an os.pathsep-separated string (the form the MODELICAPATH environment
+    variable takes), a single path, an iterable of either, or None. Empty entries
+    are dropped and the given order is preserved, since MLS 3.5 §13.3 resolves a
+    top-level name from the first root that provides it. Path objects are taken as
+    single directories; only strings are split.
+    """
+    if modelicapath is None:
+        entries: list[str | os.PathLike] = []
+    elif isinstance(modelicapath, (str, os.PathLike)):
+        entries = [modelicapath]
+    else:
+        entries = list(modelicapath)
+
+    dirs: list[Path] = []
+    for entry in entries:
+        if isinstance(entry, os.PathLike):
+            dirs.append(Path(entry))
+        else:
+            dirs.extend(Path(part) for part in entry.split(os.pathsep) if part)
+    return dirs
+
+
+def resolve_modelicapath(
+    modelicapath: str | os.PathLike | Iterable[str | os.PathLike] | None = None,
+    *,
+    use_env: bool = True,
+) -> list[Path]:
+    """Return the validated MODELICAPATH roots to search, explicitly given ones first.
+
+    Roots passed in by the caller precede those from the MODELICAPATH environment
+    variable, so with the first-root-wins rule of MLS 3.5 §13.3 an explicit root
+    shadows a same-named library in the environment. Pass use_env=False to ignore
+    the environment entirely.
+
+    Raises: ModelicaPathError for the first root that is not a directory
+    """
+    dirs = _split_modelicapath(modelicapath)
+    if use_env:
+        dirs += _split_modelicapath(os.environ.get(MODELICAPATH_ENV_VAR, ""))
+    for dir_ in dirs:
+        if not dir_.is_dir():
+            raise ModelicaPathError(f"MODELICAPATH contains non-directory: {dir_}")
+    return dirs
+
+
+def modelicapath_to_tree(
+    dirs: str | os.PathLike | Iterable[str | os.PathLike] | None = None,
+    *,
+    use_env: bool = False,
+) -> ast.Tree:
+    """Return ast.Tree for all MODELICAPATH roots in dirs
 
     TODO: Add version handling (spec 18.8.3, 18.8.4)
     """
     modelicapath_tree = ModelicaPathTree(name="root", type="MODELICAPATH")
-    for dir_ in dirs:
-        # Accept str or Path argument
-        dir_ = Path(str(dir_))
-        dir_.resolve()
-        if not dir_.is_dir():
-            raise ModelicaPathError(f"MODELICAPATH contains non-directory: {dir_}")
+    for dir_ in resolve_modelicapath(dirs, use_env=use_env):
         dir_tree = dir_to_tree(dir_)
         # First root offering a top-level name wins (MLS 3.5 §13.3): later roots are
         # never consulted for that name, and nothing below the top level is merged.

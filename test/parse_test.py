@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import time
+from pathlib import Path
 
 from conftest_parse import (
     MODEL_DIR,
@@ -358,6 +359,53 @@ def test_inner_outer_final_parsed_on_symbol():
     assert m.symbols["y"].inner is False
     assert m.symbols["n"].final is True
     assert m.symbols["n"].inner is False
+
+
+def test_split_modelicapath():
+    """A MODELICAPATH string splits on os.pathsep; a Path stays one directory"""
+    sep = os.pathsep
+    assert parser._split_modelicapath(None) == []
+    assert parser._split_modelicapath("") == []
+    assert parser._split_modelicapath(sep.join(["/a", "/b"])) == [Path("/a"), Path("/b")]
+    # Empty entries (leading, doubled or trailing separators) are dropped
+    assert parser._split_modelicapath(sep + "/a" + sep + sep + "/b" + sep) == [
+        Path("/a"),
+        Path("/b"),
+    ]
+    assert parser._split_modelicapath(Path("/a")) == [Path("/a")]
+    # A list may mix separated strings, plain strings and Paths; order is kept
+    assert parser._split_modelicapath(["/a" + sep + "/b", Path("/c"), "/d", ""]) == [
+        Path("/a"),
+        Path("/b"),
+        Path("/c"),
+        Path("/d"),
+    ]
+
+
+def test_resolve_modelicapath(monkeypatch, tmp_path):
+    """Roots given by the caller precede the environment's, or replace them"""
+    env_dir, explicit, one, two = (tmp_path / name for name in ("env", "explicit", "one", "two"))
+    for dir_ in (env_dir, explicit, one, two):
+        dir_.mkdir()
+    monkeypatch.setenv("MODELICAPATH", str(env_dir))
+    assert parser.resolve_modelicapath() == [env_dir]
+    assert parser.resolve_modelicapath(explicit) == [explicit, env_dir]
+    assert parser.resolve_modelicapath([one, two]) == [one, two, env_dir]
+    assert parser.resolve_modelicapath(explicit, use_env=False) == [explicit]
+    monkeypatch.delenv("MODELICAPATH")
+    assert parser.resolve_modelicapath(explicit) == [explicit]
+
+
+def test_resolve_modelicapath_non_directory(monkeypatch, tmp_path):
+    """Roots that are not directories raise ModelicaPathError, wherever they came from"""
+    a_file = tmp_path / "NotADir.mo"
+    a_file.write_text("model NotADir\nend NotADir;\n")
+    monkeypatch.delenv("MODELICAPATH", raising=False)
+    with pytest.raises(parser.ModelicaPathError, match="non-directory"):
+        parser.resolve_modelicapath(a_file)
+    monkeypatch.setenv("MODELICAPATH", str(a_file))
+    with pytest.raises(parser.ModelicaPathError, match="non-directory"):
+        parser.resolve_modelicapath()
 
 
 def test_modelicapath_lookup():
