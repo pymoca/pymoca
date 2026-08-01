@@ -8,6 +8,7 @@ def _get_default_options():
     """
     return {
         "library_folders": [],
+        "modelicapath": [],
         "verbose": False,
         "check_balanced": True,
         "mtime_check": True,
