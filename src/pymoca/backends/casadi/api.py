@@ -107,7 +107,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
 
     # Build the MODELICAPATH roots tree first and then extend parsed files
     # into that tree so top-level names shadow the ones from MODELICAPATH.
-    tree = parser.modelicapath_to_tree(use_env=True)
+    tree = parser.modelicapath_to_tree(compiler_options["modelicapath"], use_env=True)
 
     # Load folders
     for folder in [model_folder] + compiler_options["library_folders"]:
@@ -329,7 +329,7 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         # Delayed import to avoid top-level slowness (see _compile_model).
         from pymoca import parser
 
-        modelicapath_dirs = parser.resolve_modelicapath()
+        modelicapath_dirs = parser.resolve_modelicapath(compiler_options["modelicapath"])
         # Mtime check
         cache_mtime = os.path.getmtime(db_file)
         for folder in [model_folder] + compiler_options["library_folders"] + modelicapath_dirs:
@@ -355,10 +355,9 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         if db["version"] != __version__:
             raise InvalidCacheError("Cache generated for a different version of pymoca")
 
-        # Check compiler options. We ignore the library folders, as they have
-        # already been checked, and checking them will impede platform
-        # portability of the cache.
-        exclude_options = ["library_folders"]
+        # Ignore library folders and MODELICAPATH roots: the mtime check already
+        # covers them, and their paths would impede cache portability.
+        exclude_options = ["library_folders", "modelicapath"]
         old_opts = {k: v for k, v in db["options"].items() if k not in exclude_options}
         new_opts = {k: v for k, v in compiler_options.items() if k not in exclude_options}
 
