@@ -3213,6 +3213,62 @@ def test_modelicapath_resolves_library(monkeypatch):
         assert [p.symbol.name() for p in model.parameters] == ["x"]
 
 
+def _write_lib_package(lib_dir, parameter_name):
+    """Write a Lib package with a Base model declaring one named parameter"""
+    os.makedirs(os.path.join(lib_dir, "Lib"), exist_ok=True)
+    with open(os.path.join(lib_dir, "Lib", "package.mo"), "w") as f:
+        f.write(
+            "package Lib\n  model Base\n    parameter Real {} = 1.0;\n"
+            "  end Base;\nend Lib;\n".format(parameter_name)
+        )
+
+
+def test_modelicapath_option_resolves_library(monkeypatch):
+    """The modelicapath option puts roots on the search path without the environment.
+
+    Embedders that do not want to mutate os.environ pass their library roots as a
+    list of directories or as one os.pathsep-separated string.
+    """
+    with tempfile.TemporaryDirectory() as model_dir, tempfile.TemporaryDirectory() as lib_dir:
+        _write_lib_package(lib_dir, "x")
+        with open(os.path.join(model_dir, "UsesLib.mo"), "w") as f:
+            f.write("model UsesLib\n  extends Lib.Base;\nend UsesLib;\n")
+
+        monkeypatch.delenv("MODELICAPATH", raising=False)
+        for modelicapath in (lib_dir, [lib_dir], os.pathsep.join([lib_dir, model_dir])):
+            model = transfer_model(
+                model_dir,
+                "UsesLib",
+                {"library_folders": [], "cache": False, "modelicapath": modelicapath},
+            )
+            assert [p.symbol.name() for p in model.parameters] == ["x"]
+
+
+def test_modelicapath_option_precedes_env(monkeypatch):
+    """A root given by the caller shadows a same-named library in the environment"""
+    with (
+        tempfile.TemporaryDirectory() as model_dir,
+        tempfile.TemporaryDirectory() as option_dir,
+        tempfile.TemporaryDirectory() as env_dir,
+    ):
+        _write_lib_package(option_dir, "fromOption")
+        _write_lib_package(env_dir, "fromEnv")
+        with open(os.path.join(model_dir, "UsesLib.mo"), "w") as f:
+            f.write("model UsesLib\n  extends Lib.Base;\nend UsesLib;\n")
+
+        monkeypatch.setenv("MODELICAPATH", env_dir)
+        model = transfer_model(
+            model_dir,
+            "UsesLib",
+            {"library_folders": [], "cache": False, "modelicapath": option_dir},
+        )
+        assert [p.symbol.name() for p in model.parameters] == ["fromOption"]
+
+        # Without the option, the environment's root is the one that resolves
+        model = transfer_model(model_dir, "UsesLib", {"library_folders": [], "cache": False})
+        assert [p.symbol.name() for p in model.parameters] == ["fromEnv"]
+
+
 def test_model_folder_class_shadows_modelicapath(monkeypatch):
     """A model-folder class shadows a same-named MODELICAPATH library (MLS 3.5 13.3).
 

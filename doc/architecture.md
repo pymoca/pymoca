@@ -473,6 +473,15 @@ class still merge recursively, so multiple positional files sharing a `within` p
 continue to synthesize one package. This matches §13.3: MODELICAPATH is consulted only
 on a miss against the unnamed top-level scope built from directly-loaded files.
 
+Which roots those are is resolved by `parser.resolve_modelicapath`, the single entry point
+for turning a MODELICAPATH specification into roots. It puts roots the caller supplied
+ahead of the `MODELICAPATH` environment variable's - the `-p` arguments for the CLI, the
+`modelicapath` compiler option for the CasADi backend. Since the first root to offer a
+top-level name wins, caller-supplied roots shadow same-named libraries found in the
+environment. It also validates, raising `ModelicaPathError` on the first root that is not a
+directory, and `modelicapath_to_tree` resolves its `dirs` through it - so every consumer,
+CLI included, reports a bad root the same way, at the cost of stopping at the first one.
+
 One user-visible consequence: because pymoca synthesizes a top-level package for a
 `within` prefix, `pymoca -p /msl patched/Continuous.mo` now hides all of MSL rather than
 patching one class inside it. This is a spec-conforming regression from the old merge

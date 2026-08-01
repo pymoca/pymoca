@@ -99,18 +99,21 @@ class InvalidCacheError(Exception):
     pass
 
 
-def _modelicapath_dirs() -> List[str]:
-    """Directories from the ``MODELICAPATH`` environment variable.
+def _modelicapath_dirs(compiler_options: Dict[str, str]) -> List[str]:
+    """MODELICAPATH roots to search, from the ``modelicapath`` option and the
+    ``MODELICAPATH`` environment variable (in that order).
 
     MODELICAPATH lets callers put shared libraries (e.g. the Modelica Standard
     Library) on the compile search path without enumerating every folder in
-    ``library_folders``, which parses each file eagerly.
+    ``library_folders``, which parses each file eagerly. The ``modelicapath``
+    option takes a list of directories or one ``os.pathsep``-separated string,
+    so passing roots in does not require setting an environment variable.
     """
     # Imported here rather than at module level: pulling in parser (and antlr)
     # is slow, and the cache mtime walk that calls this is already on a slow path.
     from pymoca import parser
 
-    return [str(d) for d in parser.resolve_modelicapath()]
+    return [str(d) for d in parser.resolve_modelicapath(compiler_options["modelicapath"])]
 
 
 def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]):
@@ -126,7 +129,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     # library_folders. Parsed files are then extended into that tree, so a class of
     # the same top-level name shadows the library stub outright rather than merging
     # with it (MLS 3.5 13.3), the same order the compiler tool's pipeline uses.
-    tree = parser.modelicapath_to_tree(use_env=True)
+    tree = parser.modelicapath_to_tree(compiler_options["modelicapath"], use_env=True)
 
     # Load folders
     for folder in [model_folder] + compiler_options["library_folders"]:
@@ -347,7 +350,11 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
     if compiler_options["mtime_check"]:
         # Mtime check
         cache_mtime = os.path.getmtime(db_file)
-        for folder in [model_folder] + compiler_options["library_folders"] + _modelicapath_dirs():
+        for folder in (
+            [model_folder]
+            + compiler_options["library_folders"]
+            + _modelicapath_dirs(compiler_options)
+        ):
             for root, _dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
                     filename = os.path.join(root, item)
@@ -370,10 +377,10 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
         if db["version"] != __version__:
             raise InvalidCacheError("Cache generated for a different version of pymoca")
 
-        # Check compiler options. We ignore the library folders, as they have
-        # already been checked, and checking them will impede platform
-        # portability of the cache.
-        exclude_options = ["library_folders"]
+        # Check compiler options. We ignore the library folders and MODELICAPATH
+        # roots, as they have already been checked, and checking them will impede
+        # platform portability of the cache.
+        exclude_options = ["library_folders", "modelicapath"]
         old_opts = {k: v for k, v in db["options"].items() if k not in exclude_options}
         new_opts = {k: v for k, v in compiler_options.items() if k not in exclude_options}
 
