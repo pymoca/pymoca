@@ -3,7 +3,6 @@
 Modelica parse Tree to AST tree.
 """
 
-import glob
 import os
 import pickle
 import re
@@ -1101,49 +1100,41 @@ def test_cache_metadata():
 
 
 def test_cache():
-    # Clear cache
-    db_file = os.path.join(MODEL_DIR, "Aircraft.pymoca_cache")
-    try:
-        os.remove(db_file)
-    except FileNotFoundError:
-        pass
+    with tempfile.TemporaryDirectory() as tmpdir:
+        shutil.copy(os.path.join(MODEL_DIR, "Aircraft.mo"), tmpdir)
 
-    # Create model, cache it, and load the cache
-    compiler_options = {"cache": True}
+        # Create model, cache it, and load the cache
+        compiler_options = {"cache": True}
 
-    ref_model = transfer_model(MODEL_DIR, "Aircraft", compiler_options)
-    assert isinstance(ref_model, Model)
-    assert not isinstance(ref_model, CachedModel)
+        ref_model = transfer_model(tmpdir, "Aircraft", compiler_options)
+        assert isinstance(ref_model, Model)
+        assert not isinstance(ref_model, CachedModel)
 
-    cached_model = transfer_model(MODEL_DIR, "Aircraft", compiler_options)
-    assert isinstance(cached_model, Model)
-    assert isinstance(cached_model, CachedModel)
+        cached_model = transfer_model(tmpdir, "Aircraft", compiler_options)
+        assert isinstance(cached_model, Model)
+        assert isinstance(cached_model, CachedModel)
 
-    # Compare
-    assert_model_equivalent_numeric(ref_model, cached_model)
-    assert_model_variables_equivalant(ref_model, cached_model)
+        # Compare
+        assert_model_equivalent_numeric(ref_model, cached_model)
+        assert_model_variables_equivalant(ref_model, cached_model)
 
 
 def test_cache_delay_arguments():
-    # Clear cache
-    db_file = os.path.join(MODEL_DIR, "Delay.pymoca_cache")
-    try:
-        os.remove(db_file)
-    except FileNotFoundError:
-        pass
+    with tempfile.TemporaryDirectory() as tmpdir:
+        shutil.copy(os.path.join(MODEL_DIR, "Delay.mo"), tmpdir)
 
-    compiler_options = {"cache": True}
+        compiler_options = {"cache": True}
 
-    ref_model = transfer_model(MODEL_DIR, "Delay", compiler_options)
-    assert isinstance(ref_model, Model)
-    assert not isinstance(ref_model, CachedModel)
+        ref_model = transfer_model(tmpdir, "Delay", compiler_options)
+        assert isinstance(ref_model, Model)
+        assert not isinstance(ref_model, CachedModel)
 
-    cached_model = transfer_model(MODEL_DIR, "Delay", compiler_options)
-    assert isinstance(cached_model, Model)
-    assert isinstance(cached_model, CachedModel)
+        cached_model = transfer_model(tmpdir, "Delay", compiler_options)
+        assert isinstance(cached_model, Model)
+        assert isinstance(cached_model, CachedModel)
 
-    assert_model_equivalent_numeric(ref_model, cached_model)
-    assert_model_variables_equivalant(ref_model, cached_model)
+        assert_model_equivalent_numeric(ref_model, cached_model)
+        assert_model_variables_equivalant(ref_model, cached_model)
 
 
 def _build_spring_cache(tmpdir):
@@ -1204,34 +1195,23 @@ def test_cache_invalid_os():
 
 
 def test_codegen():
-    # Clear cache
-    db_file = os.path.join(MODEL_DIR, "Aircraft.pymoca_cache")
-    try:
-        os.remove(db_file)
-    except FileNotFoundError:
-        pass
+    with tempfile.TemporaryDirectory() as tmpdir:
+        shutil.copy(os.path.join(MODEL_DIR, "Aircraft.mo"), tmpdir)
 
-    for f in glob.glob(os.path.join(MODEL_DIR, "Aircraft*.so")):
-        os.remove(f)
-    for f in glob.glob(os.path.join(MODEL_DIR, "Aircraft*.dll")):
-        os.remove(f)
-    for f in glob.glob(os.path.join(MODEL_DIR, "Aircraft*.dylib")):
-        os.remove(f)
+        # Create model, cache it, and load the cache
+        compiler_options = {"codegen": True}
 
-    # Create model, cache it, and load the cache
-    compiler_options = {"codegen": True}
+        ref_model = transfer_model(tmpdir, "Aircraft", compiler_options)
+        assert isinstance(ref_model, Model)
+        assert not isinstance(ref_model, CachedModel)
 
-    ref_model = transfer_model(MODEL_DIR, "Aircraft", compiler_options)
-    assert isinstance(ref_model, Model)
-    assert not isinstance(ref_model, CachedModel)
+        cached_model = transfer_model(tmpdir, "Aircraft", compiler_options)
+        assert isinstance(cached_model, Model)
+        assert isinstance(cached_model, CachedModel)
 
-    cached_model = transfer_model(MODEL_DIR, "Aircraft", compiler_options)
-    assert isinstance(cached_model, Model)
-    assert isinstance(cached_model, CachedModel)
-
-    # Compare
-    assert_model_equivalent_numeric(ref_model, cached_model)
-    assert_model_variables_equivalant(ref_model, cached_model)
+        # Compare
+        assert_model_equivalent_numeric(ref_model, cached_model)
+        assert_model_variables_equivalant(ref_model, cached_model)
 
 
 def test_simplify_replace_constant_values():
