@@ -1472,6 +1472,90 @@ def test_outer_component_resolves_to_inner():
     assert eq_map["c.u"].name == "T"
 
 
+def test_modification_referencing_outer_same_named_symbol():
+    """A modification value naming an outer-scope symbol that shares the nested
+    component's own local name resolves to the outer symbol, not itself."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        parameter Real theta;
+    end Inner;
+    model Outer
+        parameter Real theta;
+        Inner storage(theta = theta);
+    end Outer;""",
+        "Outer",
+    )
+    assert flat.symbols["storage.theta"].value.name == "theta"
+
+
+def test_attribute_expr_prefers_own_member_over_outer_same_named_symbol():
+    """A local name in a symbol's attribute expression binds to the component's
+    own member, not to a same-named symbol of the enclosing model."""
+    ast_tree = parser.parse(
+        """
+    model Inner
+        Real a;
+        Real b(start = 2 * a, fixed = false);
+    end Inner;
+    model Outer
+        Real a;
+        Inner c;
+    end Outer;"""
+    )
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("Outer"))
+    start = flat_tree.classes["Outer"].symbols["c.b"].start
+    assert start.operands[1].name == "c.a"
+
+
+def test_sibling_modification_referencing_outer_same_named_symbol():
+    """An outer-scope ref resolved into a sibling symbol's modification is not
+    re-prefixed to the same-named sibling: `storage.b`'s value names the outer
+    `theta`, and `storage.theta`'s value expression does too."""
+    ast_tree = parser.parse(
+        """
+    model Inner
+        parameter Real theta;
+        parameter Real b;
+    end Inner;
+    model Outer
+        parameter Real theta = 0.3;
+        Inner storage(theta = 2 * theta, b = theta);
+    end Outer;"""
+    )
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("Outer"))
+    symbols = flat_tree.classes["Outer"].symbols
+    assert symbols["storage.b"].value.name == "theta"
+    assert symbols["storage.theta"].value.operands[1].name == "theta"
+
+
+def test_value_equation_keeps_resolved_outer_ref():
+    """The value-equation pass (MLS 5.6.2 step 1.4) must not re-prefix an
+    already-resolved outer-scope ref in a generated equation's right-hand
+    side: `storage.b`'s modification names the outer `theta`, so the emitted
+    equation is `storage.b = theta`, not `storage.b = storage.theta`."""
+    ast_tree = parser.parse(
+        """
+    model Inner
+        Real theta;
+        Real b;
+    end Inner;
+    model Outer
+        Real theta;
+        Inner storage(b = theta);
+    equation
+        theta = 0.3;
+        storage.theta = 1.0;
+    end Outer;"""
+    )
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("Outer"))
+    eqs = {
+        eq.left.name: getattr(eq.right, "name", getattr(eq.right, "value", None))
+        for eq in flat_tree.classes["Outer"].equations
+    }
+    assert eqs == {"storage.b": "theta", "storage.theta": 1.0, "theta": 0.3}
+
+
 def test_equation_ref_prefers_own_member_over_outer_same_named_symbol():
     """A bare name in a nested component's equation binds to that component's
     own member, not to a same-named symbol of the enclosing model (MLS 5.3.1)."""

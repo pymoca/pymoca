@@ -192,6 +192,8 @@ class ComponentRef(Node):
         self.name: str = ""
         self.indices: list[list[Expression | Slice | Primary | ComponentRef | None]] = [[None]]
         self.child: list[ComponentRef] = []
+        # True once name holds a final flattened reference; later passes must leave it as-is
+        self.resolved: bool = False
         super().__init__(**kwargs)
 
     def __repr__(self) -> str:
