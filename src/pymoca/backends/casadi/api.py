@@ -105,8 +105,11 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
     # compiling.
     from pymoca import parser
 
+    # Build the MODELICAPATH roots tree first and then extend parsed files
+    # into that tree so top-level names shadow the ones from MODELICAPATH.
+    tree = parser.modelicapath_to_tree(use_env=True)
+
     # Load folders
-    tree = None
     for folder in [model_folder] + compiler_options["library_folders"]:
         for root, _dir, files in os.walk(folder, followlinks=True):
             for item in fnmatch.filter(files, "*.mo"):
@@ -118,10 +121,7 @@ def _compile_model(model_folder: str, model_name: str, compiler_options: Dict[st
                     except NotImplementedError as exc:
                         logger.warning("Skipping %s: %s", item, exc)
                         continue
-                    if tree is None:
-                        tree = parsed
-                    else:
-                        tree.extend(parsed)
+                    tree.extend(parsed)
 
     return generate_model(tree, model_name, compiler_options)
 
@@ -326,9 +326,13 @@ def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, s
     db_file = os.path.join(model_folder, model_name + ".pymoca_cache")
 
     if compiler_options["mtime_check"]:
+        # Delayed import to avoid top-level slowness (see _compile_model).
+        from pymoca import parser
+
+        modelicapath_dirs = parser.resolve_modelicapath()
         # Mtime check
         cache_mtime = os.path.getmtime(db_file)
-        for folder in [model_folder] + compiler_options["library_folders"]:
+        for folder in [model_folder] + compiler_options["library_folders"] + modelicapath_dirs:
             for root, _dir, files in os.walk(folder, followlinks=True):
                 for item in fnmatch.filter(files, "*.mo"):
                     filename = os.path.join(root, item)

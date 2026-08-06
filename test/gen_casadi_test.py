@@ -25,6 +25,7 @@ from pymoca.backends.casadi.model import (
     StringVariable,
     Variable,
 )
+from pymoca.tree import ModelicaSemanticError
 
 import pytest
 
@@ -3185,6 +3186,63 @@ def test_resolve_parameter_values_lists():
     ref_model.alg_states[1].nominal = metadata_values[3]
 
     assert_model_equivalent(ref_model, casadi_model)
+
+
+def test_modelicapath_resolves_library(monkeypatch):
+    """MODELICAPATH roots resolve classes even when library_folders is empty"""
+    with tempfile.TemporaryDirectory() as model_dir, tempfile.TemporaryDirectory() as lib_dir:
+        os.makedirs(os.path.join(lib_dir, "Lib"))
+        with open(os.path.join(lib_dir, "Lib", "package.mo"), "w") as f:
+            f.write(
+                "package Lib\n  model Base\n    parameter Real x = 1.0;\n  end Base;\nend Lib;\n"
+            )
+        with open(os.path.join(model_dir, "UsesLib.mo"), "w") as f:
+            f.write("model UsesLib\n  extends Lib.Base;\nend UsesLib;\n")
+
+        monkeypatch.delenv("MODELICAPATH", raising=False)
+        with pytest.raises(ModelicaSemanticError, match="not found in scope"):
+            transfer_model(model_dir, "UsesLib", {"library_folders": [], "cache": False})
+
+        monkeypatch.setenv("MODELICAPATH", lib_dir)
+        model = transfer_model(model_dir, "UsesLib", {"library_folders": [], "cache": False})
+        assert [p.symbol.name() for p in model.parameters] == ["x"]
+
+
+def test_model_folder_class_shadows_modelicapath(monkeypatch):
+    """A model-folder class shadows a same-named MODELICAPATH library (MLS 13.3).
+
+    MODELICAPATH is consulted only on a miss against the directly-loaded files, so
+    the library stub is replaced outright rather than merged with the explicit
+    class. Same rule the compiler tool applies to positional files.
+    """
+    with tempfile.TemporaryDirectory() as model_dir, tempfile.TemporaryDirectory() as lib_dir:
+        os.makedirs(os.path.join(lib_dir, "Lib"))
+        with open(os.path.join(lib_dir, "Lib", "package.mo"), "w") as f:
+            f.write(
+                "package Lib\n"
+                "  model Base\n    parameter Real fromLibrary = 1.0;\n  end Base;\n"
+                "  model Extra\n    parameter Real libraryOnly = 1.0;\n  end Extra;\n"
+                "end Lib;\n"
+            )
+        # A package of the same top-level name, declaring Base but no Extra
+        with open(os.path.join(model_dir, "Lib.mo"), "w") as f:
+            f.write(
+                "package Lib\n  model Base\n    parameter Real fromModelFolder = 1.0;\n"
+                "  end Base;\nend Lib;\n"
+            )
+        with open(os.path.join(model_dir, "UsesBase.mo"), "w") as f:
+            f.write("model UsesBase\n  extends Lib.Base;\nend UsesBase;\n")
+        with open(os.path.join(model_dir, "UsesExtra.mo"), "w") as f:
+            f.write("model UsesExtra\n  extends Lib.Extra;\nend UsesExtra;\n")
+
+        monkeypatch.setenv("MODELICAPATH", lib_dir)
+        options = {"library_folders": [], "cache": False}
+        model = transfer_model(model_dir, "UsesBase", options)
+        assert [p.symbol.name() for p in model.parameters] == ["fromModelFolder"]
+
+        # The library's Lib is shadowed whole, so its Extra is not reachable either
+        with pytest.raises(ModelicaSemanticError, match="not found in scope"):
+            transfer_model(model_dir, "UsesExtra", options)
 
 
 if __name__ == "__main__":
