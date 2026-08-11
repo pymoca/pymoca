@@ -252,6 +252,13 @@ NUMERIC_XFAIL = {
     "pymoca version, same failure class as goal_programming/mixed_integer",
 }
 
+# Leading reference rows to ignore, for a reference the upstream example itself
+# contradicts.
+NUMERIC_SKIP_ROWS = {
+    # The first two rows carry a superseded storage_V_init.
+    "simulation__example": 2,
+}
+
 # Cases whose optimum is degenerate: the trajectory that minimizes `column` is
 # not unique, so compare sum(column), proportional to the objective, within
 # rel_tol instead of the per-timestep trajectory.
@@ -324,8 +331,9 @@ def test_timeseries_export(case: RtcToolsCase, tmp_path):
         # No reference CSV to diff against; the script completing is the only check
         return
     tolerance = NUMERIC_TOLERANCE.get(case.case_id, DEFAULT_TOLERANCE)
+    skip_rows = NUMERIC_SKIP_ROWS.get(case.case_id, 0)
     try:
-        assert_timeseries_close(actual_csv, case.reference_csv, **tolerance)
+        assert_timeseries_close(actual_csv, case.reference_csv, skip_rows=skip_rows, **tolerance)
     except AssertionError as trajectory_error:
         fallback = OBJECTIVE_FALLBACK.get(case.case_id)
         if fallback is None:
