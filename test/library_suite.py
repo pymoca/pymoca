@@ -184,6 +184,31 @@ def assert_timeseries_close(actual_csv: Path, reference_csv: Path, abs_tol: floa
     assert mismatch is None, f"timeseries mismatch: {mismatch}"
 
 
+def assert_objective_close(
+    actual_csv: Path, reference_csv: Path, column: str, rel_tol: float, cause: Exception
+):
+    """Fallback for optimization cases with a degenerate optimum: compare the sum
+    of `column`, proportional to the objective, instead of the trajectory.
+
+    Raised from `cause` (the trajectory-comparison failure) so both mismatches
+    are visible.
+    """
+    _, acols = read_timeseries_csv(actual_csv)
+    _, rcols = read_timeseries_csv(reference_csv)
+    assert all(
+        isinstance(v, float) for v in acols[column] + rcols[column]
+    ), f"objective column {column!r} has a non-numeric cell"
+    actual_sum = math.fsum(acols[column])
+    reference_sum = math.fsum(rcols[column])
+    diff = abs(actual_sum - reference_sum)
+    rel = diff / max(abs(actual_sum), abs(reference_sum), 1e-12)
+    if not rel <= rel_tol:
+        raise AssertionError(
+            f"objective mismatch on {column!r}: actual_sum={actual_sum!r} "
+            f"reference_sum={reference_sum!r} rel={rel:.3e} (tol={rel_tol:.3e})"
+        ) from cause
+
+
 # ---------------------------------------------------------------------------
 # Golden regeneration CLI
 # ---------------------------------------------------------------------------
