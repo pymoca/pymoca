@@ -3,7 +3,7 @@
 import json
 import math
 
-from library_suite import assert_fingerprint_matches, compare_csv
+from library_suite import assert_fingerprint_matches, assert_objective_close, compare_csv
 
 import pytest
 
@@ -48,3 +48,12 @@ def test_fingerprint_comparison_keeps_multiplicity(tmp_path):
     expected.write_text(json.dumps({"outputs": ["x"], "equations_count": 1}))
     with pytest.raises(AssertionError, match=r"outputs: -\[\] \+\['x'\]"):
         assert_fingerprint_matches({"outputs": ["x", "x"], "equations_count": 1}, expected)
+
+
+def test_objective_fallback_rejects_non_numeric_cell(tmp_path):
+    reference = tmp_path / "reference.csv"
+    actual = tmp_path / "actual.csv"
+    _write_csv(reference, [(0, 1.0), (1, 2.0)])
+    actual.write_text("time,Q\n0,1.0\n1,n/a\n")
+    with pytest.raises(AssertionError, match="non-numeric cell"):
+        assert_objective_close(actual, reference, "Q", rel_tol=1e-4, cause=AssertionError())
