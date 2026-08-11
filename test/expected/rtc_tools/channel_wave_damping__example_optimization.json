@@ -30,7 +30,7 @@
     "der(upstream.Q[4])",
     "der(upstream.Q[5])"
   ],
-  "equations_count": 33,
+  "equations_count": 27,
   "initial_equations_count": 12,
   "inputs": [
     "Inflow_Q",

@@ -414,6 +414,19 @@ def _resolve_modification_attribute(
         # 'time' is a Modelica built-in variable (MLS §2.7); leave it as-is.
         if value.name == "time" and not value.child:
             pass
+        elif _has_subscript(value):
+            # A subscripted reference denotes array elements, which have no
+            # InstanceSymbol of their own, so rewrite a copy of the ref instead
+            # of resolving it to the whole array's symbol.
+            assert isinstance(symbol.parent_instance, InstanceClass)
+            assert isinstance(arg.scope, InstanceClass)
+            value = copy.deepcopy(value)
+            TreeWalker().walk(_FunctionCallResolver(arg.scope, ctx.flat_class.functions), value)
+            value = _rewrite_cref_in_place(
+                value,
+                arg.scope,
+                replace(ctx, flat_class=symbol.parent_instance, name_flat_class=ctx.flat_class),
+            )
         else:
             assert symbol.parent_instance is not None
             assert arg.scope is not None
@@ -573,6 +586,28 @@ def _composite_flat_name(prefix: str, cref: ast.ComponentRef) -> str:
     return f"{prefix}.{cref}" if prefix else str(cref)
 
 
+def _absorb_child_indices(ref: ast.ComponentRef) -> None:
+    """Move the indices of a ComponentRef's children onto the ref itself.
+
+    Leaves `ref.child` in place; callers clear it once they have set the flat name.
+    """
+    c = ref
+    while c.child:
+        assert len(c.child) <= 1
+        c = c.child[0]
+        ref.indices = ref.indices + c.indices
+
+
+def _has_subscript(ref: ast.ComponentRef) -> bool:
+    """Whether a ComponentRef or any of its children carries an array subscript."""
+    c: ast.ComponentRef | None = ref
+    while c is not None:
+        if any(index is not None for dims in c.indices for index in dims):
+            return True
+        c = c.child[0] if c.child else None
+    return False
+
+
 def _collapse_to_flat_name(ref: ast.ComponentRef, prefix: str) -> None:
     """Rename a ComponentRef to its composite flat name, collapsing its children.
 
@@ -580,11 +615,7 @@ def _collapse_to_flat_name(ref: ast.ComponentRef, prefix: str) -> None:
     becomes a single ref named `prefix.a.b` indexed by `i`.
     """
     name = _composite_flat_name(prefix, ref)
-    c = ref
-    while c.child:
-        assert len(c.child) <= 1
-        c = c.child[0]
-        ref.indices = ref.indices + c.indices
+    _absorb_child_indices(ref)
     ref.name = name
     ref.child = []
 
@@ -593,15 +624,14 @@ def _rewrite_cref_in_place(
     cref: ast.ComponentRef,
     scope: InstanceClass,
     ctx: FlatteningContext,
-) -> ast.Primary | None:
+) -> ast.Primary | ast.ComponentRef:
     """Resolve a ComponentRef to its flat name in place, including its index expressions.
 
-    Returns a Primary to substitute for `cref` when it resolves to an (unindexed)
-    constant: constant values are inlined during flattening (MLS 5.6.2), so such a
-    reference does not get a flat name of its own -- it may not even end up
-    anywhere in the flattened tree (e.g. a global library constant that is never
-    instantiated as a component). Returns None when `cref` was rewritten (or left
-    unchanged) in place.
+    Returns `cref` itself, whether rewritten in place or left unchanged, or a Primary to
+    substitute for it when it resolves to an (unindexed) constant. Constant values are
+    inlined during flattening (MLS 5.6.2), so such a reference does not get a flat name of
+    its own -- it may not even end up anywhere in the flattened tree (e.g. a global library
+    constant that is never instantiated as a component).
     """
     resolved: InstanceClass | InstanceSymbol | None = None
     fast_name = _composite_flat_name(ctx.prefix, cref) if ctx.prefix is not None else None
@@ -620,6 +650,7 @@ def _rewrite_cref_in_place(
         try:
             resolved = _resolve_name(cref, scope, ctx)
             assert resolved.name is not None
+            _absorb_child_indices(cref)
             cref.name = resolved.name
             cref.child = []
             cref.resolved = True
@@ -629,7 +660,7 @@ def _rewrite_cref_in_place(
     # A constant with its own flat symbol keeps its name: backend alias
     # detection matches a simple `x = c` equation.
     if (
-        cref.indices == [[None]]
+        not _has_subscript(cref)
         and isinstance(resolved, InstanceSymbol)
         and "constant" in resolved.prefixes
         and cref.name not in ctx.flat_class.symbols
@@ -640,7 +671,7 @@ def _rewrite_cref_in_place(
 
     for dim_list in cref.indices:
         _rewrite_operand_list(dim_list, scope, ctx)
-    return None
+    return cref
 
 
 def _rewrite_operand_list(
@@ -672,8 +703,7 @@ def _rewrite_operand(operand, scope: InstanceClass, ctx: FlatteningContext):
     constant.
     """
     if isinstance(operand, ast.ComponentRef):
-        replacement = _rewrite_cref_in_place(operand, scope, ctx)
-        return operand if replacement is None else replacement
+        return _rewrite_cref_in_place(operand, scope, ctx)
     if isinstance(operand, list):
         # Multi-output function call target, or an assignment statement's targets.
         _rewrite_operand_list(operand, scope, ctx)

@@ -1961,6 +1961,49 @@ def test_modification_expression_rescopes_array_index():
     assert index.name == "h.n"
 
 
+def test_binding_equation_keeps_array_subscript():
+    """A declaration binding equation whose value is a subscripted reference
+    binds that array element, not the whole array (MLS 5.6.2 step 1.4)."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        parameter Integer n = 4;
+        Real H[n];
+    end Inner;
+    model M
+        Inner s(n = 4);
+        Real y = s.H[s.n];
+    end M;""",
+        "M",
+    )
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "y"]
+    assert eq.right.name == "s.H"
+    (index,) = eq.right.indices[-1]
+    assert index.name == "s.n"
+
+
+def test_binding_equation_subscript_function_call_discovered():
+    """A function called inside a binding equation's subscript is discovered like
+    one called in the binding expression itself."""
+    flat = _flatten_inline(
+        """
+    function idx
+        input Real u;
+        output Integer i;
+    algorithm
+        i := 1;
+    end idx;
+    model M
+        Real a[2];
+        Real y = a[idx(1)];
+    equation
+        a = {1, 2};
+    end M;""",
+        "M",
+    )
+    assert list(flat.functions) == ["idx"]
+
+
 def test_constant_via_composite_name_lookup_resolves_dimension():
     """A constant reached through a nested package (composite name lookup,
     instantiated by _resolve_name rather than the normal flatten walk) resolves
