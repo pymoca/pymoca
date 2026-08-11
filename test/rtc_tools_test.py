@@ -297,6 +297,12 @@ def _run_example_script(case: RtcToolsCase, tmp_path: Path) -> Path:
     example_dir = case.run_script.parents[1]
     dest_dir = tmp_path / example_dir.name
     shutil.copytree(example_dir, dest_dir)
+
+    # A case whose model lives in another example (fallback_option) needs that sibling too
+    model_example_dir = Path(case.model_folder).parent
+    if model_example_dir != example_dir:
+        shutil.copytree(model_example_dir, tmp_path / model_example_dir.name)
+
     script_path = dest_dir / "src" / case.run_script.name
 
     env = dict(os.environ)
@@ -313,9 +319,10 @@ def _run_example_script(case: RtcToolsCase, tmp_path: Path) -> Path:
     "case", build_params(CASES, NUMERIC_XFAIL, RTC_TOOLS_SMOKE_CASES, pytest.mark.rtc_tools_smoke)
 )
 def test_timeseries_export(case: RtcToolsCase, tmp_path):
-    if case.reference_csv is None:
-        pytest.skip(f"{case.case_id} has no independent, unambiguous reference CSV")
     actual_csv = _run_example_script(case, tmp_path)
+    if case.reference_csv is None:
+        # No reference CSV to diff against; the script completing is the only check
+        return
     tolerance = NUMERIC_TOLERANCE.get(case.case_id, DEFAULT_TOLERANCE)
     try:
         assert_timeseries_close(actual_csv, case.reference_csv, **tolerance)
