@@ -34,7 +34,7 @@
     "der(upstream_pid.error_integral)",
     "der(upstream_pid.state)"
   ],
-  "equations_count": 37,
+  "equations_count": 31,
   "initial_equations_count": 14,
   "inputs": [
     "Inflow_Q",
