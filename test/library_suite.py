@@ -130,14 +130,19 @@ def read_timeseries_csv(path: Path):
 
 
 def compare_csv(
-    actual_csv: Path, reference_csv: Path, abs_tol: float, rel_tol: float
+    actual_csv: Path, reference_csv: Path, abs_tol: float, rel_tol: float, skip_rows: int = 0
 ) -> Optional[str]:
     """Describe how two timeseries CSVs differ beyond tolerance, or None when they agree.
 
     A sample agrees when it is within `abs_tol` or `rel_tol` (math.isclose).
+    `skip_rows` drops that many leading data rows from both sides, for a
+    reference whose opening rows are known to be stale.
     """
     ah, acols = read_timeseries_csv(actual_csv)
     rh, rcols = read_timeseries_csv(reference_csv)
+    if skip_rows:
+        acols = {name: values[skip_rows:] for name, values in acols.items()}
+        rcols = {name: values[skip_rows:] for name, values in rcols.items()}
     shared = [c for c in rh if c in acols]
     only_ref = [c for c in rh if c not in acols]
     only_actual = [c for c in ah if c not in rcols]
@@ -179,8 +184,10 @@ def compare_csv(
     return f"{out_of_tol} of {total} samples outside tolerance ({'; '.join(note_parts)})"
 
 
-def assert_timeseries_close(actual_csv: Path, reference_csv: Path, abs_tol: float, rel_tol: float):
-    mismatch = compare_csv(actual_csv, reference_csv, abs_tol, rel_tol)
+def assert_timeseries_close(
+    actual_csv: Path, reference_csv: Path, abs_tol: float, rel_tol: float, skip_rows: int = 0
+):
+    mismatch = compare_csv(actual_csv, reference_csv, abs_tol, rel_tol, skip_rows)
     assert mismatch is None, f"timeseries mismatch: {mismatch}"
 
 
