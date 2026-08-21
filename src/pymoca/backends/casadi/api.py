@@ -4,6 +4,7 @@ import itertools
 import logging
 import os
 import pickle
+import uuid
 from enum import IntEnum
 from typing import Dict, Optional
 
@@ -234,80 +235,88 @@ def save_model(
 
     # Output metadata
     db_file = os.path.join(model_folder, model_name + ".pymoca_cache")
-    with open(db_file, "wb") as f:
-        db = {}
+    db = {}
 
-        # Store version
-        db["version"] = __version__
+    # Store version
+    db["version"] = __version__
 
-        # Include references to the shared libraries (codegen) or pickled functions (cache)
-        db.update(objects)
+    # Include references to the shared libraries (codegen) or pickled functions (cache)
+    db.update(objects)
 
-        db["library_os"] = os.name
+    db["library_os"] = os.name
 
-        db["options"] = compiler_options
+    db["options"] = compiler_options
 
-        # Describe variables per category
-        for key in ["states", "der_states", "alg_states", "inputs", "parameters", "constants"]:
-            db[key] = [e.to_dict() for e in getattr(model, key)]
-        db["string_constants"] = model.string_constants
-        db["string_parameters"] = model.string_parameters
+    # Describe variables per category
+    for key in ["states", "der_states", "alg_states", "inputs", "parameters", "constants"]:
+        db[key] = [e.to_dict() for e in getattr(model, key)]
+    db["string_constants"] = model.string_constants
+    db["string_parameters"] = model.string_parameters
 
-        # Caching using CasADi functions will lead to constants seemingly
-        # depending on MX variables. Figuring out that they do not is slow,
-        # especially when doing it on a lazy function call, as would be the
-        # case when reading from cache. So instead, we do the depency check
-        # once when saving the model.
+    # Caching using CasADi functions will lead to constants seemingly
+    # depending on MX variables. Figuring out that they do not is slow,
+    # especially when doing it on a lazy function call, as would be the
+    # case when reading from cache. So instead, we do the depency check
+    # once when saving the model.
 
-        # Metadata dependency checking
-        parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
+    # Metadata dependency checking
+    parameter_vector = ca.veccat(*[v.symbol for v in model.parameters])
 
-        for key in ["states", "alg_states", "inputs", "parameters", "constants"]:
-            metadata_shape = (len(getattr(model, key)), len(CASADI_ATTRIBUTES))
-            m = db[key + "__metadata_dependent"] = np.zeros(metadata_shape, dtype=int)
-            if np.prod(m.shape) > 0:
-                assert m[0, 0] == _DepMeta.NOT_MX
+    for key in ["states", "alg_states", "inputs", "parameters", "constants"]:
+        metadata_shape = (len(getattr(model, key)), len(CASADI_ATTRIBUTES))
+        m = db[key + "__metadata_dependent"] = np.zeros(metadata_shape, dtype=int)
+        if np.prod(m.shape) > 0:
+            assert m[0, 0] == _DepMeta.NOT_MX
 
-            for i, v in enumerate(getattr(model, key)):
-                for j, tmp in enumerate(CASADI_ATTRIBUTES):
-                    attr = getattr(v, tmp)
-                    if isinstance(attr, ca.MX):
-                        if not attr.is_constant() and ca.depends_on(attr, parameter_vector):
-                            m[i, j] = _DepMeta.MX_DEPENDENT
-                        else:
-                            m[i, j] = _DepMeta.MX_INDEPENDENT
+        for i, v in enumerate(getattr(model, key)):
+            for j, tmp in enumerate(CASADI_ATTRIBUTES):
+                attr = getattr(v, tmp)
+                if isinstance(attr, ca.MX):
+                    if not attr.is_constant() and ca.depends_on(attr, parameter_vector):
+                        m[i, j] = _DepMeta.MX_DEPENDENT
+                    else:
+                        m[i, j] = _DepMeta.MX_INDEPENDENT
 
-        # Delay dependency checking
-        if model.delay_states:
-            all_symbols = [
-                model.time,
-                *model._symbols(model.states),
-                *model._symbols(model.der_states),
-                *model._symbols(model.alg_states),
-                *model._symbols(model.inputs),
-                *model._symbols(model.constants),
-                *model._symbols(model.parameters),
-            ]
-            symbol_to_index = {x: i for i, x in enumerate(all_symbols)}
+    # Delay dependency checking
+    if model.delay_states:
+        all_symbols = [
+            model.time,
+            *model._symbols(model.states),
+            *model._symbols(model.der_states),
+            *model._symbols(model.alg_states),
+            *model._symbols(model.inputs),
+            *model._symbols(model.constants),
+            *model._symbols(model.parameters),
+        ]
+        symbol_to_index = {x: i for i, x in enumerate(all_symbols)}
 
-            expressions, durations = zip(*model.delay_arguments)
+        expressions, durations = zip(*model.delay_arguments)
 
-            duration_dependencies = []
-            for dur in durations:
-                if not isinstance(dur, ca.MX):
-                    dur = ca.MX(dur)  # Probably a constant, will have no dependencies
-                duration_dependencies.append(
-                    [symbol_to_index[var] for var in ca.symvar(dur) if ca.depends_on(dur, var)]
-                )
-            db["__delay_duration_dependent"] = duration_dependencies
+        duration_dependencies = []
+        for dur in durations:
+            if not isinstance(dur, ca.MX):
+                dur = ca.MX(dur)  # Probably a constant, will have no dependencies
+            duration_dependencies.append(
+                [symbol_to_index[var] for var in ca.symvar(dur) if ca.depends_on(dur, var)]
+            )
+        db["__delay_duration_dependent"] = duration_dependencies
 
-        db["outputs"] = model.outputs
+    db["outputs"] = model.outputs
 
-        db["delay_states"] = model.delay_states
+    db["delay_states"] = model.delay_states
 
-        db["alias_relation"] = model.alias_relation
+    db["alias_relation"] = model.alias_relation
 
-        pickle.dump(db, f, protocol=-1)
+    # Write the cache through a temporary file and move it into place, so that
+    # a concurrent load_model never reads a partially written cache file.
+    tmp_file = "{}.{}.tmp".format(db_file, uuid.uuid4().hex)
+    try:
+        with open(tmp_file, "wb") as f:
+            pickle.dump(db, f, protocol=-1)
+        os.replace(tmp_file, db_file)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(tmp_file)
 
 
 def load_model(model_folder: str, model_name: str, compiler_options: Dict[str, str]) -> CachedModel:
