@@ -245,13 +245,6 @@ RTC_TOOLS_SMOKE_CASES = frozenset(
     {"simulation_with_custom_equations__simple_model", "basic__example"}
 )
 
-NUMERIC_XFAIL = {
-    "goal_programming__example": "solver reports INFEASIBLE under this pymoca version",
-    "mixed_integer__example": "solver reports INFEASIBLE under this pymoca version",
-    "cascading_channels__example": "solver reports Infeasible_Problem_Detected under this "
-    "pymoca version, same failure class as goal_programming/mixed_integer",
-}
-
 # Leading reference rows to ignore, for a reference the upstream example itself
 # contradicts.
 NUMERIC_SKIP_ROWS = {
@@ -268,6 +261,12 @@ OBJECTIVE_FALLBACK = {
     # The priority-1 goal only range-constrains V_storage; priority 2 minimizes
     # integral(Q_release).
     "single_reservoir__single_reservoir": ("Q_release", 1e-4),
+    # The priority-1 RangeGoals only bound the channel levels; the priority-2
+    # TargetGoal on the extraction pump is the only goal that pins a trajectory.
+    "cascading_channels__example": ("DrinkingWaterExtractionPump_Q", 1e-4),
+    # A MIP-gap artifact rather than a degenerate optimum: branch-and-bound can
+    # land one binary flip from the reference, hence the looser bound.
+    "mixed_integer__example": ("Q_pump", 1e-3),
 }
 
 # Tight enough to catch a real numeric regression on every case that reproduces
@@ -279,6 +278,8 @@ DEFAULT_TOLERANCE = {"abs_tol": 1e-6, "rel_tol": 1e-6}
 NUMERIC_TOLERANCE = {
     # Nonlinear MPC re-solved with a newer IPOPT than the reference was generated with.
     "channel_wave_damping__example_optimization": {"abs_tol": 1e-6, "rel_tol": 1e-3},
+    # Solver noise on an otherwise exact reproduction.
+    "goal_programming__example": {"abs_tol": 1e-6, "rel_tol": 1e-3},
 }
 
 
@@ -323,7 +324,7 @@ def _run_example_script(case: RtcToolsCase, tmp_path: Path) -> Path:
 
 @pytest.mark.skipif(not RTC_TOOLS_INSTALLED, reason="rtctools not importable in this venv")
 @pytest.mark.parametrize(
-    "case", build_params(CASES, NUMERIC_XFAIL, RTC_TOOLS_SMOKE_CASES, pytest.mark.rtc_tools_smoke)
+    "case", build_params(CASES, {}, RTC_TOOLS_SMOKE_CASES, pytest.mark.rtc_tools_smoke)
 )
 def test_timeseries_export(case: RtcToolsCase, tmp_path):
     actual_csv = _run_example_script(case, tmp_path)
