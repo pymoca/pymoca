@@ -3108,6 +3108,15 @@ def test_iterative_simplification_large():
     casadi_model.simplify(compiler_options)
 
 
+def test_expand_mx_shares_subexpressions():
+    # 16 instructions when the expansion keeps the sharing, 130 when it does not.
+    compiler_options = {"expand_vectors": True, "expand_mx": True}
+
+    casadi_model = transfer_model(MODEL_DIR, "NestedFunctionCalls", compiler_options)
+
+    assert casadi_model.dae_residual_function.n_instructions() < 50
+
+
 def test_signed_expression():
     """Test that both + and - prefix operators work in expressions"""
     txt = """
