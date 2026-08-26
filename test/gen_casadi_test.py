@@ -2722,6 +2722,14 @@ class GenCasadiTest(unittest.TestCase):
 
         casadi_model.simplify(compiler_options)
 
+    def test_expand_mx_shares_subexpressions(self):
+        # 16 instructions when the expansion keeps the sharing, 130 when it does not.
+        compiler_options = {'expand_vectors': True, 'expand_mx': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'NestedFunctionCalls', compiler_options)
+
+        self.assertLess(casadi_model.dae_residual_function.n_instructions(), 50)
+
 
 if __name__ == "__main__":
     unittest.main()
