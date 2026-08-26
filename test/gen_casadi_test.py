@@ -3115,6 +3115,15 @@ def test_expand_mx_shares_subexpressions():
     assert casadi_model.dae_residual_function.n_instructions() < 50
 
 
+def test_expand_mx_eliminates_common_subexpressions():
+    # Both if-else branches evaluate the same nested call: 27 instructions merged, 39 not.
+    compiler_options = {"expand_vectors": True, "expand_mx": True}
+
+    casadi_model = transfer_model(MODEL_DIR, "SharedBranchExpression", compiler_options)
+
+    assert casadi_model.dae_residual_function.n_instructions() < 33
+
+
 def test_signed_expression():
     """Test that both + and - prefix operators work in expressions"""
     txt = """
