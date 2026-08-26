@@ -27,7 +27,7 @@ logger = logging.getLogger("pymoca")
 OP_MAP = {'*': "__mul__",
           '+': "__add__",
           "-": "__sub__",
-          "/": "__div__",
+          "/": "__truediv__",
           '^': "__pow__",
           '>': '__gt__',
           '<': '__lt__',
