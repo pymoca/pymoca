@@ -2730,6 +2730,17 @@ class GenCasadiTest(unittest.TestCase):
 
         self.assertLess(casadi_model.dae_residual_function.n_instructions(), 50)
 
+    def test_expand_mx_eliminates_common_subexpressions(self):
+        # Each branch expands its own copy of square_plus(x): cse must leave nothing to merge.
+        compiler_options = {'expand_vectors': True, 'expand_mx': True}
+
+        casadi_model = transfer_model(MODEL_DIR, 'SharedBranchExpression', compiler_options)
+
+        residual = ca.veccat(*casadi_model.equations)
+        symbols = ca.symvar(residual)
+        n_instructions = ca.Function('f', symbols, [residual]).n_instructions()
+        self.assertEqual(ca.Function('f', symbols, [ca.cse(residual)]).n_instructions(), n_instructions)
+
 
 if __name__ == "__main__":
     unittest.main()

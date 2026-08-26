@@ -185,7 +185,7 @@ class Model:
         f_sx = ca.Function('tmp_mx', symbols_mx, equations).expand()
 
         # always_inline emits the SX algorithm as MX operations that keep its shared nodes.
-        return list(f_sx.call(symbols_mx, True, False))
+        return list(ca.cse(f_sx.call(symbols_mx, True, False)))
 
     def _substitute_metadata(self, symbols, values):
         substitutions = []
