@@ -14,6 +14,7 @@ import math
 import operator
 import sys
 from collections import OrderedDict
+from dataclasses import dataclass, replace
 from typing import TypeVar, cast, overload
 
 import numpy as np
@@ -46,6 +47,18 @@ from .. import ast
 
 # An equation or statement operand, preserved across a flattening rewrite.
 _OperandT = TypeVar("_OperandT")
+
+
+@dataclass(frozen=True)
+class FlatteningContext:
+    """Per-flatten state threaded through reference resolution and rewriting."""
+
+    flat_class: InstanceClass
+    guard: RecursionGuard
+    opts: LookupOptions
+    name_flat_class: InstanceClass | None = None
+    prefix: str | None = None
+    iteration_variables: frozenset[str] = frozenset()
 
 
 def flatten_instance(
@@ -170,6 +183,7 @@ def _flatten_instance(
         guard = RecursionGuard()
     if opts is None:
         opts = LookupOptions()
+    ctx = FlatteningContext(flat_class=flat_class, guard=guard, opts=opts)
 
     # 1.1–1.6 Process local symbols per MLS 5.6.2
     for name, symbol in list(cast(dict[str, InstanceSymbol], instance.symbols).items()):
@@ -204,13 +218,7 @@ def _flatten_instance(
         elif not isinstance(flat_symbol.type, InstanceClass):
             # scope==instance (declaring class) already differs from flat_class (root); no
             # derived-vs-base asymmetry here, so name_flat_class is not needed.
-            resolved = _resolve_name(
-                flat_symbol.type,
-                instance,
-                flat_class,
-                guard=guard,
-                opts=opts,
-            )
+            resolved = _resolve_name(flat_symbol.type, instance, ctx)
             is_class = isinstance(resolved, InstanceClass)
             flat_symbol.type = resolved if is_class else resolved.parent  # type: ignore[assignment]
             # If the resolved type is an enumeration, add the symbol here now that
@@ -223,13 +231,7 @@ def _flatten_instance(
         _evaluate_conditional_declarations(flat_symbol, flat_class)
 
         # 1.3 Resolve dimensions, including enclosing instances
-        _resolve_dimensions(
-            flat_symbol,
-            instance,
-            flat_class,
-            guard=guard,
-            opts=opts,
-        )
+        _resolve_dimensions(flat_symbol, instance, ctx)
 
         # 1.4 Resolve modifications of value attributes of simple types and records
         # 1.5 Resolve modifications of other attributes of simple types
@@ -238,12 +240,7 @@ def _flatten_instance(
             or ast.is_enumeration(flat_symbol.type)
             or "record" in flat_symbol.prefixes
         ):
-            _resolve_modifications(
-                flat_symbol,
-                flat_class,
-                guard=guard,
-                opts=opts,
-            )
+            _resolve_modifications(flat_symbol, ctx)
         else:
             # 1.6 Recursively "handle" non-simple types
             symbols_before_recursive = set(flat_class.symbols.keys())
@@ -304,7 +301,7 @@ def _flatten_instance(
         )
 
     # 1.7 Resolve references in equations and algorithms
-    _collect_and_resolve_equations(instance, flat_class, prefix, guard=guard, opts=opts)
+    _collect_and_resolve_equations(instance, prefix, ctx)
 
     # Steps 1.9, 2, and 3 are done outside the recursion in the caller
 
@@ -326,10 +323,7 @@ def _evaluate_conditional_declarations(symbol: InstanceSymbol, parent: ast.Class
 def _resolve_dimensions(
     symbol: InstanceSymbol,
     instance: InstanceClass,
-    flat_class: InstanceClass,
-    *,
-    guard: RecursionGuard,
-    opts: LookupOptions,
+    ctx: FlatteningContext,
 ) -> None:
     """Resolve parametric array dimensions to concrete integers.
 
@@ -343,13 +337,7 @@ def _resolve_dimensions(
             elif isinstance(elem, ast.ComponentRef):
                 # Dimension refs are always declared in the same class (instance);
                 # no base-vs-derived asymmetry, so name_flat_class is not needed.
-                resolved = _resolve_name(
-                    elem,
-                    instance,
-                    flat_class,
-                    guard=guard,
-                    opts=opts,
-                )
+                resolved = _resolve_name(elem, instance, ctx)
                 if isinstance(resolved, InstanceSymbol):
                     val = resolved.value
                     if isinstance(val, ast.Primary):
@@ -362,13 +350,7 @@ def _resolve_dimensions(
                         dim_list[i] = ast.Primary(value=int(val))
             elif isinstance(elem, ast.Expression):
                 try:
-                    result = _resolve_expression(
-                        elem,
-                        instance,
-                        flat_class,
-                        guard=guard,
-                        opts=opts,
-                    )
+                    result = _resolve_expression(elem, instance, ctx)
                 except (
                     NotImplementedError,
                     ModelicaSemanticError,
@@ -383,16 +365,9 @@ def _resolve_dimensions(
 
 def _resolve_modifications(
     symbol: InstanceSymbol,
-    flat_class: InstanceClass,
-    *,
-    guard: RecursionGuard,
-    opts: LookupOptions,
+    ctx: FlatteningContext,
 ) -> None:
-    """Resolve modifications of a symbol
-    :param symbol: The symbol to resolve modifications for
-    :param flat_class: The flattened class
-    :return: None
-    """
+    """Resolve modifications of a symbol"""
     # TODO: Resolve modifications of records
     if "record" in symbol.prefixes:
         raise NotImplementedError("Record modifications not implemented yet")
@@ -415,22 +390,13 @@ def _resolve_modifications(
         if arg.value.component == "value" and "record" in symbol.prefixes:
             # TODO: record value modification
             continue
-        _resolve_modification_attribute(
-            symbol,
-            arg,
-            flat_class=flat_class,
-            guard=guard,
-            opts=opts,
-        )
+        _resolve_modification_attribute(symbol, arg, ctx)
 
 
 def _resolve_modification_attribute(
     symbol: InstanceSymbol,
     arg: ast.ClassModificationArgument,
-    *,
-    flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
+    ctx: FlatteningContext,
 ):
     # MLS 5.6.2 step 1.4 turns value modifications on non-parameter/non-constant
     # simple-type variables into equations. Here we only set the resolved value on the
@@ -454,10 +420,7 @@ def _resolve_modification_attribute(
             value = _resolve_name(
                 value,
                 arg.scope,
-                symbol.parent_instance,
-                name_flat_class=flat_class,
-                guard=guard,
-                opts=opts,
+                replace(ctx, flat_class=symbol.parent_instance, name_flat_class=ctx.flat_class),
             )
             value = cast(InstanceSymbol, value)
             const_val = _get_constant_value(value)
@@ -469,25 +432,19 @@ def _resolve_modification_attribute(
         # Without this, functions referenced only in modifications are lost.
         _fn_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
         if isinstance(_fn_scope, InstanceClass):
-            func_resolver = _FunctionCallResolver(_fn_scope, flat_class.functions)
+            func_resolver = _FunctionCallResolver(_fn_scope, ctx.flat_class.functions)
             walker = TreeWalker()
             walker.walk(func_resolver, value)
     if isinstance(value, ast.Expression):
         expr_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
         expr_flat_class = symbol.parent_instance
         if isinstance(expr_scope, InstanceClass) and isinstance(expr_flat_class, InstanceClass):
+            expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
             # Try to evaluate constant expressions (e.g. +1 → 1, -1.0 → -1.0);
             # keep the original Expression if evaluation fails (e.g. references
             # to non-constant variables or unsupported operators).
             try:
-                result = _resolve_expression(
-                    value,
-                    expr_scope,
-                    expr_flat_class,
-                    guard=guard,
-                    opts=opts,
-                    name_flat_class=flat_class,
-                )
+                result = _resolve_expression(value, expr_scope, expr_ctx)
                 if result is not None:
                     value = result
             except (
@@ -504,14 +461,7 @@ def _resolve_modification_attribute(
             # This mirrors the name_flat_class treatment in the ComponentRef branch
             # above (MLS §5.6.2 point B).
             if isinstance(value, ast.Expression):
-                value = _flatten_expression_crefs(
-                    value,
-                    expr_scope,
-                    expr_flat_class,
-                    flat_class,
-                    guard,
-                    opts,
-                )
+                value = _flatten_expression_crefs(value, expr_scope, expr_ctx)
 
     setattr(symbol, mod.component.name, value)
 
@@ -557,20 +507,9 @@ class ExpressionEvaluator(TreeListener):
         "min": min,
     }
 
-    def __init__(
-        self,
-        scope: InstanceClass,
-        flat_class: InstanceClass,
-        guard: RecursionGuard,
-        opts: LookupOptions,
-        name_flat_class: InstanceClass | None = None,
-    ):
+    def __init__(self, scope: InstanceClass, ctx: FlatteningContext):
         self.scope = scope
-        self.flat_class = flat_class
-        self.guard = guard
-        self.opts = opts
-        self.name_flat_class = name_flat_class
-
+        self.ctx = ctx
         self.result = None
         super().__init__()
 
@@ -579,19 +518,12 @@ class ExpressionEvaluator(TreeListener):
         operands = []
         for operand in tree.operands:
             if isinstance(operand, ast.ComponentRef):
-                operand = _resolve_name(
-                    operand,
-                    self.scope,
-                    self.flat_class,
-                    guard=self.guard,
-                    opts=self.opts,
-                    name_flat_class=self.name_flat_class,
-                )
+                operand = _resolve_name(operand, self.scope, self.ctx)
             if isinstance(operand, InstanceSymbol):
                 const_val = _get_constant_value(operand)
                 if const_val is not None and isinstance(const_val, ast.Primary):
                     operand = const_val
-                elif self.opts.evaluate_parameters and "parameter" in operand.prefixes:
+                elif self.ctx.opts.evaluate_parameters and "parameter" in operand.prefixes:
                     param_val = _get_parameter_value_from_chain(operand)
                     if param_val is not None:
                         operand = param_val
@@ -623,10 +555,7 @@ class ExpressionEvaluator(TreeListener):
 def _flatten_expression_crefs(
     expr: ast.Expression,
     scope: InstanceClass,
-    flat_class: InstanceClass,
-    name_flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
+    ctx: FlatteningContext,
 ) -> ast.Expression:
     """Return a deep copy of expr with ComponentRef operands rewritten to flat names.
 
@@ -635,7 +564,7 @@ def _flatten_expression_crefs(
     Operands that cannot be resolved are left unchanged.
     """
     result = copy.deepcopy(expr)
-    _rewrite_expression_crefs(result, scope, flat_class, name_flat_class, guard, opts)
+    _rewrite_operand_list(result.operands, scope, ctx)
     return result
 
 
@@ -663,12 +592,7 @@ def _collapse_to_flat_name(ref: ast.ComponentRef, prefix: str) -> None:
 def _rewrite_cref_in_place(
     cref: ast.ComponentRef,
     scope: InstanceClass,
-    flat_class: InstanceClass,
-    name_flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    prefix: str | None = None,
-    iteration_variables: frozenset[str] = frozenset(),
+    ctx: FlatteningContext,
 ) -> ast.Primary | None:
     """Resolve a ComponentRef to its flat name in place, including its index expressions.
 
@@ -680,28 +604,21 @@ def _rewrite_cref_in_place(
     unchanged) in place.
     """
     resolved: InstanceClass | InstanceSymbol | None = None
-    fast_name = _composite_flat_name(prefix, cref) if prefix is not None else None
+    fast_name = _composite_flat_name(ctx.prefix, cref) if ctx.prefix is not None else None
     if cref.resolved:
         pass
-    elif cref.name in iteration_variables:
+    elif cref.name in ctx.iteration_variables:
         # A for-loop index is local to the loop body (MLS 11.2.2): never a flat
         # symbol or a constant, and unknown to name lookup, so leave it as-is.
         pass
-    elif prefix is not None and fast_name in flat_class.symbols:
+    elif ctx.prefix is not None and fast_name in ctx.flat_class.symbols:
         # Innermost binding wins (MLS 5.3.1): the flattened instance's own member
         # beats a same-named symbol of an enclosing instance.
-        _collapse_to_flat_name(cref, prefix)
+        _collapse_to_flat_name(cref, ctx.prefix)
         cref.resolved = True
     else:
         try:
-            resolved = _resolve_name(
-                cref,
-                scope,
-                flat_class,
-                name_flat_class=name_flat_class,
-                guard=guard,
-                opts=opts,
-            )
+            resolved = _resolve_name(cref, scope, ctx)
             assert resolved.name is not None
             cref.name = resolved.name
             cref.child = []
@@ -715,163 +632,72 @@ def _rewrite_cref_in_place(
         cref.indices == [[None]]
         and isinstance(resolved, InstanceSymbol)
         and "constant" in resolved.prefixes
-        and cref.name not in flat_class.symbols
+        and cref.name not in ctx.flat_class.symbols
     ):
         const_val = _get_constant_value(resolved)
         if isinstance(const_val, ast.Primary) and const_val.value is not None:
             return const_val
 
     for dim_list in cref.indices:
-        _rewrite_operand_list(
-            dim_list, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
-        )
+        _rewrite_operand_list(dim_list, scope, ctx)
     return None
-
-
-def _rewrite_expression_crefs(
-    expr: ast.Expression,
-    scope: InstanceClass,
-    flat_class: InstanceClass,
-    name_flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    prefix: str | None = None,
-    iteration_variables: frozenset[str] = frozenset(),
-) -> None:
-    _rewrite_operand_list(
-        expr.operands,
-        scope,
-        flat_class,
-        name_flat_class,
-        guard,
-        opts,
-        prefix,
-        iteration_variables,
-    )
 
 
 def _rewrite_operand_list(
     operands: list,
     scope: InstanceClass,
-    flat_class: InstanceClass,
-    name_flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    prefix: str | None = None,
-    iteration_variables: frozenset[str] = frozenset(),
+    ctx: FlatteningContext,
 ) -> None:
     """Rewrite in place every ComponentRef found in a list of expression operands."""
     for i, operand in enumerate(operands):
-        operands[i] = _rewrite_operand(
-            operand, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
-        )
+        operands[i] = _rewrite_operand(operand, scope, ctx)
 
 
+@overload
 def _rewrite_operand(
-    operand,
-    scope: InstanceClass,
-    flat_class: InstanceClass,
-    name_flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    prefix: str | None = None,
-    iteration_variables: frozenset[str] = frozenset(),
-):
-    """Rewrite the ComponentRefs of a single expression operand in place.
+    operand: ast.ComponentRef, scope: InstanceClass, ctx: FlatteningContext
+) -> ast.ComponentRef | ast.Primary: ...
+
+
+@overload
+def _rewrite_operand(
+    operand: _OperandT, scope: InstanceClass, ctx: FlatteningContext
+) -> _OperandT: ...
+
+
+def _rewrite_operand(operand, scope: InstanceClass, ctx: FlatteningContext):
+    """Rewrite in place the ComponentRefs of one expression operand.
 
     Returns the operand, or the Primary replacing it when it names an inlined
-    constant (see _rewrite_cref_in_place).
+    constant.
     """
     if isinstance(operand, ast.ComponentRef):
-        replacement = _rewrite_cref_in_place(
-            operand, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
-        )
+        replacement = _rewrite_cref_in_place(operand, scope, ctx)
         return operand if replacement is None else replacement
     if isinstance(operand, list):
         # Multi-output function call target, or an assignment statement's targets.
-        _rewrite_operand_list(
-            operand, scope, flat_class, name_flat_class, guard, opts, prefix, iteration_variables
-        )
+        _rewrite_operand_list(operand, scope, ctx)
     elif isinstance(operand, ast.Expression):
-        _rewrite_operand_list(
-            operand.operands,
-            scope,
-            flat_class,
-            name_flat_class,
-            guard,
-            opts,
-            prefix,
-            iteration_variables,
-        )
+        _rewrite_operand_list(operand.operands, scope, ctx)
     elif isinstance(operand, ast.Array):
-        _rewrite_operand_list(
-            operand.values,
-            scope,
-            flat_class,
-            name_flat_class,
-            guard,
-            opts,
-            prefix,
-            iteration_variables,
-        )
+        _rewrite_operand_list(operand.values, scope, ctx)
     elif isinstance(operand, ast.IfExpression):
-        _rewrite_operand_list(
-            operand.conditions,
-            scope,
-            flat_class,
-            name_flat_class,
-            guard,
-            opts,
-            prefix,
-            iteration_variables,
-        )
-        _rewrite_operand_list(
-            operand.expressions,
-            scope,
-            flat_class,
-            name_flat_class,
-            guard,
-            opts,
-            prefix,
-            iteration_variables,
-        )
+        _rewrite_operand_list(operand.conditions, scope, ctx)
+        _rewrite_operand_list(operand.expressions, scope, ctx)
     elif isinstance(operand, ast.Slice):
         for attr in ("start", "stop", "step"):
-            setattr(
-                operand,
-                attr,
-                _rewrite_operand(
-                    getattr(operand, attr),
-                    scope,
-                    flat_class,
-                    name_flat_class,
-                    guard,
-                    opts,
-                    prefix,
-                    iteration_variables,
-                ),
-            )
+            setattr(operand, attr, _rewrite_operand(getattr(operand, attr), scope, ctx))
     return operand
 
 
 def _resolve_expression(
     expr: ast.Expression,
     scope: InstanceClass,
-    flat_class: InstanceClass,
-    *,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    name_flat_class: InstanceClass | None = None,
+    ctx: FlatteningContext,
 ) -> int | float | bool | str | None:
     """Calculate the given expression or return None if not possible"""
     assert isinstance(expr, ast.Expression)
-    listener = ExpressionEvaluator(
-        scope=scope,
-        flat_class=flat_class,
-        guard=guard,
-        opts=opts,
-        name_flat_class=name_flat_class,
-    )
+    listener = ExpressionEvaluator(scope, ctx)
     walker = TreeWalker()
     walker.walk(listener, expr)
     return listener.result
@@ -969,182 +795,90 @@ def _is_inner_connector(ref: ast.ComponentRef, instance: InstanceClass) -> bool:
     return True
 
 
-@overload
-def _inline_equation_side(
-    node: ast.ComponentRef,
-    scope: InstanceClass,
-    flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    prefix: str | None = None,
-    iteration_variables: frozenset[str] = frozenset(),
-) -> ast.ComponentRef | ast.Primary: ...
-
-
-@overload
-def _inline_equation_side(
-    node: _OperandT,
-    scope: InstanceClass,
-    flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    prefix: str | None = None,
-    iteration_variables: frozenset[str] = frozenset(),
-) -> _OperandT: ...
-
-
-def _inline_equation_side(
-    node,
-    scope: InstanceClass,
-    flat_class: InstanceClass,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    prefix: str | None = None,
-    iteration_variables: frozenset[str] = frozenset(),
-):
-    """Resolve every ComponentRef in an equation/statement operand to its flat
-    name in place (fast path or full name resolution, see _rewrite_cref_in_place),
-    inlining any that reference a constant never instantiated as a flat symbol
-    (e.g. a package constant used directly) per MLS 5.6.2.
-
-    The operand is returned rather than only mutated because a bare ComponentRef
-    naming a constant is replaced outright, by an ast.Primary holding its value.
-    Every slot this is assigned back to accepts a Primary, bar an assignment
-    statement's own targets, which can never name a constant.
-    """
-    return _rewrite_operand(
-        node, scope, flat_class, flat_class, guard, opts, prefix, iteration_variables
-    )
-
-
 def _enter_for_indices(
     indices,
     scope: InstanceClass,
-    flat_class: InstanceClass,
-    prefix: str,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    iteration_variables: frozenset[str],
-) -> frozenset[str]:
-    """Resolve a for-loop's own range expressions and return the set for its body.
+    ctx: FlatteningContext,
+) -> FlatteningContext:
+    """Resolve a for-loop's own range expressions and return the context for its body.
 
     A range (`1:n` in `for i in 1:n loop`) is never in scope of its own index, but
     a later for-index is shorthand for a nested loop, so its range sees the
     indices before it (MLS 11.2.2).
     """
     for idx in indices:
-        idx.expression = _inline_equation_side(
-            idx.expression, scope, flat_class, guard, opts, prefix, iteration_variables
-        )
-        iteration_variables = iteration_variables | {idx.name}
-    return iteration_variables
+        idx.expression = _rewrite_operand(idx.expression, scope, ctx)
+        ctx = replace(ctx, iteration_variables=ctx.iteration_variables | {idx.name})
+    return ctx
 
 
 def _resolve_equation_refs(
     node,
     scope: InstanceClass,
-    flat_class: InstanceClass,
-    prefix: str,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    iteration_variables: frozenset[str] = frozenset(),
+    ctx: FlatteningContext,
 ) -> None:
     """Recursively resolve ComponentRefs throughout an equation to their flat
     names, inlining constants along the way, including inside for/if/when bodies."""
     if isinstance(node, ast.Equation):
-        node.left = _inline_equation_side(
-            node.left, scope, flat_class, guard, opts, prefix, iteration_variables
-        )
-        node.right = _inline_equation_side(
-            node.right, scope, flat_class, guard, opts, prefix, iteration_variables
-        )
+        node.left = _rewrite_operand(node.left, scope, ctx)
+        node.right = _rewrite_operand(node.right, scope, ctx)
     elif isinstance(node, ast.Function):
-        _rewrite_operand_list(
-            node.arguments, scope, flat_class, flat_class, guard, opts, prefix, iteration_variables
-        )
+        _rewrite_operand_list(node.arguments, scope, ctx)
     elif isinstance(node, ast.ConnectClause):
-        _collapse_to_flat_name(node.left, prefix)
-        _collapse_to_flat_name(node.right, prefix)
+        assert ctx.prefix is not None
+        _collapse_to_flat_name(node.left, ctx.prefix)
+        _collapse_to_flat_name(node.right, ctx.prefix)
     elif isinstance(node, ast.ForEquation):
-        iteration_variables = _enter_for_indices(
-            node.indices, scope, flat_class, prefix, guard, opts, iteration_variables
-        )
+        ctx = _enter_for_indices(node.indices, scope, ctx)
         for sub in node.equations:
-            _resolve_equation_refs(sub, scope, flat_class, prefix, guard, opts, iteration_variables)
+            _resolve_equation_refs(sub, scope, ctx)
     elif isinstance(node, (ast.IfEquation, ast.WhenEquation)):
-        node.conditions = [
-            _inline_equation_side(cond, scope, flat_class, guard, opts, prefix, iteration_variables)
-            for cond in node.conditions
-        ]
+        node.conditions = [_rewrite_operand(cond, scope, ctx) for cond in node.conditions]
         for block in node.blocks:
             for i, item in enumerate(block):
                 if isinstance(item, ast.Expression):
-                    block[i] = _inline_equation_side(
-                        item, scope, flat_class, guard, opts, prefix, iteration_variables
-                    )
+                    block[i] = _rewrite_operand(item, scope, ctx)
                 else:
-                    _resolve_equation_refs(
-                        item, scope, flat_class, prefix, guard, opts, iteration_variables
-                    )
+                    _resolve_equation_refs(item, scope, ctx)
 
 
 def _resolve_statement_refs(
     node,
     scope: InstanceClass,
-    flat_class: InstanceClass,
-    prefix: str,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    iteration_variables: frozenset[str] = frozenset(),
+    ctx: FlatteningContext,
 ) -> None:
     """Recursively resolve ComponentRefs throughout an algorithm statement to
     their flat names, mirroring _resolve_equation_refs for equations."""
     if isinstance(node, ast.AssignmentStatement):
         # An assignment target names a variable, never a constant, so it is only
         # ever rewritten in place, never replaced by a literal.
-        node.left = _inline_equation_side(
-            node.left, scope, flat_class, guard, opts, prefix, iteration_variables
-        )
-        node.right = _inline_equation_side(
-            node.right, scope, flat_class, guard, opts, prefix, iteration_variables
-        )
+        node.left = _rewrite_operand(node.left, scope, ctx)
+        node.right = _rewrite_operand(node.right, scope, ctx)
     elif isinstance(node, ast.ForStatement):
-        iteration_variables = _enter_for_indices(
-            node.indices, scope, flat_class, prefix, guard, opts, iteration_variables
-        )
+        ctx = _enter_for_indices(node.indices, scope, ctx)
         for sub in node.statements:
-            _resolve_statement_refs(
-                sub, scope, flat_class, prefix, guard, opts, iteration_variables
-            )
+            _resolve_statement_refs(sub, scope, ctx)
     elif isinstance(node, (ast.IfStatement, ast.WhenStatement)):
-        node.conditions = [
-            _inline_equation_side(cond, scope, flat_class, guard, opts, prefix, iteration_variables)
-            for cond in node.conditions
-        ]
+        node.conditions = [_rewrite_operand(cond, scope, ctx) for cond in node.conditions]
         for block in node.blocks:
             for item in block:
-                _resolve_statement_refs(
-                    item, scope, flat_class, prefix, guard, opts, iteration_variables
-                )
+                _resolve_statement_refs(item, scope, ctx)
     elif isinstance(node, ast.WhileStatement):
-        node.condition = _inline_equation_side(
-            node.condition, scope, flat_class, guard, opts, prefix, iteration_variables
-        )
+        node.condition = _rewrite_operand(node.condition, scope, ctx)
         for item in node.statements:
-            _resolve_statement_refs(
-                item, scope, flat_class, prefix, guard, opts, iteration_variables
-            )
+            _resolve_statement_refs(item, scope, ctx)
 
 
 def _collect_and_resolve_equations(
     instance: InstanceClass,
-    flat_class: InstanceClass,
     prefix: str,
-    *,
-    guard: RecursionGuard,
-    opts: LookupOptions,
+    ctx: FlatteningContext,
 ) -> None:
-    """Deep-copy equations from *instance*, resolve refs, append to *flat_class*."""
+    """Deep-copy equations from *instance*, resolve refs, append to ``ctx.flat_class``."""
+    # Equation/statement context: enable the composite-flat-name fast path and
+    # name renaming relative to the flat root (see _rewrite_cref_in_place).
+    ctx = replace(ctx, name_flat_class=ctx.flat_class, prefix=prefix)
+    flat_class = ctx.flat_class
     walker = TreeWalker()
     func_resolver = _FunctionCallResolver(instance, flat_class.functions)
 
@@ -1167,25 +901,25 @@ def _collect_and_resolve_equations(
             _collapse_to_flat_name(eq_copy.right, prefix)
         else:
             walker.walk(func_resolver, eq_copy)
-            _resolve_equation_refs(eq_copy, instance, flat_class, prefix, guard, opts)
+            _resolve_equation_refs(eq_copy, instance, ctx)
         flat_class.equations.append(eq_copy)
 
     for eq in initial_equations:
         eq_copy = copy.deepcopy(eq)
         walker.walk(func_resolver, eq_copy)
-        _resolve_equation_refs(eq_copy, instance, flat_class, prefix, guard, opts)
+        _resolve_equation_refs(eq_copy, instance, ctx)
         flat_class.initial_equations.append(eq_copy)
 
     for stmt in statements:
         stmt_copy = copy.deepcopy(stmt)
         walker.walk(func_resolver, stmt_copy)
-        _resolve_statement_refs(stmt_copy, instance, flat_class, prefix, guard, opts)
+        _resolve_statement_refs(stmt_copy, instance, ctx)
         flat_class.statements.append(stmt_copy)
 
     for stmt in initial_statements:
         stmt_copy = copy.deepcopy(stmt)
         walker.walk(func_resolver, stmt_copy)
-        _resolve_statement_refs(stmt_copy, instance, flat_class, prefix, guard, opts)
+        _resolve_statement_refs(stmt_copy, instance, ctx)
         flat_class.initial_statements.append(stmt_copy)
 
 
@@ -1563,11 +1297,7 @@ def _flat_name_from_scope(
 def _resolve_name(
     name: str | ast.ComponentRef,
     scope: InstanceClass | ast.Class,
-    flat_class: InstanceClass,
-    *,
-    guard: RecursionGuard,
-    opts: LookupOptions,
-    name_flat_class: InstanceClass | None = None,
+    ctx: FlatteningContext,
 ) -> InstanceClass | InstanceSymbol:
     """Resolve a name reference and return a flat-named element.
 
@@ -1577,13 +1307,14 @@ def _resolve_name(
 
     - ``scope``: where to look the name up (the syntactic scope where the reference
       appears, e.g. the base class containing a modification expression).
-    - ``flat_class`` / ``name_flat_class``: the root model relative to which the
-      returned element's flat path is computed.  ``flat_class`` is also where the
-      element is cached/registered; ``name_flat_class`` overrides the naming root
-      without touching ``flat_class.symbols``.
+    - ``ctx.flat_class`` / ``ctx.name_flat_class``: the root model relative to which
+      the returned element's flat path is computed.  ``ctx.flat_class`` is also where
+      the element is cached/registered; ``ctx.name_flat_class`` overrides the naming
+      root without touching ``ctx.flat_class.symbols``.
 
-    Pass ``name_flat_class`` when ``scope`` and the flat-naming root differ — for
-    example, when resolving a ComponentRef that appears in a modification value
+    Pass a ``replace()`` variant of the context with ``name_flat_class`` set when
+    ``scope`` and the flat-naming root differ - for example, when resolving a
+    ComponentRef that appears in a modification value
     (``_resolve_modification_attribute``).  When ``name_flat_class`` is given the
     returned element is a clone with the correct flat name, but it is *not*
     registered in ``name_flat_class.symbols``; the element will be registered
@@ -1597,10 +1328,10 @@ def _resolve_name(
 
     # When scope is a raw ast.Class (not yet an InstanceClass), find the
     # corresponding InstanceClass by walking up the instance tree from
-    # flat_class.  This happens for deeply-nested modifications whose scope
+    # ctx.flat_class.  This happens for deeply-nested modifications whose scope
     # wasn't resolved to an InstanceClass during instantiation.
     if not isinstance(scope, InstanceClass):
-        current = flat_class
+        current = ctx.flat_class
         while current is not None:
             if isinstance(current, InstanceClass) and (
                 current.ast_ref is scope
@@ -1611,7 +1342,8 @@ def _resolve_name(
             current = getattr(current, "parent_instance", None)
         if not isinstance(scope, InstanceClass):
             raise FlatteningError(
-                f"Unable to find instance for scope {scope.full_name} from {flat_class.full_name}"
+                f"Unable to find instance for scope {scope.full_name} "
+                f"from {ctx.flat_class.full_name}"
             )
 
     # Step C: Fully instantiate the scope class if needed.
@@ -1623,16 +1355,16 @@ def _resolve_name(
             scope,
             ast.ClassModification(),
             scope.parent_instance,  # type: ignore[arg-type]
-            guard=guard,
-            opts=opts,
+            guard=ctx.guard,
+            opts=ctx.opts,
             update_parent_instance=bool(scope.name),
         )
 
     found = _find_name(
         scope,
         name,
-        guard,
-        LookupOptions(instantiate_in_place=opts.instantiate_in_place),
+        ctx.guard,
+        LookupOptions(instantiate_in_place=ctx.opts.instantiate_in_place),
     )
     if found is None:
         raise ModelicaSemanticError(f"Unable to resolve {name} in scope {scope.full_name}")
@@ -1647,8 +1379,8 @@ def _resolve_name(
             found,
             scope,
             ast.ClassModification(),
-            guard=guard,
-            opts=opts,
+            guard=ctx.guard,
+            opts=ctx.opts,
         )
     else:
         element = found
@@ -1659,13 +1391,13 @@ def _resolve_name(
     # modification-value clones.  Multiple modifications referencing the same symbol
     # will receive distinct clones — safe as long as consumers key off the name string
     # rather than object identity (which is the current convention).
-    if name_flat_class is not None:
+    if (name_flat_class := ctx.name_flat_class) is not None:
         root_tuple = tuple(name_flat_class.full_instance_name.split("."))
         if element_instance_name_tuple(element)[: len(root_tuple)] == root_tuple:
             flat_name = _flatten_name(element, name_flat_class.full_instance_name)
         else:
             # element was found through the class tree so rebuild the flat name
-            flat_name = _flat_name_from_scope(element, scope, flat_class, name_flat_class)
+            flat_name = _flat_name_from_scope(element, scope, ctx.flat_class, name_flat_class)
             if flat_name is None:
                 flat_name = _flatten_name(element, name_flat_class.full_instance_name)
         element = element.clone()
@@ -1674,6 +1406,7 @@ def _resolve_name(
         element.parent = name_flat_class
         return cast(InstanceClass | InstanceSymbol, element)
 
+    flat_class = ctx.flat_class
     flat_name = _flatten_name(element, flat_class.full_instance_name)
 
     # Check to see if the name is already resolved
