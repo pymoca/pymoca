@@ -3,7 +3,12 @@
 import json
 import math
 
-from library_suite import assert_fingerprint_matches, assert_objective_close, compare_csv
+from library_suite import (
+    assert_fingerprint_matches,
+    assert_objective_close,
+    compare_csv,
+    suite_names,
+)
 
 import pytest
 
@@ -57,3 +62,7 @@ def test_objective_fallback_rejects_non_numeric_cell(tmp_path):
     actual.write_text("time,Q\n0,1.0\n1,n/a\n")
     with pytest.raises(AssertionError, match="non-numeric cell"):
         assert_objective_close(actual, reference, "Q", rel_tol=1e-4, cause=AssertionError())
+
+
+def test_sweep_cli_offers_only_sweepable_suites():
+    assert "rtc_tools" not in suite_names(sweepable=True)
