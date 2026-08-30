@@ -4,7 +4,8 @@ A plain helper module imported by name, like conftest_parse.py - not a
 conftest. Compiles named cases through the CasADi backend, compares their
 flattened structure against golden fingerprints, and compares exported
 timeseries CSVs against reference data. Discovers a library's cases into a
-checked-in manifest and reports when that manifest goes stale.
+checked-in manifest and reports when that manifest goes stale. Registers the
+suites the regeneration and sweep CLIs load by name.
 """
 
 from __future__ import annotations
@@ -305,6 +306,23 @@ def read_manifest(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def manifest_entries(discovery: LibraryDiscovery) -> list:
+    """Entries from a discovery's manifest, empty when none is written yet.
+
+    A missing manifest is not an error: the regeneration CLI imports a suite
+    module to reach its discovery, so discovery has to work before a manifest
+    exists. A suite's own staleness test is what reports the gap.
+    """
+    if not discovery.manifest_path.is_file():
+        return []
+    return read_manifest(discovery.manifest_path)["models"]
+
+
+def manifest_models(discovery: LibraryDiscovery) -> list[str]:
+    """Model names from a discovery's manifest."""
+    return [entry_name(entry) for entry in manifest_entries(discovery)]
+
+
 def write_manifest(discovery: LibraryDiscovery) -> Path:
     """Discover models and write the manifest, returning its path."""
     manifest = {
@@ -332,12 +350,32 @@ def manifest_staleness(discovery: LibraryDiscovery, suite_name: str) -> Optional
 
 
 # ---------------------------------------------------------------------------
-# Golden regeneration CLI
+# Suite registry and golden regeneration CLI
 # ---------------------------------------------------------------------------
 
-# Suite name (as passed to --regenerate) -> module under test/ exposing a
+# Suite name (as passed to the command-line tools) -> module under test/ exposing a
 # module-level SUITE: LibrarySuite.
 _SUITE_MODULES = {"msl": "msl_examples_test", "rtc_tools": "rtc_tools_test"}
+
+
+def suite_names(sweepable: bool = False) -> list[str]:
+    """Registered suite names, optionally only those library_sweep can run."""
+    names = sorted(_SUITE_MODULES)
+    if sweepable:
+        names = [name for name in names if load_suite(name).discovery is not None]
+    return names
+
+
+def load_suite(name: str) -> LibrarySuite:
+    """Import a registered suite module and return its LibrarySuite."""
+    import importlib
+    import sys
+
+    module_name = _SUITE_MODULES.get(name)
+    if module_name is None:
+        raise SystemExit(f"unknown suite {name!r}; known: {suite_names()}")
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    return importlib.import_module(module_name).SUITE
 
 
 def _iter_selected(cases: list[LibraryCase], only: str):
@@ -362,21 +400,13 @@ def regenerate(cases: list[LibraryCase], expected_dir: Path, only: str = ""):
 
 def main(argv=None):
     import argparse
-    import importlib
-    import sys
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--regenerate", required=True, help="suite name, e.g. rtc_tools")
     ap.add_argument("--only", default="", help="comma-separated example names to include")
     args = ap.parse_args(argv)
 
-    module_name = _SUITE_MODULES.get(args.regenerate)
-    if module_name is None:
-        raise SystemExit(f"unknown suite {args.regenerate!r}; known: {sorted(_SUITE_MODULES)}")
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    module = importlib.import_module(module_name)
-    suite = module.SUITE
+    suite = load_suite(args.regenerate)
     # A suite regenerates its discovery manifest, its golden fingerprints, or both.
     if suite.discovery is not None:
         print(f"discovering {suite.discovery.library} ...")

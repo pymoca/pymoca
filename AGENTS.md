@@ -15,7 +15,7 @@ pytest -m msl test -n auto        # MSL examples pipeline suite (slow)
 pytest -m rtc_tools test -n auto  # RTC-Tools example suite (slow)
 pytest -m "" test -n auto         # everything, fast plus every library suite (slowest)
 python test/library_suite.py --regenerate <suite>  # after bumping a library submodule
-python test/msl_examples_test.py  # MSL pipeline CLI (pass -h for options)
+python test/library_sweep.py msl  # library sweep CLI (pass -h for options)
 tox -e py                         # via tox
 tox -e coverage                   # with coverage
 ```

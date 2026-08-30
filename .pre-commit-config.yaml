@@ -31,4 +31,4 @@ repos:
     hooks:
       - id: pyright
         additional_dependencies: [pytest, numpy]
-        files: '^(src/pymoca/.*|test/(msl_examples_test|library_suite|rtc_tools_test))\.py$'
+        files: '^(src/pymoca/.*|test/(msl_examples_test|library_suite|library_sweep|rtc_tools_test))\.py$'
