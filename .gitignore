@@ -80,7 +80,7 @@ pytest.ini
 .pytest_cache/
 
 Untitled.ipynb
-jit_tmp.c
+jit_tmp*.c
 tmp*.o
 *.orig
 *.pymoca_cache
