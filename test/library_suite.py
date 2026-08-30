@@ -3,7 +3,8 @@
 A plain helper module imported by name, like conftest_parse.py - not a
 conftest. Compiles named cases through the CasADi backend, compares their
 flattened structure against golden fingerprints, and compares exported
-timeseries CSVs against reference data.
+timeseries CSVs against reference data. Discovers a library's cases into a
+checked-in manifest and reports when that manifest goes stale.
 """
 
 from __future__ import annotations
@@ -11,10 +12,13 @@ from __future__ import annotations
 import csv
 import json
 import math
+import subprocess
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
+
+from pymoca import ast, parser
 
 import pytest
 
@@ -29,10 +33,25 @@ class LibraryCase:
     modelicapath: str = ""
 
 
+# Packages whose classes are candidate cases, and the class kinds a case can be.
+_EXAMPLE_PACKAGES = ("Examples",)
+_CASE_CLASS_TYPES = ("model", "block")
+
+
+@dataclass
+class LibraryDiscovery:
+    """Rule for generating a suite's model list from a Modelica checkout."""
+
+    library: str
+    root: Path
+    manifest_path: Path
+
+
 @dataclass
 class LibrarySuite:
     expected_dir: Path
     cases: list[LibraryCase]
+    discovery: Optional[LibraryDiscovery] = None
 
 
 def build_params(
@@ -217,12 +236,107 @@ def assert_objective_close(
 
 
 # ---------------------------------------------------------------------------
+# Discovery and manifests
+# ---------------------------------------------------------------------------
+
+
+def entry_name(entry) -> str:
+    """Model name of a manifest entry."""
+    return entry if isinstance(entry, str) else entry["name"]
+
+
+def walk_classes(root: ast.Class) -> Iterator[tuple[str, ast.Class]]:
+    """Yield (qualified name, class) for every class under an example package.
+
+    Membership latches: once a package named in `_EXAMPLE_PACKAGES` is entered,
+    everything below it is a candidate. Packages are traversed but never
+    yielded, since a package cannot be flattened.
+    """
+
+    def walk(cls: ast.Class, path: list[str], in_example: bool) -> Iterator[tuple[str, ast.Class]]:
+        for name, child in cls.classes.items():
+            child_path = path + [name]
+            child_in_example = in_example or name in _EXAMPLE_PACKAGES
+            if child_in_example and child.type != "package":
+                # Class prefixes like `partial` read as their defaults until the class parses.
+                _ = child.extends
+                yield ".".join(child_path), child
+            if child.type == "package":
+                yield from walk(child, child_path, child_in_example)
+
+    yield from walk(root, [], False)
+
+
+def discover_models(discovery: LibraryDiscovery) -> list:
+    """Run a discovery rule and return its sorted manifest entries."""
+    tree = parser.modelicapath_to_tree([str(discovery.root)])
+    return sorted(
+        name
+        for name, cls in walk_classes(tree)
+        # A partial class cannot be instantiated, so it can never be simulated.
+        if cls.type in _CASE_CLASS_TYPES and not cls.partial
+    )
+
+
+def _git(root: Path, *args: str) -> Optional[str]:
+    """Run git in `root`, returning None when git or the checkout is unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def library_sha(root: Path) -> Optional[str]:
+    return _git(root, "rev-parse", "HEAD")
+
+
+def library_describe(root: Path) -> Optional[str]:
+    return _git(root, "describe", "--tags", "--always")
+
+
+def read_manifest(path: Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def write_manifest(discovery: LibraryDiscovery) -> Path:
+    """Discover models and write the manifest, returning its path."""
+    manifest = {
+        "library": discovery.library,
+        "sha": library_sha(discovery.root),
+        "describe": library_describe(discovery.root),
+        "models": discover_models(discovery),
+    }
+    discovery.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    discovery.manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return discovery.manifest_path
+
+
+def manifest_staleness(discovery: LibraryDiscovery, suite_name: str) -> Optional[str]:
+    """Describe why a manifest is out of date, or None when it is current."""
+    manifest = read_manifest(discovery.manifest_path)
+    rerun = f"rerun: python test/library_suite.py --regenerate {suite_name}"
+    actual = library_sha(discovery.root)
+    recorded = manifest.get("sha")
+    if actual is None or recorded is None:
+        return None
+    if actual != recorded:
+        return f"{discovery.library} moved {recorded[:7]} -> {actual[:7]}; {rerun}"
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Golden regeneration CLI
 # ---------------------------------------------------------------------------
 
 # Suite name (as passed to --regenerate) -> module under test/ exposing a
 # module-level SUITE: LibrarySuite.
-_SUITE_MODULES = {"rtc_tools": "rtc_tools_test"}
+_SUITE_MODULES = {"msl": "msl_examples_test", "rtc_tools": "rtc_tools_test"}
 
 
 def _iter_selected(cases: list[LibraryCase], only: str):
@@ -261,7 +375,15 @@ def main(argv=None):
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     module = importlib.import_module(module_name)
-    regenerate(module.SUITE.cases, module.SUITE.expected_dir, only=args.only)
+    suite = module.SUITE
+    # A suite regenerates its discovery manifest, its golden fingerprints, or both.
+    if suite.discovery is not None:
+        print(f"discovering {suite.discovery.library} ...")
+        path = write_manifest(suite.discovery)
+        count = len(read_manifest(path)["models"])
+        print(f"  wrote {path} ({count} models)")
+    if suite.cases:
+        regenerate(suite.cases, suite.expected_dir, only=args.only)
 
 
 if __name__ == "__main__":

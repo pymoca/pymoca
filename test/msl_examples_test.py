@@ -12,6 +12,16 @@ import sys
 import time
 import traceback
 from multiprocessing import Pool
+from pathlib import Path
+
+from library_suite import (
+    LibraryDiscovery,
+    LibrarySuite,
+    entry_name,
+    library_sha,
+    manifest_staleness,
+    read_manifest,
+)
 
 try:
     import resource  # Unix only.
@@ -28,6 +38,7 @@ import pytest  # type: ignore[import-untyped]
 MY_DIR = os.path.dirname(os.path.realpath(__file__))
 MSL4_BASE_DIR = os.path.join(MY_DIR, "libraries", "MSL-4.0.x")
 MSL4_AVAILABLE = os.path.isfile(os.path.join(MSL4_BASE_DIR, "Modelica", "package.mo"))
+EXPECTED_DIR = Path(MY_DIR) / "expected" / "msl"
 
 # Known-missing feature to error signature map to xfail
 KNOWN_MISSING_FEATURES = {
@@ -60,36 +71,31 @@ MSL_SMOKE_MODELS = frozenset(
 # Discovery
 # ---------------------------------------------------------------------------
 
-# MSL tree of lazy-parse stubs, built once at import and shared by every test in
-# the process (--forked children inherit it copy-on-write). Building the tree is
-# cheap. Walking it in _discover_model_names parses every MSL package file.
-_msl_tree = parser.modelicapath_to_tree([MSL4_BASE_DIR]) if MSL4_AVAILABLE else None
+# Model names come from a checked-in manifest rather than a walk of the parsed
+# MSL, so importing this module costs a JSON read. Regenerate it whenever the
+# MSL-4.0.x submodule pointer moves (test_msl_manifest_current fails until you
+# do):  python test/library_suite.py --regenerate msl
+DISCOVERY = LibraryDiscovery(
+    library="MSL-4.0.x",
+    root=Path(MSL4_BASE_DIR),
+    manifest_path=EXPECTED_DIR / "manifest.json",
+)
+
+# MSL tree of lazy-parse stubs, shared by every test in the process (--forked
+# children inherit it copy-on-write). Built on first use, not at import, so a
+# run that collects but never flattens (the default fast suite) does not pay it.
+_msl_tree = None
 
 
-def _discover_model_names() -> list[str]:
-    """Return sorted qualified names of every model/block inside an Examples
-    sub-package anywhere in the MSL.
+def _get_msl_tree():
+    global _msl_tree
+    if _msl_tree is None:
+        _msl_tree = parser.modelicapath_to_tree([MSL4_BASE_DIR])
+    return _msl_tree
 
-    Uses the parsed AST so that examples defined inline inside package.mo (e.g.
-    Modelica.Blocks, Modelica.Media) are found at any nesting depth, not just
-    direct file-based children.  Only model/block classes are collected;
-    packages are traversed but never added (packages cannot be flattened).
-    """
-    parsed = _msl_tree
-    names: list[str] = []
 
-    def walk(cls, path: list[str], in_examples: bool) -> None:
-        for child_name, child in cls.classes.items():
-            child_path = path + [child_name]
-            child_in_examples = in_examples or child_name == "Examples"
-            if child_in_examples and child.type in ("model", "block"):
-                names.append(".".join(child_path))
-            if child.type == "package":
-                walk(child, child_path, child_in_examples)
-
-    walk(parsed, [], False)
-    return sorted(names)
-
+# No cases: this suite regenerates a discovery manifest, not golden fingerprints.
+SUITE = LibrarySuite(expected_dir=EXPECTED_DIR, cases=[], discovery=DISCOVERY)
 
 # ---------------------------------------------------------------------------
 # Pytest tests
@@ -103,42 +109,61 @@ def _discover_model_names() -> list[str]:
 # default, because fork() from a multi-threaded xdist worker is deadlock-prone
 # (DeprecationWarning under Python 3.12+).
 pytestmark = [
-    pytest.mark.library,
     pytest.mark.skipif(not MSL4_AVAILABLE, reason="MSL-4.0.x submodule not initialized"),
 ]
 
 
-# Yield the shared import-time tree: flattening never mutates the parsed AST
-# (guarded by the pickle checks in conftest_parse), so tests can reuse one tree.
+# Yield the shared tree: flattening never mutates the parsed AST (guarded by the
+# pickle checks in conftest_parse), so tests can reuse one tree.
 @pytest.fixture(scope="function")
 def msl_tree():
-    yield _msl_tree
+    yield _get_msl_tree()
     # Flattening builds large cyclic InstanceClass graphs that reference counting
     # alone can't reclaim. Force a collection between models so in-process runs
     # don't accumulate cyclic garbage (mirrors gc.collect() in _process_one).
     gc.collect()
 
 
+def _model_names() -> list[str]:
+    """Model names from the manifest, empty when it has yet to be generated.
+
+    Missing is not an error here: the regeneration CLI imports this module to
+    reach SUITE, so discovery has to work before a manifest exists.
+    test_msl_manifest_current is what reports the gap.
+    """
+    if not DISCOVERY.manifest_path.is_file():
+        return []
+    return [entry_name(entry) for entry in read_manifest(DISCOVERY.manifest_path)["models"]]
+
+
 def _parametrize_model_names() -> list:
-    """All discovered model names, with MSL_SMOKE_MODELS carrying the msl_smoke mark."""
-    if os.environ.get("MSL_SMOKE_ONLY"):
-        # Skip discovery so only the packages the smoke models need get parsed.
-        # A typo in MSL_SMOKE_MODELS fails that test's flatten, so CI stays red.
-        return [pytest.param(n, marks=pytest.mark.msl_smoke) for n in sorted(MSL_SMOKE_MODELS)]
-    names = _discover_model_names()
+    """All manifest model names, with MSL_SMOKE_MODELS carrying the msl_smoke mark."""
+    names = _model_names()
+    if not names:
+        return []
     missing = MSL_SMOKE_MODELS - set(names)
-    assert not missing, f"MSL_SMOKE_MODELS not in discovered models: {sorted(missing)}"
+    assert not missing, f"MSL_SMOKE_MODELS not in the manifest: {sorted(missing)}"
     return [
         pytest.param(n, marks=pytest.mark.msl_smoke) if n in MSL_SMOKE_MODELS else n for n in names
     ]
 
 
 @pytest.mark.msl
-# The __main__ guard keeps CLI startup (e.g. --help) from paying the full MSL
-# parse that discovery triggers. The CLI discovers after argparse instead.
-@pytest.mark.parametrize(
-    "model_name", _parametrize_model_names() if MSL4_AVAILABLE and __name__ != "__main__" else []
-)
+def test_msl_manifest_current():
+    """Fail with the regeneration command when the manifest no longer matches MSL."""
+    if library_sha(DISCOVERY.root) is None:
+        pytest.skip("MSL-4.0.x is not a git checkout")
+    assert DISCOVERY.manifest_path.is_file(), (
+        f"{DISCOVERY.manifest_path} is missing; "
+        "rerun: python test/library_suite.py --regenerate msl"
+    )
+    staleness = manifest_staleness(DISCOVERY, "msl")
+    assert staleness is None, staleness
+
+
+@pytest.mark.library
+@pytest.mark.msl
+@pytest.mark.parametrize("model_name", _parametrize_model_names() if MSL4_AVAILABLE else [])
 def test_msl_example(model_name, msl_tree):
     try:
         flat_instance = tree.flatten_class(msl_tree, model_name)
@@ -277,7 +302,7 @@ def process_every_MSL_example(
     options: dict | None = None,
 ) -> int:
     """Run every selected model and return the number of failures."""
-    model_names = _discover_model_names()
+    model_names = _model_names()
     if filters:
         model_names = [n for n in model_names if any(f in n for f in filters)]
     if omits:
