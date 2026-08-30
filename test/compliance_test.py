@@ -358,11 +358,13 @@ def _find_composite_binding(sym):
         if isinstance(current, InstanceSymbol):
             for arg in current.modification_environment.arguments:
                 em = arg.value
-                if hasattr(em, "component") and str(em.component) == "value":
-                    if hasattr(em, "modifications") and em.modifications:
-                        ref = em.modifications[0]
-                        if isinstance(ref, (str, ast.ComponentRef)):
-                            return str(ref), current.name
+                if str(getattr(em, "component", "")) != "value":
+                    continue
+                modifications = getattr(em, "modifications", None)
+                if modifications:
+                    ref = modifications[0]
+                    if isinstance(ref, (str, ast.ComponentRef)):
+                        return str(ref), current.name
             break  # Only check the immediate parent symbol
         current = getattr(current, "parent_instance", None)
     return None
