@@ -5,15 +5,10 @@ import sys
 
 import pytest  # type: ignore[import-untyped]
 
-# Exclude the MSL test file from normal collection: it parses the entire MSL
-# library at import time to build parametrize params, which adds several seconds
-# to every pytest run even when MSL tests are deselected.  Run them explicitly:
-#   pytest test/msl_examples_test.py
-# Also exclude test/libraries: it holds submodule checkouts, not pymoca's own
-# tests, and rtc-tools vendors its own pytest suite that needs rtctools
-# installed to even collect.
+# Exclude test/libraries: it holds submodule checkouts, not pymoca's own tests,
+# and rtc-tools vendors its own pytest suite that needs rtctools installed to
+# even collect.
 collect_ignore = [
-    os.path.join(os.path.dirname(__file__), "msl_examples_test.py"),
     os.path.join(os.path.dirname(__file__), "libraries"),
 ]
 
@@ -39,17 +34,6 @@ def pytest_configure(config):
     # pytest-forked provides this marker; register it too so it isn't an unknown
     # mark (warning, or error under --strict-markers) when forked isn't installed.
     config.addinivalue_line("markers", "forked: run each test in a forked subprocess")
-
-    # pyproject.toml's addopts deselects library-marked tests by default (they're
-    # slow and require submodules). msl_examples_test.py is excluded from normal
-    # collection above, so it is only ever collected when named explicitly; in that
-    # case the default "-m 'not library'" is redundant and would silently deselect
-    # every test it collects. Drop it so `pytest test/msl_examples_test.py` runs
-    # the msl tests without also requiring `-m msl` on the command line.
-    if config.option.markexpr == "not library" and any(
-        "msl_examples_test.py" in arg for arg in config.args
-    ):
-        config.option.markexpr = ""
 
 
 @pytest.hookimpl(optionalhook=True)
