@@ -15,8 +15,10 @@ from multiprocessing import Pool
 from pathlib import Path
 
 from library_suite import (
+    LibraryCase,
     LibraryDiscovery,
     LibrarySuite,
+    build_params,
     entry_name,
     library_sha,
     manifest_staleness,
@@ -97,6 +99,7 @@ def _get_msl_tree():
 # No cases: this suite regenerates a discovery manifest, not golden fingerprints.
 SUITE = LibrarySuite(expected_dir=EXPECTED_DIR, cases=[], discovery=DISCOVERY)
 
+
 # ---------------------------------------------------------------------------
 # Pytest tests
 # ---------------------------------------------------------------------------
@@ -136,16 +139,15 @@ def _model_names() -> list[str]:
     return [entry_name(entry) for entry in read_manifest(DISCOVERY.manifest_path)["models"]]
 
 
-def _parametrize_model_names() -> list:
-    """All manifest model names, with MSL_SMOKE_MODELS carrying the msl_smoke mark."""
-    names = _model_names()
-    if not names:
+def _msl_params() -> list:
+    """All manifest cases, with MSL_SMOKE_MODELS carrying the msl_smoke mark."""
+    cases = [LibraryCase(case_id=name, model_name=name) for name in _model_names()]
+    if not cases:
         return []
-    missing = MSL_SMOKE_MODELS - set(names)
+    missing = MSL_SMOKE_MODELS - {case.case_id for case in cases}
     assert not missing, f"MSL_SMOKE_MODELS not in the manifest: {sorted(missing)}"
-    return [
-        pytest.param(n, marks=pytest.mark.msl_smoke) if n in MSL_SMOKE_MODELS else n for n in names
-    ]
+    # No xfail dict: MSL xfails are matched on the exception, not the case name.
+    return build_params(cases, {}, MSL_SMOKE_MODELS, pytest.mark.msl_smoke)
 
 
 @pytest.mark.msl
@@ -163,10 +165,10 @@ def test_msl_manifest_current():
 
 @pytest.mark.library
 @pytest.mark.msl
-@pytest.mark.parametrize("model_name", _parametrize_model_names() if MSL4_AVAILABLE else [])
-def test_msl_example(model_name, msl_tree):
+@pytest.mark.parametrize("case", _msl_params() if MSL4_AVAILABLE else [])
+def test_msl_example(case: LibraryCase, msl_tree):
     try:
-        flat_instance = tree.flatten_class(msl_tree, model_name)
+        flat_instance = tree.flatten_class(msl_tree, case.model_name)
     except Exception as exc:
         for feature, signature in KNOWN_MISSING_FEATURES.items():
             if signature in str(exc):

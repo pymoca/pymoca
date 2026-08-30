@@ -26,8 +26,9 @@ import pytest
 @dataclass
 class LibraryCase:
     case_id: str
-    model_folder: str
     model_name: str
+    # Empty for a suite that flattens from a shared tree instead of a folder.
+    model_folder: str = ""
     compiler_options: dict[str, Any] = field(default_factory=dict)
     library_folders: list[str] = field(default_factory=list)
     modelicapath: str = ""
