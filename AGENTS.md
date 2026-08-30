@@ -8,10 +8,12 @@ Pymoca: Modelica-to-CAS translator (Python). Parses `.mo` -> AST -> flattens cla
 pip install -e ".[all,test]"      # dev editable install
 python antlr/antlr_build.py       # regenerate parser after editing Modelica.g4
 pre-commit run --all-files        # run pre-commit hook on all (automatic on staged before commit)
-pytest test -n auto               # all tests (parallel)
+pytest test -n auto               # fast tests (parallel); slow library suites deselected
 pytest test/parse_test.py -k X -n auto # single file (parallel)
 pytest test/parse_test.py -k X    # single test (serial, for debugging)
-pytest test/msl_examples_test.py  # run MSL examples pipeline tests (excluded from normal collection)
+pytest -m msl test -n auto        # MSL examples pipeline suite (slow)
+pytest -m rtc_tools test -n auto  # RTC-Tools example suite (slow)
+pytest -m "" test -n auto         # everything, fast plus every library suite (slowest)
 python test/library_suite.py --regenerate <suite>  # after bumping a library submodule
 python test/msl_examples_test.py  # MSL pipeline CLI (pass -h for options)
 tox -e py                         # via tox
