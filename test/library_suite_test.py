@@ -65,4 +65,5 @@ def test_objective_fallback_rejects_non_numeric_cell(tmp_path):
 
 
 def test_sweep_cli_offers_only_sweepable_suites():
+    assert "compliance" not in suite_names(sweepable=True)
     assert "rtc_tools" not in suite_names(sweepable=True)
