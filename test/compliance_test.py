@@ -3,11 +3,15 @@
 import collections
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 from library_suite import (
+    LibraryCase,
     LibraryDiscovery,
     LibrarySuite,
+    build_params,
     library_sha,
     manifest_entries,
     manifest_staleness,
@@ -140,6 +144,27 @@ def discover_compliance_files(subdirectory):
                 }
             )
     return entries
+
+
+@dataclass
+class ComplianceCase(LibraryCase):
+    """A case that is one .mo file with a shouldPass expectation.
+
+    compile_case does not apply: a compliance model is parsed on its own and
+    merged with Icons.mo, so there is no model folder.
+    """
+
+    mo_path: Optional[Path] = None
+    should_pass: bool = True
+
+
+def _make_case(entry) -> ComplianceCase:
+    return ComplianceCase(
+        case_id=entry["name"],
+        model_name=entry["name"],
+        mo_path=COMPLIANCE_ROOT / (entry["name"].replace(".", "/") + ".mo"),
+        should_pass=entry["should_pass"],
+    )
 
 
 def _discover():
@@ -359,19 +384,11 @@ for _model, _reason in _FLATTEN_WIP.items():
     KNOWN_FAILURES[_model] = _reason
 
 
-def build_params():
-    """Build pytest.param list with conditional xfail marks from KNOWN_FAILURES."""
-    params = []
-    for entry in manifest_entries(DISCOVERY):
-        model_name = entry["name"]
-        mo_path = str(COMPLIANCE_ROOT / (model_name.replace(".", "/") + ".mo"))
-        marks = []
-        if model_name in KNOWN_FAILURES:
-            marks.append(pytest.mark.xfail(reason=KNOWN_FAILURES[model_name]))
-        params.append(
-            pytest.param(mo_path, model_name, entry["should_pass"], id=model_name, marks=marks)
-        )
-    return params
+def _compliance_params() -> list:
+    """All manifest cases, xfailed per KNOWN_FAILURES."""
+    return build_params(
+        [_make_case(entry) for entry in manifest_entries(DISCOVERY)], KNOWN_FAILURES
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -531,13 +548,12 @@ def _resolve_symbol_value(flat, var_name, _visited=None):
 
 @pytest.mark.compliance
 @pytest.mark.flattening
-@pytest.mark.parametrize(
-    "mo_path, model_name, should_pass",
-    build_params() if COMPLIANCE_AVAILABLE else [],
-)
-def test_flatten(mo_path, model_name, should_pass):
+@pytest.mark.parametrize("case", _compliance_params() if COMPLIANCE_AVAILABLE else [])
+def test_flatten(case: ComplianceCase):
     """Test that flattening succeeds or fails as expected, with value checking."""
-    if should_pass:
+    mo_path = case.mo_path
+    model_name = case.model_name
+    if case.should_pass:
         ast_tree = load_compliance_model(mo_path)
         assert ast_tree is not None, f"Failed to parse {mo_path}"
         instance = instantiate(ast_tree, model_name)
