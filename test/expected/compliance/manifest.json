@@ -1,0 +1,528 @@
+{
+  "describe": "9734eb1",
+  "library": "Modelica-Compliance",
+  "models": [
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.BaseClassWithReplaceableElement",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.BasicInheritance",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.DuplicateInheritedEqClasses",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.DuplicateInheritedEqComps",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.DuplicateInheritedNeqClasses",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.DuplicateInheritedNeqComps",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.InheritanceScoping",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.InheritanceSections",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.InheritedBaseClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.MultiLevelInheritance",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.MultipleInheritance",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.ProtectedInheritance",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.ReplaceableBaseClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.ReplacedBaseClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Inheritance.Flattening.VisibilityHeadingInheritance",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Modification.Flattening.Array",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Modification.Flattening.Complicated",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Modification.Flattening.Merging1",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Modification.Flattening.Merging2",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Modification.Flattening.Simple",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.BasicBindingRedeclare",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceDimensionClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceDimensionComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceDirection",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceFlow",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceInnerOuterComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceProtectedClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceProtectedComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritancePublicClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritancePublicComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceStream",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceVariabilityConst",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceVariabilityParam",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.InheritanceVisibilityComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Redeclare.Flattening.ReplaceableAsRedeclare",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.MemberAccess.AccessAlgorithm",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.MemberAccess.AccessEquation",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.MemberAccess.AccessMissingAlgorithm",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.MemberAccess.AccessMissingEquation",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.MemberAccess.AccessNestedAlgorithm",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.MemberAccess.AccessNestedEquation",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.FunctionInOperatorLookupViaComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.FunctionLookupViaArrayComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.FunctionLookupViaArrayElement",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.FunctionLookupViaClassComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.FunctionLookupViaComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.FunctionLookupViaCompNonCall",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.FunctionLookupViaNonClassComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.NestedCompLookup",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.NonFunctionLookupViaComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.NonPackageLookupComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.NonPackageLookupEncapsulated",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.NonPackageLookupNonEncapsulated",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.OperatorFunctionLookupViaComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.PackageLookupClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.PackageLookupConstant",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Composite.PartialClassLookup",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.EncapsulatedGlobalLookup",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.EncapsulatedLookupClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.GlobalLookupEncapsulatedElement",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.GlobalLookupNonEncapsulatedElement",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.GlobalPartialClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.LocalNameGlobalLookup",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.NonExistingGlobalName",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.NonPackageLikeClassLookup",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Global.PackageLikeClassLookup",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.EncapsulatedImport",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.ExtendImport",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.ImportLookupLocalScope",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.ImportScopeType",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.ModifyImport",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.QualifiedImport",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.QualifiedImportConflict",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.QualifiedImportNonPackage",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.QualifiedImportProtected",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.Recursive",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.RedeclareImport",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.RenamingImport",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.RenamingImportNonPackage",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.RenamingSingleDefinitionImport",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.SingleDefinitionImport",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.UnqualifiedImport",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.UnqualifiedImportConflict",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.UnqualifiedImportNonConflict",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.UnqualifiedImportNonPackage",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Imports.UnqualifiedImportProtected",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.Encapsulation",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.EnclosingClassLookupClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.EnclosingClassLookupConstant",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.EnclosingClassLookupNonConstant",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.EnclosingClassLookupShadowedConstant",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.ImplicitShadowingFor",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.ImplicitShadowingReduction",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.LocalClassNameLookup",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.LocalCompNameLookup",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.OutsideEncapsulation",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.OutsideEncapsulationMulti",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.QualifiedImportPriority",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.NameLookup.Simple.UnqualifiedImportPriority",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessInheritedProtectedClassInvalid",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessInheritedProtectedCompInvalid",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessProtectedClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessProtectedClassClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessProtectedClassComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessProtectedComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessProtectedCompClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.AccessProtectedCompComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.EnclosingAccessProtectedClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.EnclosingAccessProtectedComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.InheritedAccessProtectedClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.InheritedAccessProtectedComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.LocalAccessProtectedClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.LocalAccessProtectedComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ModifyInheritedProtectedClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ModifyInheritedProtectedComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ModifyProtectedClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ModifyProtectedClassDeclaration",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ModifyProtectedComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ModifyProtectedCompDeclaration",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ProtectedMultiClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.ProtectedMultiComp",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.PublicSectionClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.PublicSectionComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.RedeclareInheritedProtectedClass",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.RedeclareInheritedProtectedComp",
+      "should_pass": true
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.RedeclareProtectedClass",
+      "should_pass": false
+    },
+    {
+      "name": "ModelicaCompliance.Scoping.Visibility.RedeclareProtectedComp",
+      "should_pass": false
+    }
+  ],
+  "rule": {
+    "categories": [
+      "Scoping/NameLookup/Simple",
+      "Scoping/NameLookup/Composite",
+      "Scoping/NameLookup/Global",
+      "Scoping/NameLookup/Imports",
+      "Scoping/MemberAccess",
+      "Scoping/Visibility",
+      "Inheritance/Flattening",
+      "Modification/Flattening",
+      "Redeclare/Flattening"
+    ]
+  },
+  "sha": "9734eb101c1adf3bc59ee2ec999e53fffbc13f4b"
+}

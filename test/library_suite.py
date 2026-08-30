@@ -17,7 +17,7 @@ import subprocess
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 from pymoca import ast, parser
 
@@ -47,6 +47,13 @@ class LibraryDiscovery:
     library: str
     root: Path
     manifest_path: Path
+    # Replaces the example-package walk, for a library whose cases do not come
+    # from a package tree at all. The tree is never parsed if set.
+    discover: Optional[Callable[[], list]] = None
+
+    # Configuration the discovery reads, recorded in the manifest so editing it
+    # invalidates the manifest like a submodule bump does.
+    rule: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -54,6 +61,9 @@ class LibrarySuite:
     expected_dir: Path
     cases: list[LibraryCase]
     discovery: Optional[LibraryDiscovery] = None
+    # False for a suite whose cases are not flattened from one shared tree, and
+    # so cannot be run by library_sweep.
+    sweepable: bool = True
 
 
 def build_params(
@@ -243,7 +253,7 @@ def assert_objective_close(
 
 
 def entry_name(entry) -> str:
-    """Model name of a manifest entry."""
+    """Model name of a manifest entry, which is a bare name or a payload dict."""
     return entry if isinstance(entry, str) else entry["name"]
 
 
@@ -271,6 +281,8 @@ def walk_classes(root: ast.Class) -> Iterator[tuple[str, ast.Class]]:
 
 def discover_models(discovery: LibraryDiscovery) -> list:
     """Run a discovery rule and return its sorted manifest entries."""
+    if discovery.discover is not None:
+        return discovery.discover()
     tree = parser.modelicapath_to_tree([str(discovery.root)])
     return sorted(
         name
@@ -329,6 +341,7 @@ def write_manifest(discovery: LibraryDiscovery) -> Path:
         "library": discovery.library,
         "sha": library_sha(discovery.root),
         "describe": library_describe(discovery.root),
+        "rule": discovery.rule,
         "models": discover_models(discovery),
     }
     discovery.manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -340,6 +353,10 @@ def manifest_staleness(discovery: LibraryDiscovery, suite_name: str) -> Optional
     """Describe why a manifest is out of date, or None when it is current."""
     manifest = read_manifest(discovery.manifest_path)
     rerun = f"rerun: python test/library_suite.py --regenerate {suite_name}"
+    # Compared after a JSON round trip, so tuples read back as lists
+    rule = json.loads(json.dumps(discovery.rule))
+    if manifest.get("rule") != rule:
+        return f"{discovery.library} discovery rule changed to {rule!r}; {rerun}"
     actual = library_sha(discovery.root)
     recorded = manifest.get("sha")
     if actual is None or recorded is None:
@@ -355,14 +372,19 @@ def manifest_staleness(discovery: LibraryDiscovery, suite_name: str) -> Optional
 
 # Suite name (as passed to the command-line tools) -> module under test/ exposing a
 # module-level SUITE: LibrarySuite.
-_SUITE_MODULES = {"msl": "msl_examples_test", "rtc_tools": "rtc_tools_test"}
+_SUITE_MODULES = {
+    "compliance": "compliance_test",
+    "msl": "msl_examples_test",
+    "rtc_tools": "rtc_tools_test",
+}
 
 
 def suite_names(sweepable: bool = False) -> list[str]:
     """Registered suite names, optionally only those library_sweep can run."""
     names = sorted(_SUITE_MODULES)
     if sweepable:
-        names = [name for name in names if load_suite(name).discovery is not None]
+        suites = {name: load_suite(name) for name in names}
+        names = [n for n in names if suites[n].sweepable and suites[n].discovery is not None]
     return names
 
 

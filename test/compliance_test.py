@@ -3,6 +3,15 @@
 import collections
 import os
 import re
+from pathlib import Path
+
+from library_suite import (
+    LibraryDiscovery,
+    LibrarySuite,
+    library_sha,
+    manifest_entries,
+    manifest_staleness,
+)
 
 import pymoca.ast as ast
 import pymoca.parser
@@ -21,8 +30,12 @@ import pytest
 # ---------------------------------------------------------------------------
 
 MY_DIR = os.path.dirname(os.path.realpath(__file__))
-COMPLIANCE_DIR = os.path.join(MY_DIR, "libraries", "Modelica-Compliance", "ModelicaCompliance")
+# The submodule checkout, which is what git commands run in; COMPLIANCE_DIR is
+# the Modelica package inside it.
+COMPLIANCE_ROOT = Path(MY_DIR) / "libraries" / "Modelica-Compliance"
+COMPLIANCE_DIR = os.path.join(COMPLIANCE_ROOT, "ModelicaCompliance")
 COMPLIANCE_AVAILABLE = os.path.isfile(os.path.join(COMPLIANCE_DIR, "Icons.mo"))
+EXPECTED_DIR = Path(MY_DIR) / "expected" / "compliance"
 
 _SHOULD_PASS_RE = re.compile(r"shouldPass\s*=\s*(true|false)", re.IGNORECASE)
 
@@ -87,22 +100,88 @@ def load_compliance_model(mo_file_path):
     return icon_ast
 
 
+NAME_LOOKUP_CATEGORIES = [
+    "Scoping/NameLookup/Simple",
+    "Scoping/NameLookup/Composite",
+    "Scoping/NameLookup/Global",
+    "Scoping/NameLookup/Imports",
+    "Scoping/MemberAccess",
+    "Scoping/Visibility",
+]
+
+FLATTENING_CATEGORIES = [
+    "Inheritance/Flattening",
+    "Modification/Flattening",
+    "Redeclare/Flattening",
+]
+
+ALL_CATEGORIES = NAME_LOOKUP_CATEGORIES + FLATTENING_CATEGORIES
+
+
 def discover_compliance_files(subdirectory):
-    """Walk subdirectory under COMPLIANCE_DIR, return (test_id, abs_path, should_pass) list."""
+    """Walk one category under COMPLIANCE_DIR, returning its manifest entries.
+
+    Each entry carries the model name and the shouldPass expectation read out
+    of its annotation, so a test run needs neither the walk nor the sources.
+    """
     base = os.path.join(COMPLIANCE_DIR, subdirectory)
     if not os.path.isdir(base):
         return []
-    results = []
+    entries = []
     for dirpath, _dirs, files in os.walk(base):
         for fname in sorted(files):
             if fname in ("package.mo", "package.order") or not fname.endswith(".mo"):
                 continue
             abs_path = os.path.join(dirpath, fname)
-            rel = os.path.relpath(abs_path, base)
-            test_id = os.path.splitext(rel)[0].replace(os.sep, "/")
-            should_pass = parse_should_pass(abs_path)
-            results.append((test_id, abs_path, should_pass))
-    return results
+            entries.append(
+                {
+                    "name": mo_path_to_model_name(abs_path),
+                    "should_pass": parse_should_pass(abs_path),
+                }
+            )
+    return entries
+
+
+def _discover():
+    """Discovery hook: the cases are files on disk, not classes in a package tree."""
+    entries = [e for category in ALL_CATEGORIES for e in discover_compliance_files(category)]
+    return sorted(entries, key=lambda entry: entry["name"])
+
+
+# Cases come from a checked-in manifest rather than a walk of the checkout.
+# Regenerate it whenever the Modelica-Compliance submodule pointer moves or
+# ALL_CATEGORIES changes (test_compliance_manifest_current fails until you do):
+#   python test/library_suite.py --regenerate compliance
+DISCOVERY = LibraryDiscovery(
+    library="Modelica-Compliance",
+    root=COMPLIANCE_ROOT,
+    manifest_path=EXPECTED_DIR / "manifest.json",
+    discover=_discover,
+    rule={"categories": ALL_CATEGORIES},
+)
+
+# No cases: this suite regenerates a discovery manifest, not golden fingerprints.
+# Not sweepable: library_sweep flattens from one shared tree, which would drop
+# the per-file Icons.mo merge and the shouldPass expectations.
+SUITE = LibrarySuite(
+    expected_dir=EXPECTED_DIR,
+    cases=[],
+    discovery=DISCOVERY,
+    sweepable=False,
+)
+
+
+@pytest.mark.compliance
+def test_compliance_manifest_current():
+    """Fail with the regeneration command when the manifest no longer matches the library."""
+    if library_sha(DISCOVERY.root) is None:
+        pytest.skip("Modelica-Compliance is not a git checkout")
+    assert DISCOVERY.manifest_path.is_file(), (
+        f"{DISCOVERY.manifest_path} is missing; "
+        "rerun: python test/library_suite.py --regenerate compliance"
+    )
+    staleness = manifest_staleness(DISCOVERY, "compliance")
+    assert staleness is None, staleness
 
 
 # Known failures: model_name -> xfail reason
@@ -280,16 +359,18 @@ for _model, _reason in _FLATTEN_WIP.items():
     KNOWN_FAILURES[_model] = _reason
 
 
-def build_params(categories):
+def build_params():
     """Build pytest.param list with conditional xfail marks from KNOWN_FAILURES."""
     params = []
-    for category in categories:
-        for test_id, abs_path, should_pass in discover_compliance_files(category):
-            model_name = mo_path_to_model_name(abs_path)
-            marks = []
-            if model_name in KNOWN_FAILURES:
-                marks.append(pytest.mark.xfail(reason=KNOWN_FAILURES[model_name]))
-            params.append(pytest.param(abs_path, model_name, should_pass, id=test_id, marks=marks))
+    for entry in manifest_entries(DISCOVERY):
+        model_name = entry["name"]
+        mo_path = str(COMPLIANCE_ROOT / (model_name.replace(".", "/") + ".mo"))
+        marks = []
+        if model_name in KNOWN_FAILURES:
+            marks.append(pytest.mark.xfail(reason=KNOWN_FAILURES[model_name]))
+        params.append(
+            pytest.param(mo_path, model_name, entry["should_pass"], id=model_name, marks=marks)
+        )
     return params
 
 
@@ -300,24 +381,6 @@ def build_params(categories):
 pytestmark = pytest.mark.skipif(
     not COMPLIANCE_AVAILABLE, reason="Modelica-Compliance submodule not initialized"
 )
-
-NAME_LOOKUP_CATEGORIES = [
-    "Scoping/NameLookup/Simple",
-    "Scoping/NameLookup/Composite",
-    "Scoping/NameLookup/Global",
-    "Scoping/NameLookup/Imports",
-    "Scoping/MemberAccess",
-    "Scoping/Visibility",
-]
-
-FLATTENING_CATEGORIES = [
-    "Inheritance/Flattening",
-    "Modification/Flattening",
-    "Redeclare/Flattening",
-]
-
-ALL_CATEGORIES = NAME_LOOKUP_CATEGORIES + FLATTENING_CATEGORIES
-
 
 # ---------------------------------------------------------------------------
 # Value resolution helpers
@@ -470,7 +533,7 @@ def _resolve_symbol_value(flat, var_name, _visited=None):
 @pytest.mark.flattening
 @pytest.mark.parametrize(
     "mo_path, model_name, should_pass",
-    build_params(ALL_CATEGORIES) if COMPLIANCE_AVAILABLE else [],
+    build_params() if COMPLIANCE_AVAILABLE else [],
 )
 def test_flatten(mo_path, model_name, should_pass):
     """Test that flattening succeeds or fails as expected, with value checking."""

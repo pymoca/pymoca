@@ -631,5 +631,6 @@
     "Modelica.Utilities.Examples.WriteRealMatrixToFile",
     "Modelica.Utilities.Examples.readRealParameterModel"
   ],
+  "rule": {},
   "sha": "d2dcb39e055ceb88fef5328a26255cdd094389bd"
 }
