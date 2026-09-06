@@ -780,11 +780,14 @@ class ASTListener(ModelicaListener):
             list, ctx.expr()
         )  # stubs type as ExprContext|None, runtime is list
         if len(exprs) > 1:
+            # MLS 3.3.2: a:b:c is start:step:stop, so the step precedes the stop.
             if len(exprs) > 2:
-                step = self.ast[exprs[2]]
+                step = self.ast[exprs[1]]
+                stop = self.ast[exprs[2]]
             else:
                 step = ast.Primary(value=1)
-            self.ast[ctx] = ast.Slice(start=self.ast[exprs[0]], stop=self.ast[exprs[1]], step=step)
+                stop = self.ast[exprs[1]]
+            self.ast[ctx] = ast.Slice(start=self.ast[exprs[0]], stop=stop, step=step)
         else:
             self.ast[ctx] = self.ast[exprs[0]]
 
