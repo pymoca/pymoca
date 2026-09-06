@@ -653,9 +653,20 @@ class ASTListener(ModelicaListener):
             conditions.append(True)
         self.ast[ctx] = ast.WhenEquation(conditions=conditions, blocks=blocks)
 
+    def _loop_indices(self, ctx) -> list[ast.ForIndex]:
+        """Return the indices of a for-equation or for-statement, rejecting implicit ranges."""
+        indices = self.ast[ctx.for_indices()]
+        for index in indices:
+            if index.expression is None:
+                raise NotImplementedError(
+                    f"Implicit range of iterator {index.name} at line {ctx.start.line}"
+                    " is not supported"
+                )
+        return indices
+
     def exitFor_equation(self, ctx: ModelicaParser.For_equationContext):
         self.ast[ctx] = ast.ForEquation(
-            indices=self.ast[ctx.for_indices()],
+            indices=self._loop_indices(ctx),
             equations=self.ast[ctx.equation_block()],
         )
 
@@ -763,7 +774,7 @@ class ASTListener(ModelicaListener):
 
     def exitFor_statement(self, ctx: ModelicaParser.For_statementContext):
         self.ast[ctx] = ast.ForStatement(
-            indices=self.ast[ctx.for_indices()],
+            indices=self._loop_indices(ctx),
             statements=self.ast[ctx.statement_block()],
         )
 
@@ -859,7 +870,7 @@ class ASTListener(ModelicaListener):
     def exitFor_index(self, ctx):
         self.ast[ctx] = ast.ForIndex(
             name=ctx.IDENT().getText(),  # type: ignore[union-attr]
-            expression=self.ast[ctx.expression()],
+            expression=self.ast[ctx.expression()] if ctx.expression() else None,
         )
 
     def exitFor_indices(self, ctx: ModelicaParser.For_indicesContext):
@@ -1011,12 +1022,16 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = rows[0] if len(rows) == 1 else ast.Array(values=rows)
 
     def exitPrimary_function_arguments(self, ctx: ModelicaParser.Primary_function_argumentsContext):
-        # TODO: This does not support for generators yet.
-        #       Only expressions are supported, e.g. {1.0, 2.0, 3.0}.
         func_args = ctx.function_arguments()
         assert func_args is not None
-        v = [self.ast[x.expression()] for x in func_args.function_argument()]  # type: ignore[union-attr]
-        self.ast[ctx] = ast.Array(values=v)
+        if func_args.for_indices():
+            self.ast[ctx] = ast.ForArray(
+                indices=self.ast[func_args.for_indices(0)],
+                expression=self.ast[func_args.function_argument(0).expression()],  # type: ignore[union-attr]
+            )
+        else:
+            v = [self.ast[x.expression()] for x in func_args.function_argument()]  # type: ignore[union-attr]
+            self.ast[ctx] = ast.Array(values=v)
 
     def exitEquation_function(self, ctx: ModelicaParser.Equation_functionContext):
         self.ast[ctx] = ast.Function(
