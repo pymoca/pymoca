@@ -1005,6 +1005,14 @@ def test_function_partial_application():
     assert partial2.operands[1].name == "q"
 
 
+def test_parse_stepped_range():
+    """A three-expression range parses as start:step:stop (MLS 3.3.2)."""
+    ast_tree = parser.parse("model M Real x[3]; Real y[2]; equation y = x[1:2:3]; end M;")
+    slice_ = ast_tree.classes["M"].equations[0].right.indices[0][0]
+    assert isinstance(slice_, ast.Slice)
+    assert (slice_.start.value, slice_.step.value, slice_.stop.value) == (1, 2, 3)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
