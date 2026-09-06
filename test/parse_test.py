@@ -1005,6 +1005,19 @@ def test_function_partial_application():
     assert partial2.operands[1].name == "q"
 
 
+def test_for_array_in_brace_constructor():
+    """Array comprehension {expr for i in range} parses to ForArray (MLS 10.4)."""
+    ast_tree = parser.parse(
+        "model M parameter Integer n = 3; Real x[n](min = {i for i in 1:n}); end M;"
+    )
+    sym = ast_tree.classes["M"].symbols["x"]
+    min_arg = next(a for a in sym.class_modification.arguments if str(a.value.component) == "min")
+    for_array = min_arg.value.modifications[0]
+    assert isinstance(for_array, ast.ForArray)
+    assert len(for_array.indices) == 1
+    assert for_array.indices[0].name == "i"
+
+
 def test_parse_stepped_range():
     """A three-expression range parses as start:step:stop (MLS 3.3.2)."""
     ast_tree = parser.parse("model M Real x[3]; Real y[2]; equation y = x[1:2:3]; end M;")

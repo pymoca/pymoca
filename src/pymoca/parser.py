@@ -859,7 +859,7 @@ class ASTListener(ModelicaListener):
     def exitFor_index(self, ctx):
         self.ast[ctx] = ast.ForIndex(
             name=ctx.IDENT().getText(),  # type: ignore[union-attr]
-            expression=self.ast[ctx.expression()],
+            expression=self.ast[ctx.expression()] if ctx.expression() else None,
         )
 
     def exitFor_indices(self, ctx: ModelicaParser.For_indicesContext):
@@ -1011,12 +1011,16 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = rows[0] if len(rows) == 1 else ast.Array(values=rows)
 
     def exitPrimary_function_arguments(self, ctx: ModelicaParser.Primary_function_argumentsContext):
-        # TODO: This does not support for generators yet.
-        #       Only expressions are supported, e.g. {1.0, 2.0, 3.0}.
         func_args = ctx.function_arguments()
         assert func_args is not None
-        v = [self.ast[x.expression()] for x in func_args.function_argument()]  # type: ignore[union-attr]
-        self.ast[ctx] = ast.Array(values=v)
+        if func_args.for_indices():
+            self.ast[ctx] = ast.ForArray(
+                indices=self.ast[func_args.for_indices(0)],
+                expression=self.ast[func_args.function_argument(0).expression()],  # type: ignore[union-attr]
+            )
+        else:
+            v = [self.ast[x.expression()] for x in func_args.function_argument()]  # type: ignore[union-attr]
+            self.ast[ctx] = ast.Array(values=v)
 
     def exitEquation_function(self, ctx: ModelicaParser.Equation_functionContext):
         self.ast[ctx] = ast.Function(
