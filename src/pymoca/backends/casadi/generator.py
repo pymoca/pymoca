@@ -1,7 +1,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import itertools
 import logging
+import operator
 from collections import OrderedDict, deque, namedtuple
 from typing import Dict, Iterable, Union
 
@@ -260,9 +262,18 @@ class Generator(TreeListener):
                 src = ca.mtimes(src, self.get_mx(i))
         elif op == "transpose" and n_operands == 1:
             src = self.get_mx(tree.operands[0]).T
-        elif op == "sum" and n_operands == 1:
+        elif op in ("sum", "min", "max", "product") and n_operands == 1:
             v = self.get_mx(tree.operands[0])
-            src = ca.sum1(v)
+            if isinstance(v, list):
+                v = ca.vertcat(*v)
+            if op == "sum":
+                src = ca.sum1(v)
+            elif op == "min":
+                src = ca.mmin(v)
+            elif op == "max":
+                src = ca.mmax(v)
+            else:
+                src = functools.reduce(operator.mul, ca.vertsplit(v))
         elif op == "linspace" and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])

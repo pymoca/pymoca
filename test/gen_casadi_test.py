@@ -3370,6 +3370,69 @@ def test_for_array_in_modification():
     np.testing.assert_array_equal(result, expected)
 
 
+def test_sum_of_array_literal():
+    """sum() of an array literal reduces its elements (MLS 10.3.4)."""
+    ast_tree = parser.parse(
+        """
+    model SumLiteral
+        parameter Real x[3] = {1, 2, 3};
+        Real y(min = sum({x[1], 2 * x[2], x[3]}));
+    equation
+        y = x[1];
+    end SumLiteral;"""
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "SumLiteral")
+
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [y.min])
+    assert float(F(ca.DM([1, 2, 3]))) == 8.0
+
+
+def test_reduction_in_modification():
+    """A reduction sum(expr for i in range) in a modification compiles (MLS 10.3.4.1)."""
+    ast_tree = parser.parse(
+        """
+    model ReductionModification
+        parameter Real x[3] = {1, 2, 3};
+        Real y(min = sum(x[i] ^ 2 for i in 1:3));
+    equation
+        y = x[1];
+    end ReductionModification;"""
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "ReductionModification")
+
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [y.min])
+    assert float(F(ca.DM([1, 2, 3]))) == 14.0
+
+
+def test_min_max_product_of_array():
+    """min, max and product of a reduction or array literal compile to scalars (MLS 10.3.4)."""
+    ast_tree = parser.parse(
+        """
+    model ArrayReductions
+        parameter Real x[3] = {1, 2, 3};
+        Real a(min = min(x[i] for i in 1:3));
+        Real b(min = max(x[i] for i in 1:3));
+        Real c(min = product(x[i] for i in 1:3));
+        Real d(min = min({x[2], x[3]}));
+    equation
+        a = x[1];
+        b = x[1];
+        c = x[1];
+        d = x[1];
+    end ArrayReductions;"""
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "ArrayReductions")
+
+    states = {v.symbol.name(): v for v in casadi_model.alg_states}
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [states[n].min for n in ("a", "b", "c", "d")])
+    assert [float(v) for v in F(ca.DM([1, 2, 3]))] == [1.0, 3.0, 6.0, 2.0]
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
