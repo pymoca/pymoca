@@ -1,7 +1,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import itertools
 import logging
+import operator
+import sys
 from collections import OrderedDict, deque, namedtuple
 from typing import Dict, Iterable, Union
 
@@ -88,6 +91,13 @@ class GeneratorWalker(TreeWalker):
         # Symbols must come before classes, as we need to access symbol values when creating
         # CasADi interpolant functions.
         return sorted(keys, key=lambda attr: 0 if attr == "symbols" else 1)
+
+
+def _array_to_mx(value):
+    """Return value as a vector or matrix if it is an array literal, a (nested) list of elements."""
+    if not isinstance(value, list):
+        return value
+    return ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in value])
 
 
 class Generator(TreeListener):
@@ -248,21 +258,30 @@ class Generator(TreeListener):
             v = self.get_mx(tree.operands[0])
             src = self.get_derivative(v)
         elif op == "-" and n_operands == 1:
-            src = -self.get_mx(tree.operands[0])
+            src = -_array_to_mx(self.get_mx(tree.operands[0]))
         elif op == "+" and n_operands == 1:
-            src = self.get_mx(tree.operands[0])
+            src = _array_to_mx(self.get_mx(tree.operands[0]))
         elif op == "not" and n_operands == 1:
             src = ca.if_else(self.get_mx(tree.operands[0]), 0, 1, True)
         elif op == "mtimes":
             assert n_operands >= 2
-            src = self.get_mx(tree.operands[0])
+            src = _array_to_mx(self.get_mx(tree.operands[0]))
             for i in tree.operands[1:]:
-                src = ca.mtimes(src, self.get_mx(i))
+                src = ca.mtimes(src, _array_to_mx(self.get_mx(i)))
         elif op == "transpose" and n_operands == 1:
             src = self.get_mx(tree.operands[0]).T
-        elif op == "sum" and n_operands == 1:
-            v = self.get_mx(tree.operands[0])
-            src = ca.sum1(v)
+        elif op in ("sum", "min", "max", "product") and n_operands == 1:
+            v = _array_to_mx(self.get_mx(tree.operands[0]))
+            # The results for an empty array are given by MLS 3.7, table 10.3.
+            is_empty = ca.MX(v).is_empty()
+            if op == "sum":
+                src = ca.sum1(v)
+            elif op == "min":
+                src = sys.float_info.max if is_empty else ca.mmin(v)
+            elif op == "max":
+                src = -sys.float_info.max if is_empty else ca.mmax(v)
+            else:
+                src = functools.reduce(operator.mul, ca.vertsplit(v), 1)
         elif op == "linspace" and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
@@ -373,25 +392,25 @@ class Generator(TreeListener):
             func = ca.interpolant("interpolant", mode, [xp, yp], np.array(zp).ravel(order="F"))
             src = func(ca.vertcat(arg_1, arg_2))
         elif op in OP_MAP and n_operands == 2:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
-            rhs = ca.MX(self.get_mx(tree.operands[1]))
+            lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
+            rhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[1])))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
+            lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         else:
-            src = ca.MX(self.get_mx(tree.operands[0]))
+            src = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
             # Check for built-in operations, such as the
             # elementary functions, first.
             if hasattr(src, op) and n_operands <= 2:
                 if n_operands == 1:
-                    src = ca.MX(self.get_mx(tree.operands[0]))
+                    src = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
                     src = getattr(src, op)()
                 else:
-                    lhs = ca.MX(self.get_mx(tree.operands[0]))
-                    rhs = ca.MX(self.get_mx(tree.operands[1]))
+                    lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
+                    rhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[1])))
                     lhs_op = getattr(lhs, op)
                     src = lhs_op(rhs)
             else:
