@@ -3308,6 +3308,85 @@ def test_function_dedup_name_dot_free():
     assert func.name() == "Branch_f"
 
 
+def test_array_of_component_refs_in_modification():
+    """Array literal elements that are component references compile (issue #353)."""
+    txt = """
+        model ArrayOfRefs
+          parameter Real x[2] = {1, 2};
+          Real y[2](min = {x[1], x[2]});
+        equation
+          y = x;
+        end ArrayOfRefs;
+    """
+    ast_tree = parser.parse(txt)
+    casadi_model = gen_casadi.generate(ast_tree, "ArrayOfRefs")
+
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [ca.vertcat(*y.min)])
+    np.testing.assert_array_equal(np.array(F(ca.DM([3, 4]))).flatten(), [3.0, 4.0])
+
+
+def test_for_array_in_modification():
+    """Array comprehension {expr for i in range} in a modification compiles (issue #353)."""
+    with open(os.path.join(MODEL_DIR, "ForArrayModification.mo"), "r") as f:
+        txt = f.read()
+    ast_tree = parser.parse(txt)
+    casadi_model = gen_casadi.generate(ast_tree, "ForArrayModification")
+
+    H_var = next(v for v in casadi_model.alg_states if v.symbol.name().startswith("H"))
+    H_b = next(p for p in casadi_model.parameters if p.symbol.name().startswith("H_b"))
+
+    # min has 5 elements: 1 from first literal array, 3 from comprehension, 1 from last
+    min_expr = H_var.min
+    assert min_expr.shape == (5, 1)
+
+    H_b_vals = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    F = ca.Function("f", [H_b.symbol], [min_expr])
+    result = np.array(F(ca.DM(H_b_vals))).flatten()
+
+    expected = [max(H_b_vals[:2]), *(max(H_b_vals[i : i + 3]) for i in range(3)), max(H_b_vals[3:])]
+    np.testing.assert_array_equal(result, expected)
+
+
+def test_sum_of_array_literal():
+    """sum() of an array literal reduces its elements (MLS 10.3.4)."""
+    ast_tree = parser.parse(
+        """
+    model SumLiteral
+        parameter Real x[3] = {1, 2, 3};
+        Real y(min = sum({x[1], 2 * x[2], x[3]}));
+    equation
+        y = x[1];
+    end SumLiteral;"""
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "SumLiteral")
+
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [y.min])
+    assert float(F(ca.DM([1, 2, 3]))) == 8.0
+
+
+def test_reduction_in_modification():
+    """A reduction sum(expr for i in range) in a modification compiles (MLS 10.3.4.1)."""
+    ast_tree = parser.parse(
+        """
+    model ReductionModification
+        parameter Real x[3] = {1, 2, 3};
+        Real y(min = sum(x[i] ^ 2 for i in 1:3));
+    equation
+        y = x[1];
+    end ReductionModification;"""
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "ReductionModification")
+
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [y.min])
+    assert float(F(ca.DM([1, 2, 3]))) == 14.0
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

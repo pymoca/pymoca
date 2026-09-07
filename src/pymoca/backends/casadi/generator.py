@@ -225,7 +225,7 @@ class Generator(TreeListener):
         self.entered_classes.pop()
 
     def exitArray(self, tree):
-        self.src[tree] = [self.src[e] for e in tree.values]
+        self.src[tree] = [self.get_mx(e) for e in tree.values]
 
     def exitPrimary(self, tree):
         self.src[tree] = tree.value
@@ -262,6 +262,8 @@ class Generator(TreeListener):
             src = self.get_mx(tree.operands[0]).T
         elif op == "sum" and n_operands == 1:
             v = self.get_mx(tree.operands[0])
+            if isinstance(v, list):
+                v = ca.vertcat(*v)
             src = ca.sum1(v)
         elif op == "linspace" and n_operands == 3:
             a = self.get_mx(tree.operands[0])

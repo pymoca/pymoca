@@ -709,6 +709,11 @@ fully-populated connector symbols.
   xfail
 - Connector compatibility check on `connect`: members are taken from the left
   connector only, so mismatched connectors are silently accepted (MLS 9.3)
+- Array comprehensions `{expr for i in range}` and reduction expressions
+  `f(expr for i in range)` are unrolled only in modification values (MLS 10.3.4.1,
+  10.4.1): in an equation the `ForArray` node passes through to the backends unexpanded,
+  and the reduction function name is not checked against the legal set (`array`, `sum`,
+  `product`, `min`, `max`)
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
 - Imports are effectively re-exported: composite-name lookup searches the target

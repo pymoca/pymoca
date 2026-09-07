@@ -407,6 +407,9 @@ def _resolve_modification_attribute(
     mod = cast(ast.ElementModification, arg.value)
     value = mod.modifications[0]
     assert not isinstance(value, ast.ClassModification)
+    mod_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
+    if isinstance(mod_scope, InstanceClass):
+        value = _expand_for_arrays(value, mod_scope, ctx)
     if isinstance(value, ast.Primary):
         value = value.value
     elif isinstance(value, ast.ComponentRef):
@@ -439,13 +442,10 @@ def _resolve_modification_attribute(
             const_val = _get_constant_value(value)
             if const_val is not None and isinstance(const_val, ast.Primary):
                 value = const_val.value
-    elif isinstance(value, (ast.Array, ast.Expression)):
-        # Discover function calls inside Array elements and Expressions so
-        # that the function flattening pass can include them in the output.
-        # Without this, functions referenced only in modifications are lost.
-        _fn_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
-        if isinstance(_fn_scope, InstanceClass):
-            func_resolver = _FunctionCallResolver(_fn_scope, ctx.flat_class.functions)
+    elif isinstance(value, (ast.Array, ast.Expression, ast.ForArray)):
+        # Discover function calls so the function flattening pass emits them.
+        if isinstance(mod_scope, InstanceClass):
+            func_resolver = _FunctionCallResolver(mod_scope, ctx.flat_class.functions)
             walker = TreeWalker()
             walker.walk(func_resolver, value)
     if isinstance(value, ast.Expression):
@@ -731,6 +731,128 @@ def _resolve_expression(
     walker = TreeWalker()
     walker.walk(listener, expr)
     return listener.result
+
+
+# Raised when an expression has no value in the scope at hand, as opposed to being invalid.
+_EVALUATION_ERRORS = (
+    NotImplementedError,
+    ModelicaSemanticError,
+    NameLookupError,
+    InstantiationError,
+    FlatteningError,
+)
+
+
+def _eval_range_bound(
+    node,
+    scope: InstanceClass,
+    ctx: FlatteningContext,
+) -> int | float | None:
+    """Return the value of one for-array range bound, or None if it has none here."""
+    if isinstance(node, ast.Primary):
+        return node.value if isinstance(node.value, (int, float)) else None
+    elif isinstance(node, ast.Expression):
+        try:
+            result = _resolve_expression(node, scope, ctx)
+        except _EVALUATION_ERRORS:
+            return None
+        return result if isinstance(result, (int, float)) else None
+    elif isinstance(node, ast.ComponentRef):
+        try:
+            resolved = _resolve_name(node, scope, ctx)
+        except _EVALUATION_ERRORS:
+            return None
+        if isinstance(resolved, InstanceSymbol) and isinstance(resolved.value, (int, float)):
+            return resolved.value
+        return None
+    raise ModelicaSemanticError(f"Unsupported range bound type: {type(node).__name__}")
+
+
+def _range_values(start: int | float, step: int | float, stop: int | float) -> list[int | float]:
+    """Return the elements of the range start:step:stop (MLS 10.4.3)."""
+    if step == 0:
+        raise ModelicaSemanticError("Range step must not be zero")
+    if (step > 0 and start > stop) or (step < 0 and start < stop):
+        return []
+    n = int((stop - start) // step)
+    return [start + m * step for m in range(n + 1)]
+
+
+class _IteratorSubstituter(TreeListener):
+    """Replace every bare reference to an iterator by its value, whatever node holds it."""
+
+    def __init__(self, name: str, value: int | float):
+        self.name = name
+        self.value = value
+        super().__init__()
+
+    def substitute(self, child):
+        if isinstance(child, list):
+            return [self.substitute(c) for c in child]
+        if isinstance(child, ast.ComponentRef) and child.name == self.name and not child.child:
+            return ast.Primary(value=self.value)
+        return child
+
+    def exitEvery(self, tree: ast.Node):
+        for attr in list(tree.__dict__):
+            tree.__dict__[attr] = self.substitute(tree.__dict__[attr])
+
+
+def _subst_iter(node, name: str, value: int | float):
+    """Return node with every bare ComponentRef(name) replaced by Primary(value)."""
+    substituter = _IteratorSubstituter(name, value)
+    TreeWalker().walk(substituter, node)
+    return substituter.substitute(node)
+
+
+def _unroll_for_array(
+    for_array: ast.ForArray,
+    scope: InstanceClass,
+    ctx: FlatteningContext,
+) -> ast.ForArray | ast.Array:
+    """Unroll a comprehension to a flat Array, or return it as is if its range has no value."""
+    if len(for_array.indices) != 1:
+        raise NotImplementedError("Comprehensions over several iterators are not supported")
+    index = for_array.indices[0]
+    if not isinstance(index.expression, ast.Slice):
+        raise NotImplementedError(
+            f"Only a range expression is supported as the range of iterator {index.name}"
+        )
+    start = _eval_range_bound(index.expression.start, scope, ctx)
+    step = _eval_range_bound(index.expression.step, scope, ctx)
+    stop = _eval_range_bound(index.expression.stop, scope, ctx)
+    if start is None or step is None or stop is None:
+        return for_array
+    return ast.Array(
+        values=[
+            _expand_for_arrays(
+                _subst_iter(copy.deepcopy(for_array.expression), index.name, val), scope, ctx
+            )
+            for val in _range_values(start, step, stop)
+        ]
+    )
+
+
+def _expand_for_arrays(node, scope: InstanceClass, ctx: FlatteningContext):
+    """Return node with every comprehension inside it unrolled."""
+    # Copy rather than rewrite nodes on changed paths, the parsed AST is shared across flattens.
+    if isinstance(node, ast.ForArray):
+        return _unroll_for_array(node, scope, ctx)
+    if isinstance(node, list):
+        new_items = [_expand_for_arrays(item, scope, ctx) for item in node]
+        return new_items if any(a is not b for a, b in zip(new_items, node)) else node
+    if not isinstance(node, ast.Node):
+        return node
+    changed = {}
+    for attr, child in node.__dict__.items():
+        new_child = _expand_for_arrays(child, scope, ctx)
+        if new_child is not child:
+            changed[attr] = new_child
+    if not changed:
+        return node
+    node = copy.copy(node)
+    node.__dict__.update(changed)
+    return node
 
 
 class _EquationRefResolver(TreeListener):
