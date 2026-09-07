@@ -2246,6 +2246,38 @@ def test_for_array_multiple_iterators():
     assert [el.value for el in flat.symbols["a"].min.values] == [1, 2, 3, 2, 4, 6]
 
 
+def test_reduction_in_modification_unrolled():
+    """A reduction is unrolled to its function applied to a literal Array (MLS 10.3.4.1)."""
+    flat = _flatten_inline(
+        """
+    model M
+        parameter Real x[3] = {1, 2, 3};
+        Real y(min = sum(x[i] for i in 1:3));
+    end M;""",
+        "M",
+    )
+    reduction = flat.symbols["y"].min
+    assert reduction.operator.to_tuple() == ("sum",)
+    (unrolled,) = reduction.operands
+    assert isinstance(unrolled, ast.Array)
+    assert [_subscript(el).value for el in unrolled.values] == [1, 2, 3]
+
+
+def test_reduction_unknown_range_not_unrolled():
+    """A reduction whose range has no value at flattening time keeps its ForArray operand."""
+    flat = _flatten_inline(
+        """
+    model M
+        parameter Real x[:] = {1, 2, 3};
+        parameter Integer n = size(x, 1);
+        Real y(min = sum(x[i] for i in 1:n));
+    end M;""",
+        "M",
+    )
+    (for_array,) = flat.symbols["y"].min.operands
+    assert isinstance(for_array, ast.ForArray)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

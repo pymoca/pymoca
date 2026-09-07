@@ -1018,6 +1018,31 @@ def test_for_array_in_brace_constructor():
     assert for_array.indices[0].name == "i"
 
 
+def test_reduction_expression():
+    """A reduction f(expr for i in range) parses to f applied to a ForArray (MLS 10.3.4.1)."""
+    ast_tree = parser.parse("model M Real x[3]; Real y = sqrt(sum(x[i] ^ 2 for i in 1:3)); end M;")
+    sym = ast_tree.classes["M"].symbols["y"]
+    binding = next(a for a in sym.class_modification.arguments if str(a.value.component) == "value")
+    sqrt = binding.value.modifications[0]
+    assert sqrt.operator.to_tuple() == ("sqrt",)
+    (reduction,) = sqrt.operands
+    assert reduction.operator.to_tuple() == ("sum",)
+    (for_array,) = reduction.operands
+    assert isinstance(for_array, ast.ForArray)
+    assert [index.name for index in for_array.indices] == ["i"]
+    assert for_array.expression.operator == "^"
+
+
+def test_for_clause_with_extra_argument_rejected():
+    """A for clause admits exactly one argument before it (MLS B.2.7.8)."""
+    for src in (
+        "model M Real x[3]; Real y = sum(x[i], 2 for i in 1:3); end M;",
+        "model M Real x[3]; Real y[3] = {x[i] for i in 1:3 for j in 1:2}; end M;",
+    ):
+        with pytest.raises(parser.ModelicaSyntaxError, match="one argument and one list"):
+            parser.parse(src)
+
+
 def test_parse_stepped_range():
     """A three-expression range parses as start:step:stop (MLS 3.3.2)."""
     ast_tree = parser.parse("model M Real x[3]; Real y[2]; equation y = x[1:2:3]; end M;")
