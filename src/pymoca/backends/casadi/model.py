@@ -185,56 +185,16 @@ class Model:
 
     @staticmethod
     def _expand_simplify_mx(equations):
-        # Sometimes MX expressions can end up horribly nested and complicated,
-        # which makes further simplifications like alias detection difficult.
-        # We can simplify the equations by expanding to SX, and then
-        # rebuilding them with MX symbols again.
+        # Deeply nested MX hinders later simplifications such as alias detection.
 
         if not equations:
             return []
 
         symbols_mx = ca.symvar(ca.veccat(*equations))
-        assert all(
-            x.shape == (1, 1) for x in symbols_mx
-        ), "Vector/Matrix SX symbols cannot be mapped"
+        f_sx = ca.Function("tmp_mx", symbols_mx, equations).expand()
 
-        f_mx = ca.Function("tmp_mx", symbols_mx, equations).expand()
-        symbols_sx = [ca.SX.sym(x.name(), *x.shape) for x in symbols_mx]
-        sx_equations = f_mx.call(symbols_sx)
-
-        sx_to_mx_map = dict(zip(symbols_sx, symbols_mx))
-
-        def _sx_to_mx(sx_expr):
-            if not sx_expr.is_scalar():
-                rows = []
-                for i in range(sx_expr.size1()):
-                    cols = []
-                    for j in range(sx_expr.size2()):
-                        cols.append(_sx_to_mx(sx_expr[i, j]))
-                    rows.append(cols)
-                return ca.vertcat(*[ca.horzcat(*row) for row in rows])
-            elif sx_expr.op() == ca.OP_PARAMETER:
-                assert sx_expr in sx_to_mx_map.keys()
-                return sx_to_mx_map[sx_expr]
-            elif sx_expr.op() == ca.OP_CONST:
-                return ca.MX(ca.DM(sx_expr))
-            elif sx_expr.n_dep() == 1:
-                return ca.MX.unary(sx_expr.op(), _sx_to_mx(sx_expr.dep(0)))
-            elif sx_expr.n_dep() == 2:
-                return ca.MX.binary(
-                    sx_expr.op(), _sx_to_mx(sx_expr.dep(0)), _sx_to_mx(sx_expr.dep(1))
-                )
-            else:
-                raise Exception("Unsupported operation in SX expression.")
-
-        equations = []
-        for eq in sx_equations:
-            try:
-                equations.append(_sx_to_mx(eq))
-            except Exception:
-                equations.append(eq)
-
-        return equations
+        # Inline the SX algorithm as scalar MX: always_inline=True, never_inline=False.
+        return list(f_sx.call(symbols_mx, True, False))
 
     def _substitute_metadata(self, symbols, values):
         substitutions = []
