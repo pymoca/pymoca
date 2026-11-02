@@ -847,17 +847,24 @@ def test_delay():
     x = ca.MX.sym("x")
     x_delayed = ca.MX.sym("_pymoca_delay_0")
     x_delayed_constant = ca.MX.sym("_pymoca_delay_1")
+    x_delayed_max = ca.MX.sym("_pymoca_delay_2")
     y = ca.MX.sym("y")
     z = ca.MX.sym("z")
+    w = ca.MX.sym("w")
     hour = ca.MX.sym("hour")
 
-    ref_model.alg_states = list(map(Variable, [x, y, z]))
+    ref_model.alg_states = list(map(Variable, [x, y, z, w]))
     ref_model.parameters = list(map(Variable, [hour]))
-    ref_model.inputs = list(map(Variable, [x_delayed, x_delayed_constant]))
+    ref_model.inputs = list(map(Variable, [x_delayed, x_delayed_constant, x_delayed_max]))
     ref_model.parameters[0].value = 3600
-    ref_model.equations = [y - x_delayed, z - x_delayed_constant]
-    ref_model.delay_states = [x_delayed, x_delayed_constant]
-    ref_model.delay_arguments = [DelayArgument(x, 6 * hour), DelayArgument(x, 3600.0)]
+    ref_model.equations = [y - x_delayed, z - x_delayed_constant, w - x_delayed_max]
+    ref_model.delay_states = [x_delayed, x_delayed_constant, x_delayed_max]
+    # delayMax only bounds delayTime, so the third delay has the same arguments as the first
+    ref_model.delay_arguments = [
+        DelayArgument(x, 6 * hour),
+        DelayArgument(x, 3600.0),
+        DelayArgument(x, 6 * hour),
+    ]
 
     assert_model_equivalent_numeric(ref_model, casadi_model)
     assert_model_equivalent_numeric(ref_model, casadi_model_expanded)
