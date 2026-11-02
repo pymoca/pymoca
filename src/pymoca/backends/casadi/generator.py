@@ -311,7 +311,8 @@ class Generator(TreeListener):
                 else:
                     entries.append(sym)
             src = ca.vertcat(*entries)
-        elif op == "delay" and n_operands == 2:
+        elif op == "delay" and n_operands in (2, 3):
+            # The optional delayMax only bounds delayTime
             expr = self.get_mx(tree.operands[0])
             duration = self.get_mx(tree.operands[1])
 
