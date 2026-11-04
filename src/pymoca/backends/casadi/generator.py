@@ -64,7 +64,11 @@ class ForLoop:
         self.indexed_symbols = OrderedDict()
 
     def register_indexed_symbol(self, e, index_function, transpose, tree, index_expr=None):
-        if isinstance(index_expr, ca.MX) and index_expr is not self.index_variable:
+        if (
+            len(self.values) > 0
+            and isinstance(index_expr, ca.MX)
+            and index_expr is not self.index_variable
+        ):
             F = ca.Function("index_expr", [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=int)
             Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
@@ -656,6 +660,45 @@ class Generator(TreeListener):
             self.src[tree] = all_assignments
         else:
             self.src[tree] = []
+
+    def enterForArray(self, tree):
+        logger.debug("enterForArray")
+
+        if len(tree.indices) != 1:
+            raise NotImplementedError("Array constructors with several iterators")
+        self.for_loops.append(ForLoop(self, tree))
+
+    def exitForArray(self, tree):
+        logger.debug("exitForArray")
+
+        # Before leaving the loop: a bare component reference is only looked up on demand
+        expr = ca.vec(ca.MX(self.get_mx(tree.expression)))
+        f = self.for_loops.pop()
+        if len(f.values) == 0:
+            self.src[tree] = ca.MX(0, 1)
+            return
+
+        indexed_symbols = list(f.indexed_symbols.keys())
+        args = [f.index_variable] + indexed_symbols
+
+        arg_names = [arg.name() for arg in args]
+        free_vars = [e for e in ca.symvar(expr) if e.name() not in arg_names]
+        all_args = args + free_vars
+        F = ca.Function("array_body", all_args, [expr])
+
+        indexed_symbols_full = []
+        for k in indexed_symbols:
+            s = f.indexed_symbols[k]
+            indexed_symbol = self.nodes[self.current_class][s.tree.name][s.indices]
+            if s.transpose:
+                indexed_symbol = ca.transpose(indexed_symbol)
+            indexed_symbols_full.append(indexed_symbol)
+
+        Fmap = F.map("map", self.map_mode, len(f.values), list(range(len(args), len(all_args))), [])
+        res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
+
+        # One column per iterator value, so vec() concatenates the elements in order
+        self.src[tree] = ca.vec(res[0])
 
     def get_integer(
         self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]
