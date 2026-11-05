@@ -3336,6 +3336,114 @@ def test_function_dedup_name_dot_free():
     assert func.name() == "Branch_f"
 
 
+# A non-square matrix, so that mixing up rows and columns in the element position shows.
+ITERATOR_IN_BOTH_SUBSCRIPTS_A = [[1, 2], [3, 4], [5, 6]]
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "body, n, expected",
+    [
+        ("A[i, i]", 2, [1, 4]),
+        ("A[i + 1, i]", 2, [3, 6]),
+        ("A[3 - i, i]", 2, [3, 2]),
+        ("A[4 - i, 3 - i]", 2, [6, 3]),
+        ("A[i, i] + 10 * A[i + 1, i]", 2, [31, 64]),
+        ("A[i, 2]", 3, [2, 4, 6]),
+        ("A[2, i]", 2, [3, 4]),
+        ("sum(A[i, :])", 3, [3, 7, 11]),
+    ],
+)
+def test_for_equation_iterator_in_both_subscripts(body, n, expected, unroll_loops):
+    """Each iteration picks the right element, with the iterator in one or both subscripts."""
+    txt = f"""
+        model ForElement
+          parameter Real A[3, 2];
+          Real y[{n}];
+        equation
+          for i in 1:{n} loop
+            y[i] = {body};
+          end for;
+        end ForElement;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForElement", {"unroll_loops": unroll_loops}
+    )
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    A = next(p for p in casadi_model.parameters if p.symbol.name() == "A")
+    F = ca.Function("f", [y.symbol, A.symbol], [ca.vertcat(*casadi_model.equations)])
+    residual = F(ca.DM.zeros(n), ca.DM(ITERATOR_IN_BOTH_SUBSCRIPTS_A))
+    np.testing.assert_array_equal(np.array(residual).flatten(), -np.array(expected))
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_equation_iterator_in_both_subscripts_on_left(unroll_loops):
+    """The iterator may also be in both subscripts of the left-hand side."""
+    txt = """
+        model ForElementLeft
+          parameter Real b[2];
+          Real X[3, 2];
+        equation
+          for i in 1:2 loop
+            X[i + 1, i] = b[i];
+          end for;
+        end ForElementLeft;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForElementLeft", {"unroll_loops": unroll_loops}
+    )
+    X = next(v for v in casadi_model.alg_states if v.symbol.name() == "X")
+    b = next(p for p in casadi_model.parameters if p.symbol.name() == "b")
+    F = ca.Function("f", [X.symbol, b.symbol], [ca.vertcat(*casadi_model.equations)])
+    residual = F(ca.DM(ITERATOR_IN_BOTH_SUBSCRIPTS_A), ca.DM([0, 0]))
+    np.testing.assert_array_equal(np.array(residual).flatten(), [3, 6])
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_equation_iterator_in_both_subscripts_of_empty_matrix(unroll_loops):
+    """An empty matrix gives no equations: there is nothing to map the loop over."""
+    txt = """
+        model ForElementEmpty
+          parameter Real A[0, 2];
+          Real y[0];
+        equation
+          for i in 1:0 loop
+            y[i] = A[i, i];
+          end for;
+        end ForElementEmpty;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForElementEmpty", {"unroll_loops": unroll_loops}
+    )
+    assert casadi_model.equations == []
+
+
+def test_for_statement_iterator_in_both_subscripts():
+    """A for-statement in a function picks the right element too."""
+    txt = """
+        model ForElementStatement
+          function trace_of
+            input Real A[3, 2];
+            output Real s;
+          algorithm
+            s := 0;
+            for i in 1:2 loop
+              s := s + A[i, i];
+            end for;
+          end trace_of;
+          parameter Real A[3, 2];
+          Real y;
+        equation
+          y = trace_of(A);
+        end ForElementStatement;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "ForElementStatement")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    A = next(p for p in casadi_model.parameters if p.symbol.name() == "A")
+    F = ca.Function("f", [y.symbol, A.symbol], [ca.vertcat(*casadi_model.equations)])
+    assert float(F(0, ca.DM(ITERATOR_IN_BOTH_SUBSCRIPTS_A))) == -5.0
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
