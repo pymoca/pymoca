@@ -39,6 +39,10 @@ OP_MAP = {
     "min": "fmin",
     "max": "fmax",
     "abs": "fabs",
+    "asin": "arcsin",
+    "acos": "arccos",
+    "atan": "arctan",
+    "atan2": "__arctan2__",
     "and": "__mul__",
     "or": "__add__",
 }
