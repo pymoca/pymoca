@@ -906,7 +906,19 @@ class Generator(TreeListener):
                 indices.append(sl)
 
         if for_loop is not None:
-            if isinstance(indices[0], ca.MX):
+            if len(indices) > 1 and isinstance(indices[0], ca.MX) and isinstance(indices[1], ca.MX):
+                # Both subscripts depend on the iterator, so each iteration picks one element.
+                # Pairs of row and column indices would select a submatrix instead, so use the
+                # position in column-major order. Like the subscripts, that position is one-based.
+                indexed_symbol = _new_mx(
+                    "{}[{},{}]".format(tree.name, for_loop.name, for_loop.name)
+                )
+                position = indices[0] + (indices[1] - 1) * s.size1()
+                if np.prod(s.shape) != 0:
+                    for_loop.register_indexed_symbol(
+                        indexed_symbol, lambda i: i, True, tree, position
+                    )
+            elif isinstance(indices[0], ca.MX):
                 if len(indices) > 1:
                     s = s[:, indices[1]]
                     indexed_symbol = _new_mx(
