@@ -3399,6 +3399,25 @@ def test_for_equation_iterator_in_both_subscripts_on_left(unroll_loops):
     np.testing.assert_array_equal(np.array(residual).flatten(), [3, 6])
 
 
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_equation_iterator_in_both_subscripts_of_empty_matrix(unroll_loops):
+    """An empty matrix gives no equations: there is nothing to map the loop over."""
+    txt = """
+        model ForElementEmpty
+          parameter Real A[0, 2];
+          Real y[0];
+        equation
+          for i in 1:0 loop
+            y[i] = A[i, i];
+          end for;
+        end ForElementEmpty;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForElementEmpty", {"unroll_loops": unroll_loops}
+    )
+    assert casadi_model.equations == []
+
+
 def test_for_statement_iterator_in_both_subscripts():
     """A for-statement in a function picks the right element too."""
     txt = """
