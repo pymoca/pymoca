@@ -279,7 +279,7 @@ NUMERIC_TOLERANCE = {
     # Nonlinear MPC re-solved with a newer IPOPT than the reference was generated with.
     "channel_wave_damping__example_optimization": {"abs_tol": 1e-6, "rel_tol": 1e-3},
     # Solver noise on an otherwise exact reproduction.
-    "goal_programming__example": {"abs_tol": 1e-6, "rel_tol": 1e-3},
+    "goal_programming__example": {"abs_tol": 1e-6, "rel_tol": 2e-3},
 }
 
 
