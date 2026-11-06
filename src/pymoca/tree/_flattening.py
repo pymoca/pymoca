@@ -1936,6 +1936,7 @@ class ComponentRefFlattener(TreeListener):
         self.depth = 0
         self.cutoff_depth = sys.maxsize
         self.inside_modification = 0  # We do flatten component references in modifications
+        self.iterators: list[str] = []
         super().__init__()
 
     def enterClassModificationArgument(self, tree: ast.ClassModificationArgument):
@@ -1946,12 +1947,23 @@ class ComponentRefFlattener(TreeListener):
         if tree.scope is not None:
             self.inside_modification -= 1
 
+    def exitForIndex(self, tree: ast.ForIndex):
+        # Only after the range, which is not in scope of its own iterator (MLS 11.2.2).
+        self.iterators.append(tree.name)
+
+    def exitForArray(self, tree: ast.ForArray):
+        del self.iterators[-len(tree.indices) :]
+
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
         if self.depth > self.cutoff_depth:
             return
 
         if tree.resolved:
+            return
+
+        if tree.name in self.iterators and not tree.child:
+            self.cutoff_depth = self.depth
             return
 
         # Compose flatted name

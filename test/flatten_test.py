@@ -2440,6 +2440,33 @@ def test_for_array_in_nested_and_inherited_equation():
     assert _ref_names(flat.equations) == {"a.b.x", "a.b.y", "i"}
 
 
+@pytest.mark.parametrize(
+    "declarations, expected",
+    [
+        ("parameter Integer i = 7; Real y[3](min = {2 * x[i] for i in 1:n});", {"c.n", "c.x", "i"}),
+        ("Integer i; Real y[3](min = {2 * i for i in 1:n});", {"c.n", "i"}),
+        (
+            "parameter Integer i = 2; Real y[2](min = {2 * i for i in 1:i + n - 3});",
+            {"c.i", "c.n", "i"},
+        ),
+    ],
+    ids=["parameter", "variable", "range_reads_member"],
+)
+def test_for_array_iterator_shadows_member_in_modification(declarations, expected):
+    """An iterator hides a same-named member in a modification, but not in its own range."""
+    txt = f"""
+    model M
+        model C
+            parameter Real x[3];
+            {declarations}
+            parameter Integer n = 3;
+        end C;
+        C c;
+    end M;"""
+    flat_tree = tree.flatten(parser.parse(txt), "M")
+    assert _ref_names(flat_tree.classes["M"].symbols["c.y"].min) == expected
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
