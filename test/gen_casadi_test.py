@@ -3590,6 +3590,48 @@ def test_for_array_of_matrix_slice(slice_, expected, unroll_loops):
 
 
 @pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "shape, body, range_, expected",
+    [
+        ("2, 2", "A[i, :]", "1:2", [[1, 2], [3, 4]]),
+        ("2, 2", "A[:, i]", "1:2", [[1, 3], [2, 4]]),
+        ("2, 2", "{x[i], 3 * x[i]}", "1:2", [[1, 3], [2, 6]]),
+        ("2, 3", "{x[i], 3 * x[i], 5}", "1:2", [[1, 3, 5], [2, 6, 5]]),
+        ("1, 2", "{x[i], 3 * x[i]}", "2:2", [[2, 6]]),
+    ],
+    ids=["row", "column", "literal", "non_square", "single_row"],
+)
+def test_for_array_of_vector(shape, body, range_, expected, unroll_loops):
+    """A comprehension of a vector has one row per iterator value (MLS 10.4.1)."""
+    txt = f"""
+        model M
+          parameter Real A[2, 2];
+          parameter Real x[2];
+          Real y[{shape}];
+        equation
+          y = {{{body} for i in {range_}}};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"A": ca.DM([[1, 2], [3, 4]]), "x": ca.DM([1, 2])})
+    np.testing.assert_array_equal(residual, -np.array(expected).flatten())
+
+
+def test_for_array_of_matrix_rejected():
+    """A comprehension of a matrix, which would have three dimensions, is reported."""
+    txt = """
+        model M
+          parameter Real A[2, 2];
+          Real y[4];
+        equation
+          y = {A for i in 1:2};
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="scalar or a vector"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
 def test_for_array_in_equation(unroll_loops):
     """Array comprehension in an equation, which flattening does not unroll, compiles."""
     txt = """
