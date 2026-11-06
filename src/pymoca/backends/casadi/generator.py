@@ -676,8 +676,13 @@ class Generator(TreeListener):
         logger.debug("exitForArray")
 
         # Before leaving the loop: a bare component reference is only looked up on demand
-        expr = ca.vec(ca.MX(self.get_mx(tree.expression)))
+        expr = ca.MX(_array_to_mx(self.get_mx(tree.expression)))
         f = self.for_loops.pop()
+        if not expr.is_vector():
+            raise NotImplementedError(
+                f"The body of a comprehension over {f.name} must be a scalar or a vector"
+            )
+        expr = ca.vec(expr)
         if len(f.values) == 0:
             self.src[tree] = ca.MX(0, 1)
             return
@@ -701,8 +706,8 @@ class Generator(TreeListener):
         Fmap = F.map("map", self.map_mode, len(f.values), list(range(len(args), len(all_args))), [])
         res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
 
-        # One column per iterator value, so vec() concatenates the elements in order
-        self.src[tree] = ca.vec(res[0])
+        # One row per iterator value (MLS 10.4.1), which is a column for a scalar body
+        self.src[tree] = res[0].T
 
     def get_integer(
         self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]
