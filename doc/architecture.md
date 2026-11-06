@@ -709,6 +709,21 @@ fully-populated connector symbols.
   xfail
 - Connector compatibility check on `connect`: members are taken from the left
   connector only, so mismatched connectors are silently accepted (MLS 9.3)
+- Array comprehensions `{expr for i in range}` and reduction expressions
+  `f(expr for i in range)` are unrolled only in modification values whose range has a value
+  while flattening (MLS 10.3.4.1, 10.4.1): others, such as one in an equation or with a range
+  parameter declared later, pass through to the backends as a `ForArray` node, which only the
+  CasADi backend handles: the SymPy and XML backends fail with a `KeyError` on one in an
+  equation. The reduction function name is not checked against the legal set (`array`, `sum`,
+  `product`, `min`, `max`)
+- The CasADi backend supports a comprehension over one iterator with a scalar or vector body.
+  It raises `NotImplementedError` for several iterators, a matrix body, an implicit or
+  array-valued range, and a subscript or range that uses the iterator of an enclosing loop, as
+  in `for j in 1:n loop y[j] = sum(A[j, i] for i in 1:m); end for`. The enclosing iterator can
+  be used as a value in the body
+- `min` and `max` over an empty range give the values for Real, also for Integer expressions,
+  since the CasADi backend does not track the type of an expression here (MLS 10.3.4)
+- `sum` of a matrix gives the column sums rather than a scalar (MLS 10.3.4)
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
 - Imports are effectively re-exported: composite-name lookup searches the target

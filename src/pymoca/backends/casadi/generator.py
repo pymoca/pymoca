@@ -1,7 +1,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import itertools
 import logging
+import operator
+import sys
 from collections import OrderedDict, deque, namedtuple
 from typing import Dict, Iterable, Union
 
@@ -11,6 +14,7 @@ import numpy as np
 
 from pymoca import ast
 from pymoca.tree import TreeListener, TreeWalker, flatten
+from pymoca.tree._flattening import _range_values
 
 from ._options import _merge_default_options
 from .model import DelayArgument, Model, StringVariable, Variable
@@ -52,16 +56,29 @@ class ForLoop:
         self.generator = generator
         i = tree.indices[0]
         e = i.expression
-        start = e.start.value
-        step = e.step.value
-        stop = self.generator.get_integer(e.stop)
-        self.values = np.arange(start, stop + step, step, dtype=int)
+        if not isinstance(e, ast.Slice):
+            raise NotImplementedError(
+                f"Only a range expression is supported as the range of iterator {i.name}"
+            )
+        bounds = [self.generator.get_range_bound(b, i.name) for b in (e.start, e.step, e.stop)]
+        dtype = int if all(isinstance(b, int) for b in bounds) else float
+        self.values = np.array(_range_values(*bounds), dtype=dtype)
         self.index_variable = _new_mx(i.name)
         self.name = i.name
         self.indexed_symbols = OrderedDict()
 
     def register_indexed_symbol(self, e, index_function, transpose, tree, index_expr=None):
-        if isinstance(index_expr, ca.MX) and index_expr is not self.index_variable:
+        if (
+            len(self.values) > 0
+            and isinstance(index_expr, ca.MX)
+            and index_expr is not self.index_variable
+        ):
+            outer = [v.name() for v in ca.symvar(index_expr) if v.name() != self.name]
+            if outer:
+                raise NotImplementedError(
+                    f"A subscript in the loop over {self.name} depends on {', '.join(outer)},"
+                    " nested loops are not supported"
+                )
             F = ca.Function("index_expr", [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=int)
             Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
@@ -88,6 +105,13 @@ class GeneratorWalker(TreeWalker):
         # Symbols must come before classes, as we need to access symbol values when creating
         # CasADi interpolant functions.
         return sorted(keys, key=lambda attr: 0 if attr == "symbols" else 1)
+
+
+def _array_to_mx(value):
+    """Return value as a vector or matrix if it is an array literal, a (nested) list of elements."""
+    if not isinstance(value, list):
+        return value
+    return ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in value])
 
 
 class Generator(TreeListener):
@@ -225,7 +249,7 @@ class Generator(TreeListener):
         self.entered_classes.pop()
 
     def exitArray(self, tree):
-        self.src[tree] = [self.src[e] for e in tree.values]
+        self.src[tree] = [self.get_mx(e) for e in tree.values]
 
     def exitPrimary(self, tree):
         self.src[tree] = tree.value
@@ -248,21 +272,30 @@ class Generator(TreeListener):
             v = self.get_mx(tree.operands[0])
             src = self.get_derivative(v)
         elif op == "-" and n_operands == 1:
-            src = -self.get_mx(tree.operands[0])
+            src = -_array_to_mx(self.get_mx(tree.operands[0]))
         elif op == "+" and n_operands == 1:
-            src = self.get_mx(tree.operands[0])
+            src = _array_to_mx(self.get_mx(tree.operands[0]))
         elif op == "not" and n_operands == 1:
             src = ca.if_else(self.get_mx(tree.operands[0]), 0, 1, True)
         elif op == "mtimes":
             assert n_operands >= 2
-            src = self.get_mx(tree.operands[0])
+            src = _array_to_mx(self.get_mx(tree.operands[0]))
             for i in tree.operands[1:]:
-                src = ca.mtimes(src, self.get_mx(i))
+                src = ca.mtimes(src, _array_to_mx(self.get_mx(i)))
         elif op == "transpose" and n_operands == 1:
             src = self.get_mx(tree.operands[0]).T
-        elif op == "sum" and n_operands == 1:
-            v = self.get_mx(tree.operands[0])
-            src = ca.sum1(v)
+        elif op in ("sum", "min", "max", "product") and n_operands == 1:
+            v = _array_to_mx(self.get_mx(tree.operands[0]))
+            # The results for an empty array are given by MLS 3.7, table 10.3.
+            is_empty = ca.MX(v).is_empty()
+            if op == "sum":
+                src = ca.sum1(v)
+            elif op == "min":
+                src = sys.float_info.max if is_empty else ca.mmin(v)
+            elif op == "max":
+                src = -sys.float_info.max if is_empty else ca.mmax(v)
+            else:
+                src = functools.reduce(operator.mul, ca.vertsplit(ca.vec(v)), 1)
         elif op == "linspace" and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
@@ -373,25 +406,25 @@ class Generator(TreeListener):
             func = ca.interpolant("interpolant", mode, [xp, yp], np.array(zp).ravel(order="F"))
             src = func(ca.vertcat(arg_1, arg_2))
         elif op in OP_MAP and n_operands == 2:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
-            rhs = ca.MX(self.get_mx(tree.operands[1]))
+            lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
+            rhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[1])))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
+            lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         else:
-            src = ca.MX(self.get_mx(tree.operands[0]))
+            src = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
             # Check for built-in operations, such as the
             # elementary functions, first.
             if hasattr(src, op) and n_operands <= 2:
                 if n_operands == 1:
-                    src = ca.MX(self.get_mx(tree.operands[0]))
+                    src = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
                     src = getattr(src, op)()
                 else:
-                    lhs = ca.MX(self.get_mx(tree.operands[0]))
-                    rhs = ca.MX(self.get_mx(tree.operands[1]))
+                    lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
+                    rhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[1])))
                     lhs_op = getattr(lhs, op)
                     src = lhs_op(rhs)
             else:
@@ -638,6 +671,50 @@ class Generator(TreeListener):
         else:
             self.src[tree] = []
 
+    def enterForArray(self, tree):
+        logger.debug("enterForArray")
+
+        if len(tree.indices) != 1:
+            raise NotImplementedError("Array constructors with several iterators")
+        self.for_loops.append(ForLoop(self, tree))
+
+    def exitForArray(self, tree):
+        logger.debug("exitForArray")
+
+        # Before leaving the loop: a bare component reference is only looked up on demand
+        expr = ca.MX(_array_to_mx(self.get_mx(tree.expression)))
+        f = self.for_loops.pop()
+        if not expr.is_vector():
+            raise NotImplementedError(
+                f"The body of a comprehension over {f.name} must be a scalar or a vector"
+            )
+        expr = ca.vec(expr)
+        if len(f.values) == 0:
+            self.src[tree] = ca.MX(0, 1)
+            return
+
+        indexed_symbols = list(f.indexed_symbols.keys())
+        args = [f.index_variable] + indexed_symbols
+
+        arg_names = [arg.name() for arg in args]
+        free_vars = [e for e in ca.symvar(expr) if e.name() not in arg_names]
+        all_args = args + free_vars
+        F = ca.Function("array_body", all_args, [expr])
+
+        indexed_symbols_full = []
+        for k in indexed_symbols:
+            s = f.indexed_symbols[k]
+            indexed_symbol = self.nodes[self.current_class][s.tree.name][s.indices]
+            if s.transpose:
+                indexed_symbol = ca.transpose(indexed_symbol)
+            indexed_symbols_full.append(indexed_symbol)
+
+        Fmap = F.map("map", self.map_mode, len(f.values), list(range(len(args), len(all_args))), [])
+        res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
+
+        # One row per iterator value (MLS 10.4.1), which is a column for a scalar body
+        self.src[tree] = res[0].T
+
     def get_integer(
         self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]
     ) -> Union[int, ca.MX, np.ndarray]:
@@ -650,37 +727,13 @@ class Generator(TreeListener):
             assert s.type.name == "Integer"
             return self.get_integer(s.value)
         if isinstance(tree, ast.Expression):
-            # Make sure that the expression has been converted to MX by (re)visiting the
-            # relevant part of the AST.
-            ast_walker = TreeWalker()
-            ast_walker.walk(self, tree)
-
-            # Obtain expression
-            expr = self.get_mx(tree)
-
-            # Obtain the symbols it depends on
-            free_vars = ca.symvar(expr)
-
-            # Find the values of the symbols
-            vals = []
-            for free_var in free_vars:
-                if free_var.is_symbolic():
-                    if (len(self.for_loops) > 0) and (free_var.name() == self.for_loops[-1].name):
-                        vals.append(self.for_loops[-1].index_variable)
-                    else:
-                        vals.append(
-                            self.get_integer(self.current_class.symbols[free_var.name()].value)
-                        )
-
-            # Evaluate the expression
-            F = ca.Function("get_integer", free_vars, [expr])
-            ret = F.call(vals, *self.function_mode)
-            if ret[0].is_constant():
+            ret = self._evaluate_expression(tree, self.get_integer)
+            if ret.is_constant():
                 # We managed to evaluate the expression.  Assume the result to be integer.
-                return int(ret[0])
+                return int(ret)
             else:
                 # Expression depends on other symbols.  Could not extract integer value.
-                return ret[0]
+                return ret
         if isinstance(tree, ast.Slice):
             start = self.get_integer(tree.start)
             step = self.get_integer(tree.step)
@@ -688,6 +741,49 @@ class Generator(TreeListener):
             return slice(start, stop, step)
         else:
             raise Exception("Unexpected node type {}".format(tree.__class__.__name__))
+
+    def _evaluate_expression(self, tree: ast.Expression, value_of) -> ca.MX:
+        """Return the expression with its symbols replaced by value_of(symbol value)."""
+        # Make sure that the expression has been converted to MX by (re)visiting the
+        # relevant part of the AST.
+        ast_walker = TreeWalker()
+        ast_walker.walk(self, tree)
+
+        # Obtain expression
+        expr = ca.MX(self.get_mx(tree))
+
+        # Obtain the symbols it depends on
+        free_vars = ca.symvar(expr)
+
+        # Find the values of the symbols
+        vals = []
+        for free_var in free_vars:
+            if (len(self.for_loops) > 0) and (free_var.name() == self.for_loops[-1].name):
+                vals.append(self.for_loops[-1].index_variable)
+            else:
+                vals.append(value_of(self.current_class.symbols[free_var.name()].value))
+
+        # Evaluate the expression
+        F = ca.Function("get_integer", free_vars, [expr])
+        return F.call(vals, *self.function_mode)[0]
+
+    def get_range_bound(self, tree, iterator: str) -> Union[int, float]:
+        """Return the value of a range bound, which unlike a dimension may be Real."""
+        value = None
+        if isinstance(tree, ast.Primary):
+            value = tree.value
+        elif isinstance(tree, ast.ComponentRef):
+            symbol = self.current_class.symbols.get(tree.name)
+            if symbol is not None:
+                value = self.get_range_bound(symbol.value, iterator)
+        elif isinstance(tree, ast.Expression):
+            ret = self._evaluate_expression(tree, lambda v: self.get_range_bound(v, iterator))
+            if ret.is_constant():
+                value = float(ret)
+                value = int(value) if value.is_integer() else value
+        if not isinstance(value, (int, float)):
+            raise NotImplementedError(f"The range of iterator {iterator} has no value here")
+        return value
 
     @staticmethod
     def get_python_type(tree):
