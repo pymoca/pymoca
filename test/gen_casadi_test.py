@@ -3595,6 +3595,69 @@ def test_for_array_in_equation(unroll_loops):
     np.testing.assert_array_equal(np.array(residual).flatten(), [-1.0, -3.0, -5.0])
 
 
+def _residuals(casadi_model, parameters):
+    """Return the equation residuals with the unknowns 0 and the given parameter values."""
+    variables = casadi_model.alg_states + casadi_model.parameters
+    F = ca.Function("f", [v.symbol for v in variables], casadi_model.equations)
+    values = [parameters.get(v.symbol.name(), ca.DM.zeros(*v.symbol.shape)) for v in variables]
+    return np.concatenate([np.array(r).flatten() for r in F.call(values)])
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "declaration, equation, expected",
+    [
+        ("Real y[3]", "y = {2 * x[i] for i in 1:3}", [-2, -4, -6]),
+        ("Real y", "y = sum(x[i] * i for i in 1:3)", [-14]),
+        ("Real y", "y = sum(sum(x[j] * i for j in 1:3) for i in 1:2)", [-18]),
+        ("parameter Integer n = 3; Real y[n]", "y = {x[i] for i in 1:n}", [-1, -2, -3]),
+        ("parameter Integer i = 7; Real y[3]", "y = {x[i] for i in 1:3}", [-1, -2, -3]),
+    ],
+    ids=["comprehension", "reduction", "nested", "range_parameter", "iterator_shadows_parameter"],
+)
+def test_for_array_in_component_equation(declaration, equation, expected, unroll_loops):
+    """Names in a comprehension in an equation of a component resolve to flat names."""
+    txt = f"""
+        model M
+          model C
+            parameter Real x[3];
+            {declaration};
+          equation
+            {equation};
+          end C;
+          C c;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"c.x": ca.DM([1, 2, 3])})
+    np.testing.assert_array_equal(residual, expected)
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_array_in_nested_and_inherited_equation(unroll_loops):
+    """A comprehension resolves through several levels of nesting and through extends."""
+    txt = """
+        model M
+          partial model P
+            parameter Real x[2];
+            Real y[2];
+          equation
+            y = {x[i] for i in 1:2};
+          end P;
+          model B
+            extends P;
+          end B;
+          model A
+            B b;
+          end A;
+          A a;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"a.b.x": ca.DM([1, 2])})
+    np.testing.assert_array_equal(residual, [-1, -2])
+
+
 @pytest.mark.parametrize(
     "expression, expected",
     [

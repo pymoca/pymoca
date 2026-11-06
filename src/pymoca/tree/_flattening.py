@@ -716,6 +716,9 @@ def _rewrite_operand(operand, scope: InstanceClass, ctx: FlatteningContext):
     elif isinstance(operand, ast.Slice):
         for attr in ("start", "stop", "step"):
             setattr(operand, attr, _rewrite_operand(getattr(operand, attr), scope, ctx))
+    elif isinstance(operand, ast.ForArray):
+        body_ctx = _enter_for_indices(operand.indices, scope, ctx)
+        operand.expression = _rewrite_operand(operand.expression, scope, body_ctx)
     return operand
 
 
