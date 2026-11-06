@@ -3929,6 +3929,52 @@ def test_for_array_range_without_value_in_equation(range_):
         gen_casadi.generate(parser.parse(txt), "M")
 
 
+@pytest.mark.parametrize(
+    "equation",
+    [
+        "for j in 1:2 loop y[j] = sum(A[j, i] for i in 1:2); end for",
+        "y[1] = sum(sum(A[j, i] for i in 1:2) for j in 1:2); y[2] = 0",
+    ],
+    ids=["for_equation", "reduction"],
+)
+def test_for_array_subscript_with_outer_iterator_rejected(equation):
+    """A subscript that uses the iterator of an enclosing loop is reported as unsupported."""
+    txt = f"""
+        model M
+          parameter Real A[2, 2];
+          Real y[2];
+        equation
+          {equation};
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="depends on j, nested loops"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "equation, expected",
+    [
+        ("for j in 1:2 loop y[j] = sum(j * x[i] for i in 1:2); end for", [-3, -6]),
+        ("y = {sum(i * x[j] for j in 1:2) for i in 1:2}", [-3, -6]),
+        ("y[1] = sum(sum(x[i] for i in 1:2) for i in 1:2); y[2] = 0", [-6, 0]),
+    ],
+    ids=["for_equation", "comprehension", "same_name"],
+)
+def test_for_array_with_outer_iterator_as_value(equation, expected, unroll_loops):
+    """The iterator of an enclosing loop may be used as a value in the body."""
+    txt = f"""
+        model M
+          parameter Real x[2];
+          Real y[2];
+        equation
+          {equation};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    np.testing.assert_array_equal(_residuals(casadi_model, {"x": ca.DM([1, 2])}), expected)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
