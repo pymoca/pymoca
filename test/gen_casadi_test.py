@@ -3781,6 +3781,96 @@ def test_for_equation_empty_range():
     assert len(casadi_model.equations) == 1
 
 
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "range_, n, expected",
+    [
+        ("1:2:4", 2, [-1, -3]),
+        ("3:-1:1", 3, [-3, -2, -1]),
+        ("m - 1:m", 2, [-2, -3]),
+        ("1:m - 1:3", 2, [-1, -3]),
+        ("0.0:0.5:1.0", 3, [0, -0.5, -1]),
+        ("0.0:0.5:0.75", 2, [0, -0.5]),
+        ("0.0:0.1:0.2", 3, [0, -0.1, -0.2]),
+        ("dt:dt:2 * dt", 2, [-0.25, -0.5]),
+    ],
+)
+def test_for_array_range_in_equation(range_, n, expected, unroll_loops):
+    """The generator gives a range in an equation the elements of MLS 10.4.3, also for Real."""
+    txt = f"""
+        model M
+          parameter Integer m = 3;
+          parameter Real dt = 0.25;
+          Real y[{n}];
+        equation
+          y = {{t for t in {range_}}};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"m": ca.DM(3), "dt": ca.DM(0.25)})
+    np.testing.assert_allclose(residual, expected)
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_equation_step_past_stop(unroll_loops):
+    """A for-equation stops at the last element of the range that is within its stop."""
+    txt = """
+        model M
+          Real y[3];
+        equation
+          for i in 1:2:4 loop
+            y[i] = i;
+          end for;
+          y[2] = 0;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    np.testing.assert_array_equal(_residuals(casadi_model, {}), [-1, -3, 0])
+
+
+def test_for_array_zero_step_in_equation():
+    """A zero step is rejected in the generator like it is while flattening."""
+    txt = "model M Real y[2]; equation y = {i for i in 1:0:3}; end M;"
+    with pytest.raises(tree.ModelicaSemanticError, match="step must not be zero"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+def test_for_array_range_with_outer_iterator_rejected():
+    """A range that depends on the iterator of an enclosing loop is reported as unsupported."""
+    txt = """
+        model M
+          parameter Real x[2];
+          Real y[2];
+        equation
+          for j in 1:2 loop
+            y[j] = sum(x[i] for i in 1:j + 0);
+          end for;
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="iterator i"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize(
+    "range_",
+    ["1:k", "1:undeclared", "k", "1:v"],
+    ids=["no_value", "undeclared", "not_a_range", "array_valued"],
+)
+def test_for_array_range_without_value_in_equation(range_):
+    """A range the generator cannot evaluate is reported by the name of its iterator."""
+    txt = f"""
+        model M
+          parameter Integer k;
+          parameter Integer v[2] = {{1, 2}};
+          Real y[2];
+        equation
+          y = {{i for i in {range_}}};
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="iterator i"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

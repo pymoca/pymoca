@@ -14,6 +14,7 @@ import numpy as np
 
 from pymoca import ast
 from pymoca.tree import TreeListener, TreeWalker, flatten
+from pymoca.tree._flattening import _range_values
 
 from ._options import _merge_default_options
 from .model import DelayArgument, Model, StringVariable, Variable
@@ -55,10 +56,13 @@ class ForLoop:
         self.generator = generator
         i = tree.indices[0]
         e = i.expression
-        start = e.start.value
-        step = e.step.value
-        stop = self.generator.get_integer(e.stop)
-        self.values = np.arange(start, stop + step, step, dtype=int)
+        if not isinstance(e, ast.Slice):
+            raise NotImplementedError(
+                f"Only a range expression is supported as the range of iterator {i.name}"
+            )
+        bounds = [self.generator.get_range_bound(b, i.name) for b in (e.start, e.step, e.stop)]
+        dtype = int if all(isinstance(b, int) for b in bounds) else float
+        self.values = np.array(_range_values(*bounds), dtype=dtype)
         self.index_variable = _new_mx(i.name)
         self.name = i.name
         self.indexed_symbols = OrderedDict()
@@ -712,37 +716,13 @@ class Generator(TreeListener):
             assert s.type.name == "Integer"
             return self.get_integer(s.value)
         if isinstance(tree, ast.Expression):
-            # Make sure that the expression has been converted to MX by (re)visiting the
-            # relevant part of the AST.
-            ast_walker = TreeWalker()
-            ast_walker.walk(self, tree)
-
-            # Obtain expression
-            expr = self.get_mx(tree)
-
-            # Obtain the symbols it depends on
-            free_vars = ca.symvar(expr)
-
-            # Find the values of the symbols
-            vals = []
-            for free_var in free_vars:
-                if free_var.is_symbolic():
-                    if (len(self.for_loops) > 0) and (free_var.name() == self.for_loops[-1].name):
-                        vals.append(self.for_loops[-1].index_variable)
-                    else:
-                        vals.append(
-                            self.get_integer(self.current_class.symbols[free_var.name()].value)
-                        )
-
-            # Evaluate the expression
-            F = ca.Function("get_integer", free_vars, [expr])
-            ret = F.call(vals, *self.function_mode)
-            if ret[0].is_constant():
+            ret = self._evaluate_expression(tree, self.get_integer)
+            if ret.is_constant():
                 # We managed to evaluate the expression.  Assume the result to be integer.
-                return int(ret[0])
+                return int(ret)
             else:
                 # Expression depends on other symbols.  Could not extract integer value.
-                return ret[0]
+                return ret
         if isinstance(tree, ast.Slice):
             start = self.get_integer(tree.start)
             step = self.get_integer(tree.step)
@@ -750,6 +730,49 @@ class Generator(TreeListener):
             return slice(start, stop, step)
         else:
             raise Exception("Unexpected node type {}".format(tree.__class__.__name__))
+
+    def _evaluate_expression(self, tree: ast.Expression, value_of) -> ca.MX:
+        """Return the expression with its symbols replaced by value_of(symbol value)."""
+        # Make sure that the expression has been converted to MX by (re)visiting the
+        # relevant part of the AST.
+        ast_walker = TreeWalker()
+        ast_walker.walk(self, tree)
+
+        # Obtain expression
+        expr = ca.MX(self.get_mx(tree))
+
+        # Obtain the symbols it depends on
+        free_vars = ca.symvar(expr)
+
+        # Find the values of the symbols
+        vals = []
+        for free_var in free_vars:
+            if (len(self.for_loops) > 0) and (free_var.name() == self.for_loops[-1].name):
+                vals.append(self.for_loops[-1].index_variable)
+            else:
+                vals.append(value_of(self.current_class.symbols[free_var.name()].value))
+
+        # Evaluate the expression
+        F = ca.Function("get_integer", free_vars, [expr])
+        return F.call(vals, *self.function_mode)[0]
+
+    def get_range_bound(self, tree, iterator: str) -> Union[int, float]:
+        """Return the value of a range bound, which unlike a dimension may be Real."""
+        value = None
+        if isinstance(tree, ast.Primary):
+            value = tree.value
+        elif isinstance(tree, ast.ComponentRef):
+            symbol = self.current_class.symbols.get(tree.name)
+            if symbol is not None:
+                value = self.get_range_bound(symbol.value, iterator)
+        elif isinstance(tree, ast.Expression):
+            ret = self._evaluate_expression(tree, lambda v: self.get_range_bound(v, iterator))
+            if ret.is_constant():
+                value = float(ret)
+                value = int(value) if value.is_integer() else value
+        if not isinstance(value, (int, float)):
+            raise NotImplementedError(f"The range of iterator {iterator} has no value here")
+        return value
 
     @staticmethod
     def get_python_type(tree):
