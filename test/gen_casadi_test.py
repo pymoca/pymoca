@@ -3659,6 +3659,35 @@ def test_for_array_in_nested_and_inherited_equation(unroll_loops):
 
 
 @pytest.mark.parametrize(
+    "declarations, expected",
+    [
+        ("parameter Integer i = 7; Real y[3](min = {2 * x[i] for i in 1:n});", [2, 4, 6]),
+        ("Integer i; Real y[3](min = {2 * i for i in 1:n});", [2, 4, 6]),
+        ("parameter Integer i = 2; Real y[2](min = {2 * i for i in 1:i + n - 3});", [2, 4]),
+    ],
+    ids=["parameter", "variable", "range_reads_member"],
+)
+def test_for_array_iterator_shadows_member_in_modification(declarations, expected):
+    """An iterator hides a same-named member in a modification, but not in its own range."""
+    txt = f"""
+        model M
+          model C
+            parameter Real x[3] = {{1, 2, 3}};
+            {declarations}
+            parameter Integer n = 3;
+          end C;
+          C c;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {})
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "c.y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "c.x")
+    F = ca.Function("f", [x.symbol], [ca.MX(y.min)], {"allow_free": True})
+    assert not F.has_free()
+    np.testing.assert_array_equal(np.array(F(ca.DM([1, 2, 3]))).flatten(), expected)
+
+
+@pytest.mark.parametrize(
     "expression, expected",
     [
         ("2 * {x[1], x[2], x[3]}", [2, 4, 6]),
