@@ -2369,6 +2369,77 @@ def test_reduction_unknown_range_not_unrolled():
     assert isinstance(for_array, ast.ForArray)
 
 
+def _ref_names(node):
+    """Return the names of all ComponentRefs under node, including those in subscripts."""
+    if isinstance(node, (list, tuple)):
+        return {name for n in node for name in _ref_names(n)}
+    if not isinstance(node, ast.Node):
+        return set()
+    names = {node.name} if isinstance(node, ast.ComponentRef) else set()
+    return names | _ref_names(list(vars(node).values()))
+
+
+@pytest.mark.parametrize(
+    "declaration, equation, expected",
+    [
+        ("Real y[3]", "y = {2 * x[i] for i in 1:3}", {"c.x", "c.y", "i"}),
+        (
+            "parameter Integer n = 3; Real y[n]",
+            "y = {x[i] for i in 1:n}",
+            {"c.n", "c.x", "c.y", "i"},
+        ),
+        ("parameter Integer i = 7; Real y[3]", "y = {x[i] for i in 1:3}", {"c.x", "c.y", "i"}),
+        ("Real y", "y = sum(x[i] * i for i in 1:3)", {"c.x", "c.y", "i", "sum"}),
+        (
+            "Real y",
+            "y = sum(sum(x[j] * i for j in 1:3) for i in 1:2)",
+            {"c.x", "c.y", "i", "j", "sum"},
+        ),
+    ],
+    ids=["comprehension", "range_parameter", "iterator_shadows_parameter", "reduction", "nested"],
+)
+def test_for_array_in_component_equation(declaration, equation, expected):
+    """Names in a comprehension in a component equation flatten, except the iterator."""
+    flat = _flatten_inline(
+        f"""
+    model M
+        model C
+            parameter Real x[3];
+            {declaration};
+        equation
+            {equation};
+        end C;
+        C c;
+    end M;""",
+        "M",
+    )
+    assert _ref_names(flat.equations) == expected
+
+
+def test_for_array_in_nested_and_inherited_equation():
+    """A comprehension flattens through several levels of nesting and through extends."""
+    flat = _flatten_inline(
+        """
+    model M
+        partial model P
+            parameter Real x[2];
+            Real y[2];
+        equation
+            y = {x[i] for i in 1:2};
+        end P;
+        model B
+            extends P;
+        end B;
+        model A
+            B b;
+        end A;
+        A a;
+    end M;""",
+        "M",
+    )
+    assert _ref_names(flat.equations) == {"a.b.x", "a.b.y", "i"}
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

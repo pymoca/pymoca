@@ -3595,6 +3595,33 @@ def test_for_array_in_equation(unroll_loops):
     np.testing.assert_array_equal(np.array(residual).flatten(), [-1.0, -3.0, -5.0])
 
 
+def _residuals(casadi_model, parameters):
+    """Return the equation residuals with the unknowns 0 and the given parameter values."""
+    variables = casadi_model.alg_states + casadi_model.parameters
+    F = ca.Function("f", [v.symbol for v in variables], casadi_model.equations)
+    values = [parameters.get(v.symbol.name(), ca.DM.zeros(*v.symbol.shape)) for v in variables]
+    return np.concatenate([np.array(r).flatten() for r in F.call(values)])
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_array_in_component_equation(unroll_loops):
+    """A reduction in an equation of a component compiles."""
+    txt = """
+        model M
+          model C
+            parameter Real x[3];
+            Real y;
+          equation
+            y = sum(x[i] * i for i in 1:3);
+          end C;
+          C c;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"c.x": ca.DM([1, 2, 3])})
+    np.testing.assert_array_equal(residual, [-14])
+
+
 @pytest.mark.parametrize(
     "expression, expected",
     [
