@@ -73,6 +73,12 @@ class ForLoop:
             and isinstance(index_expr, ca.MX)
             and index_expr is not self.index_variable
         ):
+            outer = [v.name() for v in ca.symvar(index_expr) if v.name() != self.name]
+            if outer:
+                raise NotImplementedError(
+                    f"A subscript in the loop over {self.name} depends on {', '.join(outer)},"
+                    " nested loops are not supported"
+                )
             F = ca.Function("index_expr", [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=int)
             Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
