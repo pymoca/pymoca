@@ -289,7 +289,7 @@ class Generator(TreeListener):
             elif op == "max":
                 src = -sys.float_info.max if is_empty else ca.mmax(v)
             else:
-                src = functools.reduce(operator.mul, ca.vertsplit(v), 1)
+                src = functools.reduce(operator.mul, ca.vertsplit(ca.vec(v)), 1)
         elif op == "linspace" and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])

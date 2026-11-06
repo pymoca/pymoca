@@ -3441,6 +3441,22 @@ def test_min_max_product_of_array():
     assert [float(v) for v in F(ca.DM([1, 2, 3]))] == [1.0, 3.0, 6.0, 2.0]
 
 
+@pytest.mark.parametrize("op, expected", [("product", 24), ("min", 1), ("max", 4)])
+def test_reduction_of_matrix(op, expected):
+    """A reduction of a matrix runs over all its elements and gives a scalar (MLS 10.3.4)."""
+    txt = f"""
+        model M
+          parameter Real A[2, 2];
+          Real y;
+        equation
+          y = {op}(A);
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    residual = _residuals(casadi_model, {"A": ca.DM([[1, 2], [3, 4]])})
+    np.testing.assert_array_equal(residual, [-expected])
+
+
 def _max_of_neighbors(H_b):
     n = len(H_b)
     return [max(H_b[:2]), *(max(H_b[i : i + 3]) for i in range(n - 2)), max(H_b[n - 2 :])]
