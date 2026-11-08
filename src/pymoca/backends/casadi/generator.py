@@ -264,25 +264,21 @@ class Generator(TreeListener):
 
         n_operands = len(tree.operands)
         if op == "der":
-            v = self.get_mx(tree.operands[0])
+            v = _array_to_mx(self.get_mx(tree.operands[0]))
             src = self.get_derivative(v)
         elif op == "-" and n_operands == 1:
-            src = -self.get_mx(tree.operands[0])
+            src = -_array_to_mx(self.get_mx(tree.operands[0]))
         elif op == "+" and n_operands == 1:
             src = self.get_mx(tree.operands[0])
         elif op == "not" and n_operands == 1:
-            src = ca.if_else(self.get_mx(tree.operands[0]), 0, 1, True)
+            src = ca.if_else(_array_to_mx(self.get_mx(tree.operands[0])), 0, 1, True)
         elif op == "mtimes":
             assert n_operands >= 2
-            src = self.get_mx(tree.operands[0])
+            src = _array_to_mx(self.get_mx(tree.operands[0]))
             for i in tree.operands[1:]:
-                src = ca.mtimes(src, self.get_mx(i))
+                src = ca.mtimes(src, _array_to_mx(self.get_mx(i)))
         elif op == "transpose" and n_operands == 1:
-            v = self.get_mx(tree.operands[0])
-            if isinstance(v, list):
-                # A matrix literal is a list of its rows, each a list of elements
-                v = ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in v])
-            src = v.T
+            src = _array_to_mx(self.get_mx(tree.operands[0])).T
         elif op in ("sum", "min", "max", "product") and n_operands == 1:
             v = _array_to_mx(self.get_mx(tree.operands[0]))
             # The results for an empty array are given by MLS 3.7, table 10.3.
@@ -411,25 +407,25 @@ class Generator(TreeListener):
             func = ca.interpolant("interpolant", mode, [xp, yp], np.array(zp).ravel(order="F"))
             src = func(ca.vertcat(arg_1, arg_2))
         elif op in OP_MAP and n_operands == 2:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
-            rhs = ca.MX(self.get_mx(tree.operands[1]))
+            lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
+            rhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[1])))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op(rhs)
         elif op in OP_MAP and n_operands == 1:
-            lhs = ca.MX(self.get_mx(tree.operands[0]))
+            lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
             lhs_op = getattr(lhs, OP_MAP[op])
             src = lhs_op()
         else:
-            src = ca.MX(self.get_mx(tree.operands[0]))
+            src = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
             # Check for built-in operations, such as the
             # elementary functions, first.
             if hasattr(src, op) and n_operands <= 2:
                 if n_operands == 1:
-                    src = ca.MX(self.get_mx(tree.operands[0]))
+                    src = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
                     src = getattr(src, op)()
                 else:
-                    lhs = ca.MX(self.get_mx(tree.operands[0]))
-                    rhs = ca.MX(self.get_mx(tree.operands[1]))
+                    lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
+                    rhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[1])))
                     lhs_op = getattr(lhs, op)
                     src = lhs_op(rhs)
             else:
