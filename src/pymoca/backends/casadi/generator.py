@@ -311,7 +311,8 @@ class Generator(TreeListener):
             for sym in [self.get_mx(op) for op in tree.operands[1:]]:
                 if isinstance(sym, list):
                     for e in sym:
-                        entries.append(e)
+                        # A row of a matrix literal is itself a list
+                        entries.append(ca.horzcat(*e) if isinstance(e, list) else e)
                 else:
                     entries.append(sym)
             src = ca.vertcat(*entries)
