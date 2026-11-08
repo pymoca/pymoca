@@ -3336,6 +3336,45 @@ def test_function_dedup_name_dot_free():
     assert func.name() == "Branch_f"
 
 
+@pytest.mark.parametrize(
+    "declaration, literal, expected",
+    [
+        ("y[2, 2]", "{{1, 2}, {3, 4}}", [[1, 3], [2, 4]]),
+        ("y[3, 2]", "{{1, 2, 3}, {4, 5, 6}}", [[1, 4], [2, 5], [3, 6]]),
+        ("y[3, 1]", "{{1, 2, 3}}", [[1], [2], [3]]),
+        # An element that is an expression rather than a number
+        ("y[2, 2]", "{{1 + 1, 2}, {3, 4}}", [[2, 3], [2, 4]]),
+        ("y[2, 2]", "{{2 * 3, -2}, {3, 4.5}}", [[6, 3], [-2, 4.5]]),
+    ],
+)
+def test_transpose_of_matrix_literal(declaration, literal, expected):
+    """transpose() of a matrix literal swaps its rows and columns."""
+    txt = f"""
+        model M
+          Real {declaration};
+        equation
+          y = transpose({literal});
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    F = ca.Function("f", [y.symbol], casadi_model.equations)
+    np.testing.assert_array_equal(-np.array(F(ca.DM.zeros(y.symbol.sparsity()))), expected)
+
+
+def test_transpose_of_matrix_literal_in_binding():
+    """transpose() of a matrix literal gives a binding its value and its inferred dimensions."""
+    txt = """
+        model M
+          parameter Real B[:, :] = transpose({{1, 2}, {3, 4}, {5, 6}});
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    (B,) = casadi_model.parameters
+    assert B.symbol.shape == (2, 3)
+    np.testing.assert_array_equal(np.array(B.value), [[1, 3, 5], [2, 4, 6]])
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
