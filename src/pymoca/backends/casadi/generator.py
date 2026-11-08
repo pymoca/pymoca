@@ -612,7 +612,7 @@ class Generator(TreeListener):
 
         all_assignments = []
 
-        expr = self.get_mx(tree.right)
+        expr = _array_to_mx(self.get_mx(tree.right))
         for component_ref in tree.left:
             all_assignments.append(Assignment(self.get_mx(component_ref), expr))
 

@@ -4257,6 +4257,35 @@ def test_array_literal_in_if_expression(condition, expression, expected):
     np.testing.assert_array_equal(np.array(residual).flatten(), -np.array(expected))
 
 
+@pytest.mark.parametrize(
+    "statements",
+    [
+        "v := {a, 2 * a};",
+        "if a > 0 then v := {a, 2 * a}; else v := {0, 0}; end if;",
+    ],
+    ids=["assignment", "if_statement"],
+)
+def test_array_literal_in_function_assignment(statements):
+    """An array literal of symbolic elements is a valid value of an assignment in a function."""
+    txt = f"""
+        model M
+          function f
+            input Real a;
+            output Real v[2];
+          algorithm
+            {statements}
+          end f;
+          Real y[2];
+        equation
+          y = f(1);
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    F = ca.Function("f", [y.symbol], casadi_model.equations)
+    np.testing.assert_array_equal(np.array(F(ca.DM.zeros(2))).flatten(), [-1, -2])
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
