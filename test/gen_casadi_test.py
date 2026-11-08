@@ -3375,6 +3375,62 @@ def test_transpose_of_matrix_literal_in_binding():
     np.testing.assert_array_equal(np.array(B.value), [[1, 3, 5], [2, 4, 6]])
 
 
+def test_cat_of_matrix_literals():
+    """cat() along the first dimension stacks the rows of matrix literals (MLS 10.4.2)."""
+    txt = """
+        model M
+          Real y[2, 2];
+        equation
+          y = cat(1, {{1, 2}}, {{3, 4}});
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    F = ca.Function("f", [y.symbol], casadi_model.equations)
+    np.testing.assert_array_equal(np.array(F(ca.DM.zeros(2, 2))), [[-1, -2], [-3, -4]])
+
+
+def _rhs_value(declaration, rhs):
+    """Compile `y = rhs` and return the value of rhs for x = {5, 7} and A = {{11, 12}, {13, 14}}."""
+    txt = f"""
+        model M
+          parameter Real x[2];
+          parameter Real A[2, 2];
+          Real {declaration};
+        equation
+          y = {rhs};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    values = {"x": ca.DM([5, 7]), "A": ca.DM([[11, 12], [13, 14]])}
+    parameters = [p.symbol for p in casadi_model.parameters]
+    F = ca.Function("f", [y.symbol] + parameters, casadi_model.equations)
+    residual = F(ca.DM.zeros(y.symbol.sparsity()), *[values[p.name()] for p in parameters])
+    return -np.array(residual)
+
+
+@pytest.mark.parametrize(
+    "declaration, rhs, expected",
+    [
+        ("y[2, 2]", "cat(1, {{1, 2}, {3, 4}})", [[1, 2], [3, 4]]),
+        ("y[3, 2]", "cat(1, A, {{3, 4}})", [[11, 12], [13, 14], [3, 4]]),
+        ("y[3, 2]", "cat(1, {{3, 4}}, A)", [[3, 4], [11, 12], [13, 14]]),
+        ("y[4]", "cat(1, {1, 2}, {3, 4})", [[1], [2], [3], [4]]),
+        ("y[4]", "cat(1, x, {3, 4})", [[5], [7], [3], [4]]),
+    ],
+)
+def test_cat_of_literals_and_variables(declaration, rhs, expected):
+    """cat() takes matrix literals of several rows, next to matrices, and vectors as before."""
+    np.testing.assert_array_equal(_rhs_value(declaration, rhs), expected)
+
+
+def test_cat_of_rows_of_different_length():
+    """cat() along the first dimension needs rows of the same length (MLS 10.4.2)."""
+    with pytest.raises(RuntimeError):
+        _rhs_value("y[3]", "cat(1, {{1, 2}}, {{3}})")
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
