@@ -4286,6 +4286,24 @@ def test_array_literal_in_function_assignment(statements):
     np.testing.assert_array_equal(np.array(F(ca.DM.zeros(2))).flatten(), [-1, -2])
 
 
+def test_array_literal_in_delay():
+    """An array literal of symbolic elements is a valid expression to delay."""
+    txt = """
+        model M
+          Real x[2];
+          Real y[2];
+        equation
+          y = delay({x[1], 2 * x[2]}, 1);
+          x = {1, 2};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    (argument,) = casadi_model.delay_arguments
+    x = next(v for v in casadi_model.alg_states if v.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [argument.expr])
+    np.testing.assert_array_equal(np.array(F(ca.DM([1, 2]))).flatten(), [1, 4])
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
