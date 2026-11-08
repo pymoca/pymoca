@@ -370,7 +370,7 @@ class Generator(TreeListener):
             src = ca.vertcat(*entries)
         elif op == "delay" and n_operands in (2, 3):
             # The optional delayMax only bounds delayTime
-            expr = self.get_mx(tree.operands[0])
+            expr = _array_to_mx(self.get_mx(tree.operands[0]))
             duration = self.get_mx(tree.operands[1])
 
             src = _new_mx("_pymoca_delay_{}".format(self.delay_counter), *expr.size())
