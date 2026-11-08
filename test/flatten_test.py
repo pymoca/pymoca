@@ -2467,6 +2467,35 @@ def test_for_array_iterator_shadows_member_in_modification(declarations, expecte
     assert _ref_names(flat_tree.classes["M"].symbols["c.y"].min) == expected
 
 
+@pytest.mark.parametrize(
+    "declarations",
+    [
+        "parameter Integer i = 7; Real y[3] = {x[i] for i in 1:n};",
+        "Real i; Real y[3] = {1.0 * i for i in 1:n};",
+        "parameter Integer i = 7; Real y = sum(x[i] for i in 1:n);",
+        "parameter Integer i = 7; parameter Real y[3] = {x[i] for i in 1:n};",
+    ],
+    ids=["parameter", "variable", "reduction", "parameter_declaration"],
+)
+def test_for_array_iterator_shadows_member_in_declaration_equation(declarations):
+    """An iterator hides a same-named member in a declaration equation (MLS 10.4.1)."""
+    flat = _flatten_inline(
+        f"""
+    model M
+        model C
+            parameter Real x[3];
+            {declarations}
+            parameter Integer n = 3;
+        end C;
+        C c;
+    end M;""",
+        "M",
+    )
+    names = _ref_names([flat.equations, flat.symbols["c.y"].value])
+    assert "i" in names
+    assert "c.i" not in names
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

@@ -875,7 +875,15 @@ class _EquationRefResolver(TreeListener):
         self.prefix = prefix
         self.depth = 0
         self.cutoff_depth = sys.maxsize
+        self.iterators: list[str] = []
         super().__init__()
+
+    def exitForIndex(self, tree: ast.ForIndex):
+        # Only after the range, which is not in scope of its own iterator (MLS 11.2.2).
+        self.iterators.append(tree.name)
+
+    def exitForArray(self, tree: ast.ForArray):
+        del self.iterators[-len(tree.indices) :]
 
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
@@ -883,6 +891,10 @@ class _EquationRefResolver(TreeListener):
             return
 
         if tree.resolved:
+            return
+
+        if tree.name in self.iterators and not tree.child:
+            self.cutoff_depth = self.depth
             return
 
         if _composite_flat_name(self.prefix, tree) in self.flat_class.symbols:
