@@ -3768,6 +3768,50 @@ def test_for_equation_range_without_value(range_):
         gen_casadi.generate(parser.parse(txt), "M")
 
 
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_equation_empty_range(unroll_loops):
+    """A for-equation over an empty range with an indexed body compiles to no equations."""
+    txt = """
+        model ForEmpty
+          parameter Integer n = 1;
+          Real x[2];
+        equation
+          for i in 1:n - 1 loop
+            x[i + 1] = x[i];
+          end for;
+          x = {1, 2};
+        end ForEmpty;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForEmpty", {"unroll_loops": unroll_loops}
+    )
+    assert len(casadi_model.equations) == 1
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_equation_empty_range_with_delay(unroll_loops):
+    """A delay in the body of a for-equation over an empty range adds no delay to the model."""
+    txt = """
+        model ForEmpty
+          parameter Integer n = 1;
+          Real x[2];
+        equation
+          for i in 1:n - 1 loop
+            x[i + 1] = delay(x[i + 1], 1);
+          end for;
+          x = {1, 2};
+        end ForEmpty;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForEmpty", {"unroll_loops": unroll_loops}
+    )
+    assert len(casadi_model.equations) == 1
+    assert casadi_model.delay_states == []
+    assert casadi_model.delay_arguments == []
+    assert casadi_model.inputs == []
+    assert casadi_model.delay_arguments_function.n_out() == 0
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

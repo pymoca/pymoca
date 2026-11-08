@@ -62,9 +62,15 @@ class ForLoop:
         self.index_variable = _new_mx(i.name)
         self.name = i.name
         self.indexed_symbols = OrderedDict()
+        # The delays that the body adds start here; a loop over an empty range drops them
+        self.first_delay = len(generator.model.delay_states)
 
     def register_indexed_symbol(self, e, index_function, transpose, tree, index_expr=None):
-        if isinstance(index_expr, ca.MX) and index_expr is not self.index_variable:
+        if (
+            len(self.values) > 0
+            and isinstance(index_expr, ca.MX)
+            and index_expr is not self.index_variable
+        ):
             F = ca.Function("index_expr", [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=int)
             Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
@@ -535,6 +541,11 @@ class Generator(TreeListener):
 
             self.src[tree] = res[0].T
         else:
+            # The body was visited but gives no equations, so its delays do not exist
+            dropped = set(self.model.delay_states[f.first_delay :])
+            del self.model.delay_states[f.first_delay :]
+            del self.model.delay_arguments[f.first_delay :]
+            self.model.inputs = [v for v in self.model.inputs if v.symbol.name() not in dropped]
             self.src[tree] = ca.MX()
 
     def exitIfEquation(self, tree):
