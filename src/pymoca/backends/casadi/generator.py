@@ -455,7 +455,8 @@ class Generator(TreeListener):
                 func = self.get_function(op)
                 src = ca.vertcat(
                     *func.call(
-                        [self.get_mx(operand) for operand in tree.operands], *self.function_mode
+                        [_array_to_mx(self.get_mx(operand)) for operand in tree.operands],
+                        *self.function_mode,
                     )
                 )
 

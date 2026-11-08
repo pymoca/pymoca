@@ -4205,6 +4205,29 @@ def test_array_literal_in_binding_with_inferred_dimensions():
     np.testing.assert_array_equal(np.array(Q), [[1, 2], [2, 1]])
 
 
+def test_array_literal_as_function_argument():
+    """An array literal of symbolic elements is a valid argument of a user-defined function."""
+    txt = """
+        model M
+          function f
+            input Real v[2];
+            output Real s;
+          algorithm
+            s := v[1] + 2 * v[2];
+          end f;
+          parameter Real x[2];
+          Real y;
+        equation
+          y = f({x[1], x[2]});
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [y.symbol, x.symbol], casadi_model.equations)
+    assert float(F(0, ca.DM([1, 2]))) == -5.0
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
