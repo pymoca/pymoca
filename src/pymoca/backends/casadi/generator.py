@@ -465,8 +465,8 @@ class Generator(TreeListener):
         else:
             src_right = self.get_mx(tree.right)
 
-        src_left = ca.MX(src_left)
-        src_right = ca.MX(src_right)
+        src_left = ca.MX(_array_to_mx(src_left))
+        src_right = ca.MX(_array_to_mx(src_right))
 
         # According to the Modelica spec,
         # "It is possible to omit left hand side component references and/or
