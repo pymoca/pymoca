@@ -3965,6 +3965,103 @@ def test_min_max_product_of_array_literal():
     assert [float(v) for v in F(ca.DM([1, 2, 3]))] == [2.0, 2.0, 6.0]
 
 
+def test_array_literal_in_der():
+    """der() of an array literal of states is the vector of their derivatives."""
+    txt = """
+        model M
+          Real x[2];
+          Real y[2];
+        equation
+          y = der({x[1], 2 * x[2]});
+          der(x) = x;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    der_x = next(v for v in casadi_model.der_states if v.symbol.name() == "der(x)")
+    F = ca.Function("f", [y.symbol, der_x.symbol], [casadi_model.equations[0]])
+    np.testing.assert_array_equal(np.array(F(ca.DM.zeros(2), ca.DM([1, 2]))).flatten(), [-1, -4])
+
+
+def test_array_literal_in_not():
+    """not of an array literal of Booleans negates each element."""
+    txt = """
+        model M
+          parameter Boolean b[2];
+          Boolean y[2];
+        equation
+          y = not {b[1], b[2]};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    b = next(p for p in casadi_model.parameters if p.symbol.name() == "b")
+    F = ca.Function("f", [y.symbol, b.symbol], casadi_model.equations)
+    np.testing.assert_array_equal(np.array(F(ca.DM.zeros(2), ca.DM([1, 0]))).flatten(), [0, -1])
+
+
+@pytest.mark.parametrize(
+    "expression, expected",
+    [
+        ("2 * {x[1], x[2], x[3]}", [2, 4, 6]),
+        ("{x[1], x[2], x[3]} / 2", [0.5, 1, 1.5]),
+        ("{x[1], x[2], x[3]} + {1, 2, 3}", [2, 4, 6]),
+        ("-{x[1], x[2], x[3]}", [-1, -2, -3]),
+        ("sin({0 * x[1], 0 * x[2], 0 * x[3]})", [0, 0, 0]),
+        ("fmax({x[1], x[2], x[3]}, {2, 2, 2})", [2, 2, 3]),
+    ],
+)
+def test_array_literal_in_arithmetic(expression, expected):
+    """Array literals are operands like any other array."""
+    txt = f"""
+        model ArrayArithmetic
+          parameter Real x[3];
+          Real y[3](min = {expression});
+        equation
+          y = x;
+        end ArrayArithmetic;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "ArrayArithmetic")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [ca.MX(y.min)])
+    np.testing.assert_allclose(np.array(F(ca.DM([1, 2, 3]))).flatten(), expected)
+
+
+def test_unary_plus_keeps_3d_literal():
+    """Unary plus leaves a literal as it is, so a 3D attribute still expands by element."""
+    txt = "model M Real y[1, 1, 2](min = +{{{1, 2}}}); end M;"
+    options = {"expand_vectors": True}
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", options)
+    casadi_model.simplify(options)
+    assert [v.min for v in casadi_model.alg_states] == [1, 2]
+
+
+@pytest.mark.parametrize(
+    "expression, expected",
+    [
+        ("2 * {{x[1], x[2]}, {3, 4}}", [[2, 4], [6, 8]]),
+        ("transpose({{x[1], x[2]}, {3, 4}})", [[1, 3], [2, 4]]),
+    ],
+    ids=["scale", "transpose"],
+)
+def test_matrix_literal_in_arithmetic(expression, expected):
+    """A nested array literal is a matrix: its inner arrays are the rows."""
+    txt = f"""
+        model MatrixArithmetic
+          parameter Real x[2];
+          Real y[2, 2](min = {expression});
+        equation
+          y = fill(0.0, 2, 2);
+        end MatrixArithmetic;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "MatrixArithmetic")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [ca.MX(y.min)])
+    np.testing.assert_array_equal(np.array(F(ca.DM([1, 2]))), expected)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
