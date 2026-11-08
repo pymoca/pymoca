@@ -1,7 +1,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import itertools
 import logging
+import operator
+import sys
 from collections import OrderedDict, deque, namedtuple
 from typing import Dict, Iterable, Union
 
@@ -273,9 +276,18 @@ class Generator(TreeListener):
                 # A matrix literal is a list of its rows, each a list of elements
                 v = ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in v])
             src = v.T
-        elif op == "sum" and n_operands == 1:
+        elif op in ("sum", "min", "max", "product") and n_operands == 1:
             v = self.get_mx(tree.operands[0])
-            src = ca.sum1(v)
+            # The results for an empty array are given by MLS 3.7, table 10.3.
+            is_empty = ca.MX(v).is_empty()
+            if op == "sum":
+                src = ca.sum1(v)
+            elif op == "min":
+                src = sys.float_info.max if is_empty else ca.mmin(v)
+            elif op == "max":
+                src = -sys.float_info.max if is_empty else ca.mmax(v)
+            else:
+                src = functools.reduce(operator.mul, ca.vertsplit(ca.vec(v)), 1)
         elif op == "linspace" and n_operands == 3:
             a = self.get_mx(tree.operands[0])
             b = self.get_mx(tree.operands[1])
