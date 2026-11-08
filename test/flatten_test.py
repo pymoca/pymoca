@@ -1961,6 +1961,38 @@ def test_modification_expression_rescopes_array_index():
     assert index.name == "h.n"
 
 
+def test_modification_array_literal_resolves_in_modification_scope():
+    """Names in an array literal modification value resolve in the scope where
+    the modification appears, not in the modified component (MLS 7.2.4)."""
+    flat = _flatten_inline(
+        """
+    model Inner
+        parameter Integer n = 3;
+        parameter Real x[3];
+        parameter Real p[2];
+        Real y[2];
+    end Inner;
+    model Holder
+        parameter Real x[3];
+        Inner c(y = {x[1], x[n]}, p = {x[2], n});
+        parameter Integer n = 3;
+    end Holder;
+    model M
+        Holder h;
+    end M;""",
+        "M",
+    )
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "h.c.y"]
+    x_1, x_n = eq.right.values
+    assert x_1.name == "h.x"
+    assert x_n.name == "h.x"
+    (index,) = x_n.indices[0]
+    assert index.name == "h.n"
+    x_2, n = flat.symbols["h.c.p"].value.values
+    assert x_2.name == "h.x"
+    assert n.name == "h.n"
+
+
 def test_binding_equation_keeps_array_subscript():
     """A declaration binding equation whose value is a subscripted reference
     binds that array element, not the whole array (MLS 5.6.2 step 1.4)."""

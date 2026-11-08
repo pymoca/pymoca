@@ -448,9 +448,18 @@ def _resolve_modification_attribute(
             func_resolver = _FunctionCallResolver(_fn_scope, ctx.flat_class.functions)
             walker = TreeWalker()
             walker.walk(func_resolver, value)
+    expr_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
+    expr_flat_class = symbol.parent_instance
+    if (
+        isinstance(value, ast.Array)
+        and isinstance(expr_scope, InstanceClass)
+        and isinstance(expr_flat_class, InstanceClass)
+    ):
+        # Elements resolve in the scope where the modification appears (MLS 7.2.4).
+        expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
+        value = copy.deepcopy(value)
+        _rewrite_operand_list(value.values, expr_scope, expr_ctx)
     if isinstance(value, ast.Expression):
-        expr_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
-        expr_flat_class = symbol.parent_instance
         if isinstance(expr_scope, InstanceClass) and isinstance(expr_flat_class, InstanceClass):
             expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
             # Try to evaluate constant expressions (e.g. +1 → 1, -1.0 → -1.0);
