@@ -106,7 +106,17 @@ def _array_to_mx(value):
     """Return value as a vector or matrix if it is an array literal, a (nested) list of elements."""
     if not isinstance(value, list):
         return value
-    return ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in value])
+    rows = []
+    for row in value:
+        if isinstance(row, list):
+            row = ca.horzcat(*row)
+        elif isinstance(row, (ca.MX, ca.DM)) and row.size1() > 1 and row.size2() > 1:
+            raise NotImplementedError("Array literals with more than two dimensions")
+        elif isinstance(row, (ca.MX, ca.DM)) and row.is_column() and row.numel() > 1:
+            # An element that is a vector is a row of the matrix (MLS 10.4.1)
+            row = row.T
+        rows.append(row)
+    return ca.vertcat(*rows)
 
 
 class Generator(TreeListener):
