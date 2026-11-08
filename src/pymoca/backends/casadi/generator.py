@@ -467,10 +467,10 @@ class Generator(TreeListener):
 
         assert len(tree.conditions) + 1 == len(tree.expressions)
 
-        src = self.get_mx(tree.expressions[-1])
+        src = _array_to_mx(self.get_mx(tree.expressions[-1]))
         for cond_index in range(len(tree.conditions)):
             cond = self.get_mx(tree.conditions[-(cond_index + 1)])
-            expr1 = self.get_mx(tree.expressions[-(cond_index + 2)])
+            expr1 = _array_to_mx(self.get_mx(tree.expressions[-(cond_index + 2)]))
 
             src = ca.if_else(cond, expr1, src, True)
 

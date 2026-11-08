@@ -4228,6 +4228,35 @@ def test_array_literal_as_function_argument():
     assert float(F(0, ca.DM([1, 2]))) == -5.0
 
 
+@pytest.mark.parametrize(
+    "condition, expression, expected",
+    [
+        ("true", "if c then {x[1], x[2]} else {x[2], x[1]}", [1, 2]),
+        ("false", "if c then {x[1], x[2]} else {x[2], x[1]}", [2, 1]),
+        ("false", "if c then {x[1], x[2]} else x", [1, 2]),
+    ],
+    ids=["then", "else", "mixed"],
+)
+def test_array_literal_in_if_expression(condition, expression, expected):
+    """An array literal of symbolic elements is a valid branch of an if-expression."""
+    txt = f"""
+        model M
+          parameter Boolean c = {condition};
+          parameter Real x[2];
+          Real y[2];
+        equation
+          y = {expression};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    c = next(p for p in casadi_model.parameters if p.symbol.name() == "c")
+    F = ca.Function("f", [y.symbol, x.symbol, c.symbol], casadi_model.equations)
+    residual = F(ca.DM.zeros(2), ca.DM([1, 2]), condition == "true")
+    np.testing.assert_array_equal(np.array(residual).flatten(), -np.array(expected))
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
