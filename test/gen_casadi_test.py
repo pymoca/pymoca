@@ -3860,7 +3860,7 @@ def test_array_of_component_refs_in_modification():
 
     y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
     x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
-    F = ca.Function("f", [x.symbol], [ca.vertcat(*y.min)])
+    F = ca.Function("f", [x.symbol], [y.min])
     np.testing.assert_array_equal(np.array(F(ca.DM([3, 4]))).flatten(), [3.0, 4.0])
 
 
@@ -4107,6 +4107,102 @@ def test_array_literal_of_vectors(literal, expected):
     np.testing.assert_array_equal(
         np.array(F(ca.DM.zeros(2, 2), ca.DM([1, 2]))), -np.array(expected)
     )
+
+
+def test_array_literal_in_attribute():
+    """An array literal of symbolic elements as an attribute reaches the variable metadata."""
+    txt = """
+        model M
+          parameter Real x[2];
+          Real y[2](min = {x[1], x[2]}, nominal = {2 * x[1], 2 * x[2]});
+        equation
+          y = x;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    alg_states = casadi_model.variable_metadata_function(ca.DM([1, 2]))[1]
+    attributes = dict(zip(CASADI_ATTRIBUTES, np.array(alg_states).T))
+    np.testing.assert_array_equal(attributes["min"], [1, 2])
+    np.testing.assert_array_equal(attributes["nominal"], [2, 4])
+
+
+def test_array_literal_of_expressions_in_attribute():
+    """An array literal whose elements are array expressions is an attribute matrix."""
+    txt = """
+        model M
+          parameter Real p;
+          Real y[2, 2](min = {fill(p, 2), fill(2.0, 2)});
+        equation
+          y = zeros(2, 2);
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    alg_states = casadi_model.variable_metadata_function(1)[1]
+    attributes = dict(zip(CASADI_ATTRIBUTES, np.array(alg_states).T))
+    np.testing.assert_array_equal(attributes["min"], [1, 2, 1, 2])
+
+
+@pytest.mark.parametrize(
+    "declaration, expected",
+    [
+        ("Real y[2](min = {x, 2 * x})", ["x", "(2.*x)"]),
+        ("Real y[1, 2](min = {{x, 2 * x}})", ["x", "(2.*x)"]),
+        ("Real y[1, 1, 2](min = {{{x, 2 * x}}})", ["x", "(2.*x)"]),
+        (
+            "model C parameter Real x; Real y[1, 1, 2](min = {{{x, 2 * x}}}); end C; C c",
+            ["c.x", "(2.*c.x)"],
+        ),
+    ],
+    ids=["vector", "matrix", "3d", "nested_3d"],
+)
+def test_array_literal_in_attribute_expanded(declaration, expected):
+    """An array literal of symbolic elements as an attribute is split by vector expansion."""
+    txt = f"model M parameter Real x; {declaration}; end M;"
+    options = {"expand_vectors": True}
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", options)
+    casadi_model.simplify(options)
+    assert [str(v.min) for v in casadi_model.alg_states] == expected
+
+
+def test_array_literal_of_matrices_in_attribute_expanded():
+    """A 3D literal of matrices as an attribute is split by vector expansion, element by element."""
+    txt = "model M parameter Real A[2, 2]; Real y[2, 2, 2](min = {A, A}); end M;"
+    options = {"expand_vectors": True}
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", options)
+    casadi_model.simplify(options)
+    parameters = [p.symbol for p in casadi_model.parameters]
+    F = ca.Function("f", parameters, [v.min for v in casadi_model.alg_states])
+    assert [float(r) for r in F(1, 2, 3, 4)] == [1, 2, 3, 4, 1, 2, 3, 4]
+
+
+def test_array_literal_of_tensors_in_attribute_expanded():
+    """A 4D literal of 3D arrays as an attribute is split by vector expansion, element by element."""
+    txt = "model M parameter Real A[2, 2, 2]; Real y[2, 2, 2, 2](min = {A, A}); end M;"
+    options = {"expand_vectors": True}
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", options)
+    casadi_model.simplify(options)
+    parameters = [p.symbol for p in casadi_model.parameters]
+    F = ca.Function("f", parameters, [v.min for v in casadi_model.alg_states])
+    assert [float(r) for r in F(*range(1, 9))] == [*range(1, 9), *range(1, 9)]
+
+
+def test_array_literal_in_binding_with_inferred_dimensions():
+    """An array literal of symbolic elements sizes a declaration with unspecified dimensions."""
+    txt = """
+        model M
+          parameter Real p[2];
+          parameter Real q[:] = {p[1], p[2]};
+          parameter Real Q[:, :] = {{p[1], p[2]}, {p[2], p[1]}};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    parameters = {p.symbol.name(): p for p in casadi_model.parameters}
+    assert parameters["q"].symbol.shape == (2, 1)
+    assert parameters["Q"].symbol.shape == (2, 2)
+    F = ca.Function("f", [parameters["p"].symbol], [parameters["q"].value, parameters["Q"].value])
+    q, Q = F(ca.DM([1, 2]))
+    np.testing.assert_array_equal(np.array(q).flatten(), [1, 2])
+    np.testing.assert_array_equal(np.array(Q), [[1, 2], [2, 1]])
 
 
 if __name__ == "__main__":
