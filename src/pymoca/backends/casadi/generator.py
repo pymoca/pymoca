@@ -259,7 +259,11 @@ class Generator(TreeListener):
             for i in tree.operands[1:]:
                 src = ca.mtimes(src, self.get_mx(i))
         elif op == "transpose" and n_operands == 1:
-            src = self.get_mx(tree.operands[0]).T
+            v = self.get_mx(tree.operands[0])
+            if isinstance(v, list):
+                # A matrix literal is a list of its rows, each a list of elements
+                v = ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in v])
+            src = v.T
         elif op == "sum" and n_operands == 1:
             v = self.get_mx(tree.operands[0])
             src = ca.sum1(v)
