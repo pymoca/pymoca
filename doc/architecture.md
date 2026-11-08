@@ -714,10 +714,11 @@ fully-populated connector symbols.
 - An array literal with more than two dimensions raises `NotImplementedError` in an
   expression, as CasADi has no such arrays. As a variable attribute it is kept as a nested
   list, which only vector expansion (`expand_vectors`) can use
-- Array comprehensions `{expr for i in range}` are unrolled only in modification values
-  (MLS 10.4.1): in an equation the `ForArray` node passes through to the backends
-  unexpanded, and the reduction form `f(expr for i in range)` (MLS 10.3.4) has its
-  for clause silently dropped by the parser
+- Array comprehensions `{expr for i in range}` and reduction expressions
+  `f(expr for i in range)` are unrolled only in modification values (MLS 10.3.4.1,
+  10.4.1): in an equation the `ForArray` node passes through to the backends unexpanded,
+  and the reduction function name is not checked against the legal set (`array`, `sum`,
+  `product`, `min`, `max`)
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
 - Imports are effectively re-exported: composite-name lookup searches the target

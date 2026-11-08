@@ -4405,6 +4405,74 @@ def test_sum_of_array(rhs, expected):
     assert float(F(0, *[values[p.name()] for p in parameters])) == -expected
 
 
+def test_reduction_in_modification():
+    """A reduction sum(expr for i in range) in a modification compiles (MLS 10.3.4.1)."""
+    ast_tree = parser.parse(
+        """
+    model ReductionModification
+        parameter Real x[3] = {1, 2, 3};
+        Real y(min = sum(x[i] ^ 2 for i in 1:3));
+    equation
+        y = x[1];
+    end ReductionModification;"""
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "ReductionModification")
+
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [y.min])
+    assert float(F(ca.DM([1, 2, 3]))) == 14.0
+
+
+def test_min_max_product_of_array():
+    """min, max and product reductions compile to scalars (MLS 10.3.4.1)."""
+    ast_tree = parser.parse(
+        """
+    model ArrayReductions
+        parameter Real x[3] = {1, 2, 3};
+        Real a(min = min(x[i] for i in 1:3));
+        Real b(min = max(x[i] for i in 1:3));
+        Real c(min = product(x[i] for i in 1:3));
+    equation
+        a = x[1];
+        b = x[1];
+        c = x[1];
+    end ArrayReductions;"""
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "ArrayReductions")
+
+    states = {v.symbol.name(): v for v in casadi_model.alg_states}
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [states[n].min for n in ("a", "b", "c")])
+    assert [float(v) for v in F(ca.DM([1, 2, 3]))] == [1.0, 3.0, 6.0]
+
+
+@pytest.mark.parametrize(
+    "declarations",
+    ["parameter Integer n = 0; Real y(min = OP(x[i] for i in 1:n));"],
+    ids=["unrolled"],
+)
+@pytest.mark.parametrize(
+    "op, expected",
+    [("sum", 0.0), ("product", 1.0), ("min", sys.float_info.max), ("max", -sys.float_info.max)],
+)
+def test_reduction_over_empty_range(op, expected, declarations):
+    """A reduction over an empty range gives the result of MLS 3.7, table 10.3."""
+    txt = f"""
+        model EmptyReduction
+          parameter Real x[3];
+          {declarations.replace("OP", op)}
+        equation
+          y = x[1];
+        end EmptyReduction;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "EmptyReduction")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [x.symbol], [ca.MX(y.min)])
+    assert float(F(ca.DM([1, 2, 3]))) == expected
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
