@@ -4062,6 +4062,25 @@ def test_matrix_literal_in_arithmetic(expression, expected):
     np.testing.assert_array_equal(np.array(F(ca.DM([1, 2]))), expected)
 
 
+@pytest.mark.parametrize(
+    "model, expected",
+    [
+        ("Real y[3]; equation y = {x[1], x[2], x[3]};", [-1, -2, -3]),
+        ("Real y[2, 2]; equation y = {{x[1], 0}, {0, x[2]}};", [-1, 0, 0, -2]),
+    ],
+    ids=["vector", "matrix"],
+)
+def test_array_literal_of_component_refs_in_equation(model, expected):
+    """An array literal of symbolic elements is a valid side of an equation."""
+    txt = f"model M parameter Real x[3]; {model} end M;"
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    F = ca.Function("f", [y.symbol, x.symbol], casadi_model.equations)
+    residual = F(ca.DM.zeros(*y.symbol.shape), ca.DM([1, 2, 3]))
+    np.testing.assert_array_equal(np.array(residual).flatten(), expected)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
