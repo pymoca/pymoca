@@ -709,6 +709,9 @@ fully-populated connector symbols.
   xfail
 - Connector compatibility check on `connect`: members are taken from the left
   connector only, so mismatched connectors are silently accepted (MLS 9.3)
+- `min` and `max` of an empty array give the values for Real, also for Integer expressions,
+  since the CasADi backend does not track the type of an expression here (MLS 10.3.4)
+- `sum` of a matrix gives the column sums rather than a scalar (MLS 10.3.4)
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
 - Imports are effectively re-exported: composite-name lookup searches the target

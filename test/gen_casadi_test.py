@@ -8,6 +8,7 @@ import os
 import pickle
 import re
 import shutil
+import sys
 import tempfile
 
 import casadi as ca
@@ -3861,6 +3862,65 @@ def test_array_of_component_refs_in_modification():
     x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
     F = ca.Function("f", [x.symbol], [ca.vertcat(*y.min)])
     np.testing.assert_array_equal(np.array(F(ca.DM([3, 4]))).flatten(), [3.0, 4.0])
+
+
+def test_min_max_product_of_vector():
+    """min, max and product of an array reduce it to a scalar (MLS 10.3.4)."""
+    txt = """
+        model M
+          parameter Real x[3];
+          Real a;
+          Real b;
+          Real c;
+        equation
+          a = min(x);
+          b = max(x);
+          c = product(x);
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+    unknowns = [v.symbol for v in casadi_model.alg_states]
+    F = ca.Function("f", [x.symbol, *unknowns], casadi_model.equations)
+    assert [float(r) for r in F(ca.DM([1, 2, 3]), 0, 0, 0)] == [-1.0, -3.0, -6.0]
+
+
+@pytest.mark.parametrize("op, expected", [("product", 24), ("min", 1), ("max", 4)])
+def test_reduction_of_matrix(op, expected):
+    """A reduction of a matrix runs over all its elements and gives a scalar (MLS 10.3.4)."""
+    txt = f"""
+        model M
+          parameter Real A[2, 2];
+          Real y;
+        equation
+          y = {op}(A);
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    A = next(p for p in casadi_model.parameters if p.symbol.name() == "A")
+    F = ca.Function("f", [y.symbol, A.symbol], casadi_model.equations)
+    assert float(F(0, ca.DM([[1, 2], [3, 4]]))) == -expected
+
+
+@pytest.mark.parametrize(
+    "op, expected",
+    [("sum", 0.0), ("product", 1.0), ("min", sys.float_info.max), ("max", -sys.float_info.max)],
+)
+def test_reduction_of_empty_array(op, expected):
+    """A reduction of an empty array gives the result of MLS 3.7, table 10.3."""
+    txt = f"""
+        model M
+          parameter Real x[0];
+          Real y;
+        equation
+          y = {op}(x);
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    F = ca.Function("f", [y.symbol], casadi_model.equations)
+    assert float(F(0)) == -expected
 
 
 if __name__ == "__main__":
