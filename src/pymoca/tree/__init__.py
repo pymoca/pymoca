@@ -35,6 +35,7 @@ __all__ = [
     "flatten_instance",
     "flatten_to_tree",
     "instantiate",
+    "range_values",
 ]
 
 
@@ -131,6 +132,7 @@ from ._flattening import (  # noqa: E402,F401,I100
     flatten_class,
     flatten_instance,
     flatten_to_tree,
+    range_values,
 )
 from ._instantiation import (  # noqa: E402,F401,I100
     instantiate,

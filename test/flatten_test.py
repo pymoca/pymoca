@@ -2130,6 +2130,31 @@ def test_equation_inlines_constant_never_instantiated():
     assert g_n.value == 9.80665
 
 
+@pytest.mark.parametrize(
+    "start, step, stop, expected",
+    [
+        (1, 2, 5, [1, 3, 5]),
+        (1, 2, 4, [1, 3]),
+        (3, -1, 1, [3, 2, 1]),
+        (1, 1, 0, []),
+        (1, -1, 2, []),
+        # (0.3 - 0.0) / 0.1 is just below 3
+        (0.0, 0.1, 0.3, [0.0, 0.1, 0.2]),
+        (0.0, 1.0, 1.0 - 2**-41, [0.0]),
+        (1e-308, 1e308, 0.0, []),
+        (1e308, 1e-308, 0.0, []),
+    ],
+)
+def test_range_values(start, step, stop, expected):
+    """The elements of start:step:stop are those of MLS 3.7, 10.4.3, without a tolerance."""
+    assert tree.range_values(start, step, stop) == expected
+
+
+def test_range_values_zero_step():
+    with pytest.raises(tree.ModelicaSemanticError, match="step must not be zero"):
+        tree.range_values(1, 0, 3)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

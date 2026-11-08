@@ -742,6 +742,19 @@ def _resolve_expression(
     return listener.result
 
 
+def range_values(start: int | float, step: int | float, stop: int | float) -> list[int | float]:
+    """Return the elements of the range start:step:stop (MLS 10.4.3)."""
+    if step == 0:
+        raise ModelicaSemanticError("Range step must not be zero")
+    if (step > 0 and start > stop) or (step < 0 and start < stop):
+        return []
+    if isinstance(start, int) and isinstance(step, int) and isinstance(stop, int):
+        n = (stop - start) // step
+    else:
+        n = math.floor((stop - start) / step)
+    return [start + m * step for m in range(n + 1)]
+
+
 class _EquationRefResolver(TreeListener):
     """Resolve ComponentRef names in equations to flattened dot-separated names.
 

@@ -3645,6 +3645,129 @@ def test_simplify_differentiated_vector_state():
     np.testing.assert_array_equal(np.array(F(ca.DM([1, 2]), ca.DM([2, 4]))).flatten(), 0)
 
 
+def _residuals(casadi_model, parameters):
+    """Return the equation residuals with the unknowns 0 and the given parameter values."""
+    variables = casadi_model.alg_states + casadi_model.parameters
+    F = ca.Function("f", [v.symbol for v in variables], casadi_model.equations)
+    values = [parameters.get(v.symbol.name(), ca.DM.zeros(*v.symbol.shape)) for v in variables]
+    return np.concatenate([np.array(r).flatten() for r in F.call(values)])
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "range_, expected",
+    [
+        ("3:-1:1", [-3, -2, -1]),
+        ("m - 1:m", [-2, -3]),
+        ("1:m - 1:3", [-1, -3]),
+    ],
+)
+def test_for_equation_range(range_, expected, unroll_loops):
+    """A for-equation runs over the elements of its range (MLS 10.4.3), whatever the bounds."""
+    txt = f"""
+        model M
+          parameter Integer m = 3;
+          Real y[3];
+        equation
+          for i in {range_} loop
+            y[i] = i;
+          end for;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    np.testing.assert_array_equal(_residuals(casadi_model, {"m": ca.DM(3)}), expected)
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_equation_step_past_stop(unroll_loops):
+    """A for-equation stops at the last element of the range that is within its stop."""
+    txt = """
+        model M
+          Real y[3];
+        equation
+          for i in 1:2:4 loop
+            y[i] = i;
+          end for;
+          y[2] = 0;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    np.testing.assert_array_equal(_residuals(casadi_model, {}), [-1, -3, 0])
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "range_, expected",
+    [
+        ("0.0:0.5:1.0", [0, 0.5, 1]),
+        # (0.3 - 0.0) / 0.1 is just below 3
+        ("0.0:0.1:0.3", [0, 0.1, 0.2]),
+        ("dt:dt:2 * dt", [0.25, 0.5]),
+    ],
+    ids=["real", "rounding", "parameter"],
+)
+def test_for_equation_real_range(range_, expected, unroll_loops):
+    """A for-equation over a Real range gives the iterator the Real elements (MLS 10.4.3)."""
+    txt = f"""
+        model M
+          parameter Real dt = 0.25;
+          Real y;
+        equation
+          for t in {range_} loop
+            y = t;
+          end for;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    np.testing.assert_allclose(_residuals(casadi_model, {"dt": ca.DM(0.25)}), -np.array(expected))
+
+
+@pytest.mark.parametrize("range_", ["1:j", "1:j + 1"], ids=["iterator", "expression"])
+def test_for_equation_range_with_outer_iterator_rejected(range_):
+    """A range that depends on the iterator of an enclosing loop is reported as unsupported."""
+    txt = f"""
+        model M
+          Real y[2];
+        equation
+          for j in 1:2 loop
+            for i in {range_} loop
+              y[i] = j;
+            end for;
+          end for;
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="iterator i"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+def test_for_equation_zero_step():
+    """A zero step is rejected in the generator like it is while flattening."""
+    txt = "model M Real y[3]; equation for i in 1:0:3 loop y[i] = i; end for; end M;"
+    with pytest.raises(tree.ModelicaSemanticError, match="step must not be zero"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize(
+    "range_",
+    ["1:k", "1:undeclared", "k", "1:(if k > 0 then 2 else 3)"],
+    ids=["no_value", "undeclared", "not_a_range", "if_expression"],
+)
+def test_for_equation_range_without_value(range_):
+    """A range the generator cannot evaluate is reported by the name of its iterator."""
+    txt = f"""
+        model M
+          parameter Integer k;
+          Real y[2];
+        equation
+          for i in {range_} loop
+            y[i] = i;
+          end for;
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="iterator i"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
