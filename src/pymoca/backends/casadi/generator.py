@@ -74,6 +74,12 @@ class ForLoop:
             and isinstance(index_expr, ca.MX)
             and index_expr is not self.index_variable
         ):
+            outer = [v.name() for v in ca.symvar(index_expr) if v.name() != self.name]
+            if outer:
+                raise NotImplementedError(
+                    f"A subscript in the loop over {self.name} depends on {', '.join(outer)},"
+                    " nested loops are not supported"
+                )
             F = ca.Function("index_expr", [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=int)
             Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
@@ -304,11 +310,17 @@ class Generator(TreeListener):
                 src = ca.mtimes(src, _array_to_mx(self.get_mx(i)))
         elif op == "transpose" and n_operands == 1:
             src = _array_to_mx(self.get_mx(tree.operands[0])).T
+        elif op == "array" and n_operands == 1 and isinstance(tree.operands[0], ast.ForArray):
+            # array(expr for i in range) is {expr for i in range} (MLS 10.4.1)
+            src = self.get_mx(tree.operands[0])
         elif op in ("sum", "min", "max", "product") and n_operands == 1:
             v = _array_to_mx(self.get_mx(tree.operands[0]))
             # The results for an empty array are given by MLS 3.7, table 10.3.
             is_empty = ca.MX(v).is_empty()
-            if op == "sum":
+            if op == "sum" and isinstance(tree.operands[0], ast.ForArray):
+                # A reduction adds the values of its body, one row each, which may be vectors
+                src = ca.sum1(v).T
+            elif op == "sum":
                 # Over all elements, also those of a matrix or of a row
                 src = ca.sum1(ca.vec(v))
             elif op == "min":
@@ -695,6 +707,52 @@ class Generator(TreeListener):
             self.src[tree] = all_assignments
         else:
             self.src[tree] = []
+
+    def enterForArray(self, tree):
+        logger.debug("enterForArray")
+
+        if len(tree.indices) != 1:
+            raise NotImplementedError("Array constructors with several iterators")
+        self.for_loops.append(ForLoop(self, tree))
+
+    def exitForArray(self, tree):
+        logger.debug("exitForArray")
+
+        # Before leaving the loop: a bare component reference is only looked up on demand
+        expr = ca.MX(_array_to_mx(self.get_mx(tree.expression)))
+        f = self.for_loops.pop()
+        if len(self.model.delay_states) > f.first_delay:
+            raise NotImplementedError(f"delay() in a comprehension over {f.name} is not supported")
+        if not expr.is_vector():
+            raise NotImplementedError(
+                f"The body of a comprehension over {f.name} must be a scalar or a vector"
+            )
+        expr = ca.vec(expr)
+        if len(f.values) == 0:
+            self.src[tree] = ca.MX(0, 1)
+            return
+
+        indexed_symbols = list(f.indexed_symbols.keys())
+        args = [f.index_variable] + indexed_symbols
+
+        arg_names = [arg.name() for arg in args]
+        free_vars = [e for e in ca.symvar(expr) if e.name() not in arg_names]
+        all_args = args + free_vars
+        F = ca.Function("array_body", all_args, [expr])
+
+        indexed_symbols_full = []
+        for k in indexed_symbols:
+            s = f.indexed_symbols[k]
+            indexed_symbol = self.nodes[self.current_class][s.tree.name][s.indices]
+            if s.transpose:
+                indexed_symbol = ca.transpose(indexed_symbol)
+            indexed_symbols_full.append(indexed_symbol)
+
+        Fmap = F.map("map", self.map_mode, len(f.values), list(range(len(args), len(all_args))), [])
+        res = Fmap.call([f.values] + indexed_symbols_full + free_vars)
+
+        # One row per iterator value (MLS 10.4.1), which is a column for a scalar body
+        self.src[tree] = res[0].T
 
     def get_integer(
         self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]

@@ -4449,8 +4449,11 @@ def test_min_max_product_of_array():
 
 @pytest.mark.parametrize(
     "declarations",
-    ["parameter Integer n = 0; Real y(min = OP(x[i] for i in 1:n));"],
-    ids=["unrolled"],
+    [
+        "parameter Integer n = 0; Real y(min = OP(x[i] for i in 1:n));",
+        "Real y(min = OP(x[i] for i in 1:n)); parameter Integer n = 0;",
+    ],
+    ids=["unrolled", "not-unrolled"],
 )
 @pytest.mark.parametrize(
     "op, expected",
@@ -4471,6 +4474,397 @@ def test_reduction_over_empty_range(op, expected, declarations):
     x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
     F = ca.Function("f", [x.symbol], [ca.MX(y.min)])
     assert float(F(ca.DM([1, 2, 3]))) == expected
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_array_in_component_equation(unroll_loops):
+    """A reduction in an equation of a component compiles."""
+    txt = """
+        model M
+          model C
+            parameter Real x[3];
+            Real y;
+          equation
+            y = sum(x[i] * i for i in 1:3);
+          end C;
+          C c;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"c.x": ca.DM([1, 2, 3])})
+    np.testing.assert_array_equal(residual, [-14])
+
+
+def test_for_array_zero_step_in_equation():
+    """A zero step is rejected in the generator like it is while flattening."""
+    txt = "model M Real y[2]; equation y = {i for i in 1:0:3}; end M;"
+    with pytest.raises(tree.ModelicaSemanticError, match="step must not be zero"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+def test_for_array_range_with_outer_iterator_rejected():
+    """A range that depends on the iterator of an enclosing loop is reported as unsupported."""
+    txt = """
+        model M
+          parameter Real x[2];
+          Real y[2];
+        equation
+          for j in 1:2 loop
+            y[j] = sum(x[i] for i in 1:j + 0);
+          end for;
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="iterator i"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize(
+    "range_",
+    ["1:k", "1:undeclared", "k", "1:v"],
+    ids=["no_value", "undeclared", "not_a_range", "array_valued"],
+)
+def test_for_array_range_without_value_in_equation(range_):
+    """A range the generator cannot evaluate is reported by the name of its iterator."""
+    txt = f"""
+        model M
+          parameter Integer k;
+          parameter Integer v[2] = {{1, 2}};
+          Real y[2];
+        equation
+          y = {{i for i in {range_}}};
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="iterator i"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize(
+    "equation",
+    [
+        "for j in 1:2 loop y[j] = sum(A[j, i] for i in 1:2); end for",
+        "y[1] = sum(sum(A[j, i] for i in 1:2) for j in 1:2); y[2] = 0",
+    ],
+    ids=["for_equation", "reduction"],
+)
+def test_for_array_subscript_with_outer_iterator_rejected(equation):
+    """A subscript that uses the iterator of an enclosing loop is reported as unsupported."""
+    txt = f"""
+        model M
+          parameter Real A[2, 2];
+          Real y[2];
+        equation
+          {equation};
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="depends on j, nested loops"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "equation, expected",
+    [
+        ("for j in 1:2 loop y[j] = sum(j * x[i] for i in 1:2); end for", [-3, -6]),
+        ("y = {sum(i * x[j] for j in 1:2) for i in 1:2}", [-3, -6]),
+        ("y[1] = sum(sum(x[i] for i in 1:2) for i in 1:2); y[2] = 0", [-6, 0]),
+    ],
+    ids=["for_equation", "comprehension", "same_name"],
+)
+def test_for_array_with_outer_iterator_as_value(equation, expected, unroll_loops):
+    """The iterator of an enclosing loop may be used as a value in the body."""
+    txt = f"""
+        model M
+          parameter Real x[2];
+          Real y[2];
+        equation
+          {equation};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    np.testing.assert_array_equal(_residuals(casadi_model, {"x": ca.DM([1, 2])}), expected)
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "range_, n, expected",
+    [
+        ("1:2:4", 2, [-1, -3]),
+        ("3:-1:1", 3, [-3, -2, -1]),
+        ("m - 1:m", 2, [-2, -3]),
+        ("1:m - 1:3", 2, [-1, -3]),
+        ("0.0:0.5:1.0", 3, [0, -0.5, -1]),
+        ("0.0:0.5:0.75", 2, [0, -0.5]),
+        ("0.0:0.1:0.2", 3, [0, -0.1, -0.2]),
+        ("dt:dt:2 * dt", 2, [-0.25, -0.5]),
+    ],
+)
+def test_for_array_range_in_equation(range_, n, expected, unroll_loops):
+    """The generator gives a range in an equation the elements of MLS 10.4.3, also for Real."""
+    txt = f"""
+        model M
+          parameter Integer m = 3;
+          parameter Real dt = 0.25;
+          Real y[{n}];
+        equation
+          y = {{t for t in {range_}}};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"m": ca.DM(3), "dt": ca.DM(0.25)})
+    np.testing.assert_allclose(residual, expected)
+
+
+def _max_of_neighbors(H_b):
+    n = len(H_b)
+    return [max(H_b[:2]), *(max(H_b[i : i + 3]) for i in range(n - 2)), max(H_b[n - 2 :])]
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_array_with_modified_range(unroll_loops):
+    """Array comprehension with a range set by a component modification compiles."""
+    with open(os.path.join(MODEL_DIR, "ForArrayModifiedRange.mo"), "r") as f:
+        txt = f.read()
+    ast_tree = parser.parse(txt)
+    casadi_model = gen_casadi.generate(
+        ast_tree, "ForArrayModifiedRange", {"unroll_loops": unroll_loops}
+    )
+    states = {v.symbol.name(): v for v in casadi_model.alg_states}
+    parameters = {p.symbol.name(): p for p in casadi_model.parameters}
+
+    # c2 keeps the default n = 2, so its comprehension over 1:0 is empty
+    for comp, H_b_vals, p_val in (("c", [0, 3, 1, 4, 2], 2.0), ("c2", [1, 0], 1.0)):
+        H = states[f"{comp}.H"]
+        H_b = parameters[f"{comp}.H_b"]
+        p = parameters[f"{comp}.p"]
+        assert H.min.shape == (len(H_b_vals), 1)
+
+        F = ca.Function("f", [H_b.symbol, p.symbol], [H.min, H.nominal])
+        min_val, nominal_val = F(ca.DM(H_b_vals), p_val)
+        np.testing.assert_array_equal(
+            np.array(min_val).flatten(), _max_of_neighbors(np.array(H_b_vals, dtype=float))
+        )
+        np.testing.assert_array_equal(
+            np.array(nominal_val).flatten(), p_val * np.arange(1, len(H_b_vals) + 1)
+        )
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "declarations",
+    [
+        "parameter Integer n = 3; Real h[3](min = {b[i] for i in 1:n});",
+        "Real h[3](min = {b[i] for i in 1:n}); parameter Integer n = 3;",
+        "parameter Integer m = 3; parameter Integer n = m; Real h[3](min = {b[i] for i in 1:n});",
+    ],
+    ids=["declared-before", "declared-after", "bound-to-parameter"],
+)
+def test_for_array_of_component_ref(declarations, unroll_loops):
+    """A comprehension whose body is a bare component reference compiles, however n is given."""
+    txt = f"""
+        model ForArrayBare
+          parameter Real b[3];
+          {declarations}
+        equation
+          h = b;
+        end ForArrayBare;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForArrayBare", {"unroll_loops": unroll_loops}
+    )
+    h = next(v for v in casadi_model.alg_states if v.symbol.name() == "h")
+    b = next(p for p in casadi_model.parameters if p.symbol.name() == "b")
+
+    h_min = ca.vertcat(*h.min) if isinstance(h.min, list) else h.min
+    F = ca.Function("f", [b.symbol], [h_min])
+    np.testing.assert_array_equal(np.array(F(ca.DM([1, 2, 3]))).flatten(), [1.0, 2.0, 3.0])
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_array_range_declared_later(unroll_loops):
+    """A range parameter declared after its use, in an inherited class, as in the channel-flow library."""
+    txt = """
+        model ForArrayLater
+          partial model Base
+            parameter Real H_b[n_level_nodes];
+            Real H[n_level_nodes](
+              min = cat(
+                1,
+                {max(H_b[1], H_b[2])},
+                {max(H_b[i], max(H_b[i + 1], H_b[i + 2])) for i in 1:n_level_nodes - 2},
+                {max(H_b[n_level_nodes - 1], H_b[n_level_nodes])}
+              )
+            );
+            parameter Integer n_level_nodes = 2;
+          equation
+            H = H_b;
+          end Base;
+          model Channel
+            extends Base;
+          end Channel;
+          Channel c(n_level_nodes = 5, H_b = {0, 3, 1, 4, 2});
+          Channel c2(H_b = {1, 0});
+        end ForArrayLater;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForArrayLater", {"unroll_loops": unroll_loops}
+    )
+    states = {v.symbol.name(): v for v in casadi_model.alg_states}
+    parameters = {p.symbol.name(): p for p in casadi_model.parameters}
+    for comp, H_b_vals in (("c", [0, 3, 1, 4, 2]), ("c2", [1, 0])):
+        H_min = states[f"{comp}.H"].min
+        F = ca.Function("f", [parameters[f"{comp}.H_b"].symbol], [H_min])
+        np.testing.assert_array_equal(
+            np.array(F(ca.DM(H_b_vals))).flatten(),
+            _max_of_neighbors(np.array(H_b_vals, dtype=float)),
+        )
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "slice_, expected",
+    [("A[i, :]", [3, 7]), ("A[:, i]", [4, 6])],
+    ids=["row", "column"],
+)
+def test_for_array_of_matrix_slice(slice_, expected, unroll_loops):
+    """The body of a comprehension may slice a matrix along either dimension."""
+    txt = f"""
+        model ForArraySlice
+          parameter Real A[2, 2];
+          Real y[2];
+        equation
+          y = {{sum({slice_}) for i in 1:2}};
+        end ForArraySlice;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForArraySlice", {"unroll_loops": unroll_loops}
+    )
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    A = next(p for p in casadi_model.parameters if p.symbol.name() == "A")
+    F = ca.Function("f", [y.symbol, A.symbol], [casadi_model.equations[0]])
+    residual = F(ca.DM.zeros(2), ca.DM([[1, 2], [3, 4]]))
+    np.testing.assert_array_equal(np.array(residual).flatten(), -np.array(expected))
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+@pytest.mark.parametrize(
+    "shape, body, range_, expected",
+    [
+        ("2, 2", "A[i, :]", "1:2", [[1, 2], [3, 4]]),
+        ("2, 2", "A[:, i]", "1:2", [[1, 3], [2, 4]]),
+        ("2, 2", "{x[i], 3 * x[i]}", "1:2", [[1, 3], [2, 6]]),
+        ("2, 3", "{x[i], 3 * x[i], 5}", "1:2", [[1, 3, 5], [2, 6, 5]]),
+        ("1, 2", "{x[i], 3 * x[i]}", "2:2", [[2, 6]]),
+    ],
+    ids=["row", "column", "literal", "non_square", "single_row"],
+)
+def test_for_array_of_vector(shape, body, range_, expected, unroll_loops):
+    """A comprehension of a vector has one row per iterator value (MLS 10.4.1)."""
+    txt = f"""
+        model M
+          parameter Real A[2, 2];
+          parameter Real x[2];
+          Real y[{shape}];
+        equation
+          y = {{{body} for i in {range_}}};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", {"unroll_loops": unroll_loops})
+    residual = _residuals(casadi_model, {"A": ca.DM([[1, 2], [3, 4]]), "x": ca.DM([1, 2])})
+    np.testing.assert_array_equal(residual, -np.array(expected).flatten())
+
+
+def test_for_array_of_matrix_rejected():
+    """A comprehension of a matrix, which would have three dimensions, is reported."""
+    txt = """
+        model M
+          parameter Real A[2, 2];
+          Real y[4];
+        equation
+          y = {A for i in 1:2};
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="scalar or a vector"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+@pytest.mark.parametrize("unroll_loops", [False, True])
+def test_for_array_in_equation(unroll_loops):
+    """Array comprehension in an equation, which flattening does not unroll, compiles."""
+    txt = """
+        model ForArrayEquation
+          parameter Real x[3];
+          Real y[3];
+        equation
+          y = {2 * x[i] for i in 1:3};
+        end ForArrayEquation;
+    """
+    casadi_model = gen_casadi.generate(
+        parser.parse(txt), "ForArrayEquation", {"unroll_loops": unroll_loops}
+    )
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    x = next(p for p in casadi_model.parameters if p.symbol.name() == "x")
+
+    F = ca.Function("f", [y.symbol, x.symbol], [casadi_model.equations[0]])
+    residual = F(ca.DM([1, 1, 1]), ca.DM([1, 2, 3]))
+    np.testing.assert_array_equal(np.array(residual).flatten(), [-1.0, -3.0, -5.0])
+
+
+def _comprehension_value(declaration, rhs):
+    """Compile `y = rhs` and return the value of rhs for the parameter values below."""
+    txt = f"""
+        model M
+          parameter Integer n = 3;
+          parameter Real x[3];
+          parameter Real z[3];
+          parameter Real A[3, 2];
+          Real {declaration};
+        equation
+          y = {rhs};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    values = {
+        "n": ca.DM(3),
+        "x": ca.DM([5, 7, 9]),
+        "z": ca.DM([2, 4, 6]),
+        "A": ca.DM([[1, 2], [3, 4], [5, 6]]),
+    }
+    parameters = [p.symbol for p in casadi_model.parameters]
+    F = ca.Function("f", [y.symbol] + parameters, casadi_model.equations)
+    residual = F(ca.DM.zeros(y.symbol.sparsity()), *[values[p.name()] for p in parameters])
+    return -np.array(residual).flatten()
+
+
+@pytest.mark.parametrize(
+    "declaration, rhs, expected",
+    [
+        ("y[3]", "sum(i * x for i in 1:2)", [15, 21, 27]),
+        ("y[2]", "sum(A[i, :] for i in 1:n)", [9, 12]),
+        ("y[2]", "sum({x[i], z[i]} for i in 1:n)", [21, 12]),
+        ("y", "sum({x[i] for i in 1:n})", [21]),
+    ],
+    ids=["vector", "row", "literal", "of_comprehension"],
+)
+def test_sum_reduction_of_vectors(declaration, rhs, expected):
+    """A sum reduction with a vector body adds the vectors, element by element (MLS 10.3.4.1)."""
+    np.testing.assert_array_equal(_comprehension_value(declaration, rhs), expected)
+
+
+def test_array_reduction():
+    """array(expr for i in range) is the comprehension {expr for i in range} (MLS 10.4.1)."""
+    np.testing.assert_array_equal(
+        _comprehension_value("y[3]", "array(2 * x[i] for i in 1:n)"), [10, 14, 18]
+    )
+
+
+@pytest.mark.parametrize(
+    "rhs", ["{delay(x[i], 1) for i in 1:n}", "sum(delay(x[i], 1) for i in 1:0) * x"]
+)
+def test_delay_in_comprehension_rejected(rhs):
+    """A delay() in the body of a comprehension is reported rather than silently dropped."""
+    with pytest.raises(NotImplementedError, match="delay"):
+        _comprehension_value("y[3]", rhs)
 
 
 if __name__ == "__main__":
