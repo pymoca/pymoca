@@ -119,6 +119,14 @@ def _array_to_mx(value):
     return ca.vertcat(*rows)
 
 
+def _has_casadi_element(value) -> bool:
+    """Return whether the (nested) list of array literal elements contains a CasADi matrix."""
+    return any(
+        _has_casadi_element(e) if isinstance(e, list) else isinstance(e, (ca.MX, ca.DM))
+        for e in value
+    )
+
+
 class Generator(TreeListener):
     def __init__(self, root: ast.Tree, class_name: str, options: Dict[str, bool]):
         super(Generator, self).__init__()
@@ -165,8 +173,13 @@ class Generator(TreeListener):
             else:
                 variable = Variable(mx_symbol, python_type)
                 if not differentiate:
+                    # Count the dimensions along the component path, as vector expansion does
+                    n_dims = sum(1 for dims in modelica_shape for d in dims if d is not None)
                     for a in ast.Symbol.ATTRIBUTES:
                         v = self.get_mx(getattr(ast_symbol, a))
+                        if isinstance(v, list) and _has_casadi_element(v) and n_dims <= 2:
+                            # Lists of numbers and 3D literals stay lists, which vector expansion indexes
+                            v = _array_to_mx(v)
                         if v is not None:
                             if isinstance(v, ca.DM) and all(x == (None,) for x in modelica_shape):
                                 # Scalar numeric type that behaves like an array.

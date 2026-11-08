@@ -316,7 +316,14 @@ class Model:
                                     val = value
                                 elif isinstance(value, list):
                                     val = value
-                                    for i in ind:
+                                    for d, i in enumerate(ind):
+                                        # A matrix or tensor element takes all remaining indices
+                                        if isinstance(val, _MTensor):
+                                            val = val[tuple(ind[d:])]
+                                            break
+                                        if isinstance(val, (ca.MX, ca.DM)) and len(ind) - d == 2:
+                                            val = val[ind[d], ind[d + 1]]
+                                            break
                                         val = val[i]
                                 elif isinstance(value, (ca.DM, np.ndarray)):
                                     val = value[ind]
