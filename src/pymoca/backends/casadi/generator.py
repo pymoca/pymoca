@@ -102,6 +102,13 @@ class GeneratorWalker(TreeWalker):
         return sorted(keys, key=lambda attr: 0 if attr == "symbols" else 1)
 
 
+def _array_to_mx(value):
+    """Return value as a vector or matrix if it is an array literal, a (nested) list of elements."""
+    if not isinstance(value, list):
+        return value
+    return ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in value])
+
+
 class Generator(TreeListener):
     def __init__(self, root: ast.Tree, class_name: str, options: Dict[str, bool]):
         super(Generator, self).__init__()
@@ -277,7 +284,7 @@ class Generator(TreeListener):
                 v = ca.vertcat(*[ca.horzcat(*row) if isinstance(row, list) else row for row in v])
             src = v.T
         elif op in ("sum", "min", "max", "product") and n_operands == 1:
-            v = self.get_mx(tree.operands[0])
+            v = _array_to_mx(self.get_mx(tree.operands[0]))
             # The results for an empty array are given by MLS 3.7, table 10.3.
             is_empty = ca.MX(v).is_empty()
             if op == "sum":
