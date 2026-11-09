@@ -4081,9 +4081,22 @@ def test_array_literal_of_component_refs_in_equation(model, expected):
     np.testing.assert_array_equal(np.array(residual).flatten(), expected)
 
 
-def test_array_literal_of_matrices_rejected():
-    """An array literal of matrices has three dimensions, which the backend reports."""
-    txt = "model M parameter Real A[2, 2]; Real y[4, 2]; equation y = {A, A}; end M;"
+@pytest.mark.parametrize(
+    "literal",
+    ["{A, A}", "{{{x[1], 2 * x[1]}, {x[2], 1}}}", "{{x, x}}", "2 * {{{1, 2}, {3, 4}}}"],
+    ids=["matrices", "nested", "row_of_vectors", "numbers"],
+)
+def test_array_literal_of_three_dimensions_rejected(literal):
+    """An array literal with three dimensions is reported, whichever way it is written."""
+    txt = f"""
+        model M
+          parameter Real A[2, 2];
+          parameter Real x[2];
+          Real y[4, 2];
+        equation
+          y = {literal};
+        end M;
+    """
     with pytest.raises(NotImplementedError, match="more than two dimensions"):
         gen_casadi.generate(parser.parse(txt), "M")
 
