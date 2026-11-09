@@ -109,6 +109,8 @@ def _array_to_mx(value):
     rows = []
     for row in value:
         if isinstance(row, list):
+            if any(isinstance(e, list) or not ca.MX(e).is_scalar() for e in row):
+                raise NotImplementedError("Array literals with more than two dimensions")
             row = ca.horzcat(*row)
         elif isinstance(row, (ca.MX, ca.DM)) and row.size1() > 1 and row.size2() > 1:
             raise NotImplementedError("Array literals with more than two dimensions")
