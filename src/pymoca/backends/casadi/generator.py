@@ -721,7 +721,8 @@ class Generator(TreeListener):
             value = tree.value
         elif isinstance(tree, ast.ComponentRef):
             symbol = self.current_class.symbols.get(tree.name)
-            if symbol is not None:
+            # The iterator of an enclosing loop hides a member of the same name
+            if symbol is not None and not any(f.name == tree.name for f in self.for_loops):
                 value = self.get_range_bound(symbol.value, iterator)
         elif isinstance(tree, ast.Expression):
             ret = self._evaluate_expression(tree, lambda v: self.get_range_bound(v, iterator))
