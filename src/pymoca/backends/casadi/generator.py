@@ -359,15 +359,7 @@ class Generator(TreeListener):
             axis = self.get_integer(tree.operands[0])
             assert axis == 1, "Currently only concatenation on first axis is supported"
 
-            entries = []
-            for sym in [self.get_mx(op) for op in tree.operands[1:]]:
-                if isinstance(sym, list):
-                    for e in sym:
-                        # A row of a matrix literal is itself a list
-                        entries.append(ca.horzcat(*e) if isinstance(e, list) else e)
-                else:
-                    entries.append(sym)
-            src = ca.vertcat(*entries)
+            src = ca.vertcat(*[_array_to_mx(self.get_mx(op)) for op in tree.operands[1:]])
         elif op == "delay" and n_operands in (2, 3):
             # The optional delayMax only bounds delayTime
             expr = _array_to_mx(self.get_mx(tree.operands[0]))
