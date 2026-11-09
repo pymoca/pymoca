@@ -4334,6 +4334,39 @@ def test_cat_of_symbolic_array_literals(declaration, rhs, expected):
     np.testing.assert_array_equal(-np.array(residual), expected)
 
 
+@pytest.mark.parametrize(
+    "rhs, expected",
+    [
+        ("sum(x)", 12),
+        ("sum(A)", 50),
+        ("sum(A[1, :])", 23),
+        ("sum(A[:, 2])", 26),
+        ("sum(transpose(x))", 12),
+        ("sum({{1, 2}, {3, 4}})", 10),
+        ("sum(x[1:0])", 0),
+    ],
+)
+def test_sum_of_array(rhs, expected):
+    """sum() adds all elements of an array, whatever its dimensions (MLS 10.3.4)."""
+    txt = f"""
+        model M
+          parameter Real x[2];
+          parameter Real A[2, 2];
+          Real y;
+        equation
+          y = {rhs};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    (equation,) = casadi_model.equations
+    assert equation.shape == (1, 1)
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    parameters = [p.symbol for p in casadi_model.parameters]
+    values = {"x": ca.DM([5, 7]), "A": ca.DM([[11, 12], [13, 14]])}
+    F = ca.Function("f", [y.symbol] + parameters, [equation])
+    assert float(F(0, *[values[p.name()] for p in parameters])) == -expected
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

@@ -307,7 +307,8 @@ class Generator(TreeListener):
             # The results for an empty array are given by MLS 3.7, table 10.3.
             is_empty = ca.MX(v).is_empty()
             if op == "sum":
-                src = ca.sum1(v)
+                # Over all elements, also those of a matrix or of a row
+                src = ca.sum1(ca.vec(v))
             elif op == "min":
                 src = sys.float_info.max if is_empty else ca.mmin(v)
             elif op == "max":
