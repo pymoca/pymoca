@@ -3460,6 +3460,70 @@ def test_diagonal_of_matrix(declaration, rhs):
         _rhs_value(declaration, rhs)
 
 
+def _der_value(declaration, equation):
+    """Compile an equation `y = der(...)` and return the value of the derivative."""
+    txt = f"""
+        model M
+          parameter Real p;
+          parameter Real q[2];
+          Real x;
+          Real z;
+          Real v[2];
+          Real w[2];
+          Real {declaration};
+        equation
+          {equation};
+        end M;
+    """
+    values = {
+        "p": 3,
+        "q": [4, 5],
+        "x": 2,
+        "z": 7,
+        "v": [11, 13],
+        "w": [17, 19],
+        "time": 29,
+        "der(x)": 0.5,
+        "der(z)": 0.25,
+        "der(v)": [0.1, 0.2],
+        "der(w)": [0.3, 0.4],
+    }
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    residual = ca.vertcat(*casadi_model.equations)
+    symbols = ca.symvar(residual)
+    F = ca.Function("f", symbols, [residual])
+    y = next(s for s in symbols if s.name() == "y")
+    values["y"] = ca.DM.zeros(y.sparsity())
+    return -np.array(F(*[values[s.name()] for s in symbols])).flatten()
+
+
+@pytest.mark.parametrize(
+    "declaration, equation, expected",
+    [
+        # Several states, also outside the first element of a vector expression
+        ("y[2]", "y = der(cat(1, x, z))", [0.5, 0.25]),
+        ("y[2]", "y = der(cat(1, 2 * x, 3 * z))", [1.0, 0.75]),
+        ("y[3]", "y = der(cat(1, x, v))", [0.5, 0.1, 0.2]),
+        ("y[2]", "y = der(v + w)", [0.4, 0.6]),
+        ("y[2]", "y = der(v .* w)", [0.1 * 17 + 11 * 0.3, 0.2 * 19 + 13 * 0.4]),
+        # An element of an array that is not its first
+        ("y", "y = der(2 * v[2])", [0.4]),
+        ("y", "y = der(v[2] * v[2])", [2 * 13 * 0.2]),
+        ("y", "y = der(v[2] * x)", [0.2 * 2 + 13 * 0.5]),
+        ("y", "y = der(v[1] * w[2])", [0.1 * 19 + 11 * 0.4]),
+        # In a for-equation
+        (
+            "y[2]",
+            "for i in 1:2 loop y[i] = der(v[i] * x); end for",
+            [0.1 * 2 + 11 * 0.5, 0.2 * 2 + 13 * 0.5],
+        ),
+    ],
+)
+def test_der_of_expression_of_several_states(declaration, equation, expected):
+    """der() of an expression differentiates every state that it depends on."""
+    np.testing.assert_allclose(_der_value(declaration, equation), expected)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
