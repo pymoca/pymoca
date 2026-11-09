@@ -3722,11 +3722,16 @@ def test_for_equation_real_range(range_, expected, unroll_loops):
     np.testing.assert_allclose(_residuals(casadi_model, {"dt": ca.DM(0.25)}), -np.array(expected))
 
 
+@pytest.mark.parametrize("member", ["", "parameter Integer j = 3;"], ids=["plain", "hides_member"])
 @pytest.mark.parametrize("range_", ["1:j", "1:j + 1"], ids=["iterator", "expression"])
-def test_for_equation_range_with_outer_iterator_rejected(range_):
-    """A range that depends on the iterator of an enclosing loop is reported as unsupported."""
+def test_for_equation_range_with_outer_iterator_rejected(range_, member):
+    """A range that depends on the iterator of an enclosing loop is reported as unsupported.
+
+    The iterator hides a member of the same name (MLS 11.2.2), whose value is not the bound.
+    """
     txt = f"""
         model M
+          {member}
           Real y[2];
         equation
           for j in 1:2 loop
