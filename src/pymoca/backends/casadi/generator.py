@@ -300,9 +300,14 @@ class Generator(TreeListener):
             src = ca.DM.eye(n)
         elif op == "diagonal" and n_operands == 1:
             diag = self.get_mx(tree.operands[0])
-            n = len(diag)
-            indices = list(range(n))
-            src = ca.DM.triplet(indices, indices, diag, n, n)
+            if isinstance(diag, list):
+                if any(isinstance(e, list) or ca.MX(e).numel() != 1 for e in diag):
+                    raise ValueError("The argument of diagonal() must be a vector")
+                diag = ca.vertcat(*diag)
+            if not diag.is_vector():
+                # ca.diag of a matrix would return its diagonal instead
+                raise ValueError("The argument of diagonal() must be a vector")
+            src = ca.diag(diag)
         elif op == "cat":
             axis = self.get_integer(tree.operands[0])
             assert axis == 1, "Currently only concatenation on first axis is supported"

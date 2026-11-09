@@ -3431,6 +3431,35 @@ def test_cat_of_rows_of_different_length():
         _rhs_value("y[3]", "cat(1, {{1, 2}}, {{3}})")
 
 
+@pytest.mark.parametrize(
+    "rhs, expected",
+    [
+        ("diagonal(x)", [[5, 0], [0, 7]]),
+        ("diagonal(2 * x)", [[10, 0], [0, 14]]),
+        ("diagonal(A[1, :])", [[11, 0], [0, 12]]),
+        ("diagonal({1, 2})", [[1, 0], [0, 2]]),
+        ("diagonal(x) * diagonal({1, 2})", [[5, 0], [0, 14]]),
+    ],
+)
+def test_diagonal_of_vector_expression(rhs, expected):
+    """diagonal() of a vector, literal or not, gives the matrix with it on the diagonal."""
+    np.testing.assert_array_equal(_rhs_value("y[2, 2]", rhs), expected)
+
+
+@pytest.mark.parametrize(
+    "declaration, rhs",
+    [
+        ("y[2]", "diagonal(A)"),
+        ("y[2, 2]", "diagonal(A)"),
+        ("y[4, 4]", "diagonal({{1, 2}, {3, 4}})"),
+    ],
+)
+def test_diagonal_of_matrix(declaration, rhs):
+    """diagonal() takes a vector: a matrix is an error, not the source of its own diagonal."""
+    with pytest.raises(ValueError, match="must be a vector"):
+        _rhs_value(declaration, rhs)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
