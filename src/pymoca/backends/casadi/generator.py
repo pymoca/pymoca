@@ -772,6 +772,12 @@ class Generator(TreeListener):
         self.nodes[self.current_class][tree.name] = s
         return s
 
+    def _is_parameter_or_constant(self, name):
+        symbol = self.current_class.symbols.get(name)
+        return symbol is not None and (
+            "parameter" in symbol.prefixes or "constant" in symbol.prefixes
+        )
+
     def get_derivative(self, s):
         # Case 1: s is a constant, e.g. MX(5)
         if ca.MX(s).is_constant():
@@ -779,7 +785,11 @@ class Generator(TreeListener):
 
         # Case 2: s is a symbol, e.g. MX(x)
         elif s.is_symbolic():
-            if s.name() not in self.derivative:
+            if s.name() == "time":
+                return 1
+            elif self._is_parameter_or_constant(s.name()):
+                return 0
+            elif s.name() not in self.derivative:
                 if len(self.for_loops) > 0 and s in self.for_loops[-1].indexed_symbols:
                     # Create a new indexed symbol, referencing to the for loop index inside the vector derivative symbol.
                     for_loop_symbol = self.for_loops[-1].indexed_symbols[s]
@@ -812,7 +822,9 @@ class Generator(TreeListener):
         elif s.is_op(ca.OP_GETNONZEROS) and s.dep().is_symbolic():
             slice_info = s.info()["slice"]
             dep = s.dep()
-            if dep.name() not in self.derivative:
+            if self._is_parameter_or_constant(dep.name()):
+                return 0
+            elif dep.name() not in self.derivative:
                 der_dep = _new_mx("der({})".format(dep.name()), dep.size())
                 der_dep._modelica_shape = self.nodes[self.current_class][dep.name()]._modelica_shape
                 self.derivative[dep.name()] = der_dep
@@ -830,7 +842,13 @@ class Generator(TreeListener):
             orig_deps = ca.symvar(s)
             deps = ca.vertcat(*orig_deps)
             J = ca.Function("J", [deps], [ca.jacobian(s, deps)])
-            der_deps = [self.get_derivative(dep) for dep in orig_deps]
+            der_deps = []
+            for dep in orig_deps:
+                der_dep = ca.MX(self.get_derivative(dep))
+                if der_dep.is_scalar() and not dep.is_scalar():
+                    # The derivative of a parameter or constant is a scalar zero
+                    der_dep = ca.repmat(der_dep, *dep.size())
+                der_deps.append(der_dep)
             return ca.mtimes(J(deps), ca.vertcat(*der_deps))
 
     def get_indexed_symbol(self, tree, s):
