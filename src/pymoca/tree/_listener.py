@@ -64,6 +64,9 @@ class TreeListener:
     def enterExtendsClause(self, tree: ast.ExtendsClause) -> None:
         pass
 
+    def enterForArray(self, tree: ast.ForArray) -> None:
+        pass
+
     def enterForEquation(self, tree: ast.ForEquation) -> None:
         pass
 
@@ -141,6 +144,9 @@ class TreeListener:
         pass
 
     def exitExtendsClause(self, tree: ast.ExtendsClause) -> None:
+        pass
+
+    def exitForArray(self, tree: ast.ForArray) -> None:
         pass
 
     def exitForEquation(self, tree: ast.ForEquation) -> None:
