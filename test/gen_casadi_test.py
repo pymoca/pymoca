@@ -3817,6 +3817,33 @@ def test_for_equation_empty_range_with_delay(unroll_loops):
     assert casadi_model.delay_arguments_function.n_out() == 0
 
 
+@pytest.mark.parametrize(
+    "declaration, equation, expected",
+    [
+        ("y[3]", "y = x[1:2:5]", [-10, -30, -50]),
+        ("y[3]", "y = x[5:-2:1]", [-50, -30, -10]),
+        ("y[3]", "y = x[6:-1:4]", [-60, -50, -40]),
+        ("y[3]", "y = x[m:-1:1]", [-30, -20, -10]),
+        ("y[3]", "y[3:-1:1] = x[1:3]", [-10, -20, -30]),
+    ],
+    ids=["step", "down_to_first", "down", "parameter", "left_hand_side"],
+)
+def test_array_slice_with_step(declaration, equation, expected):
+    """A slice with a step, also a negative one, takes the elements of its range (MLS 10.5)."""
+    txt = f"""
+        model M
+          parameter Integer m = 3;
+          parameter Real x[6];
+          Real {declaration};
+        equation
+          {equation};
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    x = ca.DM([10, 20, 30, 40, 50, 60])
+    np.testing.assert_array_equal(_residuals(casadi_model, {"x": x, "m": ca.DM(3)}), expected)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

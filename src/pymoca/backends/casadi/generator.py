@@ -957,7 +957,11 @@ class Generator(TreeListener):
                         sl = sl - 1
                     elif isinstance(sl, slice):
                         # Modelica indexing starts from one;  Python from zero.
-                        sl = slice(None if sl.start is None else sl.start - 1, sl.stop, sl.step)
+                        stop = sl.stop
+                        if isinstance(sl.step, int) and sl.step < 0 and isinstance(stop, int):
+                            # Python excludes the stop, which lies below the last element here
+                            stop = stop - 2 if stop >= 2 else None
+                        sl = slice(None if sl.start is None else sl.start - 1, stop, sl.step)
                     else:
                         for_loop = self.for_loops[-1]
 
