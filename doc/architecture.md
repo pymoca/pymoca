@@ -711,7 +711,6 @@ fully-populated connector symbols.
   connector only, so mismatched connectors are silently accepted (MLS 9.3)
 - `min` and `max` of an empty array give the values for Real, also for Integer expressions,
   since the CasADi backend does not track the type of an expression here (MLS 10.3.4)
-- `sum` of a matrix gives the column sums rather than a scalar (MLS 10.3.4)
 - An array literal with more than two dimensions raises `NotImplementedError` in an
   expression, as CasADi has no such arrays. As a variable attribute it is kept as a nested
   list, which only vector expansion (`expand_vectors`) can use
