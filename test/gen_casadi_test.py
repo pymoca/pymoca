@@ -3524,6 +3524,43 @@ def test_der_of_expression_of_several_states(declaration, equation, expected):
     np.testing.assert_allclose(_der_value(declaration, equation), expected)
 
 
+@pytest.mark.parametrize(
+    "declaration, equation, expected",
+    [
+        ("y", "y = der(p)", [0]),
+        ("y[2]", "y = der(q)", [0, 0]),
+        ("y", "y = der(q[2])", [0]),
+        ("y", "y = der(p * x)", [3 * 0.5]),
+        ("y", "y = der(q[2] * x)", [5 * 0.5]),
+        ("y[2]", "y = der(q .* v)", [4 * 0.1, 5 * 0.2]),
+        ("y[2]", "y = der(cat(1, x, p))", [0.5, 0]),
+        ("y", "y = der(time)", [1]),
+        ("y", "y = der(time * x)", [2 + 29 * 0.5]),
+        ("y[2]", "y = der(p * v + time * w)", [3 * 0.1 + 17 + 29 * 0.3, 3 * 0.2 + 19 + 29 * 0.4]),
+    ],
+)
+def test_der_of_expression_of_parameters_and_time(declaration, equation, expected):
+    """A parameter or constant has derivative zero, and time has derivative one (MLS 3.7.4)."""
+    np.testing.assert_allclose(_der_value(declaration, equation), expected)
+
+
+def test_der_of_parameter_adds_no_variable():
+    """der() of an expression of a parameter leaves the model with its own variables only."""
+    txt = """
+        model M
+          parameter Real p;
+          Real x;
+        equation
+          der(p * x) = 1;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    assert [v.symbol.name() for v in casadi_model.der_states] == ["der(x)"]
+    assert [v.symbol.name() for v in casadi_model.parameters] == ["p"]
+    # Fails on a symbol that is not a variable of the model, as der(p) was
+    assert casadi_model.dae_residual_function.n_out() == 1
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
