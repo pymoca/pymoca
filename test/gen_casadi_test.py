@@ -3470,6 +3470,7 @@ def _der_value(declaration, equation):
           Real z;
           Real v[2];
           Real w[2];
+          Real A[2, 2];
           Real {declaration};
         equation
           {equation};
@@ -3487,6 +3488,8 @@ def _der_value(declaration, equation):
         "der(z)": 0.25,
         "der(v)": [0.1, 0.2],
         "der(w)": [0.3, 0.4],
+        "A": [[1, 2], [3, 4]],
+        "der(A)": [[1, 10], [100, 1000]],
     }
     casadi_model = gen_casadi.generate(parser.parse(txt), "M")
     residual = ca.vertcat(*casadi_model.equations)
@@ -3494,7 +3497,7 @@ def _der_value(declaration, equation):
     F = ca.Function("f", symbols, [residual])
     y = next(s for s in symbols if s.name() == "y")
     values["y"] = ca.DM.zeros(y.sparsity())
-    return -np.array(F(*[values[s.name()] for s in symbols])).flatten()
+    return -np.array(F(*[ca.DM(values[s.name()]) for s in symbols])).flatten()
 
 
 @pytest.mark.parametrize(
@@ -3541,6 +3544,21 @@ def test_der_of_expression_of_several_states(declaration, equation, expected):
 )
 def test_der_of_expression_of_parameters_and_time(declaration, equation, expected):
     """A parameter or constant has derivative zero, and time has derivative one (MLS 3.7.4)."""
+    np.testing.assert_allclose(_der_value(declaration, equation), expected)
+
+
+@pytest.mark.parametrize(
+    "declaration, equation, expected",
+    [
+        ("y[2, 2]", "y = der(2 * A)", [2, 20, 200, 2000]),
+        ("y[2]", "y = der(A * v)", [141.5, 14101.1]),
+        ("y", "y = der(A[1, 2] * x)", [10 * 2 + 2 * 0.5]),
+        ("y[2]", "y = der(A[:, 2])", [10, 1000]),
+    ],
+    ids=["matrix", "matrix_times_vector", "element", "column"],
+)
+def test_der_of_matrix_expression(declaration, equation, expected):
+    """der() of an expression of a matrix has the shape of the expression."""
     np.testing.assert_allclose(_der_value(declaration, equation), expected)
 
 
