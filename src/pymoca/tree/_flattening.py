@@ -443,6 +443,7 @@ def _resolve_modification_attribute(
                 value = const_val.value
     elif isinstance(value, (ast.Array, ast.Expression, ast.ForArray)):
         # Discover function calls so the function flattening pass emits them.
+        value = copy.deepcopy(value)
         func_resolver = _FunctionCallResolver(mod_scope, ctx.flat_class.functions)
         walker = TreeWalker()
         walker.walk(func_resolver, value)
