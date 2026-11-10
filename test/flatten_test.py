@@ -1297,6 +1297,71 @@ def test_clock_builtin_type():
     assert parse_and_flatten_model("ClockBuiltin.mo", "ClockBuiltin.UsesClock") is not None
 
 
+def test_external_object():
+    """External objects flatten as simple-type leaves built by their constructor (MLS 12.9.7)."""
+    assert ast.Tree().classes["ExternalObject"].partial
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.Table")
+    assert "myTable" in flat.symbols
+    constructor = "ExternalObjectTest.MyTable.constructor"
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "myTable"]
+    assert eq.right.operator == constructor
+    assert constructor in flat.functions
+    assert "interpolTable" in flat.functions["ExternalObjectTest.interpolateMyTable"].symbols
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
+    func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
+    assert func.symbols["myTable"].value.operator == constructor
+    assert constructor in flat.functions
+
+
+_EXTERNAL_OBJECT_ERRORS = """
+package P
+  class T
+    extends ExternalObject;
+    function constructor input Real x; output T o; end constructor;
+    function destructor input T o; end destructor;
+  end T;
+  class NoConstructor
+    extends ExternalObject;
+    function destructor input NoConstructor o; end destructor;
+  end NoConstructor;
+  class ShortT = T;
+  class DerivedT extends T; end DerivedT;
+  model ModelT
+    extends ExternalObject;
+    function constructor input Real x; output ModelT o; end constructor;
+    function destructor input ModelT o; end destructor;
+  end ModelT;
+  model MissingConstructor NoConstructor t = NoConstructor(1.0); end MissingConstructor;
+  model Short ShortT t = ShortT(1.0); end Short;
+  model Derived DerivedT t = DerivedT(1.0); end Derived;
+  model Restriction ModelT t = ModelT(1.0); end Restriction;
+  model ExplicitConstructor T t = T.constructor(1.0); end ExplicitConstructor;
+  model ExplicitDestructor T t = T(1.0); algorithm T.destructor(t); end ExplicitDestructor;
+  model Predefined ExternalObject o; end Predefined;
+end P;
+"""
+
+
+@pytest.mark.parametrize(
+    "model, message",
+    [
+        ("MissingConstructor", "P.NoConstructor has no constructor"),
+        ("Short", "P.ShortT must not extend external object class P.T"),
+        ("Derived", "P.DerivedT must not extend external object class P.T"),
+        ("Restriction", "P.ModelT must be a class, not a model"),
+        ("ExplicitConstructor", "P.T.constructor must not be called explicitly"),
+        ("ExplicitDestructor", "P.T.destructor must not be called explicitly"),
+        ("Predefined", "Partial class ExternalObject cannot be a component type"),
+    ],
+)
+def test_external_object_errors(model, message):
+    """Malformed or derived external object classes and lifecycle calls fail (MLS 12.9.7)."""
+    with pytest.raises(tree.ModelicaSemanticError, match=message):
+        tree.flatten_class(parser.parse(_EXTERNAL_OBJECT_ERRORS), f"P.{model}")
+
+
 def test_inherited_equation_refs_resolved():
     """Equations referencing inherited (via extends) symbols flatten before resolution (MLS 5.6.2)."""
     flat = parse_and_flatten_model("InheritedEquationConnector.mo", "P.B")

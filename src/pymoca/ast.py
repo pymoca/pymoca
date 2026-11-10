@@ -567,6 +567,15 @@ def is_enumeration(obj: Any) -> bool:
     return getattr(obj, "enumeration", False)
 
 
+def is_external_object(obj: Any) -> bool:
+    """Return True if *obj* is an instantiated class extending ExternalObject (MLS 12.9.7)."""
+    for ext in getattr(obj, "extends", ()):
+        ref = getattr(ext, "ast_ref", None)
+        if isinstance(ref, Class) and ref.name == "ExternalObject" and isinstance(ref.parent, Tree):
+            return True
+    return False
+
+
 class ComponentClause(Node):
     def __init__(self, **kwargs):
         self.prefixes: list[str] = []
@@ -946,8 +955,8 @@ class Tree(Class):
         "StateSelect": ("never", "avoid", "default", "prefer", "always"),
     }
 
-    # Predefined opaque types (no attributes/literals); MLS 16.2 Clock
-    BUILTIN_OPAQUE_TYPES = frozenset({"Clock"})
+    # Predefined opaque types without attributes or literals (MLS 16.2 Clock, 12.9.7 ExternalObject)
+    BUILTIN_OPAQUE_TYPES = frozenset({"Clock", "ExternalObject"})
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -976,7 +985,10 @@ class Tree(Class):
                 type_class.symbols[literal] = enum_sym
             self.classes[name] = type_class
         for name in self.BUILTIN_OPAQUE_TYPES:
-            type_class = Class(name=name, type="type", parent=self)
+            type_class = Class(
+                name=name, type="class" if name == "ExternalObject" else "type", parent=self
+            )
+            type_class.partial = name == "ExternalObject"
             self.classes[name] = type_class
 
     def extend(self, other: Tree) -> None:
