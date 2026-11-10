@@ -443,6 +443,7 @@ def _resolve_modification_attribute(
                 value = const_val.value
     elif isinstance(value, (ast.Array, ast.Expression, ast.ForArray)):
         # Discover function calls so the function flattening pass emits them.
+        value = copy.deepcopy(value)
         func_resolver = _FunctionCallResolver(mod_scope, ctx.flat_class.functions)
         walker = TreeWalker()
         walker.walk(func_resolver, value)
@@ -455,7 +456,6 @@ def _resolve_modification_attribute(
     ):
         # Elements resolve in the scope where the modification appears (MLS 7.2.4).
         expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
-        value = copy.deepcopy(value)
         _rewrite_operand_list(value.values, expr_scope, expr_ctx)
     elif (
         isinstance(value, ast.ForArray)
@@ -464,7 +464,7 @@ def _resolve_modification_attribute(
     ):
         # Resolve names in the scope of the modification
         expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
-        value = _rewrite_operand(copy.deepcopy(value), expr_scope, expr_ctx)
+        value = _rewrite_operand(value, expr_scope, expr_ctx)
     if isinstance(value, ast.Expression):
         if isinstance(expr_scope, InstanceClass) and isinstance(expr_flat_class, InstanceClass):
             expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)

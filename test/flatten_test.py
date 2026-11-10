@@ -2036,6 +2036,25 @@ def test_binding_equation_subscript_function_call_discovered():
     assert list(flat.functions) == ["idx"]
 
 
+def test_binding_equation_function_call_leaves_ast_unchanged():
+    """Discovering a function called in a binding expression doesn't rewrite the parsed AST."""
+    flat = _flatten_inline(
+        """
+    function f
+        input Real u;
+        output Real y;
+    algorithm
+        y := 2 * u;
+    end f;
+    model M
+        parameter Real p = 1;
+        Real y = f(p);
+    end M;""",
+        "M",
+    )
+    assert list(flat.functions) == ["f"]
+
+
 def test_constant_via_composite_name_lookup_resolves_dimension():
     """A constant reached through a nested package (composite name lookup,
     instantiated by _resolve_name rather than the normal flatten walk) resolves
