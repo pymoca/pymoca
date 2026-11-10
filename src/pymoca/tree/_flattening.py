@@ -210,9 +210,9 @@ def _flatten_instance(
         if symbol.type.name in InstanceTree.BUILTIN_TYPES:
             flat_symbol.name = flat_name
             flat_class.symbols[flat_name] = flat_symbol
-        elif isinstance(flat_symbol.type, InstanceClass) and ast.is_enumeration(flat_symbol.type):
-            # Enumeration-typed symbols are simple leaf types (MLS 4.8.5), treated
-            # symmetrically with builtin types: place directly in the flat namespace.
+        elif isinstance(flat_symbol.type, InstanceClass) and _is_simple_class(flat_symbol.type):
+            # Enumeration and external object symbols are simple leaf types (MLS 5.6.2),
+            # treated symmetrically with builtin types: place directly in the flat namespace.
             flat_symbol.name = flat_name
             flat_class.symbols[flat_name] = flat_symbol
         elif not isinstance(flat_symbol.type, InstanceClass):
@@ -221,9 +221,9 @@ def _flatten_instance(
             resolved = _resolve_name(flat_symbol.type, instance, ctx)
             is_class = isinstance(resolved, InstanceClass)
             flat_symbol.type = resolved if is_class else resolved.parent  # type: ignore[assignment]
-            # If the resolved type is an enumeration, add the symbol here now that
+            # If the resolved type is a simple class, add the symbol here now that
             # the type is known (covers the ComponentRef → InstanceClass resolution path).
-            if ast.is_enumeration(flat_symbol.type) and flat_name not in flat_class.symbols:
+            if _is_simple_class(flat_symbol.type) and flat_name not in flat_class.symbols:
                 flat_symbol.name = flat_name
                 flat_class.symbols[flat_name] = flat_symbol
 
@@ -237,7 +237,7 @@ def _flatten_instance(
         # 1.5 Resolve modifications of other attributes of simple types
         if (
             flat_symbol.type.name in InstanceTree.BUILTIN_TYPES
-            or ast.is_enumeration(flat_symbol.type)
+            or _is_simple_class(flat_symbol.type)
             or "record" in flat_symbol.prefixes
         ):
             _resolve_modifications(flat_symbol, ctx)
@@ -304,6 +304,11 @@ def _flatten_instance(
     _collect_and_resolve_equations(instance, prefix, ctx)
 
     # Steps 1.9, 2, and 3 are done outside the recursion in the caller
+
+
+def _is_simple_class(cls) -> bool:
+    """Return True for enumeration and external object classes (simple types, MLS 5.6.2)."""
+    return ast.is_enumeration(cls) or ast.is_external_object(cls)
 
 
 def _apply_outer_variability(sym: InstanceSymbol, outer: str) -> None:
@@ -376,8 +381,8 @@ def _resolve_modifications(
     if isinstance(symbol.type, ast.ComponentRef):
         # type class, modifications at this level
         modification_environment = symbol.modification_environment  # type: ignore[union-attr]
-    elif ast.is_enumeration(symbol.type):
-        # Enum types have no value-attribute modifications to inherit from the type class
+    elif _is_simple_class(symbol.type):
+        # No value-attribute modifications to inherit from the type class
         modification_environment = symbol.modification_environment  # type: ignore[union-attr]
     else:
         assert symbol.type.name is not None
@@ -814,6 +819,18 @@ class _EquationRefResolver(TreeListener):
             self.cutoff_depth = sys.maxsize
 
 
+def _external_object_constructor(cls: ast.Class) -> ast.Class | None:
+    """Return the constructor function if *cls* is an external object class (MLS 12.9.7)."""
+    if not isinstance(cls, InstanceClass) or cls.instantiation_state < InstantiationState.PARTIAL:
+        cls = cast(
+            InstanceClass,
+            _instantiate_element(cls, cls.parent, ast.ClassModification()),  # type: ignore[arg-type]
+        )
+    if not ast.is_external_object(cls):
+        return None
+    return cls.classes["constructor"]
+
+
 class _FunctionCallResolver(TreeListener):
     """Discover function calls in equations/statements, resolve to fully-scoped names."""
 
@@ -831,6 +848,8 @@ class _FunctionCallResolver(TreeListener):
             return
         if found is None or not isinstance(found, ast.Class):
             return  # built-in function (sin, cos, etc.) or symbol
+        if found.type == "class":
+            found = _external_object_constructor(found) or found
         full_name = found.full_name
         tree.operator = full_name
         self.functions[full_name] = found

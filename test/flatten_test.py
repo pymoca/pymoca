@@ -1297,6 +1297,24 @@ def test_clock_builtin_type():
     assert parse_and_flatten_model("ClockBuiltin.mo", "ClockBuiltin.UsesClock") is not None
 
 
+def test_external_object():
+    """External objects flatten as simple-type leaves built by their constructor (MLS 12.9.7)."""
+    assert "ExternalObject" in ast.Tree().classes
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.Table")
+    assert "myTable" in flat.symbols
+    constructor = "ExternalObjectTest.MyTable.constructor"
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "myTable"]
+    assert eq.right.operator == constructor
+    assert constructor in flat.functions
+    assert "interpolTable" in flat.functions["ExternalObjectTest.interpolateMyTable"].symbols
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
+    func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
+    assert func.symbols["myTable"].value.operator == constructor
+    assert constructor in flat.functions
+
+
 def test_inherited_equation_refs_resolved():
     """Equations referencing inherited (via extends) symbols flatten before resolution (MLS 5.6.2)."""
     flat = parse_and_flatten_model("InheritedEquationConnector.mo", "P.B")
