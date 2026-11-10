@@ -839,17 +839,16 @@ class Generator(TreeListener):
         # Need to do this sort of expansion: der(x1 * x2) = der(x1) * x2 + x1 * der(x2)
         else:
             # Differentiate expression using CasADi
-            orig_deps = ca.symvar(s)
-            deps = ca.vertcat(*orig_deps)
-            J = ca.Function("J", [deps], [ca.jacobian(s, deps)])
+            # A directional derivative: no Jacobian is formed, and the result has the shape of s
+            deps = ca.symvar(s)
             der_deps = []
-            for dep in orig_deps:
+            for dep in deps:
                 der_dep = ca.MX(self.get_derivative(dep))
                 if der_dep.is_scalar() and not dep.is_scalar():
                     # The derivative of a parameter or constant is a scalar zero
                     der_dep = ca.repmat(der_dep, *dep.size())
                 der_deps.append(der_dep)
-            return ca.mtimes(J(deps), ca.vertcat(*der_deps))
+            return ca.jtimes(s, ca.veccat(*deps), ca.veccat(*der_deps))
 
     def get_indexed_symbol(self, tree, s):
         assert (
