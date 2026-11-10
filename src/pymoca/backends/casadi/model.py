@@ -805,9 +805,20 @@ class Model:
                     else:
                         return 0.0
                 else:
-                    # Differentiate using CasADi and chain rule
+                    # jtimes once to make the list of dependencies sharper: a symbol that only
+                    # occurs in a condition must not become a differentiated state.
                     deps = ca.symvar(expr)
-                    der_deps = [get_derivative(dep) for dep in deps]
+                    seeds = [ca.MX.sym("seed", dep.sparsity()) for dep in deps]
+                    derivative = ca.jtimes(expr, ca.veccat(*deps), ca.veccat(*seeds))
+                    der_deps = [
+                        (
+                            ca.MX(get_derivative(dep))
+                            if ca.depends_on(derivative, seed)
+                            else ca.MX(seed.sparsity())
+                        )
+                        for dep, seed in zip(deps, seeds)
+                    ]
+                    # Then the standard jtimes. Substituting the seeds would lose shared nodes.
                     return ca.jtimes(expr, ca.veccat(*deps), ca.veccat(*der_deps))
 
             reduced_equations = []

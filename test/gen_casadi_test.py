@@ -3579,6 +3579,72 @@ def test_der_of_parameter_adds_no_variable():
     assert casadi_model.dae_residual_function.n_out() == 1
 
 
+@pytest.mark.parametrize(
+    "expression, a_is_state",
+    [("if a > 0 then z else 2 * z", False), ("if a > 0 then a * z else 2 * z", True)],
+    ids=["condition_only", "condition_and_value"],
+)
+def test_simplify_differentiated_state_with_condition(expression, a_is_state):
+    """Eliminating a differentiated state differentiates only what its derivative uses.
+
+    A variable that only occurs in a condition stays algebraic: its derivative would be a
+    state derivative that no equation determines.
+    """
+    txt = f"""
+        model M
+          Real _xe;
+          Real z;
+          Real w;
+          Real a;
+          Real y;
+        equation
+          _xe = {expression};
+          der(_xe) = y;
+          der(z) = 1;
+          der(w) = 2;
+          a = z + w;
+        end M;
+    """
+    options = {"expand_mx": True, "eliminable_variable_expression": r"_\w+"}
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", options)
+    casadi_model.simplify(options)
+
+    states = [v.symbol.name() for v in casadi_model.states]
+    der_states = [v.symbol.name() for v in casadi_model.der_states]
+    alg_states = [v.symbol.name() for v in casadi_model.alg_states]
+    assert ("a" in states) == a_is_state
+    assert ("a" in alg_states) != a_is_state
+    assert der_states == [f"der({name})" for name in states]
+
+    in_equations = {s.name() for s in ca.symvar(ca.vertcat(*casadi_model.equations))}
+    assert set(der_states) <= in_equations
+
+
+def test_simplify_differentiated_vector_state():
+    """Eliminating a differentiated state also works when the states are vectors."""
+    txt = """
+        model M
+          Real _xe[2];
+          Real z[2];
+          Real y[2];
+        equation
+          _xe = 2 * z;
+          der(_xe) = y;
+          der(z) = {1, 2};
+        end M;
+    """
+    options = {"expand_mx": True, "eliminable_variable_expression": r"_\w+"}
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M", options)
+    casadi_model.simplify(options)
+
+    assert [v.symbol.name() for v in casadi_model.states] == ["z"]
+    (der_z,) = [v.symbol for v in casadi_model.der_states]
+    (y,) = [v.symbol for v in casadi_model.alg_states]
+    F = ca.Function("f", [der_z, y], [ca.vertcat(*casadi_model.equations)])
+    # y = der(_xe) = 2 * der(z), and der(z) = {1, 2}
+    np.testing.assert_array_equal(np.array(F(ca.DM([1, 2]), ca.DM([2, 4]))).flatten(), 0)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
