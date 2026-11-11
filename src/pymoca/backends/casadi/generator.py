@@ -343,6 +343,44 @@ class Generator(TreeListener):
     def exitPrimary(self, tree):
         self.src[tree] = tree.value
 
+    def enterIndexedExpression(self, tree):
+        if _reads(tree.indices, "end"):
+            raise NotImplementedError("'end' in a subscript of a parenthesized expression")
+        for f in self.for_loops:
+            if _reads(tree.indices, f.name):
+                raise NotImplementedError(
+                    f"The iterator {f.name} in a subscript of a parenthesized expression"
+                )
+
+    def exitIndexedExpression(self, tree):
+        if len(tree.indices) > 2:
+            raise NotImplementedError("More than two subscripts of a parenthesized expression")
+        expr = ca.MX(_array_to_mx(self.get_mx(tree.expression)))
+        indices = [
+            self._expression_subscript(index, dim) for index, dim in zip(tree.indices, expr.size())
+        ]
+        if len(indices) == 2:
+            self.src[tree] = expr[indices[0], indices[1]]
+        else:
+            # A single subscript selects an element of a vector (a column) or a row of a matrix,
+            # which is a vector and so a column as well
+            self.src[tree] = ca.transpose(expr[indices[0], :])
+
+    def _expression_subscript(self, index, dim: int) -> int:
+        """Return the zero-based value of a subscript of a parenthesized expression."""
+        if isinstance(index, ast.Slice):
+            raise NotImplementedError("Slices of a parenthesized expression")
+        value = self.get_integer(index)
+        if not isinstance(value, int):
+            raise NotImplementedError("A subscript of a parenthesized expression has no value")
+        if value <= 0 or value > dim:
+            raise ValueError(
+                "Index {} of a parenthesized expression is out of bounds. "
+                "Index should be in range [1,{}] "
+                "(Modelica uses 1-based indexing).".format(value, dim)
+            )
+        return value - 1
+
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):
             op = tree.operator.name

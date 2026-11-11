@@ -136,6 +136,13 @@ def test_time_builtin():
     _flush()
 
 
+def test_subscripted_expression_rejected():
+    """The SymPy backend does not support subscripts of a parenthesized expression."""
+    ast_tree = parser.parse("model M Real v[2]; Real w; equation w = (2 * v)[1]; end M;")
+    with pytest.raises(NotImplementedError, match="Subscripts of a parenthesized expression"):
+        gen_sympy.generate(ast_tree, "M")
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

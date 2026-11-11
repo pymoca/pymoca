@@ -5074,6 +5074,126 @@ def test_delay_in_constructor_or_reduction_rejected(rhs):
         _constructor_value("y[3]", rhs)
 
 
+def test_subscripted_expression():
+    """A parenthesized array expression can be subscripted (MLS 3.7, A.2.7)."""
+    txt = """
+        model Subscripted
+          parameter Real a = 2;
+          parameter Real v[3] = {1, 2, 3};
+          parameter Real x = (a * v)[2];
+          parameter Real y = ({1, 2, 3})[3];
+          parameter Real z = (v + v)[1];
+          Real w;
+        equation
+          w = (a * v)[3];
+        end Subscripted;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "Subscripted")
+    parameters = {p.symbol.name(): p for p in casadi_model.parameters}
+    a, v = parameters["a"].symbol, parameters["v"].symbol
+    F = ca.Function("f", [a, v], [ca.MX(parameters[n].value) for n in ("x", "y", "z")])
+    assert [float(r) for r in F(2.0, ca.DM([1, 2, 3]))] == [4.0, 3.0, 2.0]
+
+    w = next(s.symbol for s in casadi_model.alg_states if s.symbol.name() == "w")
+    residual = ca.Function("r", [w, a, v], [casadi_model.equations[0]])
+    assert float(residual(6.0, 2.0, ca.DM([1, 2, 3]))) == 0.0
+
+
+def test_subscripted_expression_in_component():
+    """The names inside a subscripted expression of a component get its prefix."""
+    txt = """
+        model A
+          parameter Real v[3] = {1, 2, 3};
+          Real w;
+        equation
+          w = (2 * v)[2];
+        end A;
+        model M
+          A a;
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    v = next(p.symbol for p in casadi_model.parameters if p.symbol.name() == "a.v")
+    w = next(s.symbol for s in casadi_model.alg_states if s.symbol.name() == "a.w")
+    residual = ca.Function("r", [w, v], [casadi_model.equations[0]])
+    assert float(residual(4.0, ca.DM([1, 2, 3]))) == 0.0
+
+
+def test_subscripted_matrix():
+    """Two subscripts select an element of a matrix, one subscript a row."""
+    txt = """
+        model M
+          parameter Real x = ([1, 2; 3, 4])[2, 1];
+          parameter Real y = ({{1, 2}, {3, 4}})[2, 1];
+          parameter Real r[2] = ([1, 2; 3, 4])[2];
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    values = {p.symbol.name(): ca.evalf(p.value) for p in casadi_model.parameters}
+    assert float(values["x"]) == 3.0
+    assert float(values["y"]) == 3.0
+    assert values["r"].shape == (2, 1)
+    assert values["r"].full().ravel().tolist() == [3.0, 4.0]
+
+
+def test_subscripted_expression_parameter_subscript():
+    """A subscript of a parenthesized expression may be a parameter."""
+    txt = """
+        model M
+          parameter Integer k = 2;
+          parameter Real v[3] = {1, 2, 3};
+          parameter Real x = (2 * v)[k + 1];
+        end M;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "M")
+    parameters = {p.symbol.name(): p for p in casadi_model.parameters}
+    v = parameters["v"].symbol
+    F = ca.Function("f", [v], [ca.MX(parameters["x"].value)])
+    assert float(F(ca.DM([1, 2, 3]))) == 6.0
+
+
+@pytest.mark.parametrize(
+    "value, error, match",
+    [
+        ("(2 * v)[0]", ValueError, "Index 0 of a parenthesized expression is out of bounds"),
+        ("(2 * v)[4]", ValueError, "Index 4 of a parenthesized expression is out of bounds"),
+        ("({1, 2})[-1]", ValueError, "Index -1 of a parenthesized expression is out of bounds"),
+        ("{(2 * v)[i] for i in 1:3}", NotImplementedError, "The iterator i in a subscript"),
+        ("(2 * v)[end]", NotImplementedError, "'end' in a subscript"),
+        ("(2 * v)[end - 1]", NotImplementedError, "'end' in a subscript"),
+        ("(2 * v)[1:2]", NotImplementedError, "Slices of a parenthesized expression"),
+        ("(2 * v)[k]", NotImplementedError, "has no value"),
+    ],
+)
+def test_subscripted_expression_rejected(value, error, match):
+    """Wrong subscripts of a parenthesized expression give an error, not a wrong element."""
+    txt = f"""
+        model M
+          parameter Integer k;
+          parameter Real v[3] = {{1, 2, 3}};
+          parameter Real x = {value};
+        end M;
+    """
+    with pytest.raises(error, match=match):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
+def test_subscripted_expression_for_loop_rejected():
+    """The iterator of a for loop as a subscript of a parenthesized expression is not supported."""
+    txt = """
+        model M
+          parameter Real v[3] = {1, 2, 3};
+          Real w[3];
+        equation
+          for i in 1:3 loop
+            w[i] = (2 * v)[i];
+          end for;
+        end M;
+    """
+    with pytest.raises(NotImplementedError, match="The iterator i in a subscript"):
+        gen_casadi.generate(parser.parse(txt), "M")
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
