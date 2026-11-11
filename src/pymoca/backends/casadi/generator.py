@@ -343,6 +343,21 @@ class Generator(TreeListener):
     def exitPrimary(self, tree):
         self.src[tree] = tree.value
 
+    def exitIndexedExpression(self, tree):
+        expr = self.get_mx(tree.expression)
+        if isinstance(expr, list):
+            expr = ca.vertcat(*expr)
+        expr = ca.MX(expr)
+
+        indices = []
+        for index in tree.indices:
+            if isinstance(index, ast.Slice):
+                raise NotImplementedError("Slices of a subscripted expression")
+            indices.append(self.get_integer(index) - 1)
+        if len(indices) > 2:
+            raise NotImplementedError("More than two subscripts of an expression")
+        self.src[tree] = expr[indices[0]] if len(indices) == 1 else expr[indices[0], indices[1]]
+
     def exitExpression(self, tree):
         if isinstance(tree.operator, ast.ComponentRef):
             op = tree.operator.name

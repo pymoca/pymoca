@@ -1032,6 +1032,12 @@ class ASTListener(ModelicaListener):
         # Collapse lists containing a single expression
         if len(self.ast[ctx]) == 1:
             self.ast[ctx] = self.ast[ctx][0]
+        if ctx.array_subscripts() is not None:
+            if isinstance(self.ast[ctx], list):
+                raise syntax_error_from_ctx("Subscripted output expression list", ctx)
+            self.ast[ctx] = ast.IndexedExpression(
+                expression=self.ast[ctx], indices=self.ast[ctx.array_subscripts()]
+            )
 
     def exitPrimary_expression_list(self, ctx: ModelicaParser.Primary_expression_listContext):
         rows = [

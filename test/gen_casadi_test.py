@@ -5074,6 +5074,31 @@ def test_delay_in_constructor_or_reduction_rejected(rhs):
         _constructor_value("y[3]", rhs)
 
 
+def test_subscripted_expression():
+    """A parenthesized array expression can be subscripted (MLS 3.7, A.2.7)."""
+    txt = """
+        model Subscripted
+          parameter Real a = 2;
+          parameter Real v[3] = {1, 2, 3};
+          parameter Real x = (a * v)[2];
+          parameter Real y = ({1, 2, 3})[3];
+          parameter Real z = (v + v)[1];
+          Real w;
+        equation
+          w = (a * v)[3];
+        end Subscripted;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "Subscripted")
+    parameters = {p.symbol.name(): p for p in casadi_model.parameters}
+    a, v = parameters["a"].symbol, parameters["v"].symbol
+    F = ca.Function("f", [a, v], [ca.MX(parameters[n].value) for n in ("x", "y", "z")])
+    assert [float(r) for r in F(2.0, ca.DM([1, 2, 3]))] == [4.0, 3.0, 2.0]
+
+    w = next(s.symbol for s in casadi_model.alg_states if s.symbol.name() == "w")
+    residual = ca.Function("r", [w, a, v], [casadi_model.equations[0]])
+    assert float(residual(6.0, 2.0, ca.DM([1, 2, 3]))) == 0.0
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

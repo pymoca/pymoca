@@ -371,6 +371,18 @@ class ForArray(Node):
         )
 
 
+class IndexedExpression(Node):
+    def __init__(self, **kwargs):
+        self.expression: Expression | Primary | ComponentRef | Array | IfExpression | None = None
+        self.indices: list[Expression | Primary | ComponentRef | Slice] = []
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(expression={!r}, indices={!r})".format(
+            type(self).__name__, self.expression, self.indices
+        )
+
+
 class ConnectClause(Node):
     def __init__(self, **kwargs):
         self.left: ComponentRef = ComponentRef()
