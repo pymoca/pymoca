@@ -729,6 +729,9 @@ def _rewrite_operand(operand, scope: InstanceClass, ctx: FlatteningContext):
     elif isinstance(operand, ast.IfExpression):
         _rewrite_operand_list(operand.conditions, scope, ctx)
         _rewrite_operand_list(operand.expressions, scope, ctx)
+    elif isinstance(operand, ast.IndexedExpression):
+        operand.expression = _rewrite_operand(operand.expression, scope, ctx)
+        _rewrite_operand_list(operand.indices, scope, ctx)
     elif isinstance(operand, ast.Slice):
         for attr in ("start", "stop", "step"):
             setattr(operand, attr, _rewrite_operand(getattr(operand, attr), scope, ctx))

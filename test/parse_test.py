@@ -1077,6 +1077,20 @@ def test_parse_stepped_range():
     assert (slice_.start.value, slice_.step.value, slice_.stop.value) == (1, 2, 3)
 
 
+def test_subscripted_output_expression_list():
+    """A parenthesized expression may be subscripted, as in (expr)[1] (MLS 3.7, A.2.7)."""
+    ast_tree = parser.parse("model M Real x[2] = {1, 2}; Real y = (2 * x)[2]; end M;")
+    value = (
+        ast_tree.classes["M"].symbols["y"].class_modification.arguments[0].value.modifications[0]
+    )
+    assert isinstance(value, ast.IndexedExpression)
+    assert isinstance(value.expression, ast.Expression)
+    assert [i.value for i in value.indices] == [2]
+
+    with pytest.raises(parser.ModelicaSyntaxError):
+        parser.parse("model M Real y = (1, 2)[1]; end M;")
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

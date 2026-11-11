@@ -178,6 +178,9 @@ class {{tree.name}}(OdeModel):
         val = str(tree.value)
         self.src[tree] = "{:s}".format(val)
 
+    def exitIndexedExpression(self, tree: ast.IndexedExpression):
+        raise NotImplementedError("Subscripts of a parenthesized expression")
+
     def exitComponentRef(self, tree: ast.ComponentRef):
         # prevent name clash with builtins
         name = tree.name.replace(".", "__")
