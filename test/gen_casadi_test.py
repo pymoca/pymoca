@@ -4,6 +4,7 @@ Modelica parse Tree to AST tree.
 """
 
 import glob
+import math
 import os
 import pickle
 import re
@@ -3334,6 +3335,54 @@ def test_function_dedup_name_dot_free():
     assert list(generator.functions.keys()) == ["Branch.f"]
     (func,) = generator.functions.values()
     assert func.name() == "Branch_f"
+
+
+@pytest.mark.parametrize(
+    "call, expected",
+    [
+        ("asin(x)", math.asin(0.5)),
+        ("acos(x)", math.acos(0.5)),
+        ("atan(x)", math.atan(0.5)),
+        ("atan2(x, z)", math.atan2(0.5, 2.5)),
+        ("atan2(z, -x)", math.atan2(2.5, -0.5)),
+    ],
+)
+def test_inverse_trigonometric_functions(call, expected):
+    """The inverse trigonometric functions of MLS 3.7, 3.7.3 have other names in CasADi."""
+    txt = f"""
+        model InverseTrig
+          parameter Real x;
+          parameter Real z;
+          Real y(nominal = {call});
+        equation
+          y = x;
+        end InverseTrig;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "InverseTrig")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    parameters = {p.symbol.name(): p.symbol for p in casadi_model.parameters}
+    F = ca.Function("f", [parameters["x"], parameters["z"]], [ca.MX(y.nominal)])
+    assert float(F(0.5, 2.5)) == pytest.approx(expected, rel=1e-14)
+
+
+def test_atan2_elementwise():
+    """atan2 of two arrays is elementwise."""
+    txt = """
+        model Atan2Arrays
+          parameter Real x[2];
+          parameter Real z[2];
+          Real y[2](nominal = atan2(x, z));
+        equation
+          y = x;
+        end Atan2Arrays;
+    """
+    casadi_model = gen_casadi.generate(parser.parse(txt), "Atan2Arrays")
+    y = next(v for v in casadi_model.alg_states if v.symbol.name() == "y")
+    parameters = {p.symbol.name(): p.symbol for p in casadi_model.parameters}
+    F = ca.Function("f", [parameters["x"], parameters["z"]], [ca.MX(y.nominal)])
+    np.testing.assert_allclose(
+        np.array(F(ca.DM([1, 2]), ca.DM([3, -4]))).flatten(), [math.atan2(1, 3), math.atan2(2, -4)]
+    )
 
 
 @pytest.mark.parametrize(
