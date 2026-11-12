@@ -714,6 +714,11 @@ fully-populated connector symbols.
 - An array literal with more than two dimensions raises `NotImplementedError` in an
   expression, as CasADi has no such arrays. As a variable attribute it is kept as a nested
   list, which only vector expansion (`expand_vectors`) can use
+- Array comprehensions `{expr for i in range}` and reduction expressions
+  `f(expr for i in range)` are not unrolled while flattening (MLS 10.3.4.1, 10.4.1). They pass
+  through to the backends as a `ForArray` node with its names resolved, which only the CasADi
+  backend handles: the SymPy and XML backends fail with a `KeyError`. The reduction function
+  name is not checked against the legal set (`array`, `sum`, `product`, `min`, `max`)
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
 - Imports are effectively re-exported: composite-name lookup searches the target

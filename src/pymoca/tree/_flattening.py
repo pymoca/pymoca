@@ -407,6 +407,8 @@ def _resolve_modification_attribute(
     mod = cast(ast.ElementModification, arg.value)
     value = mod.modifications[0]
     assert not isinstance(value, ast.ClassModification)
+    mod_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
+    assert isinstance(mod_scope, InstanceClass)
     if isinstance(value, ast.Primary):
         value = value.value
     elif isinstance(value, ast.ComponentRef):
@@ -439,15 +441,11 @@ def _resolve_modification_attribute(
             const_val = _get_constant_value(value)
             if const_val is not None and isinstance(const_val, ast.Primary):
                 value = const_val.value
-    elif isinstance(value, (ast.Array, ast.Expression)):
-        # Discover function calls inside Array elements and Expressions so
-        # that the function flattening pass can include them in the output.
-        # Without this, functions referenced only in modifications are lost.
-        _fn_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
-        if isinstance(_fn_scope, InstanceClass):
-            func_resolver = _FunctionCallResolver(_fn_scope, ctx.flat_class.functions)
-            walker = TreeWalker()
-            walker.walk(func_resolver, value)
+    elif isinstance(value, (ast.Array, ast.Expression, ast.ForArray)):
+        # Discover function calls so the function flattening pass emits them.
+        func_resolver = _FunctionCallResolver(mod_scope, ctx.flat_class.functions)
+        walker = TreeWalker()
+        walker.walk(func_resolver, value)
     expr_scope = arg.scope if isinstance(arg.scope, InstanceClass) else symbol.parent_instance
     expr_flat_class = symbol.parent_instance
     if (
@@ -459,6 +457,14 @@ def _resolve_modification_attribute(
         expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
         value = copy.deepcopy(value)
         _rewrite_operand_list(value.values, expr_scope, expr_ctx)
+    elif (
+        isinstance(value, ast.ForArray)
+        and isinstance(expr_scope, InstanceClass)
+        and isinstance(expr_flat_class, InstanceClass)
+    ):
+        # A comprehension whose range has no value yet: its names resolve in that scope too.
+        expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
+        value = _rewrite_operand(copy.deepcopy(value), expr_scope, expr_ctx)
     if isinstance(value, ast.Expression):
         if isinstance(expr_scope, InstanceClass) and isinstance(expr_flat_class, InstanceClass):
             expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
@@ -726,6 +732,9 @@ def _rewrite_operand(operand, scope: InstanceClass, ctx: FlatteningContext):
     elif isinstance(operand, ast.Slice):
         for attr in ("start", "stop", "step"):
             setattr(operand, attr, _rewrite_operand(getattr(operand, attr), scope, ctx))
+    elif isinstance(operand, ast.ForArray):
+        body_ctx = _enter_for_indices(operand.indices, scope, ctx)
+        operand.expression = _rewrite_operand(operand.expression, scope, body_ctx)
     return operand
 
 
@@ -769,7 +778,15 @@ class _EquationRefResolver(TreeListener):
         self.prefix = prefix
         self.depth = 0
         self.cutoff_depth = sys.maxsize
+        self.iterators: list[str] = []
         super().__init__()
+
+    def exitForIndex(self, tree: ast.ForIndex):
+        # Only after the range, which is not in scope of its own iterator (MLS 11.2.2).
+        self.iterators.append(tree.name)
+
+    def exitForArray(self, tree: ast.ForArray):
+        del self.iterators[-len(tree.indices) :]
 
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
@@ -777,6 +794,10 @@ class _EquationRefResolver(TreeListener):
             return
 
         if tree.resolved:
+            return
+
+        if tree.name in self.iterators and not tree.child:
+            self.cutoff_depth = self.depth
             return
 
         if _composite_flat_name(self.prefix, tree) in self.flat_class.symbols:
@@ -1830,6 +1851,7 @@ class ComponentRefFlattener(TreeListener):
         self.depth = 0
         self.cutoff_depth = sys.maxsize
         self.inside_modification = 0  # We do flatten component references in modifications
+        self.iterators: list[str] = []
         super().__init__()
 
     def enterClassModificationArgument(self, tree: ast.ClassModificationArgument):
@@ -1840,12 +1862,23 @@ class ComponentRefFlattener(TreeListener):
         if tree.scope is not None:
             self.inside_modification -= 1
 
+    def exitForIndex(self, tree: ast.ForIndex):
+        # Only after the range, which is not in scope of its own iterator (MLS 11.2.2).
+        self.iterators.append(tree.name)
+
+    def exitForArray(self, tree: ast.ForArray):
+        del self.iterators[-len(tree.indices) :]
+
     def enterComponentRef(self, tree: ast.ComponentRef):
         self.depth += 1
         if self.depth > self.cutoff_depth:
             return
 
         if tree.resolved:
+            return
+
+        if tree.name in self.iterators and not tree.child:
+            self.cutoff_depth = self.depth
             return
 
         # Compose flatted name
