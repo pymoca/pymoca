@@ -718,6 +718,16 @@ fully-populated connector symbols.
   `f(expr for i in range)` are not unrolled while flattening (MLS 10.3.4.1, 10.4.1). They pass
   through to the backends as a `ForArray` node with its names resolved. The reduction function
   name is not checked against the legal set (`array`, `sum`, `product`, `min`, `max`)
+- Only the CasADi backend handles a `ForArray`: the SymPy and XML backends fail with a
+  `KeyError`. It supports one iterator with a scalar or vector body, in an equation, a
+  declaration and an attribute. It builds the body once and maps it over the range.
+  A constructor whose body has a range that depends on its iterator, as in
+  `{sum(x[j] for j in 1:i) for i in 1:n}` or the slice in `{sum(x[i:i + 1]) for i in 1:n}`, is
+  built for each value of that iterator instead.
+  It raises `NotImplementedError` for several iterators, a matrix body, an implicit or
+  array-valued range, a `delay()` in the body, and a subscript or range that uses the iterator
+  of an enclosing for-loop, as in `for j in 1:n loop y[j] = sum(A[j, i] for i in 1:m); end for`.
+  The enclosing iterator can be used as a value in the body
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
 - Imports are effectively re-exported: composite-name lookup searches the target
