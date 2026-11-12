@@ -4809,17 +4809,26 @@ def test_for_array_in_equation(unroll_loops):
     np.testing.assert_array_equal(np.array(residual).flatten(), [-1.0, -3.0, -5.0])
 
 
-def _comprehension_value(declaration, rhs):
-    """Compile `y = rhs` and return the value of rhs for the parameter values below."""
+def _comprehension_value(declaration, rhs, position="equation"):
+    """Compile y with the value rhs and return that value for the parameter values below.
+
+    rhs is the right-hand side of an equation, the value of the declaration, or the min attribute.
+    In the last two the comprehensions are unrolled at flattening, n being known there.
+    """
+    y_declaration, equation = {
+        "equation": (declaration, f"y = {rhs};"),
+        "declaration": (f"{declaration} = {rhs}", ""),
+        "attribute": (f"{declaration}(min = {rhs})", ""),
+    }[position]
     txt = f"""
         model M
           parameter Integer n = 3;
           parameter Real x[3];
           parameter Real z[3];
           parameter Real A[3, 2];
-          Real {declaration};
+          Real {y_declaration};
         equation
-          y = {rhs};
+          {equation}
         end M;
     """
     casadi_model = gen_casadi.generate(parser.parse(txt), "M")
@@ -4831,9 +4840,16 @@ def _comprehension_value(declaration, rhs):
         "A": ca.DM([[1, 2], [3, 4], [5, 6]]),
     }
     parameters = [p.symbol for p in casadi_model.parameters]
+    arguments = [values[p.name()] for p in parameters]
+    if position == "attribute":
+        F = ca.Function("f", parameters, [ca.MX(y.min)])
+        return np.array(F(*arguments)).flatten()
     F = ca.Function("f", [y.symbol] + parameters, casadi_model.equations)
-    residual = F(ca.DM.zeros(y.symbol.sparsity()), *[values[p.name()] for p in parameters])
+    residual = F(ca.DM.zeros(y.symbol.sparsity()), *arguments)
     return -np.array(residual).flatten()
+
+
+_POSITIONS = ["equation", "declaration", "attribute"]
 
 
 @pytest.mark.parametrize(
@@ -4842,19 +4858,43 @@ def _comprehension_value(declaration, rhs):
         ("y[3]", "sum(i * x for i in 1:2)", [15, 21, 27]),
         ("y[2]", "sum(A[i, :] for i in 1:n)", [9, 12]),
         ("y[2]", "sum({x[i], z[i]} for i in 1:n)", [21, 12]),
-        ("y", "sum({x[i] for i in 1:n})", [21]),
     ],
-    ids=["vector", "row", "literal", "of_comprehension"],
+    ids=["vector", "row", "literal"],
 )
-def test_sum_reduction_of_vectors(declaration, rhs, expected):
+@pytest.mark.parametrize("position", _POSITIONS)
+def test_sum_reduction_of_vectors(declaration, rhs, expected, position):
     """A sum reduction with a vector body adds the vectors, element by element (MLS 10.3.4.1)."""
-    np.testing.assert_array_equal(_comprehension_value(declaration, rhs), expected)
+    np.testing.assert_array_equal(_comprehension_value(declaration, rhs, position), expected)
 
 
-def test_array_reduction():
+@pytest.mark.parametrize(
+    "rhs, expected",
+    [
+        ("sum({x[i] for i in 1:n})", [21]),
+        ("sum({A[i, :] for i in 1:n})", [21]),
+        ("sum({{x[i], z[i]} for i in 1:n})", [33]),
+    ],
+    ids=["scalars", "rows", "literals"],
+)
+@pytest.mark.parametrize("position", _POSITIONS)
+def test_sum_of_comprehension(rhs, expected, position):
+    """sum({expr for i in range}) is the sum of an array, over all its elements (MLS 10.3.4)."""
+    np.testing.assert_array_equal(_comprehension_value("y", rhs, position), expected)
+
+
+@pytest.mark.parametrize("op", ["product", "min", "max"])
+@pytest.mark.parametrize("position", _POSITIONS)
+def test_reduction_of_vectors_rejected(op, position):
+    """Only a sum reduction takes a body that is an array (MLS 10.3.4.1)."""
+    with pytest.raises(NotImplementedError, match="must be a scalar"):
+        _comprehension_value("y[2]", f"{op}({{x[i], z[i]}} for i in 1:n)", position)
+
+
+@pytest.mark.parametrize("position", _POSITIONS)
+def test_array_reduction(position):
     """array(expr for i in range) is the comprehension {expr for i in range} (MLS 10.4.1)."""
     np.testing.assert_array_equal(
-        _comprehension_value("y[3]", "array(2 * x[i] for i in 1:n)"), [10, 14, 18]
+        _comprehension_value("y[3]", "array(2 * x[i] for i in 1:n)", position), [10, 14, 18]
     )
 
 

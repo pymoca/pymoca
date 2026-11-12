@@ -10,6 +10,7 @@ Adapter: flatten_to_tree(root, class_name) → ast.Tree (for backend compatibili
 from __future__ import annotations
 
 import copy
+import functools
 import math
 import operator
 import sys
@@ -847,11 +848,44 @@ def _unroll_for_array(
     )
 
 
+def _unroll_reduction(reduction: ast.Expression, scope: InstanceClass, ctx: FlatteningContext):
+    """Unroll f(expr for i in range) (MLS 10.3.4.1), or return it as is.
+
+    A sum becomes the sum of its values with +, since these may be arrays, where sum of the array
+    of them would add all elements. array(expr for i in range) is the array itself (MLS 10.4.1).
+    A product, min or max reduction is left to the backend: applied to the array of its values it
+    could no longer be told from the function of an array, which takes a matrix where the body
+    of the reduction must be a scalar.
+    """
+    operator = reduction.operator
+    name = operator.name if isinstance(operator, ast.ComponentRef) else operator
+    if name not in ("array", "sum"):
+        return reduction
+    unrolled = _unroll_for_array(cast(ast.ForArray, reduction.operands[0]), scope, ctx)
+    if isinstance(unrolled, ast.ForArray):
+        return reduction
+    if name == "array":
+        return unrolled
+    if not unrolled.values:
+        return ast.Primary(value=0)
+    return functools.reduce(
+        lambda total, value: ast.Expression(operator="+", operands=[total, value]),
+        unrolled.values,
+    )
+
+
 def _expand_for_arrays(node, scope: InstanceClass, ctx: FlatteningContext):
     """Return node with every comprehension inside it unrolled."""
     # Copy rather than rewrite nodes on changed paths, the parsed AST is shared across flattens.
     if isinstance(node, ast.ForArray):
         return _unroll_for_array(node, scope, ctx)
+    if (
+        isinstance(node, ast.Expression)
+        and len(node.operands) == 1
+        and isinstance(node.operands[0], ast.ForArray)
+        and node.operands[0].reduction
+    ):
+        return _unroll_reduction(node, scope, ctx)
     if isinstance(node, list):
         new_items = [_expand_for_arrays(item, scope, ctx) for item in node]
         return new_items if any(a is not b for a, b in zip(new_items, node)) else node

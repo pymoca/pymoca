@@ -317,7 +317,13 @@ class Generator(TreeListener):
             v = _array_to_mx(self.get_mx(tree.operands[0]))
             # The results for an empty array are given by MLS 3.7, table 10.3.
             is_empty = ca.MX(v).is_empty()
-            if op == "sum" and isinstance(tree.operands[0], ast.ForArray):
+            # f(expr for i in range), not f({expr for i in range}) which is f of an array
+            is_reduction = isinstance(tree.operands[0], ast.ForArray) and tree.operands[0].reduction
+            if is_reduction and op != "sum" and ca.MX(v).size2() > 1:
+                raise NotImplementedError(
+                    f"The body of a {op} reduction must be a scalar (MLS 10.3.4.1)"
+                )
+            if op == "sum" and is_reduction:
                 # A reduction adds the values of its body, one row each, which may be vectors
                 src = ca.sum1(v).T
             elif op == "sum":

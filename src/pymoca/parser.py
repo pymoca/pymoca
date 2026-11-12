@@ -933,10 +933,10 @@ class ASTListener(ModelicaListener):
         if func_args is None:
             return []
         if func_args.for_indices():
-            return [self._for_array_ast(func_args)]
+            return [self._for_array_ast(func_args, reduction=True)]
         return [self._function_argument_ast(x) for x in func_args.function_argument()]  # type: ignore[union-attr]
 
-    def _for_array_ast(self, func_args) -> ast.ForArray:
+    def _for_array_ast(self, func_args, reduction: bool = False) -> ast.ForArray:
         """Build the ForArray of a function_arguments context with a for clause (MLS B.2.7.8)."""
         if (
             len(func_args.function_argument()) != 1
@@ -949,6 +949,7 @@ class ASTListener(ModelicaListener):
         return ast.ForArray(
             indices=self.ast[func_args.for_indices(0)],
             expression=self._function_argument_ast(func_args.function_argument(0)),
+            reduction=reduction,
         )
 
     def exitPrimary_function(self, ctx: ModelicaParser.Primary_functionContext):

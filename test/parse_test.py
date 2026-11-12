@@ -1029,6 +1029,7 @@ def test_for_array_in_brace_constructor():
     assert isinstance(for_array, ast.ForArray)
     assert len(for_array.indices) == 1
     assert for_array.indices[0].name == "i"
+    assert not for_array.reduction
 
 
 def test_reduction_expression():
@@ -1044,6 +1045,17 @@ def test_reduction_expression():
     assert isinstance(for_array, ast.ForArray)
     assert [index.name for index in for_array.indices] == ["i"]
     assert for_array.expression.operator == "^"
+    assert for_array.reduction
+
+
+def test_function_of_comprehension_is_no_reduction():
+    """sum({expr for i in range}) is sum of an array, not a reduction (MLS 10.3.4.1, 10.4.1)."""
+    ast_tree = parser.parse("model M Real x[3]; Real y = sum({x[i] for i in 1:3}); end M;")
+    sym = ast_tree.classes["M"].symbols["y"]
+    binding = next(a for a in sym.class_modification.arguments if str(a.value.component) == "value")
+    (for_array,) = binding.value.modifications[0].operands
+    assert isinstance(for_array, ast.ForArray)
+    assert not for_array.reduction
 
 
 def test_for_clause_with_extra_argument_rejected():

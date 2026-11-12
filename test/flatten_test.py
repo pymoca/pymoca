@@ -2337,36 +2337,55 @@ def test_for_array_multiple_iterators():
     assert [el.value for el in flat.symbols["a"].min.values] == [1, 2, 3, 2, 4, 6]
 
 
-def test_reduction_in_modification_unrolled():
-    """A reduction is unrolled to its function applied to a literal Array (MLS 10.3.4.1)."""
+@pytest.mark.parametrize("op", ["product", "min", "max"])
+def test_reduction_in_modification_not_unrolled(op):
+    """A product, min or max reduction stays a reduction: applied to an Array of its values it
+    would be the function of an array, which also takes a matrix (MLS 10.3.4.1)."""
     flat = _flatten_inline(
-        """
+        f"""
     model M
-        parameter Real x[3] = {1, 2, 3};
-        Real y(min = sum(x[i] for i in 1:3));
+        parameter Real x[3] = {{1, 2, 3}};
+        Real y(min = {op}(x[i] for i in 1:3));
     end M;""",
         "M",
     )
     reduction = flat.symbols["y"].min
-    assert reduction.operator.to_tuple() == ("sum",)
-    (unrolled,) = reduction.operands
-    assert isinstance(unrolled, ast.Array)
-    assert [_subscript(el).value for el in unrolled.values] == [1, 2, 3]
+    assert reduction.operator.to_tuple() == (op,)
+    (for_array,) = reduction.operands
+    assert isinstance(for_array, ast.ForArray) and for_array.reduction
 
 
-def test_reduction_unknown_range_not_unrolled():
-    """A reduction whose range has no value at flattening time keeps its ForArray operand."""
+def test_sum_reduction_in_modification_unrolled():
+    """A sum reduction is unrolled to additions, as its values may be arrays (MLS 10.3.4.1)."""
     flat = _flatten_inline(
         """
     model M
-        parameter Real x[:] = {1, 2, 3};
-        parameter Integer n = size(x, 1);
-        Real y(min = sum(x[i] for i in 1:n));
+        parameter Real x[3] = {1, 2, 3};
+        Real y(min = sum(x[i] for i in 1:3), max = sum(x[i] for i in 1:0));
     end M;""",
         "M",
     )
-    (for_array,) = flat.symbols["y"].min.operands
-    assert isinstance(for_array, ast.ForArray)
+    total = flat.symbols["y"].min
+    assert total.operator == "+"
+    first_two, third = total.operands
+    assert first_two.operator == "+"
+    assert [_subscript(el).value for el in [*first_two.operands, third]] == [1, 2, 3]
+    assert flat.symbols["y"].max == 0
+
+
+def test_array_reduction_in_modification_unrolled():
+    """array(expr for i in range) is unrolled to the Array itself (MLS 10.4.1)."""
+    flat = _flatten_inline(
+        """
+    model M
+        parameter Integer n = 3;
+        parameter Real c[n] = array(2 * i for i in 1:n);
+    end M;""",
+        "M",
+    )
+    unrolled = flat.symbols["c"].value
+    assert isinstance(unrolled, ast.Array)
+    assert [el.operands[1].value for el in unrolled.values] == [1, 2, 3]
 
 
 @pytest.mark.parametrize(

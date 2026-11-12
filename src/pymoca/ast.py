@@ -361,6 +361,9 @@ class ForArray(Node):
     def __init__(self, **kwargs):
         self.indices: list[ForIndex] = []
         self.expression: Expression | Primary | ComponentRef | Array | IfExpression | None = None
+        # True for the argument of a reduction f(expr for i in range) (MLS 10.3.4.1), False for
+        # the array constructor {expr for i in range} (MLS 10.4.1)
+        self.reduction: bool = False
         super().__init__(**kwargs)
 
     def __repr__(self):
