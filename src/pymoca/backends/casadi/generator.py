@@ -1,12 +1,13 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import copy
 import functools
 import itertools
 import logging
 import operator
 import sys
 from collections import OrderedDict, deque, namedtuple
-from typing import Dict, Iterable, Union
+from typing import Dict, Iterable, Optional, Union
 
 import casadi as ca
 
@@ -65,6 +66,8 @@ class ForLoop:
         self.index_variable = _new_mx(i.name)
         self.name = i.name
         self.indexed_symbols = OrderedDict()
+        # The component references looked up inside this loop, which hold its symbols
+        self.component_refs = []
         # The delays that the body adds start here; a loop over an empty range drops them
         self.first_delay = len(generator.model.delay_states)
 
@@ -74,6 +77,12 @@ class ForLoop:
             and isinstance(index_expr, ca.MX)
             and index_expr is not self.index_variable
         ):
+            outer = [v.name() for v in ca.symvar(index_expr) if v.name() != self.name]
+            if outer:
+                raise NotImplementedError(
+                    f"A subscript in the loop over {self.name} depends on {', '.join(outer)},"
+                    " nested loops are not supported"
+                )
             F = ca.Function("index_expr", [self.index_variable], [index_expr])
             # expr = lambda ar: np.array([F(a)[0] for a in ar], dtype=int)
             Fmap = F.map("map", self.generator.map_mode, len(self.values), [], [])
@@ -87,13 +96,70 @@ class ForLoop:
 Assignment = namedtuple("Assignment", ["left", "right"])
 
 
+def _range_reads(node, name: str) -> bool:
+    """Whether a range inside node reads the iterator name: the range of a comprehension, or a
+    slice in a subscript."""
+    if isinstance(node, list):
+        return any(_range_reads(item, name) for item in node)
+    if not isinstance(node, ast.Node):
+        return False
+    if isinstance(node, ast.Slice):
+        return _reads(node, name)
+    if isinstance(node, ast.ForArray):
+        if any(_reads(index.expression, name) for index in node.indices):
+            return True
+        # A comprehension with an iterator of the same name hides it in its body
+        if any(index.name == name for index in node.indices):
+            return False
+        return _range_reads(node.expression, name)
+    return any(_range_reads(child, name) for child in node.__dict__.values())
+
+
+def _reads(node, name: str) -> bool:
+    """Whether node reads the iterator name, which a comprehension of the same name hides."""
+    if isinstance(node, list):
+        return any(_reads(item, name) for item in node)
+    if isinstance(node, ast.ComponentRef):
+        return (node.name == name and not node.child) or _reads(node.indices, name)
+    if not isinstance(node, ast.Node):
+        return False
+    if isinstance(node, ast.ForArray) and any(index.name == name for index in node.indices):
+        return _reads([index.expression for index in node.indices], name)
+    return any(_reads(child, name) for child in node.__dict__.values())
+
+
+def _with_value(node, name: str, value):
+    """Return a copy of node with the iterator name replaced by value."""
+    if isinstance(node, list):
+        return [_with_value(item, name, value) for item in node]
+    if isinstance(node, ast.ComponentRef) and node.name == name and not node.child:
+        return ast.Primary(value=value)
+    if not isinstance(node, ast.Node):
+        return node
+    result = copy.copy(node)
+    for attr, child in node.__dict__.items():
+        hidden = (
+            attr == "expression"
+            and isinstance(node, ast.ForArray)
+            and any(index.name == name for index in node.indices)
+        )
+        result.__dict__[attr] = copy.deepcopy(child) if hidden else _with_value(child, name, value)
+    return result
+
+
 class GeneratorWalker(TreeWalker):
     """TreeWalker that skips processing of annotations"""
+
+    def __init__(self, generator: "Optional[Generator]" = None):
+        self.generator = generator
 
     def skip_child(self, tree: ast.Node, child_name: str) -> bool:
         skip = super().skip_child(tree, child_name)
         if isinstance(tree, ast.Class) and child_name == "annotation":
             return True
+        # The generator visits the body of such a comprehension itself, once per value
+        if isinstance(tree, ast.ForArray) and self.generator is not None:
+            return tree in self.generator.unrolled_for_arrays
         return skip
 
     def order_keys(self, keys: Iterable[str]):
@@ -139,6 +205,10 @@ class Generator(TreeListener):
         self.nodes = {c: {"time": self.model.time}}
         self.derivative = {}
         self.for_loops = deque()
+        # Per reduction ForArray: builds the sum of its values inside the map
+        self.reduction_sums = {}
+        # The comprehensions that are built value by value, with the values of their iterator
+        self.unrolled_for_arrays = {}
         self.functions = {}
         self.entered_classes = deque()
         self.map_mode = "inline" if options["unroll_loops"] else "serial"
@@ -304,11 +374,26 @@ class Generator(TreeListener):
                 src = ca.mtimes(src, _array_to_mx(self.get_mx(i)))
         elif op == "transpose" and n_operands == 1:
             src = _array_to_mx(self.get_mx(tree.operands[0])).T
+        elif op == "array" and n_operands == 1 and isinstance(tree.operands[0], ast.ForArray):
+            # array(expr for i in range) is {expr for i in range} (MLS 10.4.1)
+            src = self.get_mx(tree.operands[0])
         elif op in ("sum", "min", "max", "product") and n_operands == 1:
             v = _array_to_mx(self.get_mx(tree.operands[0]))
             # The results for an empty array are given by MLS 3.7, table 10.3.
             is_empty = ca.MX(v).is_empty()
-            if op == "sum":
+            # f(expr for i in range), not f({expr for i in range}) which is f of an array
+            is_reduction = isinstance(tree.operands[0], ast.ForArray) and tree.operands[0].reduction
+            if is_reduction and op != "sum" and ca.MX(v).size2() > 1:
+                raise NotImplementedError(
+                    f"The body of a {op} reduction must be a scalar (MLS 10.3.4.1)"
+                )
+            if op == "sum" and is_reduction and tree.operands[0] in self.reduction_sums:
+                # A reduction adds the values of its body, which may be vectors
+                src = self.reduction_sums[tree.operands[0]]()
+            elif op == "sum" and is_reduction:
+                # Over an empty range
+                src = ca.sum1(v).T
+            elif op == "sum":
                 # Over all elements, also those of a matrix or of a row
                 src = ca.sum1(ca.vec(v))
             elif op == "min":
@@ -696,6 +781,105 @@ class Generator(TreeListener):
         else:
             self.src[tree] = []
 
+    def enterForArray(self, tree):
+        logger.debug("enterForArray")
+
+        if len(tree.indices) != 1:
+            raise NotImplementedError("Array constructors with several iterators")
+        index = tree.indices[0]
+        if _range_reads(tree.expression, index.name):
+            # A range inside the body depends on the iterator, as in
+            # {sum(x[j] for j in 1:i) for i in 1:n} or {sum(x[i:i + 1]) for i in 1:n}: such a
+            # body has no common form to map, so it is built for each value of the iterator.
+            if not isinstance(index.expression, ast.Slice):
+                raise NotImplementedError(
+                    f"Only a range expression is supported as the range of iterator {index.name}"
+                )
+            e = index.expression
+            bounds = [self.get_range_bound(b, index.name) for b in (e.start, e.step, e.stop)]
+            self.unrolled_for_arrays[tree] = range_values(*bounds)
+            return
+        self.for_loops.append(ForLoop(self, tree))
+
+    def _unrolled_for_array(self, tree):
+        """Build a comprehension from its body for each value of the iterator."""
+        name = tree.indices[0].name
+        first_delay = len(self.model.delay_states)
+        rows = []
+        for value in self.unrolled_for_arrays.pop(tree):
+            body = _with_value(tree.expression, name, value)
+            GeneratorWalker(self).handle_walk(self, body)
+            expr = ca.MX(_array_to_mx(self.get_mx(body)))
+            if not expr.is_vector():
+                raise NotImplementedError(
+                    f"The body of a comprehension over {name} must be a scalar or a vector"
+                )
+            rows.append(ca.vec(expr).T)
+        if len(self.model.delay_states) > first_delay:
+            raise NotImplementedError(f"delay() in a comprehension over {name} is not supported")
+        if len({row.size2() for row in rows}) > 1:
+            raise NotImplementedError(
+                f"The body of the comprehension over {name} has a size that depends on {name}"
+            )
+        if not rows:
+            return ca.MX(0, 1)
+        result = ca.vertcat(*rows)
+        # Rows of numbers give numbers, as a map over numbers does
+        return ca.evalf(result) if not ca.symvar(result) else result
+
+    def exitForArray(self, tree):
+        logger.debug("exitForArray")
+
+        if tree in self.unrolled_for_arrays:
+            self.src[tree] = self._unrolled_for_array(tree)
+            return
+
+        # Before leaving the loop: a bare component reference is only looked up on demand
+        expr = ca.MX(_array_to_mx(self.get_mx(tree.expression)))
+        f = self.for_loops.pop()
+        # A comprehension in a value can be visited again, such as for a dimension that depends
+        # on it. That visit has a loop of its own, so it must not find the symbols of this one.
+        for ref in f.component_refs:
+            self.src.pop(ref, None)
+        if len(self.model.delay_states) > f.first_delay:
+            raise NotImplementedError(f"delay() in a comprehension over {f.name} is not supported")
+        if not expr.is_vector():
+            raise NotImplementedError(
+                f"The body of a comprehension over {f.name} must be a scalar or a vector"
+            )
+        expr = ca.vec(expr)
+        if len(f.values) == 0:
+            self.src[tree] = ca.MX(0, 1)
+            return
+
+        indexed_symbols = list(f.indexed_symbols.keys())
+        args = [f.index_variable] + indexed_symbols
+
+        arg_names = [arg.name() for arg in args]
+        free_vars = [e for e in ca.symvar(expr) if e.name() not in arg_names]
+        all_args = args + free_vars
+        F = ca.Function("array_body", all_args, [expr])
+
+        indexed_symbols_full = []
+        for k in indexed_symbols:
+            s = f.indexed_symbols[k]
+            indexed_symbol = self.nodes[self.current_class][s.tree.name][s.indices]
+            if s.transpose:
+                indexed_symbol = ca.transpose(indexed_symbol)
+            indexed_symbols_full.append(indexed_symbol)
+
+        reduce_in = list(range(len(args), len(all_args)))
+        map_args = [f.values] + indexed_symbols_full + free_vars
+
+        def mapped(reduce_out):
+            return F.map("map", self.map_mode, len(f.values), reduce_in, reduce_out).call(map_args)
+
+        # One row per iterator value (MLS 10.4.1), which is a column for a scalar body
+        self.src[tree] = mapped([])[0].T
+        if tree.reduction:
+            # For a sum reduction: the map adds the values of the body itself
+            self.reduction_sums[tree] = lambda: mapped([0])[0]
+
     def get_integer(
         self, tree: Union[ast.Primary, ast.ComponentRef, ast.Expression, ast.Slice]
     ) -> Union[int, ca.MX, np.ndarray]:
@@ -727,7 +911,7 @@ class Generator(TreeListener):
         """Return the expression with its symbols replaced by value_of(symbol value)."""
         # Make sure that the expression has been converted to MX by (re)visiting the
         # relevant part of the AST.
-        ast_walker = TreeWalker()
+        ast_walker = GeneratorWalker(self)
         ast_walker.walk(self, tree)
 
         # Obtain expression
@@ -1080,6 +1264,8 @@ class Generator(TreeListener):
                 s = self.get_symbol(tree)
             elif isinstance(tree, ast.ComponentRef):
                 s = self.get_component(tree)
+                if self.for_loops:
+                    self.for_loops[-1].component_refs.append(tree)
             else:
                 raise Exception(
                     "Tried to look up expression before it was reached by the tree walker"
@@ -1142,8 +1328,8 @@ def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = Non
     options = _merge_default_options(options)
 
     component_ref = ast.ComponentRef.from_string(model_name)
-    ast_walker = GeneratorWalker()
     flat_tree = flatten(ast_tree, component_ref)
     casadi_gen = Generator(flat_tree, model_name, options)
+    ast_walker = GeneratorWalker(casadi_gen)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model

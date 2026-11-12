@@ -2130,6 +2130,247 @@ def test_equation_inlines_constant_never_instantiated():
     assert g_n.value == 9.80665
 
 
+def _subscript(cref):
+    """Return the single subscript of a one-dimensional ComponentRef."""
+    (index,) = cref.indices[0]
+    return index
+
+
+def test_for_array_in_modification_kept():
+    """A comprehension in a modification stays one, with its names resolved: the backend builds
+    it and keeps its structure (MLS 10.4.1)."""
+    flat = parse_and_flatten_model("ForArrayModification.mo", "ForArrayModification")
+
+    # min = cat(1, {..}, {max(H_b[i], max(H_b[i + 1], H_b[i + 2])) for i in 1:n - 2}, {..})
+    cat = flat.symbols["H"].min
+    assert cat.operator.to_tuple() == ("cat",)
+    for_array = cat.operands[2]
+    assert isinstance(for_array, ast.ForArray)
+    assert _ref_names(for_array) == {"max", "H_b", "i", "n"}
+
+    # Literal array neighbors in the same cat() are left untouched.
+    assert [_subscript(o).value for o in cat.operands[1].values[0].operands] == [1, 2]
+
+
+@pytest.mark.parametrize(
+    "body",
+    ["i", "k * i", "x[i]", "sum(x[i:i + 1])", "if x[i] > 0 then 1 else 0", "{j for j in 1:i}"],
+    ids=["iterator", "scalar", "element", "slice", "condition", "nested"],
+)
+def test_for_array_kept(body):
+    """Flattening does not unroll a comprehension, whatever its body (MLS 10.4.1)."""
+    flat = _flatten_inline(
+        f"""
+    model M
+        parameter Real k = 2;
+        parameter Real x[4] = {{1, 2, 3, 4}};
+        Real a[3](min = {{{body} for i in 1:3}});
+    end M;""",
+        "M",
+    )
+    for_array = flat.symbols["a"].min
+    assert isinstance(for_array, ast.ForArray)
+    assert _ref_names(for_array) <= {"i", "j", "k", "x", "sum"}
+
+
+def test_for_array_function_calls_discovered():
+    """The functions that a comprehension calls are found, so that they are flattened too."""
+    ast_tree = parser.parse(
+        """
+    model M
+        function f
+            input Real u;
+            output Real y;
+        algorithm
+            y := 2 * u;
+        end f;
+        parameter Real x[:] = {1, 2, 3};
+        parameter Integer n = size(x, 1);
+        Real a[3](min = {f(i) for i in 1:n});
+    end M;"""
+    )
+    # Not _flatten_inline: resolving a function call in a modification rewrites the
+    # parsed AST, for a plain array just as much as for a comprehension.
+    flat = tree.flatten_class(ast_tree, "M")
+    assert isinstance(flat.symbols["a"].min, ast.ForArray)
+    assert "M.f" in flat.functions
+
+
+@pytest.mark.parametrize("op", ["sum", "product", "min", "max"])
+def test_reduction_in_modification_kept(op):
+    """A reduction in a modification stays a reduction (MLS 10.3.4.1)."""
+    flat = _flatten_inline(
+        f"""
+    model M
+        parameter Real x[3] = {{1, 2, 3}};
+        Real y(min = {op}(x[i] for i in 1:3));
+    end M;""",
+        "M",
+    )
+    reduction = flat.symbols["y"].min
+    assert reduction.operator.to_tuple() == (op,)
+    (for_array,) = reduction.operands
+    assert isinstance(for_array, ast.ForArray) and for_array.reduction
+
+
+@pytest.mark.parametrize(
+    "outer_declarations",
+    ["", "parameter Real lo[2] = {-1, -2}; parameter Integer m = 2;"],
+    ids=["no_outer_names", "same_names_outside"],
+)
+def test_for_array_unknown_range_names_resolved_where_written(outer_declarations):
+    """A comprehension has its names resolved in the class of the
+    modification, also when that class is instantiated elsewhere (MLS 7.2.4)."""
+    flat = _flatten_inline(
+        f"""
+    model A
+        parameter Integer n = 2;
+        Real x[n];
+    end A;
+    model B
+        A a(n = 2, x(min = {{lo[i] for i in 1:m}}, max = 2 * {{lo[i] for i in 1:m}}));
+        parameter Real lo[2] = {{5, 6}};
+        parameter Integer m = 2;
+    end B;
+    model C
+        {outer_declarations}
+        B b;
+    end C;""",
+        "C",
+    )
+    x = flat.symbols["b.a.x"]
+    assert isinstance(x.min, ast.ForArray)
+    assert _ref_names(x.min) == {"b.lo", "b.m", "i"}
+    assert _ref_names(x.max) == {"b.lo", "b.m", "i"}
+
+
+def _ref_names(node):
+    """Return the names of all ComponentRefs under node, including those in subscripts."""
+    if isinstance(node, (list, tuple)):
+        return {name for n in node for name in _ref_names(n)}
+    if not isinstance(node, ast.Node):
+        return set()
+    names = {node.name} if isinstance(node, ast.ComponentRef) else set()
+    return names | _ref_names(list(vars(node).values()))
+
+
+@pytest.mark.parametrize(
+    "declaration, equation, expected",
+    [
+        ("Real y[3]", "y = {2 * x[i] for i in 1:3}", {"c.x", "c.y", "i"}),
+        (
+            "parameter Integer n = 3; Real y[n]",
+            "y = {x[i] for i in 1:n}",
+            {"c.n", "c.x", "c.y", "i"},
+        ),
+        ("parameter Integer i = 7; Real y[3]", "y = {x[i] for i in 1:3}", {"c.x", "c.y", "i"}),
+        ("Real y", "y = sum(x[i] * i for i in 1:3)", {"c.x", "c.y", "i", "sum"}),
+        (
+            "Real y",
+            "y = sum(sum(x[j] * i for j in 1:3) for i in 1:2)",
+            {"c.x", "c.y", "i", "j", "sum"},
+        ),
+    ],
+    ids=["comprehension", "range_parameter", "iterator_shadows_parameter", "reduction", "nested"],
+)
+def test_for_array_in_component_equation(declaration, equation, expected):
+    """Names in a comprehension in a component equation flatten, except the iterator."""
+    flat = _flatten_inline(
+        f"""
+    model M
+        model C
+            parameter Real x[3];
+            {declaration};
+        equation
+            {equation};
+        end C;
+        C c;
+    end M;""",
+        "M",
+    )
+    assert _ref_names(flat.equations) == expected
+
+
+def test_for_array_in_nested_and_inherited_equation():
+    """A comprehension flattens through several levels of nesting and through extends."""
+    flat = _flatten_inline(
+        """
+    model M
+        partial model P
+            parameter Real x[2];
+            Real y[2];
+        equation
+            y = {x[i] for i in 1:2};
+        end P;
+        model B
+            extends P;
+        end B;
+        model A
+            B b;
+        end A;
+        A a;
+    end M;""",
+        "M",
+    )
+    assert _ref_names(flat.equations) == {"a.b.x", "a.b.y", "i"}
+
+
+@pytest.mark.parametrize(
+    "declarations, expected",
+    [
+        ("parameter Integer i = 7; Real y[3](min = {2 * x[i] for i in 1:n});", {"c.n", "c.x", "i"}),
+        ("Integer i; Real y[3](min = {2 * i for i in 1:n});", {"c.n", "i"}),
+        (
+            "parameter Integer i = 2; Real y[2](min = {2 * i for i in 1:i + n - 3});",
+            {"c.i", "c.n", "i"},
+        ),
+    ],
+    ids=["parameter", "variable", "range_reads_member"],
+)
+def test_for_array_iterator_shadows_member_in_modification(declarations, expected):
+    """An iterator hides a same-named member in a modification, but not in its own range."""
+    txt = f"""
+    model M
+        model C
+            parameter Real x[3];
+            {declarations}
+            parameter Integer n = 3;
+        end C;
+        C c;
+    end M;"""
+    flat_tree = tree.flatten(parser.parse(txt), "M")
+    assert _ref_names(flat_tree.classes["M"].symbols["c.y"].min) == expected
+
+
+@pytest.mark.parametrize(
+    "declarations",
+    [
+        "parameter Integer i = 7; Real y[3] = {x[i] for i in 1:n};",
+        "Real i; Real y[3] = {1.0 * i for i in 1:n};",
+        "parameter Integer i = 7; Real y = sum(x[i] for i in 1:n);",
+        "parameter Integer i = 7; parameter Real y[3] = {x[i] for i in 1:n};",
+    ],
+    ids=["parameter", "variable", "reduction", "parameter_declaration"],
+)
+def test_for_array_iterator_shadows_member_in_declaration_equation(declarations):
+    """An iterator hides a same-named member in a declaration equation (MLS 10.4.1)."""
+    flat = _flatten_inline(
+        f"""
+    model M
+        model C
+            parameter Real x[3];
+            {declarations}
+            parameter Integer n = 3;
+        end C;
+        C c;
+    end M;""",
+        "M",
+    )
+    names = _ref_names([flat.equations, flat.symbols["c.y"].value])
+    assert "i" in names
+    assert "c.i" not in names
+
+
 @pytest.mark.parametrize(
     "start, step, stop, expected",
     [
