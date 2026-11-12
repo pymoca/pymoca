@@ -2369,6 +2369,52 @@ def test_reduction_unknown_range_not_unrolled():
     assert isinstance(for_array, ast.ForArray)
 
 
+@pytest.mark.parametrize(
+    "outer_declarations",
+    ["", "parameter Real lo[2] = {-1, -2}; parameter Integer m = 2;"],
+    ids=["no_outer_names", "same_names_outside"],
+)
+def test_for_array_unknown_range_names_resolved_where_written(outer_declarations):
+    """A comprehension that is not unrolled has its names resolved in the class of the
+    modification, also when that class is instantiated elsewhere (MLS 7.2.4)."""
+    flat = _flatten_inline(
+        f"""
+    model A
+        parameter Integer n = 2;
+        Real x[n];
+    end A;
+    model B
+        A a(n = 2, x(min = {{lo[i] for i in 1:m}}, max = 2 * {{lo[i] for i in 1:m}}));
+        parameter Real lo[2] = {{5, 6}};
+        parameter Integer m = 2;
+    end B;
+    model C
+        {outer_declarations}
+        B b;
+    end C;""",
+        "C",
+    )
+    x = flat.symbols["b.a.x"]
+    assert isinstance(x.min, ast.ForArray)
+    assert _ref_names(x.min) == {"b.lo", "b.m", "i"}
+    assert _ref_names(x.max) == {"b.lo", "b.m", "i"}
+
+
+def test_reduction_unknown_range_not_unrolled():
+    """A reduction whose range has no value at flattening time keeps its ForArray operand."""
+    flat = _flatten_inline(
+        """
+    model M
+        parameter Real x[:] = {1, 2, 3};
+        parameter Integer n = size(x, 1);
+        Real y(min = sum(x[i] for i in 1:n));
+    end M;""",
+        "M",
+    )
+    (for_array,) = flat.symbols["y"].min.operands
+    assert isinstance(for_array, ast.ForArray)
+
+
 def _ref_names(node):
     """Return the names of all ComponentRefs under node, including those in subscripts."""
     if isinstance(node, (list, tuple)):

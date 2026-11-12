@@ -458,6 +458,14 @@ def _resolve_modification_attribute(
         expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
         value = copy.deepcopy(value)
         _rewrite_operand_list(value.values, expr_scope, expr_ctx)
+    elif (
+        isinstance(value, ast.ForArray)
+        and isinstance(expr_scope, InstanceClass)
+        and isinstance(expr_flat_class, InstanceClass)
+    ):
+        # A comprehension whose range has no value yet: its names resolve in that scope too.
+        expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
+        value = _rewrite_operand(copy.deepcopy(value), expr_scope, expr_ctx)
     if isinstance(value, ast.Expression):
         if isinstance(expr_scope, InstanceClass) and isinstance(expr_flat_class, InstanceClass):
             expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
