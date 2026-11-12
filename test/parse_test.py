@@ -1005,6 +1005,19 @@ def test_function_partial_application():
     assert partial2.operands[1].name == "q"
 
 
+@pytest.mark.parametrize(
+    "section",
+    [
+        "equation\n    for i loop x[i] = i; end for;",
+        "algorithm\n    for i loop x[i] := i; end for;",
+    ],
+)
+def test_for_loop_implicit_range_rejected(section):
+    """A for-equation or for-statement without an explicit range is reported as unsupported."""
+    with pytest.raises(NotImplementedError, match="Implicit range of iterator i"):
+        parser.parse(f"model M\n    Real x[2];\n{section}\nend M;")
+
+
 def test_parse_stepped_range():
     """A three-expression range parses as start:step:stop (MLS 3.3.2)."""
     ast_tree = parser.parse("model M Real x[3]; Real y[2]; equation y = x[1:2:3]; end M;")
