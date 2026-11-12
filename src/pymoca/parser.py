@@ -653,9 +653,20 @@ class ASTListener(ModelicaListener):
             conditions.append(True)
         self.ast[ctx] = ast.WhenEquation(conditions=conditions, blocks=blocks)
 
+    def _loop_indices(self, ctx) -> list[ast.ForIndex]:
+        """Return the indices of a for-equation or for-statement, rejecting implicit ranges."""
+        indices = self.ast[ctx.for_indices()]
+        for index in indices:
+            if index.expression is None:
+                raise NotImplementedError(
+                    f"Implicit range of iterator {index.name} at line {ctx.start.line}"
+                    " is not supported"
+                )
+        return indices
+
     def exitFor_equation(self, ctx: ModelicaParser.For_equationContext):
         self.ast[ctx] = ast.ForEquation(
-            indices=self.ast[ctx.for_indices()],
+            indices=self._loop_indices(ctx),
             equations=self.ast[ctx.equation_block()],
         )
 
@@ -763,7 +774,7 @@ class ASTListener(ModelicaListener):
 
     def exitFor_statement(self, ctx: ModelicaParser.For_statementContext):
         self.ast[ctx] = ast.ForStatement(
-            indices=self.ast[ctx.for_indices()],
+            indices=self._loop_indices(ctx),
             statements=self.ast[ctx.statement_block()],
         )
 
@@ -859,7 +870,7 @@ class ASTListener(ModelicaListener):
     def exitFor_index(self, ctx):
         self.ast[ctx] = ast.ForIndex(
             name=ctx.IDENT().getText(),  # type: ignore[union-attr]
-            expression=self.ast[ctx.expression()],
+            expression=self.ast[ctx.expression()] if ctx.expression() else None,
         )
 
     def exitFor_indices(self, ctx: ModelicaParser.For_indicesContext):
