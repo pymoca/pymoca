@@ -932,7 +932,25 @@ class ASTListener(ModelicaListener):
         func_args = func_call_args_ctx.function_arguments()
         if func_args is None:
             return []
+        if func_args.for_indices():
+            return [self._for_array_ast(func_args, reduction=True)]
         return [self._function_argument_ast(x) for x in func_args.function_argument()]  # type: ignore[union-attr]
+
+    def _for_array_ast(self, func_args, reduction: bool = False) -> ast.ForArray:
+        """Build the ForArray of a function_arguments context with a for clause (MLS B.2.7.8)."""
+        if (
+            len(func_args.function_argument()) != 1
+            or len(func_args.for_indices()) != 1
+            or func_args.named_arguments() is not None
+        ):
+            raise syntax_error_from_ctx(
+                "A for clause takes one argument and one list of iterators", func_args
+            )
+        return ast.ForArray(
+            indices=self.ast[func_args.for_indices(0)],
+            expression=self._function_argument_ast(func_args.function_argument(0)),
+            reduction=reduction,
+        )
 
     def exitPrimary_function(self, ctx: ModelicaParser.Primary_functionContext):
         # TODO: Could possible be cleaner if we let the expression in the ast bubble up.
@@ -1022,12 +1040,13 @@ class ASTListener(ModelicaListener):
         self.ast[ctx] = rows[0] if len(rows) == 1 else ast.Array(values=rows)
 
     def exitPrimary_function_arguments(self, ctx: ModelicaParser.Primary_function_argumentsContext):
-        # TODO: This does not support for generators yet.
-        #       Only expressions are supported, e.g. {1.0, 2.0, 3.0}.
         func_args = ctx.function_arguments()
         assert func_args is not None
-        v = [self.ast[x.expression()] for x in func_args.function_argument()]  # type: ignore[union-attr]
-        self.ast[ctx] = ast.Array(values=v)
+        if func_args.for_indices():
+            self.ast[ctx] = self._for_array_ast(func_args)
+        else:
+            v = [self.ast[x.expression()] for x in func_args.function_argument()]  # type: ignore[union-attr]
+            self.ast[ctx] = ast.Array(values=v)
 
     def exitEquation_function(self, ctx: ModelicaParser.Equation_functionContext):
         self.ast[ctx] = ast.Function(
