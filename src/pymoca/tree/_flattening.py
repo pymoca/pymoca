@@ -10,7 +10,6 @@ Adapter: flatten_to_tree(root, class_name) → ast.Tree (for backend compatibili
 from __future__ import annotations
 
 import copy
-import functools
 import math
 import operator
 import sys
@@ -868,10 +867,10 @@ def _unroll_reduction(reduction: ast.Expression, scope: InstanceClass, ctx: Flat
         return unrolled
     if not unrolled.values:
         return ast.Primary(value=0)
-    return functools.reduce(
-        lambda total, value: ast.Expression(operator="+", operands=[total, value]),
-        unrolled.values,
-    )
+    total = unrolled.values[0]
+    for value in unrolled.values[1:]:
+        total = ast.Expression(operator="+", operands=[total, value])
+    return total
 
 
 def _expand_for_arrays(node, scope: InstanceClass, ctx: FlatteningContext):
