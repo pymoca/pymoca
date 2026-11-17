@@ -18,7 +18,7 @@ from conftest_parse import (
 from pymoca import ast
 from pymoca import parser
 from pymoca import tree
-from pymoca.tree._name_lookup import _find_name
+from pymoca.tree._name_lookup import _find_name, _flatten_first_and_find_rest
 
 import pytest
 
@@ -697,6 +697,21 @@ def test_derived_type_value_modification():
     }
     assert "d.c.y" in eq_map, f"No value equation for d.c.y; equations: {flat_tree.equations}"
     assert isinstance(eq_map["d.c.y"], ast.Primary) and eq_map["d.c.y"].value == 4
+
+
+def test_flatten_first_and_find_rest_quoted_dotted_symbol():
+    """Looking up a quoted name with a dot in a temporarily flattened class keeps it whole."""
+    from pymoca.tree import LookupOptions, RecursionGuard
+
+    ast_tree = parser.parse("model A constant Real 'k.v' = 2; end A;")
+    found = _flatten_first_and_find_rest(
+        ast_tree.classes["A"],
+        "'k.v'",
+        RecursionGuard(),
+        LookupOptions(check_encapsulated=False, instantiate_in_place=True),
+    )
+    assert found is not None
+    assert found.name == "'k.v'"
 
 
 if __name__ == "__main__":

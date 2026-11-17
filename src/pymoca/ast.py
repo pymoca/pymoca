@@ -54,7 +54,40 @@ __all__ = [
     "element_full_reference",
     "element_name_tuple",
     "is_enumeration",
+    "partition_name",
+    "split_name",
 ]
+
+
+def split_name(name: str) -> list[str]:
+    """Split a dotted name at the dots outside quoted identifiers, like str.split(".")
+
+    A quoted identifier can contain dots, such as 'a.b' in c.'a.b' (MLS 2.3.1).
+    """
+    if "'" not in name:
+        return name.split(".")
+    parts = []
+    start = 0
+    quoted = False
+    escaped = False
+    for i, char in enumerate(name):
+        if escaped:
+            escaped = False
+        elif quoted and char == "\\":
+            escaped = True
+        elif char == "'":
+            quoted = not quoted
+        elif char == "." and not quoted:
+            parts.append(name[start:i])
+            start = i + 1
+    parts.append(name[start:])
+    return parts
+
+
+def partition_name(name: str) -> tuple[str, str, str]:
+    """Split a dotted name at its first dot outside quoted identifiers, like str.partition(".")"""
+    first, *rest = split_name(name)
+    return (first, ".", ".".join(rest)) if rest else (first, "", "")
 
 
 class Visibility(Enum):
@@ -245,8 +278,7 @@ class ComponentRef(Node):
         :return: ComponentRef
         """
 
-        components = s.split(".")
-        return cls.from_tuple(components)
+        return cls.from_tuple(split_name(s))
 
     def concatenate(self, arg: ComponentRef) -> ComponentRef:
         """
