@@ -1077,6 +1077,26 @@ def test_parse_stepped_range():
     assert (slice_.start.value, slice_.step.value, slice_.stop.value) == (1, 2, 3)
 
 
+@pytest.mark.parametrize(
+    "name, parts",
+    [
+        ("a.b.c", ["a", "b", "c"]),
+        (".a.b", ["", "a", "b"]),
+        ("'a.b'", ["'a.b'"]),
+        ("c.'a.b'.d", ["c", "'a.b'", "d"]),
+        (r"'a\'.b'.c", [r"'a\'.b'", "c"]),
+        (r"'a\\'.'b'", [r"'a\\'", "'b'"]),
+    ],
+)
+def test_split_name_keeps_quoted_identifiers(name, parts):
+    """A dot inside a quoted identifier does not split a name (MLS 2.3.1)."""
+    assert ast.split_name(name) == parts
+    first, sep, rest = ast.partition_name(name)
+    assert (first, rest) == (parts[0], ".".join(parts[1:]))
+    assert sep == ("." if len(parts) > 1 else "")
+    assert ast.ComponentRef.from_string(name).to_tuple() == tuple(parts)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
