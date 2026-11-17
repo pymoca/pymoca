@@ -1293,7 +1293,7 @@ def _generate_value_equations(flat_class: InstanceClass) -> None:
         # _resolve_expression fails and keeps the original ast.Expression).
         # The prefix for source-scope refs inside this symbol's value equals the
         # instance path containing the symbol (everything before the last dot).
-        prefix = flat_name.rsplit(".", 1)[0] if "." in flat_name else ""
+        prefix = ".".join(ast.split_name(flat_name)[:-1])
         resolver = _EquationRefResolver(flat_class, prefix)
         walker.walk(resolver, rhs)
 
@@ -1324,7 +1324,7 @@ def _flatten_name(
     assert isinstance(element, InstanceElement)
     element_full_name = element_instance_name_tuple(element)
     flat_name_start = 0
-    for names in zip(element_full_name, remove_prefix.split(".")):
+    for names in zip(element_full_name, ast.split_name(remove_prefix)):
         if names[0] == names[1]:
             flat_name_start += 1
     return ".".join(element_full_name[flat_name_start:])
@@ -1468,7 +1468,7 @@ def _resolve_name(
     # will receive distinct clones — safe as long as consumers key off the name string
     # rather than object identity (which is the current convention).
     if (name_flat_class := ctx.name_flat_class) is not None:
-        root_tuple = tuple(name_flat_class.full_instance_name.split("."))
+        root_tuple = tuple(ast.split_name(name_flat_class.full_instance_name))
         if element_instance_name_tuple(element)[: len(root_tuple)] == root_tuple:
             flat_name = _flatten_name(element, name_flat_class.full_instance_name)
         else:
@@ -1801,7 +1801,7 @@ def flatten_to_tree(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Tree:
             connector_types[sym_name] = ct
     w = TreeWalker()
     for sym_name, sym in flat_class.symbols.items():
-        prefix = sym_name.rsplit(".", 1)[0] + "." if "." in sym_name else ""
+        prefix = "".join(part + "." for part in ast.split_name(sym_name)[:-1])
         for attr in _VALUE_ATTRS:
             val = getattr(sym, attr, None)
             if not isinstance(val, (ast.Primary, type(None), int, float, bool, str)):

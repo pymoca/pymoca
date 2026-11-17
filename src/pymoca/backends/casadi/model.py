@@ -8,6 +8,8 @@ import casadi as ca
 
 import numpy as np
 
+from pymoca.ast import split_name
+
 from ._options import _merge_default_options
 from .alias_relation import AliasRelation
 from .mtensor import _MTensor
@@ -281,7 +283,7 @@ class Model:
                             r"((?:der\()*|\b)(.*?)([\)]*|\b)$", old_sym_name
                         ).groups()
 
-                        symbol_names = old_sym_name.split(".")
+                        symbol_names = split_name(old_sym_name)
                         assert len(symbol_names) == len(modelica_shape)
                         component_name_format = ""
                         for i, symbol_name in enumerate(symbol_names):

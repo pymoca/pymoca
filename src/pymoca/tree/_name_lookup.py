@@ -139,7 +139,7 @@ def _parse_str_or_ref(name: str | ast.ComponentRef) -> tuple[str, str]:
     """Return (left_name, rest_of_name) given composite name as a str or ComponentRef"""
     assert isinstance(name, (str, ast.ComponentRef))
     if isinstance(name, str):
-        left_name, _, rest_of_name = name.partition(".")
+        left_name, _, rest_of_name = ast.partition_name(name)
     else:
         name_parts = name.to_tuple()
         left_name = name_parts[0]
@@ -344,7 +344,7 @@ def _find_composite_name_in_symbols(
     if opts.instantiate_in_place:
         scope = _instantiate_class_if_needed_for_lookup(scope, guard, opts)
 
-    first_name, _, next_names = name.partition(".")
+    first_name, _, next_names = ast.partition_name(name)
 
     # See spec 5.3.2 bullet 2 (emphasis mine): "If the first identifier denotes
     # a component, the rest of the name (e.g., B or B.C) is looked up among the
@@ -382,7 +382,7 @@ def _find_composite_name_in_classes(
     if opts.instantiate_in_place:
         scope = _instantiate_class_if_needed_for_lookup(scope, guard, opts)
 
-    first_name, _, next_names = name.partition(".")
+    first_name, _, next_names = ast.partition_name(name)
     found = _find_local_class(scope, first_name)
     if found is None:
         next_names = name
@@ -463,7 +463,7 @@ def _flatten_first_and_find_rest(
     )
     # Need non-flat name for name lookup
     assert flat_class.name is not None, "flat_class must have a name"
-    flat_class.name = flat_class.name.split(".")[-1]
+    flat_class.name = ast.split_name(flat_class.name)[-1]
     first = flat_class
 
     if rest_of_name in flat_class.symbols:
@@ -472,7 +472,7 @@ def _flatten_first_and_find_rest(
         # object may be shared with the original instance tree.
         found = copy.copy(flat_class.symbols[rest_of_name])
         # Restore non-flat name of instance (last name if compound name)
-        found.name = found.name.split(".")[-1]
+        found.name = ast.split_name(found.name)[-1]
     else:
         # Classes with embedded references to the same class cause infinite recursion if we do
         # instantiation or temporary flattening recursively, so it is only done on the first
@@ -489,7 +489,7 @@ def _flatten_first_and_find_rest(
 
 
 def _first_name(name: str) -> str:
-    return name.split(".")[0]
+    return ast.split_name(name)[0]
 
 
 def _find_local(
@@ -704,8 +704,8 @@ def _find_imported(
 
 
 def _get_common_parent(class_: ast.Class, name: str) -> tuple[ast.Class | None, str]:
-    class_parts = class_.full_name.split(".")
-    name_parts = name.split(".")
+    class_parts = ast.split_name(class_.full_name)
+    name_parts = ast.split_name(name)
     common_count = 0
     for a, b in zip(class_parts, name_parts):
         if a != b:
