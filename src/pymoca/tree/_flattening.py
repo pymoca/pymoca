@@ -1075,7 +1075,8 @@ def _generate_connect_equations(flat_class: InstanceClass):
         for sym_name, sym in flat_class.symbols.items():
             if sym_name.startswith(left_prefix):
                 suffix = sym_name[len(left_prefix) :]
-                type_indices = getattr(sym.type, "indices", [])
+                # One index group per name part, matching the member symbols
+                type_indices = [[None] for _ in suffix.split(".")]
                 connector_vars.append((suffix, sym.prefixes, type_indices))
 
         if not connector_vars:

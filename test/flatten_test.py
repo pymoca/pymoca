@@ -725,6 +725,39 @@ def test_connect_equations_indexed_hierarchical():
     assert literal_indices(by_name["b.p.i"]) == [2]
 
 
+def test_connect_connector_array_elements():
+    """Connect refs to connector array elements have one index group per name part."""
+    txt = """
+        connector Pin Real v; flow Real i; end Pin;
+        connector C Real y; flow Real w; Pin p; end C;
+        model M
+            C c[2];
+        equation
+            connect(c[1], c[2]);
+        end M;
+    """
+    flat = tree.flatten_class(parser.parse(txt), "M")
+
+    def index_values(ref):
+        return [[i.value if isinstance(i, ast.Primary) else i for i in g] for g in ref.indices]
+
+    equalities = {
+        eq.left.name: eq
+        for eq in flat.equations
+        if isinstance(eq, ast.Equation) and isinstance(eq.left, ast.ComponentRef)
+    }
+    assert index_values(equalities["c.y"].left) == [[1], [None]]
+    assert index_values(equalities["c.y"].right) == [[2], [None]]
+    assert index_values(equalities["c.p.v"].left) == [[1], [None], [None]]
+    assert index_values(equalities["c.p.v"].right) == [[2], [None], [None]]
+
+    flow = [eq for eq in flat.equations if _is_flow_sum_equation(eq, {"c.w"})]
+    assert len(flow) == 1
+    refs = []
+    _collect_component_refs([flow[0].left], refs)
+    assert sorted(index_values(r) for r in refs) == [[[1], [None]], [[2], [None]]]
+
+
 def test_connect_inherited_component_flow_sign():
     """Connect refs through inherited components are inside connectors (MLS 9.2).
 
