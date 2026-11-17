@@ -5258,6 +5258,124 @@ def test_flatten_quoted_class_name_lookup():
     assert model.parameters[0].value == 3.0
 
 
+_QUOTED_FLAT_MODEL = """
+package 'Tank'
+  model 'Tank'
+    parameter Real 'tank.area' = 2.0;
+    input Real 'q.in'(fixed = true);
+    Real 'tank.h[1]'(start = 1.0, fixed = true);
+    Real 'tank.h[2]';
+  equation
+    'tank.area' * der('tank.h[1]') = 'q.in';
+    'tank.h[2]' = 2.0 * 'tank.h[1]';
+  end 'Tank';
+end 'Tank';
+"""
+
+
+def test_unquote_identifiers_flat_names(tmp_path):
+    """Quoted flat names such as 'tank.h[1]' become variables with that plain name."""
+    (tmp_path / "Tank.mo").write_text(_QUOTED_FLAT_MODEL)
+    model = transfer_model(str(tmp_path), "'Tank'.'Tank'", {"unquote_identifiers": True})
+
+    assert [v.symbol.name() for v in model.states] == ["tank.h[1]"]
+    assert [v.symbol.name() for v in model.alg_states] == ["tank.h[2]"]
+    assert [v.symbol.name() for v in model.inputs] == ["q.in"]
+    assert [p.symbol.name() for p in model.parameters] == ["tank.area"]
+    assert model.parameters[0].value == 2.0
+
+
+_QUOTED_HIERARCHICAL_MODEL = r"""
+package 'P'
+  function 'f'
+    input Real 'u';
+    output Real 'y';
+  algorithm
+    'y' := 2 * 'u';
+  end 'f';
+  model 'Tank'
+    parameter Real 'area' = 2.0;
+    Real 'h'(start = 1, fixed = true);
+    Real 'q in';
+  equation
+    'area' * der('h') = 'q in';
+  end 'Tank';
+  model 'Sys'
+    'Tank' 'my tank'('area' = 3.0, 'q in' = 1.0);
+    Real 'h\'s'[2];
+    Real 'g' = 'f'('my tank'.'h');
+  equation
+    for 'i' in 1:2 loop
+      'h\'s'['i'] = 'i' * 'my tank'.'h';
+    end for;
+  end 'Sys';
+end 'P';
+"""
+
+
+def test_unquote_identifiers_hierarchical():
+    """Each quoted part of the flat names of a hierarchical model is unquoted."""
+    model = generate_model(
+        parser.parse(_QUOTED_HIERARCHICAL_MODEL), "'P'.'Sys'", {"unquote_identifiers": True}
+    )
+    assert [v.symbol.name() for v in model.states] == ["my tank.h"]
+    assert [v.symbol.name() for v in model.alg_states] == ["my tank.q in", "h's", "g"]
+    assert [p.symbol.name() for p in model.parameters] == ["my tank.area"]
+    assert model.parameters[0].value == 3.0
+
+
+def test_unquote_identifiers_keeps_parsed_tree():
+    """generate_model unquotes a copy, the tree its caller parsed keeps its quotes."""
+    ast_tree = parser.parse(_QUOTED_FLAT_MODEL)
+    model = generate_model(ast_tree, "'Tank'.'Tank'", {"unquote_identifiers": True})
+    assert [v.symbol.name() for v in model.states] == ["tank.h[1]"]
+
+    model = generate_model(ast_tree, "'Tank'.'Tank'", {})
+    assert [v.symbol.name() for v in model.states] == ["'tank.h[1]'"]
+
+
+def test_unquote_identifiers_off_keeps_quotes(tmp_path):
+    """Without the option, 'x' and x are distinct variables (MLS 2.3.1)."""
+    (tmp_path / "M.mo").write_text("model M Real 'x'; Real x; equation x = 'x'; 'x' = 1; end M;")
+    model = transfer_model(str(tmp_path), "M", {})
+    assert [v.symbol.name() for v in model.alg_states] == ["'x'", "x"]
+
+    with pytest.raises(ModelicaSemanticError, match="'x' and x in M both map to x"):
+        transfer_model(str(tmp_path), "M", {"unquote_identifiers": True})
+
+
+def test_unquote_identifiers_flat_name_collision():
+    """A quoted name part with a dot that unquotes to another flat name is an error."""
+    ast_tree = parser.parse(
+        "model A Real b; end A; model C A a; Real 'a.b'; end C; model M C c; end M;"
+    )
+    with pytest.raises(ModelicaSemanticError, match=r"c\.a\.b and c\.'a\.b' in M"):
+        generate_model(ast_tree, "M", {"unquote_identifiers": True, "check_balanced": False})
+
+
+def test_unquote_identifiers_lazy_library(tmp_path):
+    """Quoted names of a MODELICAPATH library, parsed when flattening needs it, are unquoted."""
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    (lib / "Lib.mo").write_text(
+        "package Lib model 'Tank' Real 'h'; equation 'h' = 1; end 'Tank'; end Lib;"
+    )
+    (tmp_path / "M.mo").write_text("model 'M' Lib.'Tank' 't 1'; end 'M';")
+    model = transfer_model(
+        str(tmp_path), "'M'", {"unquote_identifiers": True, "modelicapath": [str(lib)]}
+    )
+    assert [v.symbol.name() for v in model.alg_states] == ["t 1.h"]
+
+
+def test_unquote_identifiers_lookup_keeps_quotes(tmp_path):
+    """Name lookup keeps the quotes, so 'Lib'.k does not find Lib.k (MLS 2.3.1)."""
+    (tmp_path / "Lib.mo").write_text("package Lib constant Real k = 4.0; end Lib;")
+    (tmp_path / "M.mo").write_text("model M Real x; equation x = 'Lib'.k; end M;")
+    # An unresolved name is reported when the CasADi model is generated
+    with pytest.raises(KeyError):
+        transfer_model(str(tmp_path), "M", {"unquote_identifiers": True})
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 

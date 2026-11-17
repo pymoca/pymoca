@@ -14,7 +14,14 @@ import casadi as ca
 import numpy as np
 
 from pymoca import ast
-from pymoca.tree import TreeListener, TreeWalker, flatten, range_values
+from pymoca.tree import (
+    TreeListener,
+    TreeWalker,
+    flatten,
+    range_values,
+    unquote_flat_names,
+    unquote_name,
+)
 
 from ._options import _merge_default_options
 from .model import DelayArgument, Model, StringVariable, Variable
@@ -1370,6 +1377,9 @@ def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = Non
 
     component_ref = ast.ComponentRef.from_string(model_name)
     flat_tree = flatten(ast_tree, component_ref)
+    if options["unquote_identifiers"]:
+        flat_tree = unquote_flat_names(flat_tree)
+        model_name = unquote_name(model_name)
     casadi_gen = Generator(flat_tree, model_name, options)
     ast_walker = GeneratorWalker(casadi_gen)
     ast_walker.walk(casadi_gen, flat_tree)

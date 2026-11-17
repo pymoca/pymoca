@@ -1111,6 +1111,47 @@ def test_split_name_keeps_quoted_identifiers(name, parts):
     assert ast.ComponentRef.from_string(name).to_tuple() == tuple(parts)
 
 
+@pytest.mark.parametrize(
+    "name, plain",
+    [
+        ("x", "x"),
+        ("'x'", "x"),
+        ("c.'a.b'[1]", "c.a.b[1]"),
+        ("'c 1'.'a.b'", "c 1.a.b"),
+        (r"'\' \" \? \\ \a \b \f \n \r \t \v'", "' \" ? \\ \a \b \f \n \r \t \v"),
+    ],
+)
+def test_unquote_name(name, plain):
+    """Each quoted part of a flat name maps to its content, escapes resolved (MLS 2.4.4)."""
+    assert tree.unquote_name(name) == plain
+
+
+def test_unquote_name_invalid_escape():
+    """An escape that MLS 2.4.4 does not define is an error."""
+    with pytest.raises(tree.ModelicaSemanticError, match=r"Invalid escape sequence \\q"):
+        tree.unquote_name(r"'a\q'")
+
+
+def test_unquote_flat_names_equation_call():
+    """The name of a function called as an equation is unquoted, the parsed tree keeps it."""
+    ast_tree = parser.parse(
+        """
+        package 'P'
+          function 'g' input Real 'u'; algorithm assert('u' > -1, "negative"); end 'g';
+          model 'M' Real 'x'; equation 'x' = 1; 'P'.'g'('x'); end 'M';
+        end 'P';
+        """
+    )
+    flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("'P'.'M'"))
+    unquoted = tree.unquote_flat_names(flat_tree)
+
+    def calls(t, model_name):
+        return [e.name for e in t.classes[model_name].equations if isinstance(e, ast.Function)]
+
+    assert calls(unquoted, "P.M") == ["P.g"]
+    assert calls(flat_tree, "'P'.'M'") == ["'P'.'g'"]
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
