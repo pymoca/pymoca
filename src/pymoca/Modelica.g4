@@ -441,7 +441,7 @@ primary :
     | 'der' function_call_args                          # primary_derivative
     | 'initial' function_call_args                      # primary_initial
     | component_reference                               # primary_component_reference
-    | '(' output_expression_list ')'                    # primary_output_expression_list
+    | '(' output_expression_list ')' array_subscripts?  # primary_output_expression_list
     | '[' expression_list (';' expression_list)* ']'    # primary_expression_list
     | '{' function_arguments '}'                        # primary_function_arguments
     | 'end'                                             # primary_end
