@@ -241,7 +241,7 @@ def _flatten_instance(
             _resolve_modifications(flat_symbol, ctx)
         else:
             # 1.6 Recursively "handle" non-simple types
-            symbols_before_recursive = set(flat_class.symbols.keys())
+            symbols_before_recursive = dict(flat_class.symbols)
             assert isinstance(flat_symbol.type, InstanceClass)
             _flatten_instance(
                 flat_symbol.type,
@@ -253,11 +253,16 @@ def _flatten_instance(
 
             # Propagate outer symbol dimensions to inner symbols (MLS 5.6.2 step 1.3)
             # Always propagate (including scalar [[None]]) to preserve nesting depth
-            # for backend indexing.  Only propagate to symbols added by this recursive
-            # call to avoid double-prepending when extends chains share component names.
+            # for backend indexing.  Only propagate to symbols added or replaced by this
+            # recursive call to avoid double-prepending when extends chains share
+            # component names.
             outer_dims = flat_symbol.dimensions
             flat_name_prefix = flat_name + "."
-            new_sym_names = set(flat_class.symbols.keys()) - symbols_before_recursive
+            new_sym_names = {
+                name
+                for name, sym in flat_class.symbols.items()
+                if symbols_before_recursive.get(name) is not sym
+            }
             outer_variability = next(
                 (p for p in _VARIABILITY_ORDER if p in flat_symbol.prefixes), None
             )
