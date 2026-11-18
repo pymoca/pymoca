@@ -287,6 +287,27 @@ def test_connector_hq():
     assert_model_equivalent_numeric(ref_model, casadi_model)
 
 
+def test_connect_memberless_connectors():
+    """Connects of connectors without members reach CasADi as no equations."""
+    txt = """
+    connector E
+    end E;
+    expandable connector Bus
+    end Bus;
+    model EmptyConn
+        E e1, e2;
+        Bus b1, b2;
+        Real x;
+    equation
+        connect(e1, e2);
+        connect(b1, b2);
+        x = 1;
+    end EmptyConn;"""
+    casadi_model = gen_casadi.generate(parser.parse(txt), "EmptyConn")
+    assert [v.symbol.name() for v in casadi_model.alg_states] == ["x"]
+    assert len(casadi_model.equations) == 1
+
+
 def test_connector_hqz():
     with open(os.path.join(MODEL_DIR, "ConnectorHQZ.mo"), "r") as f:
         txt = f.read()

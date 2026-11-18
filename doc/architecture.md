@@ -279,9 +279,9 @@ After `_flatten_instance()` returns, `flatten_instance()` runs in order:
 - **2** `_generate_connect_equations()` - connect expansion, skipped when
   `expand_connect=False`. Uses `_collapse_to_flat_name`, `_is_inner_connector`
 
-`flatten_to_tree()` converts the `InstanceClass` result back to a backward-compatible
-`ast.Tree` via `_instance_to_ast_class` / `_instance_to_ast_symbol` /
-`_add_connector_symbols`.
+`flatten_to_tree()` flattens with connect expansion and converts the `InstanceClass`
+result back to a backward-compatible `ast.Tree` via `_instance_to_ast_class` /
+`_instance_to_ast_symbol`.
 
 ## Design Decisions
 
@@ -667,22 +667,10 @@ themselves are fresh objects (from `_instance_to_ast_class`), but their value at
 the `ComponentRef` / `Expression` / `Array` objects **by reference** from the parsed AST.
 `ComponentRefFlattener` then rewrites those refs to flat names **in place**. Mutating a
 shared object would silently corrupt the parsed AST and break every *subsequent* flatten
-of any model from the same tree. Two precautions in `flatten_to_tree`'s back-conversion:
-
-- Before walking each symbol with `ComponentRefFlattener`, the non-trivial value attrs are
-  `deepcopy`'d (Primaries and scalars are immutable and shared as-is), so the walker only
-  ever mutates copies.
-- `_connector_type` stubs hold an `ast.Class` whose `ComponentRef`s are likewise shared
-  with the parsed AST. They are **stripped before the walk and restored after**, hiding
-  them from the walker.
-
-**Ordering constraint:** `_add_connector_symbols` (which sets `_connector_type` on
-connector stubs) must run **before** the `ComponentRefFlattener` walk in `flatten_to_tree`.
-Primarily this is so the intermediate connector symbols (e.g. `plug_p`) that
-`expand_connectors` expects are present in `flat_class.symbols` and equation refs like
-`plug_p.pin` resolve. It also matters for the mutation hazard above: the walker descends
-into `_connector_type`, so the strip/restore must bracket a walk that already sees the
-fully-populated connector symbols.
+of any model from the same tree. So before walking each symbol with
+`ComponentRefFlattener`, `flatten_to_tree` `deepcopy`s the non-trivial value attrs
+(Primaries and scalars are immutable and shared as-is), and the walker only ever mutates
+copies.
 
 ## TODO / WIP / Stubs
 
@@ -730,11 +718,12 @@ fully-populated connector symbols.
   The enclosing iterator can be used as a value in the body
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
+- Expandable connectors are not augmented (MLS 9.1.3): a connect to an undeclared member
+  raises `NotImplementedError`
 - Imports are effectively re-exported: composite-name lookup searches the target
   class's imports, which MLS 13.2.1.1 forbids - defer to a planned imports rewrite
 - Circular extends and self-referential component types are unguarded and raise
   `RecursionError` instead of a Modelica-level error
-- Error quality on bad input: raw `KeyError` from `connect()` to an undeclared
-  component, duplicate top-level classes silently overwrite, array dimensions are not
-  validated as non-negative integers, and deeply nested models raise a bare
-  `RecursionError`
+- Error quality on bad input: duplicate top-level classes silently overwrite, array
+  dimensions are not validated as non-negative integers, and deeply nested models raise a
+  bare `RecursionError`
