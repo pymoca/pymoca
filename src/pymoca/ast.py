@@ -517,8 +517,6 @@ class Symbol(Node):
         self.visibility: Visibility = Visibility.PUBLIC
         self.class_modification: ClassModification | None = None
         self.parent: Class | None = None
-        # Set by flattening on connector stub symbols, not a parse-time arg.
-        self._connector_type: Class | None = None
         super().__init__(**kwargs)
 
     def full_reference(self) -> ComponentRef:

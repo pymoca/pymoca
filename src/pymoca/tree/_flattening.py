@@ -17,8 +17,6 @@ from collections import OrderedDict
 from dataclasses import dataclass, replace
 from typing import TypeVar, cast, overload
 
-import numpy as np
-
 from . import (
     FlatteningError,
     InstantiationError,
@@ -33,7 +31,7 @@ from ._instantiation import (
     _instantiate_class,
     instantiate,
 )
-from ._listener import TreeListener, TreeWalker, logger
+from ._listener import TreeListener, TreeWalker
 from ._name_lookup import _find_name
 from .instance import (
     InstanceClass,
@@ -851,6 +849,32 @@ def _find_local_or_inherited_symbol(instance: InstanceClass, name: str) -> Insta
     return None
 
 
+def _check_connect_ref(ref: ast.ComponentRef, instance: InstanceClass) -> None:
+    """Raise if a connect ref does not name a component of instance.
+
+    Raises:
+        NotImplementedError: for an undeclared member of an expandable connector (MLS 9.1.3)
+        NameLookupError: for any other unknown name
+    """
+    scope = instance
+    part = ref
+    while True:
+        sym = _find_local_or_inherited_symbol(scope, part.name)
+        if sym is None:
+            if scope.type == "expandableconnector":
+                raise NotImplementedError(
+                    f"Connect to undeclared member {part.name} of expandable connector"
+                    f" {scope.name} in connect ref {ref} is not supported"
+                )
+            raise NameLookupError(f"Connect ref {ref} not found in {instance.full_name}")
+        if not part.child:
+            return
+        if not isinstance(sym.type, InstanceClass):
+            raise NameLookupError(f"Connect ref {ref} not found in {instance.full_name}")
+        scope = sym.type
+        part = part.child[0]
+
+
 def _is_inner_connector(ref: ast.ComponentRef, instance: InstanceClass) -> bool:
     """Determine if a connect ref is an inside connector per MLS 9.1.2.
 
@@ -970,6 +994,8 @@ def _collect_and_resolve_equations(
         if isinstance(eq_copy, ast.ConnectClause):
             # Annotate inner/outer per MLS 9.2 (before flattening collapses children)
             assert isinstance(eq, ast.ConnectClause)
+            _check_connect_ref(cast(ast.ComponentRef, eq.left), instance)
+            _check_connect_ref(cast(ast.ComponentRef, eq.right), instance)
             eq_copy._left_inner = _is_inner_connector(cast(ast.ComponentRef, eq.left), instance)
             eq_copy._right_inner = _is_inner_connector(cast(ast.ComponentRef, eq.right), instance)
             # Manually flatten connect refs (connector names aren't in flat_class.symbols)
@@ -1084,7 +1110,9 @@ def _generate_connect_equations(flat_class: InstanceClass):
 
         if not connector_vars:
             # Elementary type connection (e.g., connecting Reals directly)
-            flat_class.equations.append(ast.Equation(left=equation.left, right=equation.right))
+            # A connector without members (empty or memberless expandable) gives no equation
+            if left_name in flat_class.symbols:
+                flat_class.equations.append(ast.Equation(left=equation.left, right=equation.right))
             continue
 
         for suffix, prefixes, type_indices in connector_vars:
@@ -1709,42 +1737,6 @@ def _instance_to_ast_class(flat_instance: InstanceClass) -> ast.Class:
     return flat_class
 
 
-def _add_connector_symbols(
-    instance: InstanceClass,
-    flat_class: ast.Class,
-    prefix: str,
-) -> None:
-    """Walk the instance tree and add connector-level symbols to *flat_class*.
-
-    ``expand_connectors`` expects a symbol entry for each connector (e.g.
-    ``a.up``) with a ``_connector_type`` attribute containing a flat
-    ``ast.Class`` of the connector's variables.  The new flattening only
-    produces leaf symbols (``a.up.H``, ``a.up.Q``), so we recreate the
-    intermediate entries here.
-    """
-    for name, sym in instance.symbols.items():
-        if not isinstance(sym.type, InstanceClass):
-            continue
-        full_name = prefix + "." + name if prefix else name
-        if sym.type.type in ("connector", "expandableconnector"):
-            # Create a stub symbol for this connector
-            stub = ast.Symbol()
-            stub.name = full_name
-            stub.type = ast.ComponentRef(name=sym.type.name)
-            stub.prefixes = list(sym.prefixes)
-            stub.comment = sym.comment
-            # Flatten the connector type to get its variables
-            connector_flat = flatten_instance(sym.type)
-            stub._connector_type = _instance_to_ast_class(connector_flat)
-            flat_class.symbols[full_name] = stub
-        # Recurse into composite types (models containing connectors)
-        _add_connector_symbols(sym.type, flat_class, full_name)
-    # Recurse into extends instances (connectors inherited from base classes)
-    for extends in instance.extends:
-        if isinstance(extends, InstanceClass):
-            _add_connector_symbols(extends, flat_class, prefix)
-
-
 def flatten_class(
     root: ast.Tree,
     class_name: str | ast.ComponentRef,
@@ -1771,35 +1763,19 @@ def flatten_to_tree(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Tree:
     class_name_str = str(class_name)
     instance = instantiate(root, class_name_str)
 
-    # 2. Flatten (defer connect expansion to expand_connectors below)
-    flat_instance = flatten_instance(instance, expand_connect=False)
+    # 2. Flatten
+    flat_instance = flatten_instance(instance, expand_connect=True)
 
     # 3. Convert InstanceClass → ast.Class
     flat_class = _instance_to_ast_class(flat_instance)
 
-    # 4. Add connector-level symbols with _connector_type for expand_connectors.
-    #    Must happen before the ComponentRef walk so connector names (e.g. plug_p)
-    #    are present in flat_class.symbols and equation refs like plug_p.pin get
-    #    resolved.  The new flattening recurses into connectors producing leaf
-    #    symbols (e.g. a.up.H, a.up.Q) but expand_connectors expects an
-    #    intermediate symbol for each connector (e.g. a.up) with _connector_type.
-    _add_connector_symbols(instance, flat_class, prefix="")
-
-    # 5. Resolve component refs in symbol attributes (e.g. value = 2 * p1 → 2 * nested.p1).
+    # 4. Resolve component refs in symbol attributes (e.g. value = 2 * p1 -> 2 * nested.p1).
     # Symbols are fresh objects from _instance_to_ast_class, but their value attributes
     # (start, min, max, value, …) come from _to_ast_value which returns ComponentRef /
     # Expression / Array objects BY REFERENCE from the parsed AST.  ComponentRefFlattener
     # mutates those objects in-place, which would corrupt the shared parsed AST and break
     # subsequent flattenings of other models.  Deepcopy only the non-trivial attrs before
     # walking; Primary / scalar values are immutable and safe to share.
-    # _connector_type on connector stubs must be hidden from the walker: it holds
-    # an ast.Class whose ComponentRefs are shared with the parsed AST and must not
-    # be mutated.  Strip and restore around the walk.
-    connector_types = {}
-    for sym_name, sym in flat_class.symbols.items():
-        ct = sym.__dict__.pop("_connector_type", None)
-        if ct is not None:
-            connector_types[sym_name] = ct
     w = TreeWalker()
     for sym_name, sym in flat_class.symbols.items():
         prefix = sym_name.rsplit(".", 1)[0] + "." if "." in sym_name else ""
@@ -1810,11 +1786,8 @@ def flatten_to_tree(root: ast.Tree, class_name: ast.ComponentRef) -> ast.Tree:
         if sym.dimensions:
             sym.dimensions = copy.deepcopy(sym.dimensions)
         w.walk(ComponentRefFlattener(flat_class, prefix), sym)
-    for sym_name, ct in connector_types.items():
-        flat_class.symbols[sym_name]._connector_type = ct
 
-    # 6. Post-processing (same order as legacy flatten)
-    expand_connectors(flat_class)
+    # 5. Post-processing (same order as legacy flatten)
     for func in flat_class.functions.values():
         add_variable_value_statements(func)
     annotate_states(flat_class)
@@ -1916,167 +1889,6 @@ class ComponentRefFlattener(TreeListener):
         self.depth -= 1
         if self.depth < self.cutoff_depth:
             self.cutoff_depth = sys.maxsize
-
-
-def expand_connectors(node: ast.Class) -> None:
-    # keep track of which flow variables have been connected to, and which ones haven't
-    disconnected_flow_variables = OrderedDict()
-    for sym in node.symbols.values():
-        if "flow" in sym.prefixes:
-            disconnected_flow_variables[sym.name] = sym
-
-    # add flow equations
-    # for all equations in original class
-    flow_connections = OrderedDict()
-    orig_equations = node.equations[:]
-    node.equations = []
-    for equation in orig_equations:
-        if isinstance(equation, ast.ConnectClause):
-            # expand connector
-            if len(equation.left.child) != 0:
-                raise Exception(
-                    "Could not resolve {} in connect clause ({}*, {}*)".format(
-                        equation.left, equation.left, equation.right
-                    )
-                )
-            if len(equation.right.child) != 0:
-                raise Exception(
-                    "Could not resolve {} in connect clause ({}*, {}*)".format(
-                        equation.right, equation.left, equation.right
-                    )
-                )
-
-            sym_left = node.symbols[equation.left.name]
-            sym_right = node.symbols[equation.right.name]
-
-            class_left = getattr(sym_left, "_connector_type", None)
-            class_right = getattr(sym_right, "_connector_type", None)
-            if class_left is None or class_right is None:
-                # Elementary connect (no connector type — e.g. Real): emit equation directly.
-                primary_types = ["Real"]
-                # TODO
-                if (
-                    sym_left.type.name not in primary_types
-                    or sym_right.type.name not in primary_types
-                ):
-                    logger.warning(
-                        "Connector class {} or {} not defined.  "
-                        "Assuming it to be an elementary type.".format(
-                            sym_left.type, sym_right.type
-                        )
-                    )
-                connect_equation = ast.Equation(left=equation.left, right=equation.right)
-                node.equations.append(connect_equation)
-            else:
-                # TODO: Add check about matching inputs and outputs
-
-                for connector_variable in class_left.symbols.values():
-                    left_name = equation.left.name + "." + connector_variable.name
-                    right_name = equation.right.name + "." + connector_variable.name
-                    left = ast.ComponentRef(
-                        name=left_name,
-                        indices=equation.left.indices + connector_variable.type.indices,
-                    )
-                    right = ast.ComponentRef(
-                        name=right_name,
-                        indices=equation.right.indices + connector_variable.type.indices,
-                    )
-                    if len(connector_variable.prefixes) == 0 or connector_variable.prefixes[0] in [
-                        "input",
-                        "output",
-                    ]:
-                        connect_equation = ast.Equation(left=left, right=right)
-                        node.equations.append(connect_equation)
-                    elif connector_variable.prefixes == ["flow"]:
-                        # TODO generic way to get a tuple representation of a component ref, including indices.
-                        left_key = (
-                            left_name,
-                            tuple(
-                                i.value if isinstance(i, ast.Primary) else str(i)
-                                for index_array in left.indices
-                                for i in index_array
-                                if i is not None
-                            ),
-                            getattr(equation, "_left_inner", False),
-                        )
-                        right_key = (
-                            right_name,
-                            tuple(
-                                i.value if isinstance(i, ast.Primary) else str(i)
-                                for index_array in right.indices
-                                for i in index_array
-                                if i is not None
-                            ),
-                            getattr(equation, "_right_inner", False),
-                        )
-
-                        left_connected_variables = flow_connections.get(left_key, OrderedDict())
-                        right_connected_variables = flow_connections.get(right_key, OrderedDict())
-
-                        left_connected_variables.update(right_connected_variables)
-                        connected_variables = left_connected_variables
-                        connected_variables[left_key] = (
-                            left,
-                            getattr(equation, "_left_inner", False),
-                        )
-                        connected_variables[right_key] = (
-                            right,
-                            getattr(equation, "_right_inner", False),
-                        )
-
-                        for connected_variable in connected_variables:
-                            flow_connections[connected_variable] = connected_variables
-
-                        # TODO When dealing with an array of connectors, we can lose
-                        # disconnected flow variables in this way.  We don't initialize
-                        # all components of vectors to zero in 'flow_connections' as we
-                        # do not always know the length of vectors a priori.
-                        disconnected_flow_variables.pop(left_name, None)
-                        disconnected_flow_variables.pop(right_name, None)
-                    elif connector_variable.prefixes[0] in ["constant", "parameter"]:
-                        # Skip constants and parameters in connectors.
-                        pass
-                    else:
-                        raise Exception(
-                            "Unsupported connector variable prefixes {}".format(
-                                connector_variable.prefixes
-                            )
-                        )
-        else:
-            node.equations.append(equation)
-
-    processed = []  # OrderedDict is not hashable, so we cannot use sets.
-    for connected_variables in flow_connections.values():
-        if connected_variables not in processed:
-            operand_specs = list(connected_variables.values())
-            if np.all([not op_spec[1] for op_spec in operand_specs]):
-                # All outer variables. Don't include unnecessary minus expressions.
-                operands = [op_spec[0] for op_spec in operand_specs]
-            else:
-                operands = [
-                    (
-                        op_spec[0]
-                        if op_spec[1]
-                        else ast.Expression(operator="-", operands=[op_spec[0]])
-                    )
-                    for op_spec in operand_specs
-                ]
-            expr = operands[-1]
-            for op in reversed(operands[:-1]):
-                expr = ast.Expression(operator="+", operands=[op, expr])
-            connect_equation = ast.Equation(left=expr, right=ast.Primary(value=0))
-            node.equations.append(connect_equation)
-            processed.append(connected_variables)
-
-    # disconnected flow variables default to 0
-    for sym in disconnected_flow_variables.values():
-        connect_equation = ast.Equation(left=sym, right=ast.Primary(value=0))
-        node.equations.append(connect_equation)
-
-    # strip connector symbols
-    for i, sym in list(node.symbols.items()):
-        if getattr(sym, "_connector_type", None) is not None:
-            del node.symbols[i]
 
 
 def add_variable_value_statements(node: ast.Class) -> None:

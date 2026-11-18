@@ -1263,8 +1263,8 @@ def test_composite_lookup_via_extends():
     assert "tau_copy" in flat.symbols
 
 
-def test_inherited_connector_stub_via_extends():
-    """Connectors inherited via extends get connector stubs so connect() resolves (MLS 9.1.3)."""
+def test_inherited_connector_connect_via_extends():
+    """Connect of connectors inherited via extends resolves (MLS 9.1.3)."""
     ast_tree = parse_model_files("InheritedConnectorConnect.mo")
     flat = tree.flatten(ast_tree, ast.ComponentRef.from_string("P.System"))
     symbols = flat.classes["P.System"].symbols
@@ -1272,18 +1272,100 @@ def test_inherited_connector_stub_via_extends():
     assert "m.flange_b.s" in symbols
 
 
-def test_expandable_connector_stub():
-    """Expandable connectors get connector stubs so whole-bus connect() resolves (MLS 9.1.3).
-
-    Without a stub for the expandable-connector-typed symbol, expand_connectors
-    raised KeyError looking up the bus name in node.symbols.
-    """
+def test_expandable_connector_bus_connect():
+    """Whole-bus connect() of expandable connectors resolves (MLS 9.1.3)."""
     ast_tree = parse_model_files("ExpandableConnectorBus.mo")
     flat = tree.flatten(ast_tree, ast.ComponentRef.from_string("P.System"))
     ref_names = set()
     _collect_component_ref_names(flat.classes["P.System"].equations, ref_names)
     assert "s.bus.speed" in ref_names
     assert "bus.speed" in ref_names
+
+
+def test_connect_memberless_connectors_skipped():
+    """Connects of connectors without members give no equations, elementary ones do."""
+    flat = _flatten_inline(
+        """
+    connector E
+    end E;
+    expandable connector Bus
+    end Bus;
+    connector RealInput = input Real;
+    model M
+        E e1, e2;
+        Bus b1, b2;
+        RealInput u1, u2;
+    equation
+        connect(e1, e2);
+        connect(b1, b2);
+        connect(u1, u2);
+    end M;""",
+        "M",
+    )
+    eqs = [(str(eq.left.name), str(eq.right.name)) for eq in flat.equations]
+    assert eqs == [("u1", "u2")]
+
+
+@pytest.mark.parametrize(
+    "connect", ["connect(s.y, bus.sig)", "connect(bus.sig, s.y)"], ids=["right", "left"]
+)
+def test_connect_undeclared_expandable_member_raises(connect):
+    """Connecting an undeclared member of an expandable connector is not supported (MLS 9.1.3)."""
+    with pytest.raises(NotImplementedError, match="undeclared member sig"):
+        _flatten_inline(
+            f"""
+        connector RealOutput = output Real;
+        expandable connector Bus
+        end Bus;
+        model Src
+            RealOutput y;
+        end Src;
+        model M
+            Bus bus;
+            Src s;
+        equation
+            {connect};
+        end M;""",
+            "M",
+        )
+
+
+def test_connect_unknown_component_raises():
+    """A connect naming an unknown component raises."""
+    with pytest.raises(tree.NameLookupError, match="s.z"):
+        _flatten_inline(
+            """
+        connector RealOutput = output Real;
+        model Src
+            RealOutput y;
+        end Src;
+        model M
+            Src s;
+            RealOutput u;
+        equation
+            connect(s.z, u);
+        end M;""",
+            "M",
+        )
+
+
+def test_connect_ref_member_of_builtin_component_raises():
+    """A connect ref to a member of a builtin-typed component raises."""
+    with pytest.raises(tree.NameLookupError, match=r"Connect ref s\.y\.z not found in M"):
+        _flatten_inline(
+            """
+        connector RealOutput = output Real;
+        model Src
+            RealOutput y;
+        end Src;
+        model M
+            Src s;
+            RealOutput u;
+        equation
+            connect(s.y.z, u);
+        end M;""",
+            "M",
+        )
 
 
 def test_multiple_extends_array_dim():
