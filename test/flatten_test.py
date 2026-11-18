@@ -1382,6 +1382,36 @@ def test_multiple_extends_array_dim():
     assert isinstance(dim, ast.Primary) and dim.value == 2
 
 
+def test_element_inherited_twice_keeps_prefixes_and_dims():
+    """An element inherited through two extends paths keeps its prefixes and dimensions."""
+    flat = _flatten_inline(
+        """
+    type MassFlowRate = Real;
+    connector Port
+        flow MassFlowRate m_flow;
+        MassFlowRate v[3];
+    end Port;
+    model Two
+        Port ports[2];
+        parameter MassFlowRate q[2] = {1, 2};
+    end Two;
+    model A extends Two; end A;
+    model B extends Two; end B;
+    model Pipe extends A; extends B; end Pipe;
+    model M Pipe p; end M;""",
+        "M",
+    )
+
+    def dims(name):
+        return [[i.value for i in d] for d in flat.symbols[name].dimensions]
+
+    assert flat.symbols["p.ports.m_flow"].prefixes == ["flow"]
+    assert flat.symbols["p.q"].prefixes == ["parameter"]
+    assert dims("p.ports.m_flow") == [[None], [2], [None]]
+    assert dims("p.ports.v") == [[None], [2], [3]]
+    assert dims("p.q") == [[None], [2]]
+
+
 def test_redeclare_inherits_modification():
     """Redeclared replaceable whose subtype extends the original must accept
     the original modifier (e.g. 'final m=m').
