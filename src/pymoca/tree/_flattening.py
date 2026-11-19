@@ -25,6 +25,7 @@ from . import (
     NameLookupError,
     RecursionGuard,
 )
+from ._connection_sets import ConnectionSet, SetKey, merge_into_sets, sum_terms, unique_sets
 from ._instantiation import (
     _VARIABILITY_ORDER,
     _get_lexical_parent_instance,
@@ -1089,7 +1090,7 @@ def _generate_connect_equations(flat_class: InstanceClass):
         if "flow" in sym.prefixes:
             disconnected_flow_variables[name] = name
 
-    flow_connections = OrderedDict()
+    flow_connections: dict[SetKey, ConnectionSet] = {}
     orig_equations = flat_class.equations[:]
     flat_class.equations = []
 
@@ -1135,39 +1136,7 @@ def _generate_connect_equations(flat_class: InstanceClass):
             if len(prefixes) == 0 or prefixes[0] in ["input", "output"]:
                 flat_class.equations.append(ast.Equation(left=left, right=right))
             elif "flow" in prefixes:
-                # Build flow connection groups for sum-to-zero equations
-                left_key = (
-                    l_name,
-                    tuple(
-                        i.value if isinstance(i, ast.Primary) else str(i)
-                        for index_array in left.indices
-                        for i in index_array
-                        if i is not None
-                    ),
-                    left_inner,
-                )
-                right_key = (
-                    r_name,
-                    tuple(
-                        i.value if isinstance(i, ast.Primary) else str(i)
-                        for index_array in right.indices
-                        for i in index_array
-                        if i is not None
-                    ),
-                    right_inner,
-                )
-
-                left_connected = flow_connections.get(left_key, OrderedDict())
-                right_connected = flow_connections.get(right_key, OrderedDict())
-
-                left_connected.update(right_connected)
-                connected = left_connected
-                connected[left_key] = (left, left_inner)
-                connected[right_key] = (right, right_inner)
-
-                for k in connected:
-                    flow_connections[k] = connected
-
+                merge_into_sets(flow_connections, left, left_inner, right, right_inner)
                 disconnected_flow_variables.pop(l_name, None)
                 disconnected_flow_variables.pop(r_name, None)
             elif prefixes[0] in ["constant", "parameter"]:
@@ -1178,27 +1147,17 @@ def _generate_connect_equations(flat_class: InstanceClass):
                 )
 
     # Generate flow sum-to-zero equations
-    processed: set[int] = set()
-    for connected_variables in flow_connections.values():
-        if id(connected_variables) not in processed:
-            processed.add(id(connected_variables))
-            operand_specs = list(connected_variables.values())
-            if all(not op_spec[1] for op_spec in operand_specs):
-                # All outer variables — no sign inversion needed
-                operands = [op_spec[0] for op_spec in operand_specs]
-            else:
-                operands = [
-                    (
-                        op_spec[0]
-                        if op_spec[1]
-                        else ast.Expression(operator="-", operands=[op_spec[0]])
-                    )
-                    for op_spec in operand_specs
-                ]
-            expr = operands[-1]
-            for op in reversed(operands[:-1]):
-                expr = ast.Expression(operator="+", operands=[op, expr])
-            flat_class.equations.append(ast.Equation(left=expr, right=ast.Primary(value=0)))
+    for connected_variables in unique_sets(flow_connections):
+        members = connected_variables.values()
+        # All outer variables - no sign inversion needed
+        all_outside = not any(inside for _, inside in members)
+        operands = [
+            ref if inside or all_outside else ast.Expression(operator="-", operands=[ref])
+            for ref, inside in members
+        ]
+        flat_class.equations.append(
+            ast.Equation(left=sum_terms(operands), right=ast.Primary(value=0))
+        )
 
     # Disconnected flow variables default to 0
     for name in disconnected_flow_variables.values():

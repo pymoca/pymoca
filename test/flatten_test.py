@@ -18,6 +18,7 @@ from conftest_parse import (
 from pymoca import ast
 from pymoca import parser
 from pymoca import tree
+from pymoca.tree._connection_sets import part_subscripts
 
 import pytest
 
@@ -798,6 +799,45 @@ def test_connect_subconnector_of_outside_connector_flow_sign():
     positive, negated = _flow_sum_signs(flow[0].left)
     assert positive == {"d.plug.pin.i"}
     assert negated == {"op.pin.i"}
+
+
+def test_connection_set_keys_keep_name_part_of_subscript():
+    """Subscripts on different name parts of connect refs give different connection sets."""
+    flat = _flatten_inline(
+        """
+    connector Pin
+        Real v;
+        flow Real i;
+    end Pin;
+    model Sub
+        Pin pins[2];
+    end Sub;
+    model Duo
+        Pin c[2];
+    end Duo;
+    model M
+        Sub s[2];
+        Duo d, e;
+    equation
+        connect(d.c, s[1].pins);
+        connect(e.c, s.pins[1]);
+    end M;""",
+        "M",
+    )
+    flow_sums = [
+        eq
+        for eq in flat.equations
+        if isinstance(eq, ast.Equation)
+        and isinstance(eq.left, ast.Expression)
+        and eq.left.operator == "+"
+    ]
+    members = sorted(
+        sorted((ref.name, part_subscripts(ref)) for ref in eq.left.operands) for eq in flow_sums
+    )
+    assert members == [
+        [("d.c.i", ((), (), ())), ("s.pins.i", ((1,), (), ()))],
+        [("e.c.i", ((), (), ())), ("s.pins.i", ((), (1,), ()))],
+    ]
 
 
 def _flow_sum_signs(expr):
