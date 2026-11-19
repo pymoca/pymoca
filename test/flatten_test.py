@@ -4,8 +4,10 @@ Tests for tree.flatten_instance() / tree.flatten().
 """
 
 import copy
+import logging
 import os
 import pickle
+import re
 
 from conftest_parse import (
     MSL4_DIR,
@@ -19,6 +21,7 @@ from pymoca import ast
 from pymoca import parser
 from pymoca import tree
 from pymoca.tree._connection_sets import part_subscripts
+from pymoca.tree._stream import _slice_values
 
 import pytest
 
@@ -1980,30 +1983,752 @@ def test_conditional_component_removed():
     assert "y" in flat.symbols
 
 
-@pytest.mark.xfail(
-    raises=NotImplementedError,
-    reason="stream connectors and inStream() are not yet supported (MLS 15)",
-)
-def test_stream_connector_instream():
-    """Stream connector variables flatten and inStream() is expanded (MLS 15.2)."""
-    flat = _flatten_inline(
-        """
+def _subscript_str(sub):
+    if isinstance(sub, ast.Slice):
+        bounds = [sub.start, sub.stop]
+        if not (isinstance(sub.step, ast.Primary) and sub.step.value == 1):
+            bounds.insert(1, sub.step)
+        return ":".join("" if _is_whole_subscript(b) else _subscript_str(b) for b in bounds)
+    return str(sub.value) if isinstance(sub, ast.Primary) else _expr_str(sub)
+
+
+def _is_whole_subscript(sub):
+    return sub is None or (isinstance(sub, ast.Primary) and sub.value is None)
+
+
+def _expr_str(node):
+    """Compact infix string of a flat expression, whole-dimension subscripts omitted."""
+    if isinstance(node, ast.ComponentRef):
+        idx = [_subscript_str(i) for g in node.indices for i in g if not _is_whole_subscript(i)]
+        return node.name + (f"[{', '.join(idx)}]" if idx else "")
+    if isinstance(node, ast.Primary):
+        return repr(node.value)
+    if isinstance(node, ast.Array):
+        return "{" + ", ".join(_expr_str(v) for v in node.values) + "}"
+    if isinstance(node, ast.IfExpression):
+        branches = " elseif ".join(
+            f"{_expr_str(c)} then {_expr_str(e)}" for c, e in zip(node.conditions, node.expressions)
+        )
+        return f"if {branches} else {_expr_str(node.expressions[-1])}"
+    if isinstance(node, ast.ForArray):
+        names = ", ".join(i.name for i in node.indices)
+        return f"{{{_expr_str(node.expression)} for {names}}}"
+    op = node.operator.name if isinstance(node.operator, ast.ComponentRef) else node.operator
+    if op in ("+", "-", "*", "/", "<", ">", "==") and len(node.operands) == 2:
+        left, right = node.operands
+        return f"({_expr_str(left)} {op} {_expr_str(right)})"
+    return f"{op}({', '.join(_expr_str(o) for o in node.operands)})"
+
+
+def _stream_equations(txt, model_name="M"):
+    """Map of each flat equation's left side to its right side, as strings."""
+    flat = _flatten_inline(_STREAM_CONNECTOR + txt, model_name)
+    eqs = {}
+    for eq in flat.equations:
+        if isinstance(eq, ast.Equation):
+            left = _expr_str(eq.left)
+            # Potential variables legitimately repeat, stream variables must not
+            assert "h_outflow" not in left or left not in eqs, f"Second equation for {left}"
+            eqs[left] = _expr_str(eq.right)
+    return eqs
+
+
+_STREAM_CONNECTOR = """
     connector FluidPort
         Real p;
         flow Real m_flow;
         stream Real h_outflow;
     end FluidPort;
+    model Pipe
+        FluidPort a, b;
+        Real h;
+    equation
+        a.h_outflow = h;
+        b.h_outflow = inStream(a.h_outflow);
+    end Pipe;
+"""
+
+
+def _pmax(x):
+    return f"max({x}, 1e-15)"
+
+
+def test_stream_connector_instream():
+    """Stream variables of connected outside connectors get the N=0, M=2 equations (MLS 15.2)."""
+    eqs = _stream_equations(
+        """
     model M
         FluidPort a, b;
         Real h_mix;
     equation
         connect(a, b);
         h_mix = inStream(a.h_outflow);
+    end M;"""
+    )
+    # inStream of an outside connector of the root model has no enclosing set
+    assert eqs["h_mix"] == "a.h_outflow"
+    assert eqs["a.h_outflow"] == "b.h_outflow"
+
+
+def test_stream_unconnected_outside_pair_single_equation(caplog):
+    """Outside connectors connected only to each other get one equality, not a mirrored pair."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        eqs = _stream_equations(
+            """
+    model Sub
+        FluidPort a, b;
+    equation
+        connect(a, b);
+    end Sub;
+    model M
+        Sub s;
+    end M;"""
+        )
+    assert eqs["s.a.h_outflow"] == "s.b.h_outflow"
+    assert "s.b.h_outflow" not in eqs
+    assert "nothing is connected to them from outside" in caplog.text
+
+
+def test_stream_outside_pair_connected_from_outside(caplog):
+    """Outside connectors connected to each other, one also from outside, get mixing equations."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        eqs = _stream_equations(
+            """
+    model Sub
+        FluidPort a, b;
+    equation
+        connect(a, b);
+    end Sub;
+    model M
+        Sub s;
+        Pipe q;
+    equation
+        connect(q.b, s.a);
+    end M;"""
+        )
+    assert eqs["s.a.h_outflow"] == "s.b.h_outflow"
+    assert eqs["s.b.h_outflow"] == "q.b.h_outflow"
+    assert "nothing is connected" not in caplog.text
+
+
+def test_stream_inside_pair():
+    """inStream of one of two connected inside connectors is the other's stream (MLS 15.2)."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p1, p2;
+    equation
+        connect(p1.b, p2.a);
+    end M;"""
+    )
+    assert eqs["p1.b.h_outflow"] == "p1.a.h_outflow"
+    assert eqs["p2.b.h_outflow"] == "p1.b.h_outflow"
+
+
+def test_stream_inside_outside_one_to_one():
+    """An inside-outside pair passes inStream up a level, the outside stream down (MLS 15.2)."""
+    eqs = _stream_equations(
+        """
+    model Sub
+        FluidPort port;
+        Pipe p;
+    equation
+        connect(port, p.a);
+    end Sub;
+    model M
+        Sub s;
+        Pipe q;
+    equation
+        connect(q.b, s.port);
+    end M;"""
+    )
+    assert eqs["s.p.b.h_outflow"] == "q.b.h_outflow"
+    assert eqs["s.port.h_outflow"] == "s.p.a.h_outflow"
+
+
+def test_stream_three_way_mixing():
+    """Three connected inside connectors mix by their outgoing flows (MLS 15.2)."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p1, p2, p3;
+    equation
+        connect(p1.b, p2.a);
+        connect(p1.b, p3.a);
+    end M;"""
+    )
+    w1, w3 = _pmax("-(p1.b.m_flow)"), _pmax("-(p3.a.m_flow)")
+    assert eqs["p2.b.h_outflow"] == (
+        f"((({w1} * p1.b.h_outflow) + ({w3} * p3.a.h_outflow)) / ({w1} + {w3}))"
+    )
+
+
+def test_stream_mixing_with_outside_connector():
+    """An outside connector enters the mix with inStream, and gets its own mix (MLS 15.2)."""
+    eqs = _stream_equations(
+        """
+    model Sub
+        FluidPort port;
+        Pipe p1, p2;
+    equation
+        connect(port, p1.a);
+        connect(port, p2.a);
+    end Sub;
+    model M
+        Sub s;
+        Pipe q;
+    equation
+        connect(q.b, s.port);
+    end M;"""
+    )
+    w1, w2 = _pmax("-(s.p1.a.m_flow)"), _pmax("-(s.p2.a.m_flow)")
+    wc = _pmax("s.port.m_flow")
+    assert eqs["s.p1.b.h_outflow"] == (
+        f"((({w2} * s.p2.a.h_outflow) + ({wc} * q.b.h_outflow)) / ({w2} + {wc}))"
+    )
+    assert eqs["s.port.h_outflow"] == (
+        f"((({w1} * s.p1.a.h_outflow) + ({w2} * s.p2.a.h_outflow)) / ({w1} + {w2}))"
+    )
+
+
+def test_stream_actual_stream():
+    """actualStream selects inStream for flow into the connector (MLS 15.3)."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p1, p2;
+        Real h;
+    equation
+        connect(p1.b, p2.a);
+        h = actualStream(p2.a.h_outflow);
+    end M;"""
+    )
+    assert eqs["h"] == "if (p2.a.m_flow > 0) then p1.b.h_outflow else p2.a.h_outflow"
+
+
+def test_stream_unconnected():
+    """inStream of an unconnected inside connector is its own stream (MLS 15.2)."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p;
+    end M;"""
+    )
+    assert eqs["p.b.h_outflow"] == "p.a.h_outflow"
+
+
+def test_stream_connector_array_elements():
+    """inStream finds the set of a connector array element by its literal subscript."""
+    eqs = _stream_equations(
+        """
+    model M
+        FluidPort c[2];
+        Pipe p;
+    equation
+        connect(c[1], p.a);
+    end M;"""
+    )
+    assert eqs["p.b.h_outflow"] == "c.h_outflow[1]"
+    assert eqs["c.h_outflow[1]"] == "p.a.h_outflow"
+
+
+def test_stream_array_variable():
+    """Stream operators on an array stream variable keep its subscript off the set and flow."""
+    flat = _flatten_inline(
+        """
+    connector XPort
+        flow Real m_flow;
+        stream Real X[2];
+    end XPort;
+    model XPipe
+        XPort a, b;
+    equation
+        b.X = inStream(a.X);
+    end XPipe;
+    model M
+        XPipe p1, p2, p3, q1, q2;
+        Real x1, x2, x3;
+    equation
+        connect(p1.b, p2.a);
+        connect(p1.b, p3.a);
+        connect(q1.b, q2.a);
+        x1 = inStream(q2.a.X[2]);
+        x2 = actualStream(q2.a.X[1]);
+        x3 = inStream(p2.a.X[1]);
     end M;""",
         "M",
     )
-    assert "a.h_outflow" in flat.symbols
-    assert "b.h_outflow" in flat.symbols
+    eqs = {
+        _expr_str(eq.left): _expr_str(eq.right)
+        for eq in flat.equations
+        if isinstance(eq, ast.Equation)
+    }
+    assert eqs["q2.b.X"] == "q1.b.X"
+    assert eqs["x1"] == "q1.b.X[2]"
+    assert eqs["x2"] == "if (q2.a.m_flow > 0) then q1.b.X[1] else q2.a.X[1]"
+    w1, w3 = _pmax("-(p1.b.m_flow)"), _pmax("-(p3.a.m_flow)")
+    assert eqs["x3"] == f"((({w1} * p1.b.X[1]) + ({w3} * p3.a.X[1])) / ({w1} + {w3}))"
+
+
+def _for_body_equations(txt, model_name="M"):
+    """Equation strings in the bodies of the flat model's for-equations."""
+    flat = _flatten_inline(_STREAM_CONNECTOR + txt, model_name)
+    return [
+        f"{_expr_str(eq.left)} = {_expr_str(eq.right)}"
+        for for_eq in flat.equations
+        if isinstance(for_eq, ast.ForEquation)
+        for eq in for_eq.equations
+    ]
+
+
+def test_stream_connector_array_elementwise():
+    """inStream on connector array elements expands per element, unconnected ones to themselves."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p[2];
+        Pipe q;
+        parameter Integer n = 1;
+        Real h1, h2;
+    equation
+        connect(q.b, p[1].a);
+        h1 = inStream(p[2].a.h_outflow);
+        h2 = inStream(p[n].a.h_outflow);
+    end M;"""
+    )
+    assert eqs["p.b.h_outflow"] == "{q.b.h_outflow, p.a.h_outflow[2]}"
+    assert eqs["h1"] == "p.a.h_outflow[2]"
+    assert eqs["h2"] == "if (n == 1) then q.b.h_outflow else p.a.h_outflow[2]"
+
+
+def test_stream_operator_in_symbol_attribute():
+    """inStream in a start attribute expands like in an equation, on both flatten paths."""
+    txt = (
+        _STREAM_CONNECTOR
+        + """
+    model Mon
+        FluidPort a;
+        Real y(start = 1 + inStream(a.h_outflow));
+    equation
+        y = 0;
+    end Mon;
+    model M
+        Pipe p;
+        Mon m;
+    equation
+        connect(p.b, m.a);
+    end M;"""
+    )
+    ast_tree = parser.parse(txt)
+    flat = tree.flatten_class(ast_tree, "M")
+    assert _expr_str(flat.symbols["m.y"].start) == "(1 + p.b.h_outflow)"
+    for _ in range(2):
+        # Twice, so a mutated parsed AST would show up in the second run
+        flat_tree = tree.flatten(ast_tree, ast.ComponentRef.from_string("M"))
+        assert _expr_str(flat_tree.classes["M"].symbols["m.y"].start) == "(1 + p.b.h_outflow)"
+
+
+def test_stream_connector_array_range():
+    """inStream on a range of connector array elements expands to an array of the elements."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p[3];
+        Pipe q;
+        Real h2[2], h3[3];
+    equation
+        connect(q.b, p[1].a);
+        h2 = inStream(p[2:3].a.h_outflow);
+        h3 = inStream(p[:].a.h_outflow);
+    end M;"""
+    )
+    assert eqs["h2"] == "{p.a.h_outflow[2], p.a.h_outflow[3]}"
+    assert eqs["h3"] == "{q.b.h_outflow, p.a.h_outflow[2], p.a.h_outflow[3]}"
+
+
+def test_stream_connector_array_range_non_literal_unexpanded(caplog):
+    """inStream on a range with a non-literal bound stays unexpanded, with a warning."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        eqs = _stream_equations(
+            """
+    model M
+        Pipe p[3];
+        parameter Integer n = 2;
+        Real h[n];
+    equation
+        h = inStream(p[1:n].a.h_outflow);
+    end M;"""
+        )
+    assert eqs["h"].startswith("inStream(")
+    assert "Stream operator on p.a.h_outflow left unexpanded" in caplog.text
+
+
+def test_stream_actual_stream_for_index():
+    """actualStream with a for-loop connector subscript selects the element by the index."""
+    body = _for_body_equations(
+        """
+    model M
+        Pipe p[2];
+        Pipe q;
+        Real h[2];
+    equation
+        connect(q.b, p[1].a);
+        for i in 1:2 loop
+            h[i] = actualStream(p[i].a.h_outflow);
+        end for;
+    end M;"""
+    )
+    assert body == [
+        "h[i] = if (i == 1) then"
+        " if (p.a.m_flow[1] > 0) then q.b.h_outflow else p.a.h_outflow[1]"
+        " else if (p.a.m_flow[2] > 0) then p.a.h_outflow[2] else p.a.h_outflow[2]"
+    ]
+
+
+def test_stream_zero_size_connector_array():
+    """A stream operator on an element of a zero-size connector array expands to an empty array."""
+    body = _for_body_equations(
+        """
+    model M
+        Pipe p[0];
+        Real h[0];
+    equation
+        for i in 1:0 loop
+            h[i] = inStream(p[i].a.h_outflow);
+        end for;
+    end M;"""
+    )
+    assert body == ["h[i] = {}"]
+
+
+@pytest.mark.parametrize(
+    "start, stop, step, values",
+    [(None, None, 1, [1, 2, 3]), (2, 3, 1, [2, 3]), (3, 1, -1, [3, 2, 1]), (1, 3, 2, [1, 3])],
+)
+def test_stream_slice_values(start, stop, step, values):
+    """Element values of a literal slice of a size-3 dimension, including negative steps."""
+    subscript = ast.Slice(
+        start=ast.Primary(value=start), stop=ast.Primary(value=stop), step=ast.Primary(value=step)
+    )
+    assert _slice_values(subscript, 3) == values
+
+
+def test_stream_array_connected_unexpanded(caplog):
+    """An element of a connector array connected as a whole stays unexpanded, with a warning."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        eqs = _stream_equations(
+            """
+    model M
+        FluidPort c[2];
+        Pipe p[2];
+        Real h;
+    equation
+        connect(c, p.a);
+        h = inStream(p[1].a.h_outflow);
+    end M;"""
+        )
+    assert eqs["p.b.h_outflow"] == "{c.h_outflow[1], c.h_outflow[2]}"
+    assert eqs["h"] == "inStream(p.a.h_outflow[1])"
+    assert "Stream operator on p.a.h_outflow left unexpanded" in caplog.text
+
+
+def test_stream_array_connected_whole_and_element_unexpanded(caplog):
+    """A connector array connected as a whole and element-wise stays unexpanded, with a warning."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        eqs = _stream_equations(
+            """
+    model Sub
+        FluidPort ports[2];
+        Real h1;
+    equation
+        h1 = inStream(ports[1].h_outflow);
+        ports.h_outflow = {1, 2};
+    end Sub;
+    model M
+        Sub s;
+        Pipe q[2], r;
+        Real hr;
+    equation
+        connect(q.b, s.ports);
+        connect(r.b, s.ports[1]);
+        hr = inStream(r.b.h_outflow);
+    end M;"""
+        )
+    assert eqs["s.h1"] == "inStream(s.ports.h_outflow[1])"
+    assert eqs["hr"] == "inStream(r.b.h_outflow)"
+    assert "Stream operator on s.ports.h_outflow left unexpanded" in caplog.text
+
+
+def test_stream_connect_in_for_equation_unexpanded():
+    """Only stream operators on connectors in for-equation connects stay unexpanded."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p[2];
+        Pipe q1, q2;
+        Real h;
+    equation
+        connect(q1.b, q2.a);
+        for i in 1:1 loop
+            connect(p[i].b, p[i + 1].a);
+        end for;
+        h = inStream(p[1].b.h_outflow);
+    end M;"""
+    )
+    assert eqs["h"] == "inStream(p.b.h_outflow[1])"
+    assert eqs["q2.b.h_outflow"] == "q1.b.h_outflow"
+
+
+def test_stream_connect_in_if_equation_unexpanded():
+    """Stream operators on connectors in if-equation connects stay unexpanded."""
+    eqs = _stream_equations(
+        """
+    model M
+        parameter Boolean b = true;
+        Pipe p1, p2;
+        Pipe q1, q2;
+    equation
+        connect(q1.b, q2.a);
+        if b then
+            connect(p1.b, p2.a);
+        end if;
+    end M;"""
+    )
+    assert eqs["p2.b.h_outflow"] == "inStream(p2.a.h_outflow)"
+    assert eqs["q2.b.h_outflow"] == "q1.b.h_outflow"
+
+
+@pytest.mark.parametrize(
+    "flows, found", [("", 0), ("flow Real m1, m2;", 2)], ids=["no_flow", "two_flows"]
+)
+def test_stream_connector_without_flow(flows, found):
+    """A connector with a stream variable must have exactly one flow variable (MLS 15.1)."""
+    with pytest.raises(
+        tree.ModelicaSemanticError,
+        match=f"Connector a1.c with a stream variable must have exactly one flow variable,"
+        f" found {found}",
+    ):
+        _flatten_inline(
+            f"""
+        connector C
+            Real p;
+            {flows}
+            stream Real h;
+        end C;
+        model A
+            C c;
+        end A;
+        model M
+            A a1, a2;
+        equation
+            connect(a1.c, a2.c);
+        end M;""",
+            "M",
+        )
+
+
+def test_stream_unconnected_connector_without_flow():
+    """An unconnected connector with a stream variable but no flow variable raises (MLS 15.1)."""
+    with pytest.raises(
+        tree.ModelicaSemanticError,
+        match="Connector a.c with a stream variable must have exactly one flow variable, found 0",
+    ):
+        _flatten_inline(
+            """
+        connector C
+            Real p;
+            stream Real h;
+        end C;
+        model A
+            C c;
+        end A;
+        model M
+            A a;
+        end M;""",
+            "M",
+        )
+
+
+@pytest.mark.parametrize(
+    "call, message",
+    [
+        ("inStream(x)", "Argument x of inStream() is not a stream variable"),
+        ("actualStream(p.a.m_flow)", "Argument p.a.m_flow of actualStream() is not a stream"),
+        ("inStream(2 * p.a.h_outflow)", "Argument of inStream() must be a component reference"),
+    ],
+    ids=["not_connector", "flow_variable", "expression"],
+)
+def test_stream_operator_argument_not_stream_variable(call, message):
+    """The argument of inStream() and actualStream() must be a stream variable (MLS 15.2, 15.3)."""
+    with pytest.raises(tree.ModelicaSemanticError, match=re.escape(message)):
+        _stream_equations(
+            f"""
+    model M
+        Pipe p;
+        Real x, h;
+    equation
+        x = 1;
+        h = {call};
+    end M;"""
+        )
+
+
+def test_stream_operator_argument_not_stream_variable_without_streams():
+    """A stream operator in a model without stream variables still raises (MLS 15.2)."""
+    with pytest.raises(tree.ModelicaSemanticError, match=re.escape("Argument x of inStream()")):
+        _flatten_inline("model M Real x, y; equation x = 1; y = inStream(x); end M;", "M")
+
+
+def test_stream_partial_subscript_of_matrix_unexpanded(caplog):
+    """inStream on a row of a connector matrix stays unexpanded, with a warning."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        eqs = _stream_equations(
+            """
+    model M
+        Pipe p[2, 2];
+        Pipe q;
+        Real h[2];
+    equation
+        connect(q.b, p[1, 1].a);
+        h = inStream(p[1].a.h_outflow);
+    end M;"""
+        )
+    assert eqs["h"] == "inStream(p.a.h_outflow[1])"
+    assert "Stream operator on p.a.h_outflow left unexpanded" in caplog.text
+
+
+def test_stream_expression_subscript_of_size_one_array():
+    """An expression subscript of a size-one connector array selects the only element."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p[1];
+        Pipe q;
+        parameter Integer n = 1;
+        Real h;
+    equation
+        connect(q.b, p[1].a);
+        h = inStream(p[n].a.h_outflow);
+    end M;"""
+    )
+    assert eqs["h"] == "q.b.h_outflow"
+
+
+def test_stream_connector_connected_to_itself():
+    """A connector connected only to itself mixes to its own stream, with no outside equation."""
+    eqs = _stream_equations(
+        """
+    model M
+        Pipe p;
+        FluidPort c;
+    equation
+        connect(p.a, p.a);
+        connect(c, c);
+    end M;"""
+    )
+    assert eqs["p.b.h_outflow"] == "p.a.h_outflow"
+    assert "c.h_outflow" not in eqs
+
+
+def test_stream_incomplete_set_has_no_outside_equation():
+    """An outside connector in a set with a for-equation connect gets no stream equation."""
+    eqs = _stream_equations(
+        """
+    model M
+        FluidPort c;
+        Pipe p[2];
+    equation
+        connect(c, p[1].a);
+        for i in 1:1 loop
+            connect(p[i].b, p[i + 1].a);
+        end for;
+    end M;"""
+    )
+    assert "c.h_outflow" not in eqs
+
+
+def test_stream_operators_nested_in_equations_and_statements():
+    """Stream operators expand inside expressions, calls, and algorithm statements."""
+    flat = _flatten_inline(
+        _STREAM_CONNECTOR
+        + """
+    function f
+        input Real u;
+        output Real y;
+    algorithm
+        y := u;
+    end f;
+    model M
+        Pipe p[2];
+        Pipe q;
+        parameter Boolean b = true;
+        Real x(start = 1);
+        Real h1, h2[2], h3[2], h4, h5, h6;
+    equation
+        connect(q.b, p[1].a);
+        der(x) = -x;
+        h6 = noEvent(f(inStream(p[1].a.h_outflow)));
+        h1 = if b then inStream(p[1].a.h_outflow) else 0;
+        h2 = {inStream(p[1].a.h_outflow), 0};
+        h3 = {inStream(p[i].a.h_outflow) for i in 1:2};
+        assert(inStream(p[2].a.h_outflow) > -1, "negative");
+    algorithm
+        h4 := 0;
+        for i in 1:2 loop
+            h4 := h4 + inStream(p[i].a.h_outflow);
+        end for;
+        h5 := 0;
+        while h5 < inStream(p[1].a.h_outflow) loop
+            h5 := h5 + 1;
+        end while;
+    end M;""",
+        "M",
+    )
+    eqs = {
+        _expr_str(eq.left): _expr_str(eq.right)
+        for eq in flat.equations
+        if isinstance(eq, ast.Equation)
+    }
+    assert eqs["der(x)"] == "-(x)"
+    assert eqs["h6"] == "noEvent(f(q.b.h_outflow))"
+    assert eqs["h1"] == "if b then q.b.h_outflow else 0"
+    assert eqs["h2"] == "{q.b.h_outflow, 0}"
+    assert eqs["h3"] == "{if (i == 1) then q.b.h_outflow else p.a.h_outflow[2] for i}"
+    (assertion,) = [eq for eq in flat.equations if isinstance(eq, ast.Function)]
+    assert _expr_str(assertion.arguments[0]) == "(p.a.h_outflow[2] > -(1))"
+    for_stmt, while_stmt = flat.statements[1], flat.statements[3]
+    assert isinstance(for_stmt, ast.ForStatement)
+    assert isinstance(while_stmt, ast.WhileStatement)
+    assert _expr_str(for_stmt.statements[0].right) == (
+        "(h4 + if (i == 1) then q.b.h_outflow else p.a.h_outflow[2])"
+    )
+    assert _expr_str(while_stmt.condition) == "(h5 < q.b.h_outflow)"
+
+
+def test_stream_operators_nested_in_symbol_attributes():
+    """Stream operators expand inside expressions, arrays, and array constructors in attributes."""
+    flat = _flatten_inline(
+        _STREAM_CONNECTOR
+        + """
+    model M
+        Pipe p[2];
+        Pipe q;
+        Real y1(start = 1 + inStream(p[1].a.h_outflow));
+        Real y2[2](start = {inStream(p[1].a.h_outflow), 0});
+        Real y3[2](start = {inStream(p[i].a.h_outflow) for i in 1:2});
+    equation
+        connect(q.b, p[1].a);
+        y1 = 0;
+        y2 = {0, 0};
+        y3 = {0, 0};
+    end M;""",
+        "M",
+    )
+    assert _expr_str(flat.symbols["y1"].start) == "(1 + q.b.h_outflow)"
+    assert _expr_str(flat.symbols["y2"].start) == "{q.b.h_outflow, 0}"
+    assert _expr_str(flat.symbols["y3"].start) == (
+        "{if (i == 1) then q.b.h_outflow else p.a.h_outflow[2] for i}"
+    )
 
 
 @pytest.mark.xfail(reason="operator record overload resolution is not yet implemented (MLS 14)")

@@ -277,7 +277,11 @@ After `_flatten_instance()` returns, `flatten_instance()` runs in order:
 - **1.9** `_check_all_references_valid()` - TODO stub
 - **3** `_process_transitions()` - TODO stub
 - **2** `_generate_connect_equations()` - connect expansion, skipped when
-  `expand_connect=False`. Uses `_collapse_to_flat_name`, `_is_inner_connector`
+  `expand_connect=False`. Uses `_collapse_to_flat_name`, `_is_inner_connector`.
+  Flow and stream variables form connection sets (`_connection_sets`), and
+  `_stream.expand_stream_operators()` then replaces `inStream()` and `actualStream()`
+  with their MLS 15.2 expansion and adds the equations for the stream variables of
+  outside connectors
 
 `flatten_to_tree()` flattens with connect expansion and converts the `InstanceClass`
 result back to a backward-compatible `ast.Tree` via `_instance_to_ast_class` /
@@ -720,6 +724,19 @@ copies.
   `NotImplementedError` during connect expansion rather than being flattened
 - Expandable connectors are not augmented (MLS 9.1.3): a connect to an undeclared member
   raises `NotImplementedError`
+- Stream connectors (MLS 15.2): `inStream()` uses `max(flow, 1e-15)` for the mixing
+  weights. The optional dropping of terms for flow variables with `min >= 0` and the
+  smooth regularization are not done. `inStream()` of an outside connector with nothing
+  connected from outside, such as one of the root model, is the variable itself. When
+  only such connectors form a set, they are equated pairwise with a warning instead of
+  getting the singular mirrored N=0 equations
+- `inStream()` and `actualStream()` on a connector array without literal subscripts
+  expand per element, to an array for a whole dimension or a range and to an
+  if-expression on the subscript otherwise. They are left unexpanded with a warning, and
+  fail in the backends, on connectors used in connects inside for- or if-equations, which
+  are not expanded, on elements of connector arrays connected as a whole, on connector
+  arrays connected both as a whole and element-wise, and when an array size or a range
+  bound is not a literal
 - Imports are effectively re-exported: composite-name lookup searches the target
   class's imports, which MLS 13.2.1.1 forbids - defer to a planned imports rewrite
 - Circular extends and self-referential component types are unguarded and raise

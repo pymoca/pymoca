@@ -32,7 +32,6 @@ EXPECTED_DIR = Path(MY_DIR) / "expected" / "msl"
 # Known-missing feature to error signature map to xfail
 KNOWN_MISSING_FEATURES = {
     "ExternalObject": "Extends name ExternalObject not found",
-    "stream connectors": "Unsupported connector variable prefixes ['stream']",
 }
 
 # Fast CI smoke subset (msl_smoke marker): one known-green model per Modelica
