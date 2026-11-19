@@ -34,6 +34,7 @@ from ._instantiation import (
 )
 from ._listener import TreeListener, TreeWalker
 from ._name_lookup import _find_name
+from ._stream import check_stream_connectors, expand_stream_operators
 from .instance import (
     InstanceClass,
     InstanceElement,
@@ -1078,6 +1079,7 @@ def _generate_connect_equations(flat_class: InstanceClass):
     For each ConnectClause, expand into variable-level equations:
     - Non-flow variables (no prefix, input, output): equality equations
     - Flow variables: Kirchhoff sum-to-zero equations
+    - Stream variables: inStream()/actualStream() expansion (MLS 15.2)
     - Constant/parameter: skipped
     Disconnected flow variables default to 0.
     """
@@ -1088,6 +1090,7 @@ def _generate_connect_equations(flat_class: InstanceClass):
             disconnected_flow_variables[name] = name
 
     flow_connections: dict[SetKey, ConnectionSet] = {}
+    stream_connections: dict[SetKey, ConnectionSet] = {}
     orig_equations = flat_class.equations[:]
     flat_class.equations = []
 
@@ -1117,6 +1120,7 @@ def _generate_connect_equations(flat_class: InstanceClass):
             if left_name in flat_class.symbols:
                 flat_class.equations.append(ast.Equation(left=equation.left, right=equation.right))
             continue
+        check_stream_connectors(left_name, [(s, p) for s, p, _ in connector_vars])
 
         for suffix, prefixes, type_indices in connector_vars:
             l_name = left_name + "." + suffix
@@ -1130,7 +1134,9 @@ def _generate_connect_equations(flat_class: InstanceClass):
                 indices=equation.right.indices + type_indices,
             )
 
-            if len(prefixes) == 0 or prefixes[0] in ["input", "output"]:
+            if "stream" in prefixes:
+                merge_into_sets(stream_connections, left, left_inner, right, right_inner)
+            elif len(prefixes) == 0 or prefixes[0] in ["input", "output"]:
                 flat_class.equations.append(ast.Equation(left=left, right=right))
             elif "flow" in prefixes:
                 merge_into_sets(flow_connections, left, left_inner, right, right_inner)
@@ -1161,6 +1167,8 @@ def _generate_connect_equations(flat_class: InstanceClass):
         flat_class.equations.append(
             ast.Equation(left=ast.ComponentRef(name=name), right=ast.Primary(value=0))
         )
+
+    expand_stream_operators(flat_class, stream_connections)
 
 
 def _get_parameter_value_from_chain(isym: InstanceSymbol) -> ast.Primary | None:
