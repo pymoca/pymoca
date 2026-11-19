@@ -800,6 +800,39 @@ def test_connect_subconnector_of_outside_connector_flow_sign():
     assert negated == {"op.pin.i"}
 
 
+def test_connection_set_keys_keep_name_part_of_subscript():
+    """Subscripts on different name parts of connect refs give different connection sets."""
+    flat = _flatten_inline(
+        """
+    connector Pin
+        Real v;
+        flow Real i;
+    end Pin;
+    model Sub
+        Pin pins[2];
+    end Sub;
+    model Duo
+        Pin c[2];
+    end Duo;
+    model M
+        Sub s[2];
+        Duo d, e;
+    equation
+        connect(d.c, s[1].pins);
+        connect(e.c, s.pins[1]);
+    end M;""",
+        "M",
+    )
+    flow_sums = [
+        eq
+        for eq in flat.equations
+        if isinstance(eq, ast.Equation)
+        and isinstance(eq.left, ast.Expression)
+        and eq.left.operator == "+"
+    ]
+    assert len(flow_sums) == 2
+
+
 def _flow_sum_signs(expr):
     """Split a flow sum expression's operand names into (positive, negated) sets."""
     positive = set()
