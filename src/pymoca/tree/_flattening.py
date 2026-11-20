@@ -1080,6 +1080,7 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
             _flatten_instance(func_instance, flat_func)
             _flatten_external_clause(func_instance, flat_func)
             _register_external_objects(flat_func, functions)
+            _flatten_derivative_annotations(func_instance, flat_func, functions)
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -1121,6 +1122,91 @@ def _formal_counts(func: ast.Class, scope: InstanceClass) -> tuple[int, int]:
         func = cast(InstanceClass, _instantiate_element(func, scope, ast.ClassModification()))
     symbols = _declared_symbols(func)
     return sum("input" in s.prefixes for s in symbols), sum("output" in s.prefixes for s in symbols)
+
+
+def _flatten_derivative_annotations(
+    instance: InstanceClass, flat_func: InstanceClass, functions: OrderedDict
+) -> None:
+    """Record the derivative annotations of a function and queue their functions (MLS 12.7.1).
+
+    An invalid annotation drops all of the function's derivatives with a warning, since a
+    backend would misroute a partial set.
+    """
+    scope = _find_derivative_scope(instance)
+    if scope is None:
+        return
+    derivatives: list[tuple[ast.DerivativeAnnotation, ast.Class]] = []
+    for mod in _derivative_modifications(scope):
+        name = next((m for m in mod.modifications if isinstance(m, ast.ComponentRef)), None)
+        if name is None:
+            continue
+        try:
+            found = _find_name(scope, name, RecursionGuard(), LookupOptions())
+        except (NameLookupError, ModelicaSemanticError):
+            found = None
+        if not isinstance(found, ast.Class) or not found.type.endswith("function"):
+            logger.warning(
+                "Ignoring derivative annotations of %s: %s is not a function",
+                flat_func.name,
+                name,
+            )
+            return
+        derivative = ast.DerivativeAnnotation(function=found.full_name)
+        for attrs in (m for m in mod.modifications if isinstance(m, ast.ClassModification)):
+            for attr in (a.value for a in attrs.arguments):
+                if not isinstance(attr, ast.ElementModification) or not attr.modifications:
+                    continue
+                key, value = str(attr.component), attr.modifications[0]
+                if key == "order":
+                    order = value.value if isinstance(value, ast.Primary) else None
+                    if type(order) is not int or order < 1:
+                        logger.warning(
+                            "Ignoring derivative annotations of %s: order of %s must be a"
+                            " positive integer literal",
+                            flat_func.name,
+                            name,
+                        )
+                        return
+                    derivative.order = order
+                elif key == "noDerivative":
+                    derivative.no_derivative.append(str(value))
+                elif key == "zeroDerivative":
+                    derivative.zero_derivative.append(str(value))
+        derivatives.append((derivative, found))
+    for derivative, found in derivatives:
+        functions.setdefault(found.full_name, found)
+        flat_func.derivatives.append(derivative)
+
+
+def _derivative_modifications(cls: InstanceClass) -> list[ast.ElementModification]:
+    """Return the derivative annotations declared on *cls* itself."""
+    # Extends instances carry an empty annotation, the declared one is on the AST class
+    ref = cls.ast_ref if isinstance(cls.ast_ref, ast.Class) else cls
+    annotation = ref.annotation or cls.annotation
+    return [
+        arg.value
+        for arg in (annotation.arguments if annotation is not None else [])
+        if isinstance(arg.value, ast.ElementModification)
+        and str(arg.value.component) == "derivative"
+    ]
+
+
+def _find_derivative_scope(instance: InstanceClass) -> InstanceClass | None:
+    """Return the class declaring the derivative annotations of a function, if any.
+
+    They are inherited through extends only while no class on the way declares formals of
+    its own, since a derivative is only valid for the same inputs and outputs.
+    """
+    if _derivative_modifications(instance):
+        return instance
+    if any({"input", "output"} & set(s.prefixes) for s in instance.symbols.values()):
+        return None
+    for extends in instance.extends:
+        if isinstance(extends, InstanceClass):
+            found = _find_derivative_scope(extends)
+            if found is not None:
+                return found
+    return None
 
 
 def _find_external_clause(
@@ -2005,6 +2091,7 @@ def _instance_to_ast_class(flat_instance: InstanceClass) -> ast.Class:
     flat_class.annotation = flat_instance.annotation
     flat_class.external = flat_instance.external
     flat_class.external_objects = flat_instance.external_objects
+    flat_class.derivatives = flat_instance.derivatives
 
     # Convert symbols
     for name, isym in flat_instance.symbols.items():

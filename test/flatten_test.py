@@ -4,6 +4,7 @@ Tests for tree.flatten_instance() / tree.flatten().
 """
 
 import copy
+import logging
 import os
 import pickle
 from pathlib import Path
@@ -1458,6 +1459,13 @@ def test_external_object():
     lifecycle = {"ExternalObjectTest.MyTable": (constructor, destructor)}
     assert flat.external_objects == lifecycle
     assert flat.functions[destructor].external.external_name == "closeMyTable"
+    (der,) = flat.functions["ExternalObjectTest.interpolateMyTable"].derivatives
+    assert der.function == "ExternalObjectTest.interpolateMyTableDer"
+    assert (der.order, der.no_derivative, der.zero_derivative) == (1, ["interpolTable"], [])
+    (der2,) = flat.functions[der.function].derivatives
+    assert der2.function == "ExternalObjectTest.interpolateMyTableDer2"
+    assert (der2.order, der2.no_derivative, der2.zero_derivative) == (2, [], ["interpolTable"])
+    assert not flat.functions[der2.function].derivatives
 
     flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
     func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
@@ -1559,6 +1567,84 @@ def test_external_object_inherited_lifecycle():
     """
     flat = tree.flatten_class(parser.parse(src), "P.M")
     assert flat.external_objects == {"P.T": ("P.T.constructor", "P.T.destructor")}
+
+
+_DERIVATIVE_ANNOTATIONS = """
+package P
+  constant Integer n = 1;
+  function d input Real x; input Real dx; output Real dy; algorithm dy := dx; end d;
+  function d2
+    input Real x; input Real dx; input Real ddx; output Real dy; algorithm dy := ddx;
+  end d2;
+  function valid input Real x; output Real y; algorithm y := x;
+    annotation(derivative = d, derivative(order = 2) = d2); end valid;
+  function zero input Real x; output Real y; algorithm y := x;
+    annotation(derivative = d, derivative(order = 0) = d2); end zero;
+  function reference input Real x; output Real y; algorithm y := x;
+    annotation(derivative(order = n) = d); end reference;
+  function missing input Real x; output Real y; algorithm y := x;
+    annotation(derivative = d, derivative(order = 2) = nosuch); end missing;
+  function component input Real x; output Real y; algorithm y := x;
+    annotation(derivative = n); end component;
+  model M
+    Real a = valid(1); Real b = zero(1); Real c = reference(1);
+    Real e = missing(1); Real f = component(1);
+  end M;
+end P;
+"""
+
+
+def test_invalid_derivative_annotations(caplog):
+    """An invalid derivative annotation drops all of the function's derivatives (MLS 12.7.1)."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        flat = tree.flatten_class(parser.parse(_DERIVATIVE_ANNOTATIONS), "P.M")
+    derivatives = {
+        name: [(d.function, d.order) for d in flat.functions[f"P.{name}"].derivatives]
+        for name in ("valid", "zero", "reference", "missing", "component")
+    }
+    assert derivatives == {
+        "valid": [("P.d", 1), ("P.d2", 2)],
+        "zero": [],
+        "reference": [],
+        "missing": [],
+        "component": [],
+    }
+    assert "Ignoring derivative annotations of P.zero: order of d2" in caplog.text
+    assert "Ignoring derivative annotations of P.reference: order of d" in caplog.text
+    assert "Ignoring derivative annotations of P.missing: nosuch is not a function" in caplog.text
+    assert "Ignoring derivative annotations of P.component: n is not a function" in caplog.text
+
+
+def test_inherited_derivative_annotations():
+    """Derivatives are inherited unless the function declares formals of its own (MLS 12.7.1)."""
+    src = """
+    package P
+      function d input Real x; input Real dx; output Real dy; algorithm dy := dx; end d;
+      function base input Real x; output Real y; algorithm y := x;
+        annotation(derivative = d); end base;
+      function derived extends base; end derived;
+      function short = base;
+      function modified extends base(x(min = 0)); end modified;
+      function added extends base; input Real z; end added;
+      function own extends base; annotation(derivative(order = 2) = d); end own;
+      model M
+        Real a = derived(1); Real b = short(1); Real c = modified(1);
+        Real e = added(1, 2); Real f = own(1);
+      end M;
+    end P;
+    """
+    flat = tree.flatten_class(parser.parse(src), "P.M")
+    derivatives = {
+        name: [(d.function, d.order) for d in flat.functions[f"P.{name}"].derivatives]
+        for name in ("derived", "short", "modified", "added", "own")
+    }
+    assert derivatives == {
+        "derived": [("P.d", 1)],
+        "short": [("P.d", 1)],
+        "modified": [("P.d", 1)],
+        "added": [],
+        "own": [("P.d", 2)],
+    }
 
 
 def test_inherited_equation_refs_resolved():
@@ -1725,6 +1811,11 @@ def test_msl_external_table_functions():
     lifecycle = (table + ".constructor", table + ".destructor")
     assert flat.external_objects == {table: lifecycle}
     assert set(lifecycle) <= flat.functions.keys()
+    internal = "Modelica.Blocks.Tables.Internal."
+    (der,) = flat.functions[internal + "getTimeTableValue"].derivatives
+    assert der.function == internal + "getDerTimeTableValue"
+    assert der.no_derivative == ["nextTimeEvent", "pre_nextTimeEvent"]
+    assert der.function in flat.functions
     c_sources = os.path.join(os.path.realpath(MSL4_DIR), "Modelica", "Resources", "C-Sources")
     table_funcs = [
         func
