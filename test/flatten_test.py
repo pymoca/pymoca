@@ -1297,6 +1297,128 @@ def test_clock_builtin_type():
     assert parse_and_flatten_model("ClockBuiltin.mo", "ClockBuiltin.UsesClock") is not None
 
 
+def _external_call(func):
+    """Return a flat function's external call as (name, output, argument strings)."""
+
+    def arg(a):
+        if isinstance(a, ast.Expression):
+            return "{}({})".format(a.operator, ", ".join(arg(o) for o in a.operands))
+        return str(a.value) if isinstance(a, ast.Primary) else str(a)
+
+    ext = func.external
+    output = str(ext.output) if ext.output is not None else None
+    return ext.external_name, output, [arg(a) for a in ext.arguments]
+
+
+def test_external_function_call():
+    """External calls resolve to function-local names, an omitted call made explicit (MLS 12.9)."""
+    flat = parse_and_flatten_model("ExternalFunction.mo", "ExternalFunctionTest.M")
+    funcs = {name.rsplit(".", 1)[1]: func for name, func in flat.functions.items()}
+    assert _external_call(funcs["explicitCall"]) == (
+        "cExplicit",
+        "y",
+        ["x", "size(x, 1)", "k", "n", "work"],
+    )
+    default_call = ("defaultCall", "y", ["a", "size(a, 1)", "size(a, 2)", "s"])
+    assert _external_call(funcs["defaultCall"]) == default_call
+    assert _external_call(funcs["derivedCall"]) == default_call
+    assert _external_call(funcs["extendedCall"]) == default_call
+    assert _external_call(funcs["recordCall"]) == (
+        "recordCall",
+        "y",
+        ["r", "v", "size(v, 1)", "s"],
+    )
+    assert _external_call(funcs["defaultProcedure"]) == (
+        "defaultProcedure",
+        None,
+        ["x", "y1", "y2", "size(y2, 1)"],
+    )
+    assert funcs["defaultCall"].external.language == "C"
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalFunction.mo"),
+        ast.ComponentRef.from_string("ExternalFunctionTest.M"),
+    )
+    explicit = flat_tree.classes["ExternalFunctionTest.explicitCall"]
+    (stmt,) = explicit.statements
+    assert stmt.left[0].name == "work"
+    assert explicit.symbols["k"].value.value == 1
+    assert not flat_tree.classes["ExternalFunctionTest.defaultCall"].statements
+
+
+_EXTERNAL_CALL_ERRORS = """
+package P
+  record R Real a; end R;
+  constant Integer k = 1;
+  constant Real kr = 1.0;
+  function valid
+    input R r; input Real a[:]; output Real y;
+    external "C" y = cf(r, r.a, a, size(a, k), size(a, 1), k, -1, 2.5, "s", true);
+  end valid;
+  function size_vector input Real a[:]; output Real y; external "C" y = cf(size(a)); end size_vector;
+  function size_real input Real a[:]; output Real y; external "C" y = cf(size(a, 1.5)); end size_real;
+  function size_real_constant
+    input Real a[:]; output Real y; external "C" y = cf(size(a, kr));
+  end size_real_constant;
+  function expr input Real s; output Real y; external "C" y = cf(s + 1); end expr;
+  function undeclared input Real s; output Real y; external "C" y = cf(nosuch); end undeclared;
+  function size_input
+    input Real a[:]; input Integer n; output Real y; external "C" y = cf(a, size(a, n));
+  end size_input;
+  function lhs_input input Real s; output Real y; external "C" s = cf(y); end lhs_input;
+  function array_return
+    input Real s; output Real y[2]; external "C" y = cf(s);
+  end array_return;
+  function both input Real s; output Real y; algorithm y := s; external "C"; end both;
+  function base input Real s; output Real y; algorithm y := s; end base;
+  function inherited extends base; external "C"; end inherited;
+  model M Real a[1]; Real z = F(R(a=1), a); end M;
+end P;
+"""
+
+
+@pytest.mark.parametrize(
+    "func, message",
+    [
+        ("valid", None),
+        ("expr", "P.expr has invalid argument 1"),
+        ("undeclared", "P.undeclared has invalid argument 1"),
+        ("size_input", "P.size_input has invalid argument 2"),
+        ("size_vector", "P.size_vector has invalid argument 1"),
+        ("size_real", "P.size_real has invalid argument 1"),
+        ("size_real_constant", "P.size_real_constant has invalid argument 1"),
+        ("lhs_input", "P.lhs_input must return to an output, not s"),
+        ("array_return", "P.array_return must not return array y"),
+        ("both", "P.both has both an algorithm section and an external clause"),
+        ("inherited", "P.inherited has both an algorithm section and an external clause"),
+    ],
+)
+def test_external_call_errors(func, message):
+    """Invalid external calls and functions with an algorithm are rejected (MLS 12.2, 12.9)."""
+    args = "R(a=1), a" if func == "valid" else "1"
+    src = _EXTERNAL_CALL_ERRORS.replace("F(R(a=1), a)", f"{func}({args})")
+    if message is None:
+        assert f"P.{func}" in tree.flatten_class(parser.parse(src), "P.M").functions
+        return
+    with pytest.raises(tree.ModelicaSemanticError, match=message):
+        tree.flatten_class(parser.parse(src), "P.M")
+
+
+def test_external_default_array_output():
+    """A single array output of a default call is passed as an argument (MLS 12.9.2)."""
+    src = """
+    package P
+      type Angle = Real(unit = "rad");
+      function f input Real s; output Real y[3]; external "C"; end f;
+      function g input Angle a; output Angle y; external "C"; end g;
+      model M Real v[3] = f(1); Real w = g(1); end M;
+    end P;
+    """
+    flat = tree.flatten_class(parser.parse(src), "P.M")
+    assert _external_call(flat.functions["P.f"]) == ("f", None, ["s", "y", "size(y, 1)"])
+    assert _external_call(flat.functions["P.g"]) == ("g", "y", ["a"])
+
+
 def test_external_object():
     """External objects flatten as simple-type leaves built by their constructor (MLS 12.9.7)."""
     assert ast.Tree().classes["ExternalObject"].partial

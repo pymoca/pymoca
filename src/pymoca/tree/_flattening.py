@@ -1075,6 +1075,7 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
             # Name the flat function by its dict key, which its call sites reference
             flat_func.name = full_name
             _flatten_instance(func_instance, flat_func)
+            _flatten_external_clause(func_instance, flat_func)
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -1083,6 +1084,170 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             flat_class.functions[full_name] = flat_func
             processed.add(full_name)
+
+
+def _find_external_clause(
+    instance: InstanceClass,
+) -> tuple[ast.ExternalClause, InstanceClass] | None:
+    """Return the external clause of a function and the class declaring it, if any."""
+    ast_ref = instance.ast_ref
+    if isinstance(ast_ref, ast.Class) and ast_ref.external is not None:
+        return ast_ref.external, instance
+    for extends in instance.extends:
+        if isinstance(extends, InstanceClass):
+            found = _find_external_clause(extends)
+            if found is not None:
+                return found
+    return None
+
+
+def _flatten_external_clause(instance: InstanceClass, flat_func: InstanceClass) -> None:
+    """Resolve the external clause into *flat_func*, making a default call explicit (MLS 12.9)."""
+    found = _find_external_clause(instance)
+    if found is None:
+        return
+    clause, declaring = found
+    if _has_algorithm(instance):
+        raise ModelicaSemanticError(
+            f"Function {flat_func.name} has both an algorithm section and an external clause"
+        )
+    external = copy.deepcopy(clause)
+    ctx = FlatteningContext(
+        flat_class=flat_func,
+        guard=RecursionGuard(),
+        opts=LookupOptions(),
+        name_flat_class=flat_func,
+        prefix="",
+    )
+    if external.external_name is None:
+        external.external_name = cast(ast.Class, declaring.ast_ref).name
+        _set_default_external_call(external, declaring)
+    else:
+        _check_external_call(external, declaring, flat_func.name)
+        if external.output is not None:
+            external.output = cast(
+                ast.ComponentRef, _rewrite_operand(external.output, declaring, ctx)
+            )
+        _rewrite_operand_list(external.arguments, declaring, ctx)
+    flat_func.external = external
+
+
+def _has_algorithm(cls: InstanceClass) -> bool:
+    """Return True if *cls* or a class it extends has an algorithm section."""
+    return bool(cls.statements or cls.initial_statements) or any(
+        _has_algorithm(e) for e in cls.extends if isinstance(e, InstanceClass)
+    )
+
+
+def _check_external_call(
+    external: ast.ExternalClause, scope: InstanceClass, name: str | None
+) -> None:
+    """Raise if an explicit external call has an invalid output or argument (MLS 12.9)."""
+
+    def lookup(ref: ast.ComponentRef) -> ast.Class | ast.Symbol | None:
+        try:
+            return _find_name(scope, ref, RecursionGuard(), LookupOptions())
+        except (NameLookupError, ModelicaSemanticError):
+            return None
+
+    output = external.output
+    returned = lookup(output) if output is not None else None
+    if output is not None and "output" not in getattr(returned, "prefixes", ()):
+        raise ModelicaSemanticError(
+            f"External call of {name} must return to an output, not {output}"
+        )
+    if isinstance(returned, ast.Symbol) and _declared_ndims(returned):
+        raise ModelicaSemanticError(
+            f"External call of {name} must not return array {output}, pass it as an argument"
+        )
+
+    def is_integer_constant(arg) -> bool:
+        if isinstance(arg, ast.ComponentRef):
+            sym = lookup(arg)
+            return isinstance(sym, ast.Symbol) and (
+                "constant" in sym.prefixes and str(sym.type) == "Integer"
+            )
+        return isinstance(arg, ast.Primary) and type(arg.value) is int
+
+    def is_valid(arg) -> bool:
+        if isinstance(arg, ast.ComponentRef):
+            return isinstance(lookup(arg), ast.Symbol)
+        if isinstance(arg, ast.Primary):
+            return True
+        if isinstance(arg, ast.Expression) and str(arg.operator) == "size":
+            return (
+                len(arg.operands) == 2
+                and isinstance(arg.operands[0], ast.ComponentRef)
+                and is_valid(arg.operands[0])
+                and is_integer_constant(arg.operands[1])
+            )
+        # A negative scalar constant
+        return (
+            isinstance(arg, ast.Expression)
+            and str(arg.operator) == "-"
+            and len(arg.operands) == 1
+            and isinstance(arg.operands[0], ast.Primary)
+        )
+
+    for i, arg in enumerate(external.arguments, 1):
+        if not is_valid(arg):
+            raise ModelicaSemanticError(
+                f"External call of {name} has invalid argument {i}: arguments must be declared"
+                " component references, scalar constants or size of a constant dimension"
+            )
+
+
+def _set_default_external_call(external: ast.ExternalClause, instance: InstanceClass) -> None:
+    """Fill in the arguments and returned output of an omitted external call (MLS 12.9.1-2)."""
+    formals = [s for s in _declared_symbols(instance) if {"input", "output"} & set(s.prefixes)]
+    outputs = [s for s in formals if "output" in s.prefixes]
+    # An array cannot be a return value, so it is passed like other outputs (MLS 12.9.2)
+    returned = outputs[0] if len(outputs) == 1 and not _declared_ndims(outputs[0]) else None
+    arguments = external.arguments
+    for sym in formals:
+        if sym is returned:
+            continue
+        arguments.append(ast.ComponentRef(name=sym.name))
+        for dim in range(1, _declared_ndims(sym) + 1):
+            arguments.append(
+                ast.Expression(
+                    operator="size",
+                    operands=[ast.ComponentRef(name=sym.name), ast.Primary(value=dim)],
+                )
+            )
+    if returned is not None:
+        external.output = ast.ComponentRef(name=returned.name)
+
+
+def _declared_symbols(cls: InstanceClass) -> list[InstanceSymbol]:
+    """Return the components declared in *cls*, local before inherited, first name wins."""
+    symbols: dict[str, InstanceSymbol] = {}
+    pending = [cls]
+    while pending:
+        current = pending.pop(0)
+        for name, sym in current.symbols.items():
+            symbols.setdefault(name, sym)  # type: ignore[arg-type]
+        pending.extend(e for e in current.extends if isinstance(e, InstanceClass))
+    return list(symbols.values())
+
+
+def _declared_ndims(sym: ast.Symbol) -> int:
+    """Return the number of array dimensions of *sym*, including those of short class types."""
+
+    def count(subscripts: list[list]) -> int:
+        return sum(
+            dim is not None and not (isinstance(dim, ast.Primary) and dim.value is None)
+            for dims in subscripts
+            for dim in dims
+        )
+
+    ndims = count(sym.dimensions)
+    cls = sym.type
+    while isinstance(cls, InstanceClass) and cast(ast.Class, cls.ast_ref).is_short_class_definition:
+        component = cast(ast.Class, cls.ast_ref).extends[0].component
+        ndims += count(component.indices if component is not None else [])
+        cls = cls.extends[0] if cls.extends else None
+    return ndims
 
 
 def _check_all_references_valid(flat_class: InstanceClass):
@@ -1732,6 +1897,7 @@ def _instance_to_ast_class(flat_instance: InstanceClass) -> ast.Class:
     flat_class.type = flat_instance.type
     flat_class.comment = flat_instance.comment
     flat_class.annotation = flat_instance.annotation
+    flat_class.external = flat_instance.external
 
     # Convert symbols
     for name, isym in flat_instance.symbols.items():
@@ -2127,6 +2293,9 @@ def expand_connectors(node: ast.Class) -> None:
 
 def add_variable_value_statements(node: ast.Class) -> None:
     for sym in node.symbols.values():
+        # The external call computes outputs, and input bindings are default arguments
+        if node.external is not None and sym.visibility != ast.Visibility.PROTECTED:
+            continue
         if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
             node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
             sym.value = ast.Primary(value=None)
