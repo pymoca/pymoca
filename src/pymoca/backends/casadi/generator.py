@@ -16,7 +16,9 @@ import numpy as np
 from pymoca import ast
 from pymoca.tree import TreeListener, TreeWalker, flatten, range_values
 
+from ._evaluate import EvaluationError, Evaluator
 from ._options import _merge_default_options
+from .external import ExternalFunction, load_external_functions
 from .model import DelayArgument, Model, StringVariable, Variable
 from .mtensor import _MTensor, _new_mx
 
@@ -160,6 +162,9 @@ class GeneratorWalker(TreeWalker):
         skip = super().skip_child(tree, child_name)
         if isinstance(tree, ast.Class) and child_name == "annotation":
             return True
+        # External functions are called through callbacks, their body is not generated
+        if isinstance(tree, ast.Class) and tree.external is not None:
+            return True
         # The generator visits the body of a constructor/reduction itself, once per value
         if isinstance(tree, ast.ForArray) and self.generator is not None:
             return tree in self.generator.unrolled_for_arrays
@@ -198,6 +203,74 @@ def _has_casadi_element(value) -> bool:
     )
 
 
+def _casadi_shape(shape: tuple) -> tuple:
+    if len(shape) > 2:
+        raise NotImplementedError("External function arguments with more than two dimensions")
+    return tuple(shape) + (1,) * (2 - len(shape))
+
+
+def _hashable(value):
+    """Return *value* with its arrays and lists as tuples."""
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return tuple(_hashable(v) for v in value)
+    return value
+
+
+class ExternalFunctionCallback(ca.Callback):
+    """CasADi function that calls an external function numerically (MLS 12.9).
+
+    Inputs bound at the call site, such as strings, are not inputs of the CasADi function.
+    """
+
+    def __init__(self, name: str, function: ExternalFunction, shapes: dict, bound: dict):
+        ca.Callback.__init__(self)
+        self.function = function
+        self.bound = bound
+        self.free = [i for i in range(len(function.inputs)) if i not in bound]
+        self.input_shapes = [shapes[i] for i in self.free]
+        self.output_shapes = function.output_shapes(
+            [shapes.get(i, np.shape(bound.get(i))) for i in range(len(function.inputs))]
+        )
+        for symbol in function.outputs:
+            if function.is_string(symbol):
+                raise NotImplementedError(
+                    f"String output {symbol.name} of external function {function.name}"
+                    " cannot be used in equations"
+                )
+        self.construct(name, {})
+
+    def get_n_in(self):
+        return len(self.free)
+
+    def get_n_out(self):
+        return len(self.output_shapes)
+
+    def get_sparsity_in(self, i):
+        return ca.Sparsity.dense(*_casadi_shape(self.input_shapes[i]))
+
+    def get_sparsity_out(self, i):
+        return ca.Sparsity.dense(*_casadi_shape(self.output_shapes[i]))
+
+    def _input_value(self, index: int, value: ca.DM):
+        symbol = self.function.inputs[index]
+        array = np.array(value)
+        shape = self.input_shapes[self.free.index(index)]
+        if not shape:
+            scalar = float(array.ravel()[0])
+            return int(round(scalar)) if self.function.is_integer(symbol) else scalar
+        return array.reshape(shape)
+
+    def eval(self, arg):
+        inputs = [self.bound.get(i) for i in range(len(self.function.inputs))]
+        for index, value in zip(self.free, arg):
+            inputs[index] = self._input_value(index, value)
+        outputs = self.function(*inputs)
+        return [
+            ca.DM(np.asarray(value, dtype=float).reshape(_casadi_shape(shape)))
+            for value, shape in zip(outputs, self.output_shapes)
+        ]
+
+
 class Generator(TreeListener):
     def __init__(self, root: ast.Tree, class_name: str, options: Dict[str, bool]):
         super(Generator, self).__init__()
@@ -217,6 +290,9 @@ class Generator(TreeListener):
         self.map_mode = "inline" if options["unroll_loops"] else "serial"
         self.function_mode = (True, False) if options["inline_functions"] else (False, True)
         self.delay_counter = 0
+        self.external_library_paths = options["external_library_paths"]
+        self._external_functions = None
+        self._external_callbacks = {}
 
         # NOTE: Part of MTensor workaround.
         self._expand_vectors_enabled = options["expand_vectors"]
@@ -550,6 +626,8 @@ class Generator(TreeListener):
                 mode = "linear"
             func = ca.interpolant("interpolant", mode, [xp, yp], np.array(zp).ravel(order="F"))
             src = func(ca.vertcat(arg_1, arg_2))
+        elif op in self.root.classes and self.root.classes[op].external is not None:
+            src = ca.vertcat(*self._call_external(op, tree.operands))
         elif op in OP_MAP and n_operands == 2:
             lhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[0])))
             rhs = ca.MX(_array_to_mx(self.get_mx(tree.operands[1])))
@@ -1317,6 +1395,71 @@ class Generator(TreeListener):
                 )
             self.src[tree] = s
         return self.src[tree]
+
+    def evaluator(self) -> Evaluator:
+        """Return an evaluator of expressions with values of the current class's symbols."""
+        symbols = self.current_class.symbols
+
+        def lookup(name):
+            if name in symbols and "input" in symbols[name].prefixes:
+                # Its default only applies to calls without it
+                raise NotImplementedError(f"{name} is an input of {self.current_class.name}")
+            if name not in symbols:
+                raise NotImplementedError(f"{name} has no value at generation time")
+            return evaluate(symbols[name].value)
+
+        evaluate = Evaluator(lookup)
+        return evaluate
+
+    def get_external_function(self, function_name: str) -> ExternalFunction:
+        if self._external_functions is None:
+            # Built on first use, so models that never call external code need no compiler
+            functions = [
+                c for c in self.root.classes.values() if c.type == "function" and c.external
+            ]
+            self._external_functions = load_external_functions(
+                functions, self.external_library_paths
+            )
+        return self._external_functions[function_name]
+
+    def _call_external(self, function_name: str, operands: list) -> list:
+        """Return the outputs of a call to an external function through a callback."""
+        function = self.get_external_function(function_name)
+        if len(operands) != len(function.inputs):
+            raise NotImplementedError(
+                f"Call to external function {function_name} without all of its arguments"
+            )
+        bound, shapes, args = {}, {}, []
+        for i, (symbol, operand) in enumerate(zip(function.inputs, operands)):
+            if function.is_string(symbol):
+                bound[i] = self._string_argument(function, symbol, operand)
+                continue
+            arg = ca.MX(_array_to_mx(self.get_mx(operand)))
+            n_dims = sum(
+                not (isinstance(d, ast.Primary) and d.value is None)
+                for dims in symbol.dimensions
+                for d in dims
+            )
+            shapes[i] = () if n_dims == 0 else (arg.numel(),) if n_dims == 1 else arg.shape
+            args.append(arg)
+        key = (function_name, tuple(shapes.items()), _hashable(tuple(bound.items())))
+        callback = self._external_callbacks.get(key)
+        if callback is None:
+            name = "{}_{}".format(function_name.replace(".", "_"), len(self._external_callbacks))
+            callback = ExternalFunctionCallback(name, function, shapes, bound)
+            self._external_callbacks[key] = callback
+            self.model._external_callbacks.append(callback)
+        return callback.call(args)
+
+    def _string_argument(self, function: ExternalFunction, symbol: ast.Symbol, operand):
+        """Return the value of a String argument, which must be known at generation time."""
+        try:
+            return self.evaluator()(operand)
+        except (EvaluationError, NotImplementedError) as e:
+            raise NotImplementedError(
+                f"String input {symbol.name} of external function {function.name} must"
+                f" evaluate at generation time, unlike {operand}: {e}"
+            ) from e
 
     def get_function(self, function_name):
         if function_name in self.functions:

@@ -14,7 +14,8 @@ feeds the backends.
 
 ### External Functions and Objects (MLS 12.9)
 
-The backend compiles the external C code of a model into one shared library.
+The backend compiles the external C code of a model into one shared library and calls it
+numerically through CasADi callbacks.
 
 Choices the spec leaves open:
 
@@ -29,7 +30,13 @@ Departures from the spec:
 
 Not implemented:
 
+- A String argument of an external function must evaluate at generation time, from
+  literals and String parameters. A String input of a calling Modelica function raises
+  `NotImplementedError`, and a Modelica function cannot be called in an equation with a
+  String argument
 - Language `"FORTRAN 77"` raises `NotImplementedError` (MLS 12.9)
+- Arrays with more than two dimensions as arguments of an external function called in an
+  equation
 
 ### TODO / WIP / Stubs
 

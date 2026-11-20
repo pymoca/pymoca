@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include "ModelicaUtilities.h"
 
 void weightedSum(const double *a, size_t n, size_t m, const double *w, double *y) {
@@ -41,6 +42,10 @@ double sumWithWork(const double *x, size_t nx, double *work, int n) {
     return sum;
 }
 
+double lookupScale(const char *key, double x) {
+    return strcmp(key, "double") == 0 ? 2 * x : x;
+}
+
 void addInPlace(double x, double *y, double *w, size_t n) {
     *y += x;
     for (size_t i = 0; i < n; i++) {
@@ -66,5 +71,11 @@ void addIndices(const double *a, size_t n, size_t m, double *b) {
         for (size_t i = 0; i < n; i++) {
             b[i + j * n] = a[i + j * n] + 10 * i + j;
         }
+    }
+}
+
+void lengths(const char **names, size_t n, double *y) {
+    for (size_t i = 0; i < n; i++) {
+        y[i] = (double)strlen(names[i]);
     }
 }
