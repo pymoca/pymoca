@@ -187,7 +187,11 @@ _SOURCE_GROUPS = {
         ["ModelicaStandardTables.c", "ModelicaStandardTablesUsertab.c"],
         ["DUMMY_FUNCTION_USERTAB=1"],
     ),
-    "zlib": (["zlib/*.c"], ["HAVE_ZLIB=1"]),
+    # zutil.h otherwise defines fdopen as NULL on macOS, which its stdio.h rejects
+    "zlib": (
+        ["zlib/*.c"],
+        ["HAVE_ZLIB=1", "fdopen=fdopen"] + (["HAVE_UNISTD_H"] if os.name != "nt" else []),
+    ),
 }
 
 _LIBRARY_EXTENSIONS = (".so", ".dylib", ".a", ".lib")
@@ -350,6 +354,8 @@ class ExternalLibrary:
             elif sources:
                 for source in sources:
                     inputs.add_source(source)
+                    # Headers next to the sources, such as zlib.h of the zlib sources
+                    inputs.add_unique(inputs.include_dirs, source.parent)
                 for define in defines:
                     inputs.add_unique(inputs.defines, define)
             else:
