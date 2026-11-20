@@ -1297,6 +1297,49 @@ def test_clock_builtin_type():
     assert parse_and_flatten_model("ClockBuiltin.mo", "ClockBuiltin.UsesClock") is not None
 
 
+def _external_call(func):
+    """Return a flat function's external call as (name, output, argument strings)."""
+
+    def arg(a):
+        if isinstance(a, ast.Expression):
+            return "{}({})".format(a.operator, ", ".join(arg(o) for o in a.operands))
+        return str(a.value) if isinstance(a, ast.Primary) else str(a)
+
+    ext = func.external
+    output = str(ext.output) if ext.output is not None else None
+    return ext.external_name, output, [arg(a) for a in ext.arguments]
+
+
+def test_external_function_call():
+    """External calls resolve to function-local names, an omitted call made explicit (MLS 12.9)."""
+    flat = parse_and_flatten_model("ExternalFunction.mo", "ExternalFunctionTest.M")
+    funcs = {name.rsplit(".", 1)[1]: func for name, func in flat.functions.items()}
+    assert _external_call(funcs["explicitCall"]) == (
+        "cExplicit",
+        "y",
+        ["x", "size(x, 1)", "k", "n", "work"],
+    )
+    default_call = ("defaultCall", "y", ["a", "size(a, 1)", "size(a, 2)", "s"])
+    assert _external_call(funcs["defaultCall"]) == default_call
+    assert _external_call(funcs["derivedCall"]) == default_call
+    assert _external_call(funcs["defaultProcedure"]) == (
+        "defaultProcedure",
+        None,
+        ["x", "y1", "y2", "size(y2, 1)"],
+    )
+    assert funcs["defaultCall"].external.language == "C"
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalFunction.mo"),
+        ast.ComponentRef.from_string("ExternalFunctionTest.M"),
+    )
+    explicit = flat_tree.classes["ExternalFunctionTest.explicitCall"]
+    (stmt,) = explicit.statements
+    assert stmt.left[0].name == "work"
+    assert explicit.symbols["k"].value.value == 1
+    assert not flat_tree.classes["ExternalFunctionTest.defaultCall"].statements
+
+
 def test_external_object():
     """External objects flatten as simple-type leaves built by their constructor (MLS 12.9.7)."""
     assert "ExternalObject" in ast.Tree().classes

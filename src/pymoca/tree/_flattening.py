@@ -1045,6 +1045,7 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
             # Name the flat function by its dict key, which its call sites reference
             flat_func.name = full_name
             _flatten_instance(func_instance, flat_func)
+            _flatten_external_clause(func_instance, flat_func)
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -1053,6 +1054,73 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             flat_class.functions[full_name] = flat_func
             processed.add(full_name)
+
+
+def _find_external_clause(
+    instance: InstanceClass,
+) -> tuple[ast.ExternalClause, InstanceClass] | None:
+    """Return the external clause of a function and the class declaring it, if any."""
+    ast_ref = instance.ast_ref
+    if isinstance(ast_ref, ast.Class) and ast_ref.external is not None:
+        return ast_ref.external, instance
+    for extends in instance.extends:
+        if isinstance(extends, InstanceClass):
+            found = _find_external_clause(extends)
+            if found is not None:
+                return found
+    return None
+
+
+def _flatten_external_clause(instance: InstanceClass, flat_func: InstanceClass) -> None:
+    """Resolve the external clause into *flat_func*, making a default call explicit (MLS 12.9)."""
+    found = _find_external_clause(instance)
+    if found is None:
+        return
+    clause, declaring = found
+    external = copy.deepcopy(clause)
+    ctx = FlatteningContext(
+        flat_class=flat_func,
+        guard=RecursionGuard(),
+        opts=LookupOptions(),
+        name_flat_class=flat_func,
+        prefix="",
+    )
+    if external.external_name is None:
+        external.external_name = cast(ast.Class, declaring.ast_ref).name
+        _set_default_external_call(external, flat_func)
+    else:
+        if external.output is not None:
+            external.output = cast(
+                ast.ComponentRef, _rewrite_operand(external.output, declaring, ctx)
+            )
+        _rewrite_operand_list(external.arguments, declaring, ctx)
+    flat_func.external = external
+
+
+def _set_default_external_call(external: ast.ExternalClause, flat_func: InstanceClass) -> None:
+    """Fill in the arguments and returned output of an omitted external call (MLS 12.9.1-2)."""
+    formals = [s for s in flat_func.symbols.values() if {"input", "output"} & set(s.prefixes)]
+    outputs = [s for s in formals if "output" in s.prefixes]
+    returned = outputs[0] if len(outputs) == 1 else None
+    arguments = external.arguments
+    for sym in formals:
+        if sym is returned:
+            continue
+        arguments.append(ast.ComponentRef(name=sym.name))
+        ndims = sum(
+            not (isinstance(dim, ast.Primary) and dim.value is None)
+            for dims in sym.dimensions
+            for dim in dims
+        )
+        for dim in range(1, ndims + 1):
+            arguments.append(
+                ast.Expression(
+                    operator="size",
+                    operands=[ast.ComponentRef(name=sym.name), ast.Primary(value=dim)],
+                )
+            )
+    if returned is not None:
+        external.output = ast.ComponentRef(name=returned.name)
 
 
 def _check_all_references_valid(flat_class: InstanceClass):
@@ -1702,6 +1770,7 @@ def _instance_to_ast_class(flat_instance: InstanceClass) -> ast.Class:
     flat_class.type = flat_instance.type
     flat_class.comment = flat_instance.comment
     flat_class.annotation = flat_instance.annotation
+    flat_class.external = flat_instance.external
 
     # Convert symbols
     for name, isym in flat_instance.symbols.items():
@@ -2097,6 +2166,9 @@ def expand_connectors(node: ast.Class) -> None:
 
 def add_variable_value_statements(node: ast.Class) -> None:
     for sym in node.symbols.values():
+        # The external call computes outputs, and input bindings are default arguments
+        if node.external is not None and sym.visibility != ast.Visibility.PROTECTED:
+            continue
         if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
             node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
             sym.value = ast.Primary(value=None)
