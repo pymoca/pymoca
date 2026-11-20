@@ -680,7 +680,7 @@ def _generate_external_object_model(model_name):
 def test_external_objects():
     """A model's external objects live as long as the Model (MLS 12.9.7)."""
     casadi_model = _generate_external_object_model("Table")
-    assert [p.symbol.name() for p in casadi_model.parameters] == ["vals"]
+    assert [p.symbol.name() for p in casadi_model.parameters] == ["vals", "scaled"]
     residual = _residual_function(casadi_model)
     # The constructor binding is a modification of a parameter, or an equation of a variable
     np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [3.6, 7.5, 8.1])
@@ -780,6 +780,9 @@ def test_external_string_arguments():
     residual = _residual_function(casadi_model)
     np.testing.assert_array_equal(-np.array(residual(0.0, [0, 0])).ravel(), [2, 1])
 
+    with pytest.raises(NotImplementedError, match="String input names of external function"):
+        gen_casadi.generate(ast_tree, "ExternalCasadi.ForwardedString")
+
 
 @needs_compiler
 def test_external_object_arguments():
@@ -791,6 +794,33 @@ def test_external_object_arguments():
     vals = [5, 3, 1, 9, 6]
     assert float(residual(0.7, vals, 2, 0)) == pytest.approx(-5.6)
     assert float(residual(4.5, vals, 3, 0)) == pytest.approx(-9.0)
+
+
+def test_function_in_for_equation():
+    """A function generated for a call in a for-equation does not see its index."""
+    ast_tree = parser.parse(
+        """
+        model ForFunction
+          function twice
+            input Real i;
+            output Real y;
+          algorithm
+            y := 2 * i;
+          end twice;
+          Real x[3];
+        equation
+          for i in 1:3 loop
+            x[i] = twice(10.0 * i);
+          end for;
+        end ForFunction;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "ForFunction")
+    x = casadi_model.alg_states[0].symbol
+    residual = ca.vertcat(*casadi_model.equations)
+    np.testing.assert_array_equal(
+        -np.array(ca.evalf(ca.substitute(residual, x, 0))).ravel(), [20, 40, 60]
+    )
 
 
 def test_pure_function():

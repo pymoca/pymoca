@@ -45,6 +45,10 @@ double interpolateMyTableDer(void *object, double u, double der_u) {
     return (table->array[i + 1] - table->array[i]) * der_u;
 }
 
+int stringLength(const char *s) {
+    return (int)strlen(s);
+}
+
 typedef struct {
     MyTable *table;
     int shift;

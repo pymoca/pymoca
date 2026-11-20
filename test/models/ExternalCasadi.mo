@@ -180,6 +180,17 @@ package ExternalCasadi
     der_y := k * der_x + x * der_k;
   end scaledDer;
 
+  function nameLength
+    input Real x;
+    input String name = "abc";
+    output Real y;
+  protected
+    Real ys[1];
+  algorithm
+    ys := lengths({name});
+    y := x * ys[1];
+  end nameLength;
+
   model Smooth
     input Real u;
     parameter Real p = 3;
@@ -194,6 +205,11 @@ package ExternalCasadi
     input Real u;
     Real y[2] = lengths({"ab", "c"});
   end StringArray;
+
+  model ForwardedString
+    input Real u;
+    Real y = nameLength(u);
+  end ForwardedString;
 
   model Numeric
     input Real u;
