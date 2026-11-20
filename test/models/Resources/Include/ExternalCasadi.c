@@ -1,0 +1,42 @@
+#include <math.h>
+#include <stddef.h>
+#include <stdio.h>
+#include "ModelicaUtilities.h"
+
+void weightedSum(const double *a, size_t n, size_t m, const double *w, double *y) {
+    for (size_t i = 0; i < n; i++) {
+        y[i] = 0;
+        for (size_t j = 0; j < m; j++) {
+            y[i] += a[i * m + j] * w[j];
+        }
+    }
+}
+
+void scaleShift(double x, int k, int negate, int c, double *y, int *m) {
+    *y = (negate ? -x : x) * k;
+    *m = k + c;
+}
+
+const char *describe(const char *name, double x) {
+    char *s = ModelicaAllocateString(63);
+    snprintf(s, 64, "%s=%g", name, x);
+    return s;
+}
+
+double checkedSqrt(double x) {
+    if (x < 0) {
+        ModelicaFormatError("checkedSqrt: negative input %g", x);
+    }
+    return sqrt(x);
+}
+
+double sumWithWork(const double *x, size_t nx, double *work, int n) {
+    double sum = 0;
+    for (size_t i = 0; i < nx; i++) {
+        sum += x[i];
+    }
+    for (int j = 0; j < n; j++) {
+        sum += work[j];
+    }
+    return sum;
+}

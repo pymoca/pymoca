@@ -12,7 +12,11 @@ import tempfile
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
+import numpy as np
+
 from pymoca import ast
+
+from ._evaluate import EvaluationError, Evaluator
 
 logger = logging.getLogger("pymoca")
 
@@ -406,3 +410,266 @@ class ExternalLibrary:
             # Atomic, so concurrent builds of the same library never load a partial file
             os.replace(output, target)
         return target
+
+
+class _CType:
+    """C representation of a Modelica scalar type (MLS 12.9.1.1)."""
+
+    def __init__(self, name: str, ctype, dtype=None):
+        self.name = name
+        self.ctype = ctype
+        self.dtype = dtype
+
+
+_REAL = _CType("double", ctypes.c_double, np.float64)
+_INTEGER = _CType("int", ctypes.c_int, np.intc)
+_STRING = _CType("const char *", ctypes.c_char_p)
+_OBJECT = _CType("void *", ctypes.c_void_p)
+_SIZE = _CType("size_t", ctypes.c_size_t)
+_BUILTIN_TYPES = {"Real": _REAL, "Integer": _INTEGER, "Boolean": _INTEGER, "String": _STRING}
+
+
+def _is_scalar_dims(dimensions) -> bool:
+    return all(isinstance(d, ast.Primary) and d.value is None for dims in dimensions for d in dims)
+
+
+class _Argument:
+    """One argument of an external call, or its returned output."""
+
+    def __init__(self, ctype: _CType, symbol: Optional[ast.Symbol], expression=None):
+        self.ctype = ctype
+        self.symbol = symbol
+        self.expression = expression
+        self.is_array = symbol is not None and not _is_scalar_dims(symbol.dimensions)
+        self.is_input = symbol is not None and "input" in symbol.prefixes
+
+    def c_parameter(self) -> str:
+        if self.symbol is None or (self.is_input and not self.is_array):
+            return self.ctype.name
+        if self.is_input or self.ctype is _STRING:
+            # An output string is set to a string that the callee allocated
+            base = self.ctype.name if self.ctype is _STRING else f"const {self.ctype.name}"
+            return f"{base} *"
+        return f"{self.ctype.name} *"
+
+    def c_expression(self, index: int) -> str:
+        parameter = self.c_parameter()
+        if self.symbol is None or (self.is_input and not self.is_array):
+            return f"*({parameter} *)a[{index}]"
+        return f"({parameter})a[{index}]"
+
+
+class ExternalFunction:
+    """A flat external function, called numerically through a generated C wrapper (MLS 12.9)."""
+
+    def __init__(self, tree: ast.Class, wrapper: str):
+        self.tree = tree
+        self.name = tree.name
+        self.wrapper = wrapper
+        self.external = tree.external
+        self.library: Optional[ExternalLibrary] = None
+        self.inputs = [s for s in tree.symbols.values() if "input" in s.prefixes]
+        self.outputs = [s for s in tree.symbols.values() if "output" in s.prefixes]
+        if self.external.language not in ("C", "builtin"):
+            raise NotImplementedError(
+                f"External function {self.name}: language {self.external.language!r} is not"
+                " supported"
+            )
+        output = self.external.output
+        self.returned = None if output is None else self._argument(output)
+        self.arguments = [self._argument(arg) for arg in self.external.arguments]
+
+    def ctype_of(self, symbol: ast.Symbol) -> _CType:
+        type_name = str(symbol.type)
+        if type_name in _BUILTIN_TYPES:
+            return _BUILTIN_TYPES[type_name]
+        if type_name in self.tree.external_objects:
+            return _OBJECT
+        # Enumerations are passed as their ordinal (MLS 12.9.1.1)
+        return _INTEGER
+
+    def is_external_object(self, symbol: ast.Symbol) -> bool:
+        return self.ctype_of(symbol) is _OBJECT
+
+    def _argument(self, expression) -> _Argument:
+        if isinstance(expression, ast.ComponentRef) and expression.name in self.tree.symbols:
+            if any(i is not None for dims in expression.indices for i in dims):
+                raise NotImplementedError(
+                    f"External function {self.name}: subscripted argument {expression}"
+                )
+            symbol = self.tree.symbols[expression.name]
+            if "constant" in symbol.prefixes or "parameter" in symbol.prefixes:
+                return _Argument(self.ctype_of(symbol), None, symbol.value)
+            return _Argument(self.ctype_of(symbol), symbol)
+        if isinstance(expression, ast.Expression) and str(expression.operator) == "size":
+            return _Argument(_SIZE, None, expression)
+        if isinstance(expression, ast.Primary) and isinstance(expression.value, str):
+            return _Argument(_STRING, None, expression)
+        is_real = isinstance(expression, ast.Primary) and isinstance(expression.value, float)
+        return _Argument(_REAL if is_real else _INTEGER, None, expression)
+
+    def glue(self, declare: bool) -> str:
+        """Return the C wrapper, with a prototype of the external function if *declare*."""
+        ret = self.returned.ctype.name if self.returned is not None else "void"
+        name = self.external.external_name
+        lines = []
+        if declare:
+            parameters = ", ".join(a.c_parameter() for a in self.arguments) or "void"
+            lines.append(f"{ret} {name}({parameters});")
+        call = "{}({})".format(
+            name, ", ".join(a.c_expression(i + 1) for i, a in enumerate(self.arguments))
+        )
+        statement = f"*({ret} *)a[0] = {call};" if self.returned is not None else f"{call};"
+        lines += [
+            f"PYMOCA_EXPORT int {self.wrapper}(void **a) {{",
+            "    PYMOCA_TRY",
+            f"    {statement}",
+            "    PYMOCA_END",
+            "}",
+        ]
+        return "\n".join(lines)
+
+    def _evaluator(self, values: dict):
+        def lookup(name):
+            if name in values:
+                return values[name]
+            symbol = self.tree.symbols.get(name)
+            if symbol is None:
+                raise EvaluationError(f"Unknown name {name} in external function {self.name}")
+            values[name] = evaluator(symbol.value)
+            return values[name]
+
+        evaluator = Evaluator(lookup)
+        return evaluator
+
+    def _shape(self, symbol: ast.Symbol, evaluate) -> tuple:
+        shape = []
+        for dims in symbol.dimensions:
+            for dim in dims:
+                if isinstance(dim, ast.Primary) and dim.value is None:
+                    continue
+                if isinstance(dim, ast.Slice):
+                    raise NotImplementedError(
+                        f"External function {self.name}: the size of {symbol.name} is unknown"
+                    )
+                shape.append(int(evaluate(dim)))
+        return tuple(shape)
+
+    def _storage(self, ctype: _CType, value, is_array: bool):
+        """Return the ctypes storage of a value and a pointer to it."""
+        if ctype is _STRING:
+            if is_array:
+                strings = [s.encode("utf-8") for s in np.ravel(value)]
+                storage = (ctypes.c_char_p * max(len(strings), 1))(*strings)
+            else:
+                storage = ctypes.c_char_p(None if value is None else value.encode("utf-8"))
+            return storage, ctypes.addressof(storage)
+        if is_array:
+            array = np.ascontiguousarray(value, dtype=ctype.dtype)
+            return array, array.ctypes.data
+        storage = ctype.ctype(value)
+        return storage, ctypes.addressof(storage)
+
+    @staticmethod
+    def _read(ctype: _CType, symbol: ast.Symbol, storage, is_array: bool):
+        if ctype is _STRING:
+            if is_array:
+                return [(s or b"").decode("utf-8") for s in storage]
+            return (storage.value or b"").decode("utf-8")
+        if is_array:
+            return storage.copy()
+        value = storage.value
+        type_name = str(symbol.type)
+        if type_name == "Boolean":
+            return bool(value)
+        return value
+
+    def __call__(self, *inputs) -> list:
+        """Call the function with its inputs in declaration order and return its outputs.
+
+        Arrays are numpy arrays, strings are str, and external objects are pointers.
+
+        Raises:
+            ExternalFunctionError: if the external code calls ModelicaError
+        """
+        assert self.library is not None, "bind() the function to its library first"
+        if len(inputs) != len(self.inputs):
+            raise TypeError(
+                f"{self.name} takes {len(self.inputs)} inputs, {len(inputs)} were given"
+            )
+        values = {s.name: v for s, v in zip(self.inputs, inputs)}
+        evaluate = self._evaluator(values)
+
+        storage = {}
+        for symbol in self.tree.symbols.values():
+            if "constant" in symbol.prefixes or "parameter" in symbol.prefixes:
+                continue
+            ctype = self.ctype_of(symbol)
+            is_array = not _is_scalar_dims(symbol.dimensions)
+            if symbol.name in values:
+                value = values[symbol.name]
+            elif ctype is _STRING:
+                value = None
+            else:
+                shape = self._shape(symbol, evaluate)
+                value = np.zeros(shape, dtype=ctype.dtype) if is_array else 0
+                values[symbol.name] = value
+            storage[symbol.name] = self._storage(ctype, value, is_array)
+        for statement in self.tree.statements:
+            # Bindings of protected variables, such as work arrays
+            (target,) = statement.left
+            value = evaluate(statement.right)
+            symbol = self.tree.symbols[target.name]
+            is_array = not _is_scalar_dims(symbol.dimensions)
+            values[target.name] = value
+            storage[target.name] = self._storage(self.ctype_of(symbol), value, is_array)
+
+        keep = []
+        pointers = (ctypes.c_void_p * (len(self.arguments) + 1))()
+        returned = self.returned
+        if returned is not None:
+            pointers[0] = storage[returned.symbol.name][1]
+        for i, argument in enumerate(self.arguments, 1):
+            if argument.symbol is not None:
+                pointers[i] = storage[argument.symbol.name][1]
+                continue
+            value = evaluate(argument.expression)
+            item, pointer = self._storage(argument.ctype, value, False)
+            keep.append(item)
+            pointers[i] = pointer
+
+        try:
+            self.library.call(self.wrapper, pointers)
+            return [
+                self._read(
+                    self.ctype_of(s),
+                    s,
+                    storage[s.name][0],
+                    not _is_scalar_dims(s.dimensions),
+                )
+                for s in self.outputs
+            ]
+        finally:
+            self.library.free_strings()
+
+
+def load_external_functions(
+    functions: Sequence[ast.Class],
+    external_library_paths: Sequence[str] = (),
+    cache_dir: Optional[Path] = None,
+) -> dict:
+    """Build one library for the flat external *functions* and return them by name."""
+    loaded = {f.name: ExternalFunction(f, f"pymoca_ext_{i}") for i, f in enumerate(functions)}
+    includes = [inc for f in functions for inc in f.external.resources.includes]
+    glue = ['#include "pymoca_external.h"', *dict.fromkeys(includes)]
+    for function in loaded.values():
+        glue.append(function.glue(declare=not function.external.resources.includes))
+    library = ExternalLibrary(
+        "\n".join(glue) + "\n",
+        [f.external.resources for f in functions],
+        external_library_paths,
+        cache_dir,
+    )
+    for function in loaded.values():
+        function.library = library
+    return loaded
