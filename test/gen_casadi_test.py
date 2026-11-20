@@ -692,6 +692,33 @@ def test_external_objects():
 
 
 @needs_compiler
+def test_external_function_sensitivities(caplog):
+    """Sensitivities use derivative functions, or else finite differences (MLS 12.7.1)."""
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalCasadi.mo"))
+    with caplog.at_level("WARNING", logger="pymoca"):
+        casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.Smooth")
+    u = casadi_model.inputs[0].symbol
+    c, r = (
+        -ca.substitute(eq, v.symbol, 0)
+        for eq, v in zip(casadi_model.equations, casadi_model.alg_states)
+    )
+    derivatives = ca.Function(
+        "derivatives", [u], [ca.jacobian(c, u), ca.hessian(c, u)[0], ca.jacobian(r, u)]
+    )
+    dc, d2c, dr = (float(v) for v in derivatives(2.0))
+    # c = 2 u^3: exact from cubeDer and, by its order 2 annotation, cubeDer2
+    assert (dc, d2c) == (24.0, 24.0)
+    assert dr == pytest.approx(0.25 / np.sqrt(0.5), rel=1e-6)
+    assert "checkedSqrt has no derivative function" in caplog.text
+    assert "cubeDer2" not in caplog.text
+
+    casadi_model = _generate_external_object_model("Table")
+    u = casadi_model.inputs[0].symbol
+    y = -ca.substitute(casadi_model.equations[0], casadi_model.alg_states[0].symbol, 0)
+    assert float(ca.Function("dy", [u], [ca.jacobian(y, u)])(0.7)) == -2.0
+
+
+@needs_compiler
 def test_external_objects_in_function():
     """A protected external object of a function lives for one call (MLS 12.9.7)."""
     casadi_model = _generate_external_object_model("TableInFunction")

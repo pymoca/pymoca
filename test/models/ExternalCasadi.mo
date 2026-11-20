@@ -60,6 +60,41 @@ package ExternalCasadi
     y := 2 * checkedSqrt(x);
   end twiceSqrt;
 
+  function cube
+    input Real x;
+    input Integer k;
+    output Real y;
+  external "C" y = cube(x, k)
+    annotation(Library = "ExternalCasadi");
+    annotation(derivative = cubeDer);
+  end cube;
+
+  function cubeDer
+    input Real x;
+    input Integer k;
+    input Real der_x;
+    output Real der_y;
+  external "C" der_y = cubeDer(x, k, der_x)
+    annotation(Library = "ExternalCasadi");
+    annotation(derivative(order = 2) = cubeDer2);
+  end cubeDer;
+
+  function cubeDer2
+    input Real x;
+    input Integer k;
+    input Real der_x;
+    input Real der2_x;
+    output Real der2_y;
+  external "C" der2_y = cubeDer2(x, k, der_x, der2_x)
+    annotation(Library = "ExternalCasadi");
+  end cubeDer2;
+
+  model Smooth
+    input Real u;
+    Real c = cube(u, 2);
+    Real r = checkedSqrt(u);
+  end Smooth;
+
   model Numeric
     input Real u;
     parameter String key = "double";

@@ -45,3 +45,15 @@ double sumWithWork(const double *x, size_t nx, double *work, int n) {
 double lookupScale(const char *key, double x) {
     return strcmp(key, "double") == 0 ? 2 * x : x;
 }
+
+double cube(double x, int k) {
+    return k * x * x * x;
+}
+
+double cubeDer(double x, int k, double der_x) {
+    return 3 * k * x * x * der_x;
+}
+
+double cubeDer2(double x, int k, double der_x, double der2_x) {
+    return 6 * k * x * der_x * der_x + 3 * k * x * x * der2_x;
+}

@@ -205,16 +205,67 @@ def _casadi_shape(shape: tuple) -> tuple:
     return tuple(shape) + (1,) * (2 - len(shape))
 
 
+def _n_dims(symbol: ast.Symbol) -> int:
+    return sum(
+        not (isinstance(d, ast.Primary) and d.value is None)
+        for dims in symbol.dimensions
+        for d in dims
+    )
+
+
+class ExternalCallbacks:
+    """Callbacks of the external functions of a model, by function and call signature."""
+
+    def __init__(self, functions: dict, owner: list, finite_differences: bool):
+        self.functions = functions
+        # CasADi destroys a Callback with its Python object, so owner keeps them
+        self.owner = owner
+        self.finite_differences = finite_differences
+        self.callbacks = {}
+        # Functions already warned about using finite differences
+        self.warned = set()
+
+    def call(self, function_name: str, args: dict, bound: dict, derivative=False) -> list:
+        """Call *function_name* with MX *args* and *bound* values, both by input index.
+
+        A *derivative* function does not warn about finite differences of its own.
+        """
+        function = self.functions[function_name]
+        shapes = {}
+        for i, arg in args.items():
+            n_dims = _n_dims(function.inputs[i])
+            shapes[i] = () if n_dims == 0 else (arg.numel(),) if n_dims == 1 else arg.shape
+        key = (function_name, tuple(sorted(shapes.items())), tuple(sorted(bound.items())))
+        callback = self.callbacks.get(key)
+        if callback is None:
+            name = "{}_{}".format(function_name.replace(".", "_"), len(self.callbacks))
+            callback = ExternalFunctionCallback(name, function, shapes, bound, self, derivative)
+            self.callbacks[key] = callback
+            self.owner.append(callback)
+        return callback.call([args[i] for i in sorted(args)])
+
+
 class ExternalFunctionCallback(ca.Callback):
     """CasADi function that calls an external function numerically (MLS 12.9).
 
     Inputs bound at the call site, such as strings, are not inputs of the CasADi function.
+    Sensitivities come from the derivative functions of the function (MLS 12.7.1), or else
+    from finite differences.
     """
 
-    def __init__(self, name: str, function: ExternalFunction, shapes: dict, bound: dict):
+    def __init__(
+        self,
+        name: str,
+        function: ExternalFunction,
+        shapes: dict,
+        bound: dict,
+        callbacks: ExternalCallbacks,
+        derivative: bool,
+    ):
         ca.Callback.__init__(self)
         self.function = function
         self.bound = bound
+        self.callbacks = callbacks
         self.free = [i for i in range(len(function.inputs)) if i not in bound]
         self.input_shapes = [shapes[i] for i in self.free]
         self.output_shapes = function.output_shapes(
@@ -226,7 +277,21 @@ class ExternalFunctionCallback(ca.Callback):
                     f"String output {symbol.name} of external function {function.name}"
                     " cannot be used in equations"
                 )
-        self.construct(name, {})
+        derivatives = {d.order: d for d in function.tree.derivatives}
+        self.derivative = derivatives.get(1)
+        self.second_derivative = derivatives.get(2) if self.derivative is None else None
+        opts = {}
+        if self.derivative is None and self.second_derivative is None:
+            if callbacks.finite_differences:
+                opts["enable_fd"] = True
+                if not derivative and function.name not in callbacks.warned:
+                    callbacks.warned.add(function.name)
+                    logger.warning(
+                        "External function %s has no derivative function, its sensitivities"
+                        " use finite differences",
+                        function.name,
+                    )
+        self.construct(name, opts)
 
     def get_n_in(self):
         return len(self.free)
@@ -261,6 +326,92 @@ class ExternalFunctionCallback(ca.Callback):
             for value, shape in zip(outputs, self.output_shapes)
         ]
 
+    def has_forward(self, nfwd):
+        return self.derivative is not None or self.second_derivative is not None
+
+    def _differentiable(self, annotation, inputs: list) -> list:
+        """Return the indices of the Real *inputs* that have a derivative input (MLS 12.7.1)."""
+        excluded = set(annotation.no_derivative) | set(annotation.zero_derivative)
+        return [
+            i
+            for i, symbol in enumerate(inputs)
+            if str(symbol.type) == "Real" and symbol.name not in excluded
+        ]
+
+    def _derivative_outputs(self, outputs: list) -> list:
+        """Map the outputs of a derivative function to the outputs, zero if not Real."""
+        result, it = [], iter(outputs)
+        for symbol, shape in zip(self.function.outputs, self.output_shapes):
+            real = str(symbol.type) == "Real"
+            result.append(next(it) if real else ca.MX.zeros(*_casadi_shape(shape)))
+        return result
+
+    def _first_order(self, x: dict, seeds: dict) -> list:
+        """Directional derivative from the derivative function: df(x, s)."""
+        annotation = self.derivative
+        n = len(self.function.inputs)
+        der_inputs = self._differentiable(annotation, self.function.inputs)
+        args = dict(x)
+        for j, i in enumerate(der_inputs):
+            args[n + j] = seeds[i]
+        outputs = self.callbacks.call(annotation.function, args, self.bound, True)
+        return self._derivative_outputs(outputs)
+
+    def _second_order(self, x: dict, seeds: dict) -> list:
+        """Directional derivative of a derivative function from its order 2 function.
+
+        This function is d(z, dz) = f'(z) dz, linear in dz, and the order 2 function gives
+        f''(z)[a, a] at (z, a, 0), so its mixed term follows by polarization.
+        """
+        annotation = self.second_derivative
+        n = len(self.function.inputs)
+        n_der = len(self.callbacks.functions[annotation.function].inputs) - n
+        z_inputs = self._differentiable(annotation, self.function.inputs[: n - n_der])
+        if len(z_inputs) != n_der:
+            raise NotImplementedError(
+                f"Order 2 derivative {annotation.function} of {self.function.name}: cannot pair"
+                " its inputs with the derivative inputs"
+            )
+        dz = [n - n_der + j for j in range(n_der)]
+
+        def d(values: dict) -> list:
+            return self.callbacks.call(self.function.name, values, self.bound, True)
+
+        def d2(directions: list) -> list:
+            args = dict(x)
+            for j, (i, direction) in enumerate(zip(dz, directions)):
+                args[i] = direction
+                args[n + j] = ca.MX.zeros(*direction.shape)
+            return self.callbacks.call(annotation.function, args, self.bound, True)
+
+        linear = d({**x, **{i: seeds[i] for i in dz}})
+        sx = [seeds[i] for i in z_inputs]
+        nominal = [x[i] for i in dz]
+        both = d2([a + b for a, b in zip(nominal, sx)])
+        mixed = [0.5 * (ab - a - b) for ab, a, b in zip(both, d2(nominal), d2(sx))]
+        return [lin + m for lin, m in zip(linear, self._derivative_outputs(mixed))]
+
+    def get_forward(self, nfwd, name, inames, onames, opts):
+        x = [ca.MX.sym(f"x{i}", self.sparsity_in(i)) for i in range(self.get_n_in())]
+        y = [ca.MX.sym(f"y{i}", self.sparsity_out(i)) for i in range(self.get_n_out())]
+        seeds = [
+            ca.MX.sym(f"s{i}", ca.repmat(self.sparsity_in(i), 1, nfwd))
+            for i in range(self.get_n_in())
+        ]
+        x_by_index = dict(zip(self.free, x))
+        directions = []
+        for k in range(nfwd):
+            seeds_k = {
+                i: s[:, k * xi.size2() : (k + 1) * xi.size2()]
+                for i, s, xi in zip(self.free, seeds, x)
+            }
+            if self.derivative is not None:
+                directions.append(self._first_order(x_by_index, seeds_k))
+            else:
+                directions.append(self._second_order(x_by_index, seeds_k))
+        sensitivities = [ca.horzcat(*outputs) for outputs in zip(*directions)]
+        return ca.Function(name, x + y + seeds, sensitivities, inames, onames, opts)
+
 
 class LocalObjectsCallback(ca.Callback):
     """A function with protected external objects, built at entry and destroyed at return.
@@ -270,12 +421,12 @@ class LocalObjectsCallback(ca.Callback):
     the numeric constructor arguments, with *bound* holding the others (MLS 12.9.7).
     """
 
-    def __init__(self, name: str, body: ca.Function, constructors: list):
+    def __init__(self, name: str, body: ca.Function, constructors: list, opts: dict):
         ca.Callback.__init__(self)
         self.body = body
         self.constructors = constructors
         self.n_inputs = body.n_in() - len(constructors)
-        self.construct(name, {})
+        self.construct(name, opts)
 
     def get_n_in(self):
         return self.n_inputs
@@ -334,8 +485,8 @@ class Generator(TreeListener):
         self.function_mode = (True, False) if options["inline_functions"] else (False, True)
         self.delay_counter = 0
         self.external_library_paths = options["external_library_paths"]
-        self._external_functions = None
-        self._external_callbacks = {}
+        self.external_finite_differences = options["external_finite_differences"]
+        self._external = None
         # Ids of the model's external objects by symbol name
         self.external_objects = {}
 
@@ -1420,16 +1571,22 @@ class Generator(TreeListener):
         evaluate = Evaluator(lookup)
         return evaluate
 
-    def get_external_function(self, function_name: str) -> ExternalFunction:
-        if self._external_functions is None:
+    @property
+    def external(self) -> ExternalCallbacks:
+        if self._external is None:
             # Built on first use, so models that never call external code need no compiler
             functions = [
                 c for c in self.root.classes.values() if c.type == "function" and c.external
             ]
-            self._external_functions = load_external_functions(
-                functions, self.external_library_paths
+            self._external = ExternalCallbacks(
+                load_external_functions(functions, self.external_library_paths),
+                self.model._external_callbacks,
+                self.external_finite_differences,
             )
-        return self._external_functions[function_name]
+        return self._external
+
+    def get_external_function(self, function_name: str) -> ExternalFunction:
+        return self.external.functions[function_name]
 
     def _call_external(self, function_name: str, operands: list) -> list:
         """Return the outputs of a call to an external function through a callback."""
@@ -1441,27 +1598,13 @@ class Generator(TreeListener):
             raise NotImplementedError(
                 f"Call to external function {function_name} without all of its arguments"
             )
-        bound, shapes, args = {}, {}, []
+        bound, args = {}, {}
         for i, (symbol, operand) in enumerate(zip(function.inputs, operands)):
             if function.is_string(symbol):
                 bound[i] = self.evaluator()(operand)
-                continue
-            arg = ca.MX(_array_to_mx(self.get_mx(operand)))
-            n_dims = sum(
-                not (isinstance(d, ast.Primary) and d.value is None)
-                for dims in symbol.dimensions
-                for d in dims
-            )
-            shapes[i] = () if n_dims == 0 else (arg.numel(),) if n_dims == 1 else arg.shape
-            args.append(arg)
-        key = (function_name, tuple(shapes.items()), tuple(bound.items()))
-        callback = self._external_callbacks.get(key)
-        if callback is None:
-            name = "{}_{}".format(function_name.replace(".", "_"), len(self._external_callbacks))
-            callback = ExternalFunctionCallback(name, function, shapes, bound)
-            self._external_callbacks[key] = callback
-            self.model._external_callbacks.append(callback)
-        return callback.call(args)
+            else:
+                args[i] = ca.MX(_array_to_mx(self.get_mx(operand)))
+        return self.external.call(function_name, args, bound)
 
     def _external_object_binding(self, tree: ast.Class, symbol: ast.Symbol) -> ast.Expression:
         """Remove and return the constructor call that binds an external object (MLS 12.9.7)."""
@@ -1529,7 +1672,9 @@ class Generator(TreeListener):
         body = self._statements_function(
             tree.name + "_body", inputs + object_ids, outputs, tmp, statements
         )
-        callback = LocalObjectsCallback(tree.name.replace(".", "_"), body, constructors)
+        # Objects exist only within a call, so sensitivities use finite differences
+        opts = {"enable_fd": self.external_finite_differences}
+        callback = LocalObjectsCallback(tree.name.replace(".", "_"), body, constructors, opts)
         self.model._external_callbacks.append(callback)
         return callback
 

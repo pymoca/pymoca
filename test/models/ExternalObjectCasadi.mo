@@ -22,7 +22,17 @@ package ExternalObjectCasadi
     output Real y;
   external "C"
     y = interpolateMyTable(interpolTable, u);
+    annotation(derivative(noDerivative = interpolTable) = interpolateMyTableDer);
   end interpolateMyTable;
+
+  function interpolateMyTableDer
+    input MyTable interpolTable;
+    input Real u;
+    input Real der_u;
+    output Real der_y;
+  external "C"
+    der_y = interpolateMyTableDer(interpolTable, u, der_u);
+  end interpolateMyTableDer;
 
   function interpolateMyTableFunc
     input Real[5] vals;
