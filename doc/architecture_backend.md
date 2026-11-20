@@ -12,6 +12,16 @@ feeds the backends.
 
 ## CasADi Backend
 
+### External Functions and Objects (MLS 12.9)
+
+The backend compiles the external C code of a model into one shared library.
+
+Choices the spec leaves open:
+
+- `LibraryDirectory` is searched in `<os><bits>` (such as `linux64`) and
+  `<machine>-<os>` subdirectories, then itself, but not in compiler subdirectories such
+  as `win64/vs2019` (MLS 12.9.4)
+
 ### TODO / WIP / Stubs
 
 - `min` and `max` of an empty array give the values for Real, also for Integer expressions,
