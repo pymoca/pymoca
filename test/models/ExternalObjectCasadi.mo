@@ -58,6 +58,14 @@ package ExternalObjectCasadi
     end if;
   end interpolateShiftedFunc;
 
+  function tableOf
+    input Real a;
+    input Real b = a;
+    output Real y[5];
+  algorithm
+    y := {0, a + b, 0, 0, 0};
+  end tableOf;
+
   pure function interpolateMyTable
     input MyTable interpolTable;
     input Real u;
@@ -112,6 +120,10 @@ package ExternalObjectCasadi
     Real w = interpolateMyTable(reversed, u);
   end Table;
 
+  model ScaledTable
+    extends Table(scaled = true, scale = "twice");
+  end ScaledTable;
+
   model TableInFunction
     parameter Real vals[5] = {5, 3, 1, 9, 6};
     input Real u;
@@ -124,6 +136,12 @@ package ExternalObjectCasadi
     input Real u;
     Real y = interpolateShiftedFunc(vals, shift, u);
   end ShiftedInFunction;
+
+  model DefaultArgument
+    parameter Real a = 5;
+    parameter MyTable myTable = MyTable(tableOf(1.0));
+    Real y = interpolateMyTable(myTable, 1.0);
+  end DefaultArgument;
 
   model FreeTable
     parameter Real vals[5];

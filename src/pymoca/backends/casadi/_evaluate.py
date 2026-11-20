@@ -166,3 +166,53 @@ class Evaluator:
             raise EvaluationError(f"Cannot evaluate a call to {op}")
         outputs = self.call(op, args)
         return outputs[0]
+
+
+def interpret_function(tree: ast.Class, args: List[Any], call) -> List[Any]:
+    """Run the algorithm of a flat function on numeric *args* and return its outputs.
+
+    Calls to other functions go to *call*.
+    """
+    inputs = [s for s in tree.symbols.values() if "input" in s.prefixes]
+    env = {s.name: a for s, a in zip(inputs, args)}
+
+    def lookup(name):
+        if name in env:
+            return env[name]
+        symbol = tree.symbols.get(name)
+        if symbol is None or (isinstance(symbol.value, ast.Primary) and symbol.value.value is None):
+            raise EvaluationError(f"{name} has no value in function {tree.name}")
+        env[name] = evaluate(symbol.value)
+        return env[name]
+
+    evaluate = Evaluator(lookup, call)
+
+    def run(statements):
+        for statement in statements:
+            if isinstance(statement, ast.AssignmentStatement):
+                targets = [t.name for t in statement.left]
+                if len(targets) == 1:
+                    env[targets[0]] = evaluate(statement.right)
+                else:
+                    outputs = call(
+                        str(statement.right.operator),
+                        [evaluate(o) for o in statement.right.operands],
+                    )
+                    env.update(zip(targets, outputs))
+            elif isinstance(statement, ast.IfStatement):
+                for condition, block in zip(statement.conditions, statement.blocks):
+                    if evaluate(condition):
+                        run(block)
+                        break
+            elif isinstance(statement, ast.ForStatement):
+                (index,) = statement.indices
+                for value in np.ravel(evaluate(index.expression)):
+                    env[index.name] = _scalar(value)
+                    run(statement.statements)
+            else:
+                raise EvaluationError(
+                    f"Cannot evaluate a {type(statement).__name__} in function {tree.name}"
+                )
+
+    run(tree.statements)
+    return [lookup(s.name) for s in tree.symbols.values() if "output" in s.prefixes]

@@ -49,6 +49,11 @@ Departures from the spec:
 
 Not implemented:
 
+- Named arguments are dropped by the parser, so a call with named arguments gets the
+  defaults of its trailing inputs, or fails when they have none, such as the MLS 12.9.7
+  example `MyTable(fileName = "testTables.txt", tableName = "table1")` (MLS 12.4.1)
+- Default inputs are only filled in for calls evaluated at generation time. A call in an
+  equation must give all inputs of an external function
 - A String argument of an external function must evaluate at generation time, from
   literals and String parameters. A String input of a calling Modelica function raises
   `NotImplementedError`, and a Modelica function cannot be called in an equation with a

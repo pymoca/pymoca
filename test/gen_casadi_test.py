@@ -693,6 +693,11 @@ def test_external_objects():
     gc.collect()
     assert library.cdll.countMyTables() == 0
 
+    # Constructor arguments may call functions, here an algorithm with an external call
+    casadi_model = _generate_external_object_model("ScaledTable")
+    residual = _residual_function(casadi_model)
+    np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [7.2, 15.0, 8.1])
+
     with pytest.raises(NotImplementedError, match="myTable must evaluate at generation time"):
         _generate_external_object_model("FreeTable")
 
@@ -794,6 +799,11 @@ def test_external_object_arguments():
     vals = [5, 3, 1, 9, 6]
     assert float(residual(0.7, vals, 2, 0)) == pytest.approx(-5.6)
     assert float(residual(4.5, vals, 3, 0)) == pytest.approx(-9.0)
+
+    # Defaults of inputs depend on the other inputs, not on the model (MLS 12.4.1)
+    casadi_model = _generate_external_object_model("DefaultArgument")
+    y = casadi_model.alg_states[0].symbol
+    assert float(ca.evalf(ca.substitute(casadi_model.equations[0], y, 0))) == -2.0
 
 
 def test_function_in_for_equation():

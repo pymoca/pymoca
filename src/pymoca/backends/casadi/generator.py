@@ -17,7 +17,7 @@ import numpy as np
 from pymoca import ast
 from pymoca.tree import TreeListener, TreeWalker, flatten, range_values
 
-from ._evaluate import EvaluationError, Evaluator
+from ._evaluate import EvaluationError, Evaluator, interpret_function
 from ._options import _merge_default_options
 from .external import ExternalFunction, ExternalObject, load_external_functions, object_pointer
 from .model import DelayArgument, Model, StringVariable, Variable
@@ -1706,6 +1706,8 @@ class Generator(TreeListener):
         symbols = self.current_class.symbols
 
         def lookup(name):
+            if name in self.external_objects:
+                return object_pointer(self.external_objects[name])
             if name in symbols and "input" in symbols[name].prefixes:
                 # Its default only applies to calls without it
                 raise NotImplementedError(f"{name} is an input of {self.current_class.name}")
@@ -1716,7 +1718,16 @@ class Generator(TreeListener):
                 return ordinal
             return evaluate(symbols[name].value)
 
-        evaluate = Evaluator(lookup)
+        def call(name, args):
+            tree = self.root.classes.get(name)
+            if tree is None:
+                raise NotImplementedError(f"Cannot evaluate a call to {name}")
+            # Missing inputs take their defaults, evaluated in the callee (MLS 12.4.1)
+            if tree.external is not None:
+                return self.get_external_function(name)(*args)
+            return interpret_function(tree, args, call)
+
+        evaluate = Evaluator(lookup, call)
         return evaluate
 
     @property
@@ -1810,7 +1821,7 @@ class Generator(TreeListener):
             binding = self._external_object_binding(tree, symbol)
             try:
                 args = [evaluate(operand) for operand in binding.operands]
-            except (NotImplementedError, ValueError) as e:
+            except (NotImplementedError, ValueError, KeyError) as e:
                 raise NotImplementedError(
                     f"The constructor arguments of external object {symbol.name} must evaluate"
                     f" at generation time: {e}"
