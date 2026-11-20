@@ -110,6 +110,7 @@ class ModelicaFile:
 
 _TYPE_KEYWORD_RE = re.compile(r"\b(package|model|connector|record|function|type|block|operator)\b")
 _WITHIN_RE = re.compile(r"\bwithin\s+[^;]*;")
+_EXTERNAL_TOKEN = ModelicaParser.literalNames.index("'external'")
 
 
 def _file_class_type(path: Path) -> str:
@@ -148,6 +149,7 @@ class LazyParseClass(ast.Class):
             "initial_statements",
             "imports",
             "annotation",
+            "external",
             "functions",
             "enumeration",  # True for enumeration types; governs instantiation/flattening
         }
@@ -553,8 +555,39 @@ class ASTListener(ModelicaListener):
                 else:
                     self.class_node.statements += alglist.statements
 
+        if ctx.getToken(_EXTERNAL_TOKEN, 0) is not None:
+            self.class_node.external = self._external_clause(ctx)
+
         if ctx.comp_annotation is not None:
             self.class_node.annotation = self.ast[ctx.comp_annotation]
+
+    def _external_clause(self, ctx: ModelicaParser.CompositionContext) -> ast.ExternalClause:
+        """Build the external function clause of a composition (MLS 12.9)."""
+        if not self.class_node.type.endswith("function"):
+            raise syntax_error_from_ctx("External clause is only allowed in a function", ctx)
+        external = ast.ExternalClause()
+        lang = ctx.language_specification()
+        if lang is not None:
+            external.language = lang.getText()[1:-1]
+            if external.language not in ("builtin", "FORTRAN 77") and not (
+                external.language.startswith("C")
+            ):
+                raise syntax_error_from_ctx(
+                    f'External language "{external.language}" must be "builtin", "C", "C..."'
+                    ' or "FORTRAN 77"',
+                    lang,
+                )
+        call = ctx.external_function_call()
+        if call is not None:
+            if call.component_reference() is not None:
+                external.output = self.ast[call.component_reference()]
+            external.external_name = call.IDENT().getText()  # type: ignore[union-attr]
+            expr_list = call.expression_list()
+            if expr_list is not None:
+                external.arguments = [self.ast[e] for e in expr_list.expression()]  # type: ignore[union-attr]
+        if ctx.ext_annotation is not None:
+            external.annotation = self.ast[ctx.ext_annotation]
+        return external
 
     def exitArgument(self, ctx: ModelicaParser.ArgumentContext):
         # class_spec_base does not create a new scope

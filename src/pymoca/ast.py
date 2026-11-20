@@ -731,6 +731,23 @@ class ExtendsClause(Node):
         )
 
 
+class ExternalClause(Node):
+    """External function interface of a function class (MLS 12.9)."""
+
+    def __init__(self, **kwargs):
+        self.language: str = "C"
+        self.output: ComponentRef | None = None
+        self.external_name: str | None = None
+        self.arguments: list[Expression | Primary | ComponentRef | Array] = []
+        self.annotation: ClassModification | None = None
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(language={!r}, output={!r}, external_name={!r}, arguments={!r})".format(
+            type(self).__name__, self.language, self.output, self.external_name, self.arguments
+        )
+
+
 class Class(Node):
     BUILTIN = ("Real", "Integer", "String", "Boolean")
 
@@ -753,6 +770,7 @@ class Class(Node):
         self.initial_statements: list[AssignmentStatement | IfStatement | ForStatement] = []
         self.statements: list[AssignmentStatement | IfStatement | ForStatement] = []
         self.annotation: ClassModification | None = None
+        self.external: ExternalClause | None = None
         self.parent: Class | None = None
         self.visibility: Visibility = Visibility.PUBLIC
         self.is_short_class_definition: bool = False

@@ -1115,6 +1115,88 @@ def test_subscripted_output_expression_list():
         parser.parse("model M Real y = (1, 2)[1]; end M;")
 
 
+def test_external_clause():
+    """External function clauses keep language, call and annotation (MLS 12.9)."""
+    ast_tree = parser.parse(
+        """
+        package P
+          function f
+            input Real x[:]; output Real y;
+          external "C" y = cfun(x, size(x, 1)) annotation(Library = "m");
+          end f;
+          function g
+            input Real x;
+          external "FORTRAN 77" gfun(x);
+          end g;
+          function h
+            input Real x; output Real y;
+          external "C";
+          end h;
+          function k
+            input Real x; output Real y;
+          external;
+          end k;
+          function n
+            input Real x; output Real y;
+          algorithm
+            y := x;
+          end n;
+        end P;
+        """
+    )
+    classes = ast_tree.classes["P"].classes
+
+    f = classes["f"].external
+    assert (f.language, str(f.output), f.external_name) == ("C", "y", "cfun")
+    assert str(f.arguments[0]) == "x"
+    assert f.arguments[1].operator.to_tuple() == ("size",)
+    (lib,) = f.annotation.arguments
+    assert str(lib.value.component) == "Library"
+    assert lib.value.modifications[0].value == "m"
+    assert classes["f"].annotation is None
+
+    g = classes["g"].external
+    assert (g.language, g.output, g.external_name) == ("FORTRAN 77", None, "gfun")
+    assert [str(a) for a in g.arguments] == ["x"]
+
+    for name in ("h", "k"):
+        ext = classes[name].external
+        assert (ext.language, ext.external_name, ext.arguments) == ("C", None, [])
+        assert ext.annotation is None
+
+    assert classes["n"].external is None
+
+
+def test_external_clause_lazy(tmp_path):
+    """Reading the external clause of a lazy MODELICAPATH stub parses it."""
+    lib_dir = tmp_path / "Lib"
+    lib_dir.mkdir()
+    (lib_dir / "package.mo").write_text("package Lib\nend Lib;")
+    (lib_dir / "f.mo").write_text('within Lib;\nfunction f\n  external "C";\nend f;')
+    lazy = parser.modelicapath_to_tree(dirs=[tmp_path])
+    stub = vars(lazy.classes["Lib"])["classes"]["f"]
+    assert isinstance(stub, parser.LazyParseClass)
+    assert stub.external.language == "C"
+
+
+@pytest.mark.parametrize(
+    "src, message",
+    [
+        ('function f external "Java"; end f;', 'External language "Java" must be'),
+        ('model m external "C"; end m;', "External clause is only allowed in a function"),
+        ('operator function f external "C99"; end f;', None),
+        ('impure function f external "builtin"; end f;', None),
+    ],
+)
+def test_external_clause_errors(src, message):
+    """External clauses need a known language and a function (MLS 12.9)."""
+    if message is None:
+        parser.parse(src)
+        return
+    with pytest.raises(parser.ModelicaSyntaxError, match=message):
+        parser.parse(src)
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
