@@ -44,9 +44,25 @@ package ExternalObjectCasadi
     y := interpolateMyTable(myTable, u);
   end interpolateMyTableFunc;
 
+  function stringLength
+    input String s;
+    output Integer n;
+  external "C"
+    n = stringLength(s);
+  end stringLength;
+
+  function isBlank
+    input String s;
+    output Boolean blank;
+  algorithm
+    blank := stringLength(s) == 0;
+  end isBlank;
+
   model Table
     parameter Real vals[5] = {5, 3, 1, 9, 6};
-    parameter MyTable myTable = MyTable(vals);
+    parameter Boolean scaled = false;
+    parameter String scale = "";
+    parameter MyTable myTable = MyTable(if scaled and not isBlank(scale) then 2 * vals else vals);
     MyTable reversed = MyTable({6, 9, 1, 3, 5});
     input Real u;
     Real y = interpolateMyTable(myTable, u);

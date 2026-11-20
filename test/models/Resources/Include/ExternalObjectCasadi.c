@@ -44,3 +44,7 @@ double interpolateMyTableDer(void *object, double u, double der_u) {
     size_t i = (size_t)u < table->size - 1 ? (size_t)u : table->size - 2;
     return (table->array[i + 1] - table->array[i]) * der_u;
 }
+
+int stringLength(const char *s) {
+    return (int)strlen(s);
+}

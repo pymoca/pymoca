@@ -149,10 +149,13 @@ def _with_value(node, name: str, value):
 
 
 class GeneratorWalker(TreeWalker):
-    """TreeWalker that skips processing of annotations"""
+    """TreeWalker that skips processing of annotations, and of functions other than *function*"""
 
-    def __init__(self, generator: "Optional[Generator]" = None):
+    def __init__(
+        self, generator: "Optional[Generator]" = None, function: Optional[ast.Class] = None
+    ):
         self.generator = generator
+        self.function = function
 
     def skip_child(self, tree: ast.Node, child_name: str) -> bool:
         skip = super().skip_child(tree, child_name)
@@ -160,6 +163,9 @@ class GeneratorWalker(TreeWalker):
             return True
         # External functions are called through callbacks, their body is not generated
         if isinstance(tree, ast.Class) and tree.external is not None:
+            return True
+        # A function is generated when first called, see Generator.get_function
+        if isinstance(tree, ast.Class) and _is_function(tree) and tree is not self.function:
             return True
         # The generator visits the body of a constructor/reduction itself, once per value
         if isinstance(tree, ast.ForArray) and self.generator is not None:
@@ -1712,6 +1718,17 @@ class Generator(TreeListener):
         except KeyError:
             raise Exception("Unknown function {}".format(function_name))
 
+        # Generate the function here, so one used only at generation time is never generated
+        GeneratorWalker(self, tree).walk(self, tree)
+        self.entered_classes.append(tree)
+        try:
+            func = self._generate_function(tree)
+        finally:
+            self.entered_classes.pop()
+        self.functions[function_name] = func
+        return func
+
+    def _generate_function(self, tree: ast.Class):
         inputs = []
         outputs = []
         objects = []
@@ -1728,17 +1745,8 @@ class Generator(TreeListener):
                 tmp.append(src)
 
         if objects:
-            # Constructor arguments are looked up in the function, as statements were
-            self.entered_classes.append(tree)
-            try:
-                func = self._local_objects_function(tree, inputs, outputs, tmp, objects)
-            finally:
-                self.entered_classes.pop()
-        else:
-            func = self._statements_function(function_name, inputs, outputs, tmp, tree.statements)
-        self.functions[function_name] = func
-
-        return func
+            return self._local_objects_function(tree, inputs, outputs, tmp, objects)
+        return self._statements_function(tree.name, inputs, outputs, tmp, tree.statements)
 
 
 def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = None) -> Model:

@@ -674,7 +674,7 @@ def _generate_external_object_model(model_name):
 def test_external_objects():
     """A model's external objects live as long as the Model (MLS 12.9.7)."""
     casadi_model = _generate_external_object_model("Table")
-    assert [p.symbol.name() for p in casadi_model.parameters] == ["vals"]
+    assert [p.symbol.name() for p in casadi_model.parameters] == ["vals", "scaled"]
     residual = _residual_function(casadi_model)
     # The constructor binding is a modification of a parameter, or an equation of a variable
     np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [3.6, 7.5, 8.1])
