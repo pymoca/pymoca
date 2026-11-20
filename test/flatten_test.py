@@ -2394,6 +2394,29 @@ def test_range_values_zero_step():
         tree.range_values(1, 0, 3)
 
 
+def test_tree_walker_extends_cycle():
+    """The walker skips the extends clause's back-reference to its enclosing class."""
+
+    class Collector(tree.TreeListener):
+        def __init__(self):
+            super().__init__()
+            self.extends = []
+
+        def enterExtendsClause(self, node):
+            self.extends.append(node)
+
+    ast_tree = parser.parse("model A Real x; end A; model B extends A; end B; model C B b; end C;")
+    listener = Collector()
+    tree.TreeWalker().walk(listener, ast_tree)
+    assert [e.component.name for e in listener.extends] == ["A"]
+
+    # Reaches the extends clause through the instance's AST reference
+    instance = tree.instantiate(ast_tree, "C")
+    listener = Collector()
+    tree.TreeWalker().walk(listener, instance.symbols["b"])
+    assert [e.component.name for e in listener.extends] == ["A"]
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
