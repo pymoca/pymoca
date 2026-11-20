@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include "ModelicaUtilities.h"
 
 void weightedSum(const double *a, size_t n, size_t m, const double *w, double *y) {
@@ -39,4 +40,8 @@ double sumWithWork(const double *x, size_t nx, double *work, int n) {
         sum += work[j];
     }
     return sum;
+}
+
+double lookupScale(const char *key, double x) {
+    return strcmp(key, "double") == 0 ? 2 * x : x;
 }

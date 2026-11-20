@@ -555,6 +555,23 @@ class ExternalFunction:
                 shape.append(int(evaluate(dim)))
         return tuple(shape)
 
+    def output_shapes(self, input_shapes: Sequence[tuple]) -> List[tuple]:
+        """Return the shapes of the outputs for inputs of the given shapes."""
+        # Only the sizes of array inputs are known, so a size depending on a value fails
+        values = {
+            s.name: np.zeros(shape)
+            for s, shape in zip(self.inputs, input_shapes)
+            if not _is_scalar_dims(s.dimensions)
+        }
+        evaluate = self._evaluator(values)
+        return [self._shape(s, evaluate) for s in self.outputs]
+
+    def is_string(self, symbol: ast.Symbol) -> bool:
+        return self.ctype_of(symbol) is _STRING
+
+    def is_integer(self, symbol: ast.Symbol) -> bool:
+        return self.ctype_of(symbol) is _INTEGER
+
     def _storage(self, ctype: _CType, value, is_array: bool):
         """Return the ctypes storage of a value and a pointer to it."""
         if ctype is _STRING:

@@ -31,6 +31,11 @@ from pymoca.tree import ModelicaSemanticError
 
 import pytest
 
+needs_compiler = pytest.mark.skipif(
+    os.name == "nt" or shutil.which(os.environ.get("CC") or "cc") is None,
+    reason="needs a C compiler (Windows compilers are not detected yet)",
+)
+
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "models")
 
 
@@ -628,6 +633,31 @@ def test_function_binding():
     (residual,) = casadi_model.equations
     y = casadi_model.alg_states[0].symbol
     assert float(ca.evalf(ca.substitute(residual, y, 0))) == -10.0
+
+
+def _residual_function(casadi_model):
+    """Return the equations as a function of the inputs, parameters and algebraic states."""
+    symbols = [v.symbol for v in casadi_model.inputs + casadi_model.alg_states]
+    return ca.Function("residual", symbols, [ca.vertcat(*casadi_model.equations)])
+
+
+@needs_compiler
+def test_external_function_callbacks():
+    """External function calls are CasADi callbacks into the native code (MLS 12.9)."""
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalCasadi.mo"))
+    casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.Numeric")
+    names = [v.symbol.name() for v in casadi_model.alg_states]
+    assert names == ["y", "z", "m", "r", "w", "d", "q"]
+
+    # With zero algebraic states, the residuals are minus the right-hand sides
+    residual = _residual_function(casadi_model)
+    zeros = [ca.DM.zeros(*v.symbol.shape) for v in casadi_model.alg_states]
+    values = -np.array(residual(4.0, *zeros)).ravel()
+    # (z, m), then y, r, w, d (key is bound from its string parameter) and q
+    np.testing.assert_allclose(values, [-8, 5, 12, 34, 2, 17, 8, 4])
+
+    with pytest.raises(RuntimeError, match="checkedSqrt: negative input -1"):
+        residual(-1.0, *zeros)
 
 
 def test_function_call():

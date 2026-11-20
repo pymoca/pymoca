@@ -45,6 +45,35 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end sumWithWork;
 
+  function lookupScale
+    input String key;
+    input Real x;
+    output Real y;
+  external "C" y = lookupScale(key, x)
+    annotation(Library = "ExternalCasadi");
+  end lookupScale;
+
+  function twiceSqrt
+    input Real x;
+    output Real y;
+  algorithm
+    y := 2 * checkedSqrt(x);
+  end twiceSqrt;
+
+  model Numeric
+    input Real u;
+    parameter String key = "double";
+    Real y[2] = weightedSum({{1, 2}, {3, u}}, {10, 1});
+    Real z;
+    Integer m;
+    Real r = checkedSqrt(u);
+    Real w = sumWithWork({u, 2});
+    Real d = lookupScale(key, u);
+    Real q = twiceSqrt(u);
+  equation
+    (z, m) = scaleShift(u, 2, true, 3);
+  end Numeric;
+
   model Calls
     Real y[2] = weightedSum({{1, 2}, {3, 4}}, {10, 1});
     Real z;

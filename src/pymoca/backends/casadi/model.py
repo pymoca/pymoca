@@ -120,6 +120,8 @@ class Model:
         self.delay_arguments = []
         self.alias_relation = AliasRelation()
         self._expand_mx_func = lambda x: x
+        # CasADi destroys a Callback with its Python object, so the model owns them
+        self._external_callbacks = []
 
     def __str__(self):
         r = ""
