@@ -172,6 +172,11 @@ class GeneratorWalker(TreeWalker):
         return sorted(keys, key=lambda attr: 0 if attr == "symbols" else 1)
 
 
+def _is_function(tree: ast.Class) -> bool:
+    """Whether a class is a function, also when pure, impure or an operator function."""
+    return tree.type.endswith("function")
+
+
 def _array_to_mx(value):
     """Return value as a vector or matrix if it is an array literal, a (nested) list of elements."""
     if not isinstance(value, list):
@@ -552,13 +557,13 @@ class Generator(TreeListener):
 
         self.entered_classes.append(tree)
         self.nodes.setdefault(tree, {})
-        if tree.type != "function" and tree.external_objects:
+        if not _is_function(tree) and tree.external_objects:
             self._construct_external_objects(tree)
 
     def exitClass(self, tree):
         logger.debug("exitClass {}".format(tree.name))
 
-        if tree.type == "function":
+        if _is_function(tree):
             # Already handled previously
             self.entered_classes.pop()
             return
@@ -1517,7 +1522,7 @@ class Generator(TreeListener):
                 if f.name == tree.name:
                     return f.index_variable
 
-        if tree.name in self.external_objects and self.current_class.type != "function":
+        if tree.name in self.external_objects and not _is_function(self.current_class):
             return ca.MX(self.external_objects[tree.name])
 
         # Check ordinary symbols
@@ -1575,9 +1580,7 @@ class Generator(TreeListener):
     def external(self) -> ExternalCallbacks:
         if self._external is None:
             # Built on first use, so models that never call external code need no compiler
-            functions = [
-                c for c in self.root.classes.values() if c.type == "function" and c.external
-            ]
+            functions = [c for c in self.root.classes.values() if _is_function(c) and c.external]
             self._external = ExternalCallbacks(
                 load_external_functions(functions, self.external_library_paths),
                 self.model._external_callbacks,

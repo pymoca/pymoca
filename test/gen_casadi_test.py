@@ -751,6 +751,26 @@ def test_external_objects_in_function():
     assert destructor.library.cdll.countMyTables() == 0
 
 
+def test_pure_function():
+    ast_tree = parser.parse(
+        """
+        model PureFunction
+          pure function f
+            input Real x;
+            output Real y;
+          algorithm
+            y := 2 * x;
+          end f;
+          Real y = f(3.0);
+        end PureFunction;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "PureFunction")
+    (residual,) = casadi_model.equations
+    y = casadi_model.alg_states[0].symbol
+    assert float(ca.evalf(ca.substitute(residual, y, 0))) == -6.0
+
+
 def test_function_call():
     with open(os.path.join(MODEL_DIR, "FunctionCall.mo"), "r") as f:
         txt = f.read()
