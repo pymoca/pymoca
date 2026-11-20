@@ -1101,6 +1101,58 @@ def test_parse_stepped_range():
     assert (slice_.start.value, slice_.step.value, slice_.stop.value) == (1, 2, 3)
 
 
+def test_external_clause():
+    """External function clauses keep language, call and annotation (MLS 12.9)."""
+    ast_tree = parser.parse(
+        """
+        package P
+          function f
+            input Real x[:]; output Real y;
+          external "C" y = cfun(x, size(x, 1)) annotation(Library = "m");
+          end f;
+          function g
+            input Real x;
+          external "FORTRAN 77" gfun(x);
+          end g;
+          function h
+            input Real x; output Real y;
+          external "C";
+          end h;
+          function k
+            input Real x; output Real y;
+          external;
+          end k;
+          function n
+            input Real x; output Real y;
+          algorithm
+            y := x;
+          end n;
+        end P;
+        """
+    )
+    classes = ast_tree.classes["P"].classes
+
+    f = classes["f"].external
+    assert (f.language, str(f.output), f.external_name) == ("C", "y", "cfun")
+    assert str(f.arguments[0]) == "x"
+    assert f.arguments[1].operator.to_tuple() == ("size",)
+    (lib,) = f.annotation.arguments
+    assert str(lib.value.component) == "Library"
+    assert lib.value.modifications[0].value == "m"
+    assert classes["f"].annotation is None
+
+    g = classes["g"].external
+    assert (g.language, g.output, g.external_name) == ("FORTRAN 77", None, "gfun")
+    assert [str(a) for a in g.arguments] == ["x"]
+
+    for name in ("h", "k"):
+        ext = classes[name].external
+        assert (ext.language, ext.external_name, ext.arguments) == ("C", None, [])
+        assert ext.annotation is None
+
+    assert classes["n"].external is None
+
+
 if __name__ == "__main__":
     import pytest as _pytest
 
