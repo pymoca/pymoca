@@ -1729,6 +1729,27 @@ def test_user_defined_enum_flatten():
     assert not any(name.startswith("e.") for name in flat.symbols)
 
 
+def test_if_expression_binding_names():
+    """Names in an if-expression binding resolve where it is declared (MLS 5.3.1)."""
+    src = """
+    package P
+      type E = enumeration(a, b);
+      model C
+        Real y = if E.b > E.a then 1.0 else 0.0;
+      end C;
+    end P;
+    package Q
+      type E = enumeration(b, a);
+      model M
+        P.C c;
+      end M;
+    end Q;
+    """
+    flat = tree.flatten_class(parser.parse(src), "Q.M")
+    (equation,) = flat.equations
+    assert [str(o) for o in equation.right.conditions[0].operands] == ["P.E.b", "P.E.a"]
+
+
 def test_builtin_enum_literals_are_enumeration_literals():
     """Builtin enum types (StateSelect) use EnumerationLiteral with ordinals."""
     ast_tree = ast.Tree()

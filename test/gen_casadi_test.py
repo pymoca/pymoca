@@ -843,6 +843,58 @@ def test_pure_function():
     assert float(ca.evalf(ca.substitute(residual, y, 0))) == -6.0
 
 
+def test_enumeration_literals():
+    """Enumeration literals are their ordinals (MLS 4.8.5)."""
+    ast_tree = parser.parse(
+        """
+        model EnumerationLiterals
+          type Mode = enumeration(Off, Slow, Fast);
+          parameter Mode mode = Mode.Fast;
+          Real y = if mode == Mode.Slow then 3.0 else 1.0;
+          Real z = if Mode.Fast > Mode.Slow then 2.0 else 0.0;
+        end EnumerationLiterals;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "EnumerationLiterals")
+    (mode,) = casadi_model.parameters
+    assert mode.value == 3
+    symbols = [mode.symbol] + [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, [ca.vertcat(*casadi_model.equations)])
+    np.testing.assert_array_equal(np.array(residual(2, 0, 0)).ravel(), [-3, -2])
+    np.testing.assert_array_equal(np.array(residual(3, 0, 0)).ravel(), [-1, -2])
+
+
+def test_enumeration_literal_scope():
+    """An enumeration literal is found where it is written, not in the model (MLS 5.3.1)."""
+    ast_tree = parser.parse(
+        """
+        package P
+          type E = enumeration(a, b, c);
+          function f
+            input Real x;
+            output Real y;
+          algorithm
+            y := if E.b > E.a then x else -x;
+          end f;
+          model C
+            Real y = if E.b > E.a then 1.0 else 0.0;
+            Real z = f(2.0);
+          end C;
+        end P;
+        package Q
+          type E = enumeration(c, b, a);
+          model M
+            P.C c;
+          end M;
+        end Q;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "Q.M")
+    symbols = [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, [ca.vertcat(*casadi_model.equations)])
+    np.testing.assert_array_equal(np.array(residual(0, 0)).ravel(), [-1, -2])
+
+
 def test_function_call():
     with open(os.path.join(MODEL_DIR, "FunctionCall.mo"), "r") as f:
         txt = f.read()

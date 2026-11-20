@@ -558,6 +558,9 @@ class Generator(TreeListener):
         self.delay_counter = 0
         self.external_library_paths = options["external_library_paths"]
         self.external_finite_differences = options["external_finite_differences"]
+        # The tree before flattening, which still has the enumeration types
+        self.source_tree: Optional[ast.Tree] = None
+        self.model_name = class_name
         self._external = None
         # Ids of the model's external objects by symbol name
         self.external_objects = {}
@@ -1632,6 +1635,11 @@ class Generator(TreeListener):
         if tree.name in self.external_objects and not _is_function(self.current_class):
             return ca.MX(self.external_objects[tree.name])
 
+        if tree.name not in self.current_class.symbols:
+            ordinal = self.enumeration_literal(".".join(tree.to_tuple()))
+            if ordinal is not None:
+                return ca.MX(ordinal)
+
         # Check ordinary symbols
         symbol = self.current_class.symbols[tree.name]
         s = self.get_mx(symbol)
@@ -1671,6 +1679,28 @@ class Generator(TreeListener):
             self.src[tree] = s
         return self.src[tree]
 
+    def enumeration_literal(self, name: str) -> Optional[int]:
+        """Return the ordinal of the enumeration literal *name*, if it is one (MLS 4.8.5)."""
+        if self.source_tree is None or "." not in name:
+            return None
+        *class_path, literal = name.split(".")
+        # Flattening names it without the leading parts it shares with the flattened class
+        flat_class = self.current_class
+        scope = flat_class.name if _is_function(flat_class) else self.model_name
+        scope_path = scope.split(".")
+        for n_scope in range(len(scope_path), -1, -1):
+            full_path = scope_path[:n_scope] + class_path
+            if sum(a == b for a, b in zip(full_path + [literal], scope_path)) != n_scope:
+                continue
+            cls = self.source_tree
+            for part in full_path:
+                cls = cls.classes.get(part) if cls is not None else None
+            if cls is not None and ast.is_enumeration(cls):
+                symbol = cls.symbols.get(literal)
+                if isinstance(symbol, ast.EnumerationLiteral):
+                    return symbol.ordinal
+        return None
+
     def evaluator(self) -> Evaluator:
         """Return an evaluator of expressions with values of the current class's symbols."""
         symbols = self.current_class.symbols
@@ -1680,7 +1710,10 @@ class Generator(TreeListener):
                 # Its default only applies to calls without it
                 raise NotImplementedError(f"{name} is an input of {self.current_class.name}")
             if name not in symbols:
-                raise NotImplementedError(f"{name} has no value at generation time")
+                ordinal = self.enumeration_literal(name)
+                if ordinal is None:
+                    raise NotImplementedError(f"{name} has no value at generation time")
+                return ordinal
             return evaluate(symbols[name].value)
 
         evaluate = Evaluator(lookup)
@@ -1905,6 +1938,7 @@ def generate(ast_tree: ast.Tree, model_name: str, options: Dict[str, bool] = Non
     component_ref = ast.ComponentRef.from_string(model_name)
     flat_tree = flatten(ast_tree, component_ref)
     casadi_gen = Generator(flat_tree, model_name, options)
+    casadi_gen.source_tree = ast_tree
     ast_walker = GeneratorWalker(casadi_gen)
     ast_walker.walk(casadi_gen, flat_tree)
     return casadi_gen.model
