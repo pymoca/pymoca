@@ -186,3 +186,23 @@ def test_external_array_layout(tmp_path):
     )
     (b,) = functions["ExternalCasadi.addIndices"](np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
     np.testing.assert_array_equal(b, [[1, 3, 5], [14, 16, 18]])
+
+
+_MSL_SOURCES = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    "libraries",
+    "MSL-4.0.x",
+    "Modelica",
+    "Resources",
+    "C-Sources",
+)
+
+
+@needs_compiler
+@pytest.mark.skipif(not os.path.isdir(_MSL_SOURCES), reason="needs the MSL submodule")
+def test_external_library_msl_zlib(tmp_path):
+    """The zlib sources of the MSL compile as a library named zlib."""
+    resources = ast.ExternalResources(libraries=["zlib"], include_dirs=[_MSL_SOURCES])
+    library = ExternalLibrary('#include "pymoca_external.h"\n', [resources], cache_dir=tmp_path)
+    library.cdll.zlibVersion.restype = ctypes.c_char_p
+    assert library.cdll.zlibVersion().startswith(b"1.")
