@@ -1045,12 +1045,14 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             # Flatten using new pipeline — discovers nested function calls
             flat_func = _create_partial_flat_instance(func_instance)
-            # Name the flat function by its dict key, which its call sites reference
-            flat_func.name = full_name
+            # Same instance path as func_instance while names are resolved relative to it
+            flat_func.name = func_instance.name
             _flatten_instance(func_instance, flat_func)
             _flatten_external_clause(func_instance, flat_func)
             _register_external_objects(flat_func, functions)
             _flatten_derivative_annotations(func_instance, flat_func, functions)
+            # Name the flat function by its dict key, which its call sites reference
+            flat_func.name = full_name
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():

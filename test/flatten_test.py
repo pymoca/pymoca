@@ -1404,6 +1404,21 @@ def test_external_object():
     assert str(interpolate.symbols["interpolTable"].type) == "ExternalObjectTest.MyTable"
 
 
+def _function_binding_test_function():
+    flat_tree = tree.flatten(
+        parse_model_files("FunctionBinding.mo"),
+        ast.ComponentRef.from_string("FunctionBindingTest.M"),
+    )
+    return flat_tree.classes["FunctionBindingTest.f"]
+
+
+def test_function_binding_names():
+    """A binding in a function references the function's own variables by flat name."""
+    func = _function_binding_test_function()
+    (binding,) = [s for s in func.statements if s.left[0].name == "a"]
+    assert [str(o) for o in binding.right.operands] == ["k", "x"]
+
+
 def test_inherited_equation_refs_resolved():
     """Equations referencing inherited (via extends) symbols flatten before resolution (MLS 5.6.2)."""
     flat = parse_and_flatten_model("InheritedEquationConnector.mo", "P.B")
