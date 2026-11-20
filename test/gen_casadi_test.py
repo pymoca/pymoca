@@ -693,6 +693,48 @@ def test_external_objects():
 
 
 @needs_compiler
+def test_external_function_sensitivities(caplog):
+    """Sensitivities use derivative functions, or else finite differences (MLS 12.7.1)."""
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalCasadi.mo"))
+    with caplog.at_level("WARNING", logger="pymoca"):
+        casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.Smooth")
+    u = casadi_model.inputs[0].symbol
+    (p,) = (v.symbol for v in casadi_model.parameters)
+    c, r, s, k, kp = (
+        -ca.substitute(eq, v.symbol, 0)
+        for eq, v in zip(casadi_model.equations, casadi_model.alg_states)
+    )
+    derivatives = ca.Function(
+        "derivatives",
+        [u, p],
+        [ca.jacobian(c, u), ca.hessian(c, u)[0], ca.jacobian(r, u), ca.jacobian(s, u)]
+        + [ca.jacobian(k, u), ca.jacobian(kp, u), ca.jacobian(kp, p)],
+    )
+    dc, d2c, dr, ds, dk, dkp_du, dkp_dp = (float(v) for v in derivatives(2.0, 3.0))
+    # c = 2 u^3: exact from cubeDer and, by its order 2 annotation, cubeDer2
+    assert (dc, d2c) == (24.0, 24.0)
+    assert dr == pytest.approx(0.25 / np.sqrt(0.5), rel=1e-6)
+    assert "checkedSqrt has no derivative function" in caplog.text
+    assert "cubeDer2" not in caplog.text
+    # The derivative function of square is a Modelica function
+    assert ds == 4.0
+    assert "square has no derivative function" not in caplog.text
+    # A zeroDerivative annotation is only used where its input is constant
+    assert (dk, dkp_du, dkp_dp) == (2.0, 3.0, 2.0)
+    used = {
+        c.derivative.function
+        for c in casadi_model._external_callbacks
+        if getattr(c, "function", None) is not None and c.function.name == "ExternalCasadi.scaled"
+    }
+    assert used == {"ExternalCasadi.scaledDerK", "ExternalCasadi.scaledDer"}
+
+    casadi_model = _generate_external_object_model("Table")
+    u = casadi_model.inputs[0].symbol
+    y = -ca.substitute(casadi_model.equations[0], casadi_model.alg_states[0].symbol, 0)
+    assert float(ca.Function("dy", [u], [ca.jacobian(y, u)])(0.7)) == -2.0
+
+
+@needs_compiler
 def test_external_objects_in_function():
     """A protected external object of a function lives for one call (MLS 12.9.7)."""
     casadi_model = _generate_external_object_model("TableInFunction")

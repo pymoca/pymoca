@@ -25,6 +25,9 @@ Choices the spec leaves open:
   of their constructor arguments then, and live as long as the `Model` (MLS 12.9.7 only
   requires construction before first use). So these arguments must evaluate at generation
   time, and a parameter changed on the `Model` afterwards does not reach the object
+- A `zeroDerivative` annotation is only used for a call whose inputs it names are
+  numeric constants there. A parameter counts as varying, since sensitivities may be
+  taken with respect to it (MLS 12.7.1)
 - `LibraryDirectory` is searched in `<os><bits>` (such as `linux64`) and
   `<machine>-<os>` subdirectories, then itself, but not in compiler subdirectories such
   as `win64/vs2019` (MLS 12.9.4)

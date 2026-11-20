@@ -60,6 +60,35 @@ package ExternalCasadi
     y := 2 * checkedSqrt(x);
   end twiceSqrt;
 
+  function cube
+    input Real x;
+    input Integer k;
+    output Real y;
+  external "C" y = cube(x, k)
+    annotation(Library = "ExternalCasadi");
+    annotation(derivative = cubeDer);
+  end cube;
+
+  function cubeDer
+    input Real x;
+    input Integer k;
+    input Real der_x;
+    output Real der_y;
+  external "C" der_y = cubeDer(x, k, der_x)
+    annotation(Library = "ExternalCasadi");
+    annotation(derivative(order = 2) = cubeDer2);
+  end cubeDer;
+
+  function cubeDer2
+    input Real x;
+    input Integer k;
+    input Real der_x;
+    input Real der2_x;
+    output Real der2_y;
+  external "C" der2_y = cubeDer2(x, k, der_x, der2_x)
+    annotation(Library = "ExternalCasadi");
+  end cubeDer2;
+
   function addInPlace
     input Real x;
     output Real y = 2.5;
@@ -106,6 +135,60 @@ package ExternalCasadi
   external "C" lengths(names, size(names, 1), y)
     annotation(Library = "ExternalCasadi");
   end lengths;
+
+  function square
+    input Real x;
+    output Real y;
+  external "C" y = square(x)
+    annotation(Library = "ExternalCasadi");
+    annotation(derivative = squareDer);
+  end square;
+
+  function squareDer
+    input Real x;
+    input Real der_x;
+    output Real der_y;
+  algorithm
+    der_y := 2 * x * der_x;
+  end squareDer;
+
+  function scaled
+    input Real x;
+    input Real k;
+    output Real y;
+  external "C" y = scaled(x, k)
+    annotation(Library = "ExternalCasadi");
+    annotation(derivative(zeroDerivative = k) = scaledDerK, derivative = scaledDer);
+  end scaled;
+
+  function scaledDerK
+    input Real x;
+    input Real k;
+    input Real der_x;
+    output Real der_y;
+  algorithm
+    der_y := k * der_x;
+  end scaledDerK;
+
+  function scaledDer
+    input Real x;
+    input Real k;
+    input Real der_x;
+    input Real der_k;
+    output Real der_y;
+  algorithm
+    der_y := k * der_x + x * der_k;
+  end scaledDer;
+
+  model Smooth
+    input Real u;
+    parameter Real p = 3;
+    Real c = cube(u, 2);
+    Real r = checkedSqrt(u);
+    Real s = square(u);
+    Real k = scaled(u, 2.0);
+    Real kp = scaled(u, p);
+  end Smooth;
 
   model StringArray
     input Real u;

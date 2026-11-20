@@ -46,6 +46,18 @@ double lookupScale(const char *key, double x) {
     return strcmp(key, "double") == 0 ? 2 * x : x;
 }
 
+double cube(double x, int k) {
+    return k * x * x * x;
+}
+
+double cubeDer(double x, int k, double der_x) {
+    return 3 * k * x * x * der_x;
+}
+
+double cubeDer2(double x, int k, double der_x, double der2_x) {
+    return 6 * k * x * der_x * der_x + 3 * k * x * x * der2_x;
+}
+
 void addInPlace(double x, double *y, double *w, size_t n) {
     *y += x;
     for (size_t i = 0; i < n; i++) {
@@ -78,4 +90,12 @@ void lengths(const char **names, size_t n, double *y) {
     for (size_t i = 0; i < n; i++) {
         y[i] = (double)strlen(names[i]);
     }
+}
+
+double square(double x) {
+    return x * x;
+}
+
+double scaled(double x, double k) {
+    return k * x;
 }
