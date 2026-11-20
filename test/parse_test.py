@@ -90,6 +90,18 @@ def test_declarations_are_not_builtin_names():
         assert ast_tree is not None, f"for '{txt}'"
 
 
+def test_combined_type_prefixes():
+    """Each keyword of a type prefix is a separate prefix (MLS B.2.4.2)."""
+    ast_tree = parser.parse(
+        "model M discrete input Real x; flow parameter Real p = 1; Real y; end M;",
+        bypass_cache=True,
+    )
+    symbols = ast_tree.classes["M"].symbols
+    assert symbols["x"].prefixes == ["discrete", "input"]
+    assert symbols["p"].prefixes == ["flow", "parameter"]
+    assert symbols["y"].prefixes == []
+
+
 def test_parse_nonexistent_file_error():
     """Test parse_file on non-existent file raises an error"""
     with pytest.raises(FileNotFoundError, match="File not found: NonExistentFile.mo"):
