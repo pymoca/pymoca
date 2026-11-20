@@ -3,6 +3,7 @@
 Modelica parse Tree to AST tree.
 """
 
+import gc
 import glob
 import math
 import os
@@ -661,6 +662,52 @@ def test_external_function_callbacks():
         residual(-1.0, *zeros)
 
 
+_EXTERNAL_OBJECT_SOURCE = os.path.join(MODEL_DIR, "Resources", "Include", "ExternalObjectCasadi.c")
+
+
+def _generate_external_object_model(model_name):
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalObjectCasadi.mo"))
+    options = {"external_library_paths": [_EXTERNAL_OBJECT_SOURCE]}
+    return gen_casadi.generate(ast_tree, "ExternalObjectCasadi." + model_name, options)
+
+
+@needs_compiler
+def test_external_objects():
+    """A model's external objects live as long as the Model (MLS 12.9.7)."""
+    casadi_model = _generate_external_object_model("Table")
+    assert [p.symbol.name() for p in casadi_model.parameters] == ["vals"]
+    residual = _residual_function(casadi_model)
+    # The constructor binding is a modification of a parameter, or an equation of a variable
+    np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [3.6, 7.5, 8.1])
+    with pytest.raises(RuntimeError, match="4.5 is outside of the table"):
+        residual(4.5, 0, 0, 0)
+
+    library = casadi_model._external_objects[0].destructor.library
+    assert library.cdll.countMyTables() == 2
+    del casadi_model, residual
+    gc.collect()
+    assert library.cdll.countMyTables() == 0
+
+    with pytest.raises(NotImplementedError, match="myTable must evaluate at generation time"):
+        _generate_external_object_model("FreeTable")
+
+
+@needs_compiler
+def test_external_objects_in_function():
+    """A protected external object of a function lives for one call (MLS 12.9.7)."""
+    casadi_model = _generate_external_object_model("TableInFunction")
+    symbols = [casadi_model.inputs[0].symbol, casadi_model.parameters[0].symbol]
+    symbols += [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, casadi_model.equations)
+    vals = [5, 3, 1, 9, 6]
+    assert float(residual(0.7, vals, 0)) == pytest.approx(-3.6)
+    assert float(residual(3.5, vals, 0)) == pytest.approx(-7.5)
+
+    (callback,) = [c for c in casadi_model._external_callbacks if hasattr(c, "constructors")]
+    (constructor, destructor, _, _) = callback.constructors[0]
+    assert destructor.library.cdll.countMyTables() == 0
+
+
 @needs_compiler
 def test_external_string_arguments():
     """String arguments must be known at generation time, and may be arrays."""
@@ -668,6 +715,18 @@ def test_external_string_arguments():
     casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.StringArray")
     residual = _residual_function(casadi_model)
     np.testing.assert_array_equal(-np.array(residual(0.0, [0, 0])).ravel(), [2, 1])
+
+
+@needs_compiler
+def test_external_object_arguments():
+    """Constructor arguments may be Integers and other external objects (MLS 12.9.7)."""
+    casadi_model = _generate_external_object_model("ShiftedInFunction")
+    symbols = [casadi_model.inputs[0].symbol] + [p.symbol for p in casadi_model.parameters]
+    symbols += [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, casadi_model.equations)
+    vals = [5, 3, 1, 9, 6]
+    assert float(residual(0.7, vals, 2, 0)) == pytest.approx(-5.6)
+    assert float(residual(4.5, vals, 3, 0)) == pytest.approx(-9.0)
 
 
 def test_function_call():

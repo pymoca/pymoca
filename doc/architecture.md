@@ -724,7 +724,9 @@ Accepted without a check:
 
 - Binding rules of external objects (MLS 12.9.7): a component bound by a function other
   than the constructor, an unbound component, an input with a default binding, and
-  attribute modifications such as `start`. The CasADi backend raises for the first two
+  attribute modifications such as `start`. The
+  [CasADi backend](architecture_backend.md#external-functions-and-objects-mls-129) raises for
+  the first two
 - Shape of an external object class beyond the lifecycle function counts: other elements,
   a `replaceable` constructor, and the type of the constructor output and destructor input
 - Unknown derivative attributes, `noDerivative` and `zeroDerivative` naming an input that

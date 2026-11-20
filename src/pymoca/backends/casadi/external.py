@@ -2,6 +2,7 @@
 
 import ctypes
 import hashlib
+import itertools
 import logging
 import os
 import platform
@@ -9,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import weakref
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
@@ -749,3 +751,44 @@ def load_external_functions(
     for function in loaded.values():
         function.library = library
     return loaded
+
+
+# Live external objects by id. The CasADi graph carries ids, as it can only carry numbers.
+_object_pointers: dict = {}
+_object_ids = itertools.count(1)
+
+
+def _destroy_object(object_id: int, destructor: ExternalFunction, pointer: int) -> None:
+    del _object_pointers[object_id]
+    try:
+        destructor(pointer)
+    except ExternalFunctionError as e:
+        logger.warning("Destructor %s failed: %s", destructor.name, e)
+
+
+class ExternalObject:
+    """A constructed external object, destroyed by its destructor when released (MLS 12.9.7)."""
+
+    def __init__(self, pointer: Optional[int], destructor: ExternalFunction):
+        if not pointer:
+            raise ExternalFunctionError(f"Constructor of {destructor.name} returned NULL")
+        self.id = next(_object_ids)
+        self.destructor = destructor
+        _object_pointers[self.id] = pointer
+        self._finalizer = weakref.finalize(self, _destroy_object, self.id, destructor, pointer)
+
+    def release(self) -> None:
+        """Destroy the object now, unless already done."""
+        self._finalizer()
+
+
+def object_pointer(object_id: float) -> int:
+    """Return the pointer of the live external object with id *object_id*.
+
+    Raises:
+        ExternalFunctionError: if no live external object has that id
+    """
+    pointer = _object_pointers.get(int(object_id)) if object_id == int(object_id) else None
+    if pointer is None:
+        raise ExternalFunctionError(f"{object_id} is not the id of a live external object")
+    return pointer

@@ -18,7 +18,7 @@ from pymoca.tree import TreeListener, TreeWalker, flatten, range_values
 
 from ._evaluate import EvaluationError, Evaluator
 from ._options import _merge_default_options
-from .external import ExternalFunction, load_external_functions
+from .external import ExternalFunction, ExternalObject, load_external_functions, object_pointer
 from .model import DelayArgument, Model, StringVariable, Variable
 from .mtensor import _MTensor, _new_mx
 
@@ -209,6 +209,26 @@ def _casadi_shape(shape: tuple) -> tuple:
     return tuple(shape) + (1,) * (2 - len(shape))
 
 
+def _n_dims(symbol: ast.Symbol) -> int:
+    return sum(
+        not (isinstance(d, ast.Primary) and d.value is None)
+        for dims in symbol.dimensions
+        for d in dims
+    )
+
+
+def _numeric_input(function: ExternalFunction, symbol: ast.Symbol, value):
+    """Return a numeric CasADi value as the Python value of an input of an external function."""
+    array = np.array(value)
+    n_dims = _n_dims(symbol)
+    if n_dims == 0:
+        scalar = float(array.ravel()[0])
+        if function.is_external_object(symbol):
+            return object_pointer(scalar)
+        return int(round(scalar)) if function.is_integer(symbol) else scalar
+    return array.ravel() if n_dims == 1 else array
+
+
 def _hashable(value):
     """Return *value* with its arrays and lists as tuples."""
     if isinstance(value, (list, tuple, np.ndarray)):
@@ -251,24 +271,62 @@ class ExternalFunctionCallback(ca.Callback):
     def get_sparsity_out(self, i):
         return ca.Sparsity.dense(*_casadi_shape(self.output_shapes[i]))
 
-    def _input_value(self, index: int, value: ca.DM):
-        symbol = self.function.inputs[index]
-        array = np.array(value)
-        shape = self.input_shapes[self.free.index(index)]
-        if not shape:
-            scalar = float(array.ravel()[0])
-            return int(round(scalar)) if self.function.is_integer(symbol) else scalar
-        return array.reshape(shape)
-
     def eval(self, arg):
         inputs = [self.bound.get(i) for i in range(len(self.function.inputs))]
         for index, value in zip(self.free, arg):
-            inputs[index] = self._input_value(index, value)
+            inputs[index] = _numeric_input(self.function, self.function.inputs[index], value)
         outputs = self.function(*inputs)
         return [
             ca.DM(np.asarray(value, dtype=float).reshape(_casadi_shape(shape)))
             for value, shape in zip(outputs, self.output_shapes)
         ]
+
+
+class LocalObjectsCallback(ca.Callback):
+    """A function with protected external objects, built at entry and destroyed at return.
+
+    *body* takes the function inputs followed by the ids of the objects, and *constructors*
+    gives, per object in construction order, its constructor, destructor and a function of
+    the inputs and earlier ids that returns the numeric constructor arguments, with *bound*
+    holding the others (MLS 12.9.7).
+    """
+
+    def __init__(self, name: str, body: ca.Function, constructors: list):
+        ca.Callback.__init__(self)
+        self.body = body
+        self.constructors = constructors
+        self.n_inputs = body.n_in() - len(constructors)
+        self.construct(name, {})
+
+    def get_n_in(self):
+        return self.n_inputs
+
+    def get_n_out(self):
+        return self.body.n_out()
+
+    def get_sparsity_in(self, i):
+        return self.body.sparsity_in(i)
+
+    def get_sparsity_out(self, i):
+        return self.body.sparsity_out(i)
+
+    def eval(self, arg):
+        objects = []
+        try:
+            for constructor, destructor, args_function, bound in self.constructors:
+                numeric = iter(args_function.call(list(arg) + [ca.DM(o.id) for o in objects]))
+                args = []
+                for i, symbol in enumerate(constructor.inputs):
+                    if i in bound:
+                        args.append(bound[i])
+                        continue
+                    args.append(_numeric_input(constructor, symbol, next(numeric)))
+                (pointer,) = constructor(*args)
+                objects.append(ExternalObject(pointer, destructor))
+            return self.body.call(list(arg) + [ca.DM(o.id) for o in objects])
+        finally:
+            for o in objects:
+                o.release()
 
 
 class Generator(TreeListener):
@@ -293,6 +351,8 @@ class Generator(TreeListener):
         self.external_library_paths = options["external_library_paths"]
         self._external_functions = None
         self._external_callbacks = {}
+        # Ids of the model's external objects by symbol name
+        self.external_objects = {}
 
         # NOTE: Part of MTensor workaround.
         self._expand_vectors_enabled = options["expand_vectors"]
@@ -356,6 +416,8 @@ class Generator(TreeListener):
 
         self.entered_classes.append(tree)
         self.nodes.setdefault(tree, {})
+        if tree.type != "function" and tree.external_objects:
+            self._construct_external_objects(tree)
 
     def exitClass(self, tree):
         logger.debug("exitClass {}".format(tree.name))
@@ -1357,6 +1419,9 @@ class Generator(TreeListener):
                 if f.name == tree.name:
                     return f.index_variable
 
+        if tree.name in self.external_objects and self.current_class.type != "function":
+            return ca.MX(self.external_objects[tree.name])
+
         # Check ordinary symbols
         symbol = self.current_class.symbols[tree.name]
         s = self.get_mx(symbol)
@@ -1425,6 +1490,9 @@ class Generator(TreeListener):
     def _call_external(self, function_name: str, operands: list) -> list:
         """Return the outputs of a call to an external function through a callback."""
         function = self.get_external_function(function_name)
+        if any(function.is_external_object(s) for s in function.outputs):
+            # A constructor call is an object binding, which is constructed numerically
+            return [ca.MX(np.nan)]
         if len(operands) != len(function.inputs):
             raise NotImplementedError(
                 f"Call to external function {function_name} without all of its arguments"
@@ -1461,6 +1529,102 @@ class Generator(TreeListener):
                 f" evaluate at generation time, unlike {operand}: {e}"
             ) from e
 
+    def _external_object_binding(self, tree: ast.Class, symbol: ast.Symbol) -> ast.Expression:
+        """Remove and return the constructor call that binds an external object (MLS 12.9.7)."""
+        constructor = tree.external_objects[str(symbol.type)][0]
+        if isinstance(symbol.value, ast.Expression):
+            return symbol.value
+        for equation in tree.equations:
+            if (
+                isinstance(equation, ast.Equation)
+                and isinstance(equation.left, ast.ComponentRef)
+                and equation.left.name == symbol.name
+                and isinstance(equation.right, ast.Expression)
+                and str(equation.right.operator) == constructor
+            ):
+                tree.equations.remove(equation)
+                return equation.right
+        raise ValueError(f"External object {symbol.name} has no constructor binding")
+
+    def _construct_external_objects(self, tree: ast.Class) -> None:
+        """Construct the external objects of a model, which live as long as the Model."""
+        evaluate = self.evaluator()
+        for symbol in list(tree.symbols.values()):
+            lifecycle = tree.external_objects.get(str(symbol.type))
+            if lifecycle is None:
+                continue
+            binding = self._external_object_binding(tree, symbol)
+            try:
+                args = [evaluate(operand) for operand in binding.operands]
+            except (NotImplementedError, ValueError) as e:
+                raise NotImplementedError(
+                    f"The constructor arguments of external object {symbol.name} must evaluate"
+                    f" at generation time: {e}"
+                ) from e
+            constructor, destructor = map(self.get_external_function, lifecycle)
+            (pointer,) = constructor(*args)
+            external_object = ExternalObject(pointer, destructor)
+            self.model._external_objects.append(external_object)
+            self.external_objects[symbol.name] = external_object.id
+            del tree.symbols[symbol.name]
+
+    def _local_objects_function(self, tree, inputs, outputs, tmp, objects):
+        """Return a callback for a function with protected external objects (MLS 12.9.7)."""
+        object_names = {s.name for s in objects}
+        # Ids of the objects in construction order, which a constructor may take
+        constructors, statements, object_ids = [], [], []
+        for statement in tree.statements:
+            targets = getattr(statement, "left", [])
+            if len(targets) != 1 or targets[0].name not in object_names:
+                statements.append(statement)
+                continue
+            (target,) = targets
+            symbol = tree.symbols[target.name]
+            constructor, destructor = map(
+                self.get_external_function, tree.external_objects[str(symbol.type)]
+            )
+            bound, numeric = {}, []
+            operands = statement.right.operands
+            for i, (formal, operand) in enumerate(zip(constructor.inputs, operands)):
+                if constructor.is_string(formal):
+                    bound[i] = self._string_argument(constructor, formal, operand)
+                else:
+                    numeric.append(ca.MX(_array_to_mx(self.get_mx(operand))))
+            args_function = ca.Function(
+                f"{target.name}_constructor_args", inputs + object_ids, numeric
+            )
+            constructors.append((constructor, destructor, args_function, bound))
+            object_ids.append(self.get_mx(symbol))
+
+        body = self._statements_function(
+            tree.name + "_body", inputs + object_ids, outputs, tmp, statements
+        )
+        callback = LocalObjectsCallback(tree.name.replace(".", "_"), body, constructors)
+        self.model._external_callbacks.append(callback)
+        return callback
+
+    def _statements_function(self, name, inputs, outputs, tmp, statements) -> ca.Function:
+        """Return a function of *inputs* that runs *statements* and returns *outputs*."""
+        # Store current variable values
+        values = {}
+        for variable in inputs:
+            values[variable] = variable
+
+        # Process statements in order
+        for statement in statements:
+            src = self.get_mx(statement)
+            for assignment in src:
+                [values[assignment.left]] = ca.substitute(
+                    [assignment.right], list(values.keys()), list(values.values())
+                )
+
+        output_expr = ca.substitute(
+            [values[output] for output in outputs], tmp, [values[t] for t in tmp]
+        )
+        # name is a fully qualified Modelica class name (dot-separated),
+        # which CasADi does not accept as a Function name.
+        return ca.Function(name.replace(".", "_"), inputs, output_expr)
+
     def get_function(self, function_name):
         if function_name in self.functions:
             return self.functions[function_name]
@@ -1472,6 +1636,7 @@ class Generator(TreeListener):
 
         inputs = []
         outputs = []
+        objects = []
         tmp = []
         for s in tree.symbols.values():
             src = self.get_mx(s)
@@ -1479,28 +1644,20 @@ class Generator(TreeListener):
                 inputs.append(src)
             elif "output" in s.prefixes:
                 outputs.append(src)
+            elif str(s.type) in tree.external_objects:
+                objects.append(s)
             else:
                 tmp.append(src)
 
-        # Store current variable values
-        values = {}
-        for variable in inputs:
-            values[variable] = variable
-
-        # Process statements in order
-        for statement in tree.statements:
-            src = self.get_mx(statement)
-            for assignment in src:
-                [values[assignment.left]] = ca.substitute(
-                    [assignment.right], list(values.keys()), list(values.values())
-                )
-
-        output_expr = ca.substitute(
-            [values[output] for output in outputs], tmp, [values[t] for t in tmp]
-        )
-        # function_name is a fully qualified Modelica class name (dot-separated),
-        # which CasADi does not accept as a Function name.
-        func = ca.Function(function_name.replace(".", "_"), inputs, output_expr)
+        if objects:
+            # Constructor arguments are looked up in the function, as statements were
+            self.entered_classes.append(tree)
+            try:
+                func = self._local_objects_function(tree, inputs, outputs, tmp, objects)
+            finally:
+                self.entered_classes.pop()
+        else:
+            func = self._statements_function(function_name, inputs, outputs, tmp, tree.statements)
         self.functions[function_name] = func
 
         return func

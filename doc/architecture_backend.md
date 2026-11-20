@@ -15,16 +15,26 @@ feeds the backends.
 ### External Functions and Objects (MLS 12.9)
 
 The backend compiles the external C code of a model into one shared library and calls it
-numerically through CasADi callbacks.
+numerically through CasADi callbacks. External objects are ids in the CasADi graph. An
+external object bound by a function other than its constructor, or not bound at all, raises
+an error (MLS 12.9.7).
 
 Choices the spec leaves open:
 
+- A model's external objects are constructed once, at generation time, from the values
+  of their constructor arguments then, and live as long as the `Model` (MLS 12.9.7 only
+  requires construction before first use). So these arguments must evaluate at generation
+  time, and a parameter changed on the `Model` afterwards does not reach the object
 - `LibraryDirectory` is searched in `<os><bits>` (such as `linux64`) and
   `<machine>-<os>` subdirectories, then itself, but not in compiler subdirectories such
   as `win64/vs2019` (MLS 12.9.4)
+- Function-local objects are destroyed in construction order, also when one was built
+  from another (MLS 12.9.7 does not fix the order)
 
 Departures from the spec:
 
+- An equation `obj = Constructor(...)` in an equation section binds an external object,
+  which MLS 12.9.7 only allows in its declaration
 - A Boolean array output is not normalized to 0 and 1, and an enumeration output is not
   checked to be in range (MLS 12.9.1.1)
 
