@@ -5,6 +5,7 @@ Parse-only and miscellaneous AST tests.
 
 import copy
 import io
+import logging
 import os
 import pickle
 import re
@@ -582,6 +583,64 @@ def test_lazyparse_remove_class(tmp_path):
     assert "Child" not in vars(pkg)["classes"]
     assert child.parent is None
     assert isinstance(pkg, parser.LazyParseClass)  # parse never fired
+
+
+def test_resource_dir(tmp_path):
+    """Top-level classes record the directory modelica: URIs resolve against (MLS 13.5)."""
+    pkg_dir = tmp_path / "Pkg"
+    (pkg_dir / "Sub").mkdir(parents=True)
+    (pkg_dir / "package.mo").write_text("package Pkg\nend Pkg;")
+    (pkg_dir / "Sub" / "package.mo").write_text("within Pkg;\npackage Sub\nend Sub;")
+    (pkg_dir / "Sub" / "M.mo").write_text("within Pkg.Sub;\nmodel M\nend M;")
+    (tmp_path / "Single.mo").write_text("package Single\nend Single;")
+
+    for path, name in (
+        (pkg_dir / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "M.mo", "Pkg"),
+        (tmp_path / "Single.mo", "Single"),
+    ):
+        expected = tmp_path.resolve() if name == "Single" else pkg_dir.resolve()
+        assert parser.parse_file(path).classes[name].resource_dir == expected
+    assert (
+        parser.parse(pkg_dir.joinpath("package.mo").read_text()).classes["Pkg"].resource_dir is None
+    )
+
+    pkg = parser.modelicapath_to_tree(dirs=[tmp_path]).classes["Pkg"]
+    _ = pkg.classes
+    assert not isinstance(pkg, parser.LazyParseClass)
+    assert pkg.resource_dir == pkg_dir.resolve()
+
+
+def test_resource_dir_layout(tmp_path, caplog):
+    """A within that does not match the directories leaves modelica: URIs unresolved (MLS 13.4)."""
+    versioned = tmp_path / "Lib 1.2" / "Sub"
+    versioned.mkdir(parents=True)
+    (versioned / "M.mo").write_text("within Lib.Sub;\nmodel M\nend M;")
+    assert parser.parse_file(versioned / "M.mo").classes["Lib"].resource_dir == (
+        versioned.parent.resolve()
+    )
+
+    (tmp_path / "Other").mkdir()
+    deep = ".".join("ABCDEFGHIJKLMNOPQRSTUVWXYZ") * 2
+    for path, within in ((tmp_path / "Other" / "M.mo", "Lib.Sub"), (tmp_path / "D.mo", deep)):
+        path.write_text(f"within {within};\nmodel M\nend M;")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="pymoca"):
+            top = parser.parse_file(path).classes[within.split(".")[0]]
+        assert top.resource_dir is None
+        assert f"within {within} does not match directory layout of {path}" in caplog.text
+
+
+def test_resource_dir_extend(tmp_path):
+    """Merging files of one package keeps the first resource_dir found (MLS 13.5)."""
+    (tmp_path / "Other").mkdir()
+    (tmp_path / "Lib").mkdir()
+    (tmp_path / "Other" / "A.mo").write_text("within Lib;\nmodel A\nend A;")
+    (tmp_path / "Lib" / "B.mo").write_text("within Lib;\nmodel B\nend B;")
+    tree = parser.parse_file(tmp_path / "Other" / "A.mo")
+    tree.extend(parser.parse_file(tmp_path / "Lib" / "B.mo"))
+    assert tree.classes["Lib"].resource_dir == (tmp_path / "Lib").resolve()
 
 
 def test_modelicapath_first_root_wins(tmp_path):

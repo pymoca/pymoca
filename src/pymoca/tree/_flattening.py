@@ -12,6 +12,8 @@ from __future__ import annotations
 import copy
 import math
 import operator
+import os
+import re
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass, replace
@@ -1129,6 +1131,9 @@ def _flatten_external_clause(instance: InstanceClass, flat_func: InstanceClass) 
                 ast.ComponentRef, _rewrite_operand(external.output, declaring, ctx)
             )
         _rewrite_operand_list(external.arguments, declaring, ctx)
+    external.resources = _external_resources(
+        external.annotation, cast(ast.Class, declaring.ast_ref)
+    )
     flat_func.external = external
 
 
@@ -1195,6 +1200,68 @@ def _check_external_call(
                 f"External call of {name} has invalid argument {i}: arguments must be declared"
                 " component references, scalar constants or size of a constant dimension"
             )
+
+
+_RESOURCE_ANNOTATIONS = {
+    "Include": "includes",
+    "IncludeDirectory": "include_dirs",
+    "Library": "libraries",
+    "LibraryDirectory": "library_dirs",
+}
+
+
+def _external_resources(
+    annotation: ast.ClassModification | None, declaring: ast.Class
+) -> ast.ExternalResources:
+    """Normalize the resource annotations of an external clause (MLS 12.9.4)."""
+    resources = ast.ExternalResources()
+    for arg in annotation.arguments if annotation is not None else []:
+        mod = arg.value
+        if not isinstance(mod, ast.ElementModification) or not mod.modifications:
+            continue
+        field = _RESOURCE_ANNOTATIONS.get(str(mod.component))
+        if field is None:
+            continue
+        value = mod.modifications[0]
+        items = value.values if isinstance(value, ast.Array) else [value]
+        strings = [
+            _unescape_string(i.value)
+            for i in items
+            if isinstance(i, ast.Primary) and isinstance(i.value, str)
+        ]
+        setattr(resources, field, strings)
+
+    ancestors = declaring.ancestors()
+    top = ancestors[1] if len(ancestors) > 1 else declaring
+    root = ancestors[0] if ancestors else declaring
+    resources.include_dirs = resources.include_dirs or [f"modelica://{top.name}/Resources/Include"]
+    resources.library_dirs = resources.library_dirs or [f"modelica://{top.name}/Resources/Library"]
+    resources.include_dirs = [_resolve_modelica_uri(uri, root) for uri in resources.include_dirs]
+    resources.library_dirs = [_resolve_modelica_uri(uri, root) for uri in resources.library_dirs]
+    return resources
+
+
+_STRING_ESCAPES = {"a": "\a", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
+
+
+def _unescape_string(text: str) -> str:
+    """Replace the escape sequences of a Modelica string literal (MLS 2.4.6)."""
+    return re.sub(r"\\(.)", lambda m: _STRING_ESCAPES.get(m[1], m[1]), text)
+
+
+def _resolve_modelica_uri(uri: str, root: ast.Class) -> str:
+    """Return the file system path of a modelica: URI, or *uri* if it cannot be resolved (MLS 13.5)."""
+    match = re.fullmatch(r"modelica:/{1,2}([^/]+)(/.*)?", uri, re.IGNORECASE)
+    if match is None:
+        return uri
+    class_name, resource = match.groups()
+    top_name, *packages = class_name.split(".")
+    top = root.classes.get(top_name)
+    if top is None or top.resource_dir is None:
+        return uri
+    resource = resource or ""
+    path = str(top.resource_dir.joinpath(*packages, *filter(None, resource.split("/"))))
+    return path + os.sep if resource.endswith("/") else path
 
 
 def _set_default_external_call(external: ast.ExternalClause, instance: InstanceClass) -> None:

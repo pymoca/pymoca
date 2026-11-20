@@ -731,6 +731,26 @@ class ExtendsClause(Node):
         )
 
 
+class ExternalResources(Node):
+    """Resolved resource annotations of an external clause (MLS 12.9.4)."""
+
+    def __init__(self, **kwargs):
+        self.includes: list[str] = []
+        self.include_dirs: list[str] = []
+        self.libraries: list[str] = []
+        self.library_dirs: list[str] = []
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(includes={!r}, include_dirs={!r}, libraries={!r}, library_dirs={!r})".format(
+            type(self).__name__,
+            self.includes,
+            self.include_dirs,
+            self.libraries,
+            self.library_dirs,
+        )
+
+
 class ExternalClause(Node):
     """External function interface of a function class (MLS 12.9)."""
 
@@ -740,6 +760,8 @@ class ExternalClause(Node):
         self.external_name: str | None = None
         self.arguments: list[Expression | Primary | ComponentRef | Array] = []
         self.annotation: ClassModification | None = None
+        # Set by flattening from the annotation
+        self.resources: ExternalResources | None = None
         super().__init__(**kwargs)
 
     def __repr__(self):
@@ -771,6 +793,8 @@ class Class(Node):
         self.statements: list[AssignmentStatement | IfStatement | ForStatement] = []
         self.annotation: ClassModification | None = None
         self.external: ExternalClause | None = None
+        # Directory that modelica:/<name>/ URIs map to, set on top-level classes from files
+        self.resource_dir: Path | None = None
         self.parent: Class | None = None
         self.visibility: Visibility = Visibility.PUBLIC
         self.is_short_class_definition: bool = False
@@ -786,6 +810,8 @@ class Class(Node):
         return element_full_name(self)
 
     def _extend(self, other: Class) -> None:
+        if self.resource_dir is None:
+            self.resource_dir = other.resource_dir
         for class_name in other.classes.keys():
             if class_name in self.classes.keys():
                 self.classes[class_name]._extend(other.classes[class_name])

@@ -7,7 +7,10 @@ package ExternalFunctionTest
     output Real y;
   protected
     Real work[n] = zeros(n);
-  external "C" y = cExplicit(x, size(x, 1), k, n, work);
+  external "C" y = cExplicit(x, size(x, 1), k, n, work) annotation(
+      Library = {"lib1", "lib2"},
+      Include = "#include \"explicit.h\"",
+      IncludeDirectory = "modelica://ExternalFunctionTest/Resources/C-Sources");
   end explicitCall;
 
   function defaultCall
