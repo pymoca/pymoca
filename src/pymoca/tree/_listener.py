@@ -208,6 +208,8 @@ class TreeWalker:
             and child_name in ("parent", "parent_instance")
             or isinstance(tree, ast.ClassModificationArgument)
             and child_name in ("scope", "__deepcopy__")
+            or isinstance(tree, ast.ExtendsClause)
+            and child_name == "scope"
         ):
             return True
         return False
