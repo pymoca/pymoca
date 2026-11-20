@@ -172,6 +172,7 @@ class LazyParseClass(ast.Class):
         # the update overwrites .classes with the parsed content.
         existing_subdir_stubs = list(my["classes"].values())
         saved_parent = my["parent"]
+        saved_resource_dir = my["resource_dir"]
 
         # Set parent BEFORE __dict__.update so that arg.scope references inside parsed
         # symbols (e.g. stateSelect=stateSelect) resolve via the correct full_name.
@@ -180,6 +181,7 @@ class LazyParseClass(ast.Class):
         # parsed content without needing to know a swap occurred.
         self.__dict__.update(parsed_class.__dict__)
         self.parent = saved_parent
+        self.resource_dir = saved_resource_dir
         self.__class__ = ast.Class  # type: ignore[assignment]  # demote: drops .path, removes __getattribute__ overhead
 
         # Re-parent classes/symbols that arrived via parsed_class (parsed_class is orphaned)
@@ -359,6 +361,8 @@ def modelicapath_to_tree(
         # unions same-named top-level packages across roots, which is non-conforming.
         for cls in list(dir_tree.classes.values()):
             if cls.name not in modelicapath_tree.classes:
+                if isinstance(cls, LazyParseClass) and cls.path is not None:
+                    cls.resource_dir = cls.path.parent
                 modelicapath_tree.add_class(cls)
     return modelicapath_tree
 
@@ -1836,7 +1840,7 @@ def parse_file(file_path: str | Path, trace: bool = False) -> ast.Tree:
         raise FileNotFoundError(f"File not found: {path}")
     txt = path.read_text(encoding="utf-8")
     try:
-        ast_tree = parse(txt, trace=trace)
+        modelica_file = parse_text(txt, trace=trace)
     except ModelicaSyntaxError as exception:
         # Add filename to the exception
         info = (str(path),) + exception.args[1][1:]
@@ -1844,4 +1848,17 @@ def parse_file(file_path: str | Path, trace: bool = False) -> ast.Tree:
             exception.msg,
             info,
         ) from exception
+    ast_tree = file_to_tree(modelica_file)
+    _set_resource_dir(ast_tree, modelica_file, path)
     return ast_tree
+
+
+def _set_resource_dir(ast_tree: ast.Tree, modelica_file: ModelicaFile, path: Path) -> None:
+    """Record the directory of the top-level class of a parsed file (MLS 13.5)."""
+    within = modelica_file.within[0].to_tuple() if modelica_file.within else ()
+    # A package.mo file sits inside the directory of the package it defines
+    levels = len(within) + (path.name == "package.mo")
+    path = path.resolve()
+    top_dir = path.parents[levels - 1] if levels else path.parent
+    for name in within[:1] or modelica_file.classes:
+        ast_tree.classes[name].resource_dir = top_dir

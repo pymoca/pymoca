@@ -6,8 +6,10 @@ Tests for tree.flatten_instance() / tree.flatten().
 import copy
 import os
 import pickle
+from pathlib import Path
 
 from conftest_parse import (
+    MODEL_DIR,
     MSL4_DIR,
     _flush,
     parse_and_flatten_model,
@@ -1340,6 +1342,27 @@ def test_external_function_call():
     assert not flat_tree.classes["ExternalFunctionTest.defaultCall"].statements
 
 
+def test_external_resources():
+    """External resource annotations normalize, modelica URIs resolved (MLS 12.9.4, 13.5)."""
+    flat = parse_and_flatten_model("ExternalFunction.mo", "ExternalFunctionTest.M")
+    resources = flat.functions["ExternalFunctionTest.explicitCall"].external.resources
+    resources_dir = os.path.join(MODEL_DIR, "Resources")
+    assert resources.includes == ['#include "explicit.h"']
+    assert resources.libraries == ["lib1", "lib2"]
+    assert resources.include_dirs == [os.path.join(resources_dir, "C-Sources")]
+    assert resources.library_dirs == [os.path.join(resources_dir, "Library")]
+
+    resources = flat.functions["ExternalFunctionTest.defaultCall"].external.resources
+    assert (resources.includes, resources.libraries) == ([], [])
+    assert resources.include_dirs == [os.path.join(resources_dir, "Include")]
+
+    flat = tree.flatten_class(
+        parser.parse(Path(MODEL_DIR, "ExternalFunction.mo").read_text()), "ExternalFunctionTest.M"
+    )
+    resources = flat.functions["ExternalFunctionTest.explicitCall"].external.resources
+    assert resources.include_dirs == ["modelica://ExternalFunctionTest/Resources/C-Sources"]
+
+
 def test_external_object():
     """External objects flatten as simple-type leaves built by their constructor (MLS 12.9.7)."""
     assert "ExternalObject" in ast.Tree().classes
@@ -1504,6 +1527,37 @@ def test_idealgash2o_stale_stub_import():
     flat = tree.flatten_class(root, "Modelica.Media.Examples.IdealGasH2O")
     assert "state.p" in flat.symbols
     assert "smoothState.T" in flat.symbols
+
+
+@pytest.mark.library
+@pytest.mark.msl
+@pytest.mark.skipif(
+    not os.path.isfile(os.path.join(MSL4_DIR, "Modelica", "package.mo")),
+    reason="MSL-4.0.x submodule not present",
+)
+def test_msl_external_table_functions():
+    """MSL table functions flatten with explicit external calls and resolved resources."""
+    root = parser.modelicapath_to_tree([MSL4_DIR])
+    flat = tree.flatten_class(
+        root, "Modelica.Electrical.Machines.Examples.InductionMachines.IMC_Conveyor"
+    )
+    c_sources = os.path.join(os.path.realpath(MSL4_DIR), "Modelica", "Resources", "C-Sources")
+    table_funcs = [
+        func
+        for name, func in flat.functions.items()
+        if name.startswith("Modelica.Blocks.Types.ExternalCombiTimeTable.")
+        or name.startswith("Modelica.Blocks.Tables.Internal.")
+    ]
+    assert table_funcs
+    for func in table_funcs:
+        assert func.external.external_name.startswith("ModelicaStandardTables_")
+        assert func.external.resources.include_dirs == [c_sources]
+        assert func.external.resources.libraries == [
+            "ModelicaStandardTables",
+            "ModelicaIO",
+            "ModelicaMatIO",
+            "zlib",
+        ]
 
 
 @pytest.mark.xfail(reason="outer components are not yet merged with their inner match (MLS 5.4)")

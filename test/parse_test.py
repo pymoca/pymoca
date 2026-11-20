@@ -584,6 +584,33 @@ def test_lazyparse_remove_class(tmp_path):
     assert isinstance(pkg, parser.LazyParseClass)  # parse never fired
 
 
+def test_resource_dir(tmp_path):
+    """Top-level classes record the directory modelica: URIs resolve against (MLS 13.5)."""
+    pkg_dir = tmp_path / "Pkg"
+    (pkg_dir / "Sub").mkdir(parents=True)
+    (pkg_dir / "package.mo").write_text("package Pkg\nend Pkg;")
+    (pkg_dir / "Sub" / "package.mo").write_text("within Pkg;\npackage Sub\nend Sub;")
+    (pkg_dir / "Sub" / "M.mo").write_text("within Pkg.Sub;\nmodel M\nend M;")
+    (tmp_path / "Single.mo").write_text("package Single\nend Single;")
+
+    for path, name in (
+        (pkg_dir / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "M.mo", "Pkg"),
+        (tmp_path / "Single.mo", "Single"),
+    ):
+        expected = tmp_path.resolve() if name == "Single" else pkg_dir.resolve()
+        assert parser.parse_file(path).classes[name].resource_dir == expected
+    assert (
+        parser.parse(pkg_dir.joinpath("package.mo").read_text()).classes["Pkg"].resource_dir is None
+    )
+
+    pkg = parser.modelicapath_to_tree(dirs=[tmp_path]).classes["Pkg"]
+    _ = pkg.classes
+    assert not isinstance(pkg, parser.LazyParseClass)
+    assert pkg.resource_dir == pkg_dir.resolve()
+
+
 def test_modelicapath_first_root_wins(tmp_path):
     """modelicapath_to_tree loads a colliding top-level name entirely from the first
     root that offers it; a later root's version of that name is never consulted
