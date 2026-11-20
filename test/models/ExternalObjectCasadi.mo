@@ -70,6 +70,10 @@ package ExternalObjectCasadi
     Real w = interpolateMyTable(reversed, u);
   end Table;
 
+  model ScaledTable
+    extends Table(scaled = true, scale = "twice");
+  end ScaledTable;
+
   model TableInFunction
     parameter Real vals[5] = {5, 3, 1, 9, 6};
     input Real u;

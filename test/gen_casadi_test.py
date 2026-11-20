@@ -687,6 +687,11 @@ def test_external_objects():
     gc.collect()
     assert library.cdll.countMyTables() == 0
 
+    # Constructor arguments may call functions, here an algorithm with an external call
+    casadi_model = _generate_external_object_model("ScaledTable")
+    residual = _residual_function(casadi_model)
+    np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [7.2, 15.0, 8.1])
+
     with pytest.raises(NotImplementedError, match="myTable must evaluate at generation time"):
         _generate_external_object_model("FreeTable")
 
