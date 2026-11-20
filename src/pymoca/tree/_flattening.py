@@ -2288,13 +2288,18 @@ def expand_connectors(node: ast.Class) -> None:
 
 
 def add_variable_value_statements(node: ast.Class) -> None:
+    """Turn the bindings of a function's non-input variables into leading statements (MLS 12.4.4)."""
+    bindings = []
     for sym in node.symbols.values():
-        # The external call computes outputs, and input bindings are default arguments
-        if node.external is not None and sym.visibility != ast.Visibility.PROTECTED:
+        # Input bindings are default arguments, and an external call computes the outputs
+        if "input" in sym.prefixes or (
+            node.external is not None and sym.visibility != ast.Visibility.PROTECTED
+        ):
             continue
         if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
-            node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
+            bindings.append(ast.AssignmentStatement(left=[sym], right=sym.value))
             sym.value = ast.Primary(value=None)
+    node.statements[:0] = bindings
 
 
 class StateAnnotator(TreeListener):

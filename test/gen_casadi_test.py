@@ -622,6 +622,14 @@ def test_interpolate():
     assert_model_equivalent_numeric(ref_model, casadi_model)
 
 
+def test_function_binding():
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "FunctionBinding.mo"))
+    casadi_model = gen_casadi.generate(ast_tree, "FunctionBindingTest.M")
+    (residual,) = casadi_model.equations
+    y = casadi_model.alg_states[0].symbol
+    assert float(ca.evalf(ca.substitute(residual, y, 0))) == -10.0
+
+
 def test_function_call():
     with open(os.path.join(MODEL_DIR, "FunctionCall.mo"), "r") as f:
         txt = f.read()

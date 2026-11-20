@@ -1419,6 +1419,12 @@ def test_function_binding_names():
     assert [str(o) for o in binding.right.operands] == ["k", "x"]
 
 
+def test_function_binding_statements():
+    """Non-input bindings of a function run before its algorithm (MLS 12.4.4)."""
+    func = _function_binding_test_function()
+    assert [s.left[0].name for s in func.statements] == ["a", "y"]
+
+
 def test_inherited_equation_refs_resolved():
     """Equations referencing inherited (via extends) symbols flatten before resolution (MLS 5.6.2)."""
     flat = parse_and_flatten_model("InheritedEquationConnector.mo", "P.B")
