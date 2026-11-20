@@ -421,6 +421,9 @@ class Model:
 
     def simplify(self, options):
         options = _merge_default_options(options)
+        if options["expand_mx"] and getattr(self, "_external_callbacks", None):
+            logger.warning("External function calls cannot be expanded to SX, keeping MX")
+            options["expand_mx"] = False
 
         alg_states_left = 0
 

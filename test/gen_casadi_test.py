@@ -719,6 +719,23 @@ def test_external_function_sensitivities(caplog):
 
 
 @needs_compiler
+def test_external_functions_cache_and_codegen(tmp_path, caplog):
+    """Models calling external functions are neither cached nor code generated."""
+    shutil.copy(os.path.join(MODEL_DIR, "ExternalObjectCasadi.mo"), tmp_path)
+    options = {"external_library_paths": [_EXTERNAL_OBJECT_SOURCE], "cache": True}
+    with caplog.at_level("WARNING", logger="pymoca"):
+        casadi_model = transfer_model(str(tmp_path), "ExternalObjectCasadi.Table", options)
+    assert "cannot be expanded to SX" in caplog.text
+    assert not list(tmp_path.glob("*.pymoca_cache"))
+    residual = _residual_function(casadi_model)
+    np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [3.6, 7.5, 8.1])
+
+    options = {"external_library_paths": [_EXTERNAL_OBJECT_SOURCE], "codegen": True}
+    with pytest.raises(NotImplementedError, match="do not support codegen"):
+        transfer_model(str(tmp_path), "ExternalObjectCasadi.Table", options)
+
+
+@needs_compiler
 def test_external_objects_in_function():
     """A protected external object of a function lives for one call (MLS 12.9.7)."""
     casadi_model = _generate_external_object_model("TableInFunction")

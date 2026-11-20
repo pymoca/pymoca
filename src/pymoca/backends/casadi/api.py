@@ -219,6 +219,15 @@ def save_model(
 
     compiler_options = _merge_default_options(compiler_options)
 
+    if model._external_callbacks:
+        # Callbacks into native code can neither be code generated nor pickled
+        if compiler_options["codegen"]:
+            raise NotImplementedError(
+                f"Model {model_name} calls external functions, which do not support codegen"
+            )
+        logger.debug("Not caching model %s, as it calls external functions", model_name)
+        return
+
     objects = {
         "dae_residual": None,
         "initial_residual": None,
