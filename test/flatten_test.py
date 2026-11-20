@@ -1375,10 +1375,26 @@ def test_external_object():
     assert constructor in flat.functions
     assert "interpolTable" in flat.functions["ExternalObjectTest.interpolateMyTable"].symbols
 
+    destructor = "ExternalObjectTest.MyTable.destructor"
+    lifecycle = {"ExternalObjectTest.MyTable": (constructor, destructor)}
+    assert flat.external_objects == lifecycle
+    assert flat.functions[destructor].external.external_name == "closeMyTable"
+
     flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
     func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
     assert func.symbols["myTable"].value.operator == constructor
-    assert constructor in flat.functions
+    assert func.external_objects == lifecycle
+    assert {constructor, destructor} <= flat.functions.keys()
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalObject.mo"),
+        ast.ComponentRef.from_string("ExternalObjectTest.Table"),
+    )
+    flat_class = flat_tree.classes["ExternalObjectTest.Table"]
+    assert str(flat_class.symbols["myTable"].type) == "ExternalObjectTest.MyTable"
+    assert flat_class.external_objects == lifecycle
+    interpolate = flat_tree.classes["ExternalObjectTest.interpolateMyTable"]
+    assert str(interpolate.symbols["interpolTable"].type) == "ExternalObjectTest.MyTable"
 
 
 def test_inherited_equation_refs_resolved():
@@ -1536,11 +1552,15 @@ def test_idealgash2o_stale_stub_import():
     reason="MSL-4.0.x submodule not present",
 )
 def test_msl_external_table_functions():
-    """MSL table functions flatten with explicit external calls and resolved resources."""
+    """MSL table functions flatten with external calls, resources and object lifecycle."""
     root = parser.modelicapath_to_tree([MSL4_DIR])
     flat = tree.flatten_class(
         root, "Modelica.Electrical.Machines.Examples.InductionMachines.IMC_Conveyor"
     )
+    table = "Modelica.Blocks.Types.ExternalCombiTimeTable"
+    lifecycle = (table + ".constructor", table + ".destructor")
+    assert flat.external_objects == {table: lifecycle}
+    assert set(lifecycle) <= flat.functions.keys()
     c_sources = os.path.join(os.path.realpath(MSL4_DIR), "Modelica", "Resources", "C-Sources")
     table_funcs = [
         func

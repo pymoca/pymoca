@@ -773,6 +773,8 @@ class Class(Node):
         self.classes: dict[str, Class] = OrderedDict()
         self.symbols: OrderedDict[str, Symbol] = OrderedDict()
         self.functions: OrderedDict[str, Class] = OrderedDict()
+        # Set by flattening: external object class -> (constructor, destructor) full names
+        self.external_objects: dict[str, tuple[str, str]] = {}
         self.initial_equations: list[Equation | ForEquation] = []
         self.equations: list[Equation | ForEquation | ConnectClause] = []
         self.initial_statements: list[AssignmentStatement | IfStatement | ForStatement] = []
