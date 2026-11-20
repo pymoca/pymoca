@@ -137,13 +137,22 @@ class Node:
             res = {
                 key: cls.to_json(guard(var.__dict__[key]))
                 for key in var.__dict__.keys()
-                if key not in ("parent", "parent_instance", "scope", "__deepcopy__")
+                if key not in ("parent", "parent_instance", "scope")
             }
         elif isinstance(var, Visibility):
             res = str(var)
         else:
             res = var
         return res
+
+
+def _deepcopy_fields(obj: Node, memo: dict, shared: tuple[str, ...] = ()) -> Any:
+    """Deep copy *obj* field by field, sharing the fields named in *shared* by reference."""
+    new = obj.__class__.__new__(obj.__class__)
+    memo[id(obj)] = new
+    for key, value in vars(obj).items():
+        vars(new)[key] = value if key in shared else copy.deepcopy(value, memo)
+    return new
 
 
 class Primary(Node):
@@ -692,12 +701,7 @@ class ClassModificationArgument(Node):
         )
 
     def __deepcopy__(self, memo):
-        _scope, _deepcp = self.scope, self.__deepcopy__
-        self.scope, self.__deepcopy__ = None, None  # type: ignore[method-assign]
-        new = copy.deepcopy(self, memo)
-        self.scope, self.__deepcopy__ = _scope, _deepcp  # type: ignore[method-assign]
-        new.scope, new.__deepcopy__ = _scope, _deepcp  # type: ignore[method-assign]
-        return new
+        return _deepcopy_fields(self, memo, shared=("scope",))
 
 
 class ExtendsClause(Node):
@@ -856,15 +860,9 @@ class Class(Node):
 
     def __deepcopy__(self, memo):
         # Avoid copying the entire tree
-        if self.parent is not None and self.parent not in memo:
-            memo[id(self.parent)] = self.parent
-
-        _deepcp = self.__deepcopy__
-        self.__deepcopy__ = None  # type: ignore[method-assign]
-        new = copy.deepcopy(self, memo)
-        self.__deepcopy__ = _deepcp  # type: ignore[method-assign]
-        new.__deepcopy__ = _deepcp  # type: ignore[method-assign]
-        return new
+        if self.parent is not None:
+            memo.setdefault(id(self.parent), self.parent)
+        return _deepcopy_fields(self, memo)
 
     def __repr__(self):
         return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)

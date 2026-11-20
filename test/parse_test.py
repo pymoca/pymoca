@@ -3,8 +3,10 @@
 Parse-only and miscellaneous AST tests.
 """
 
+import copy
 import io
 import os
+import pickle
 import re
 import threading
 import time
@@ -118,6 +120,28 @@ def test_deep_copy_timeout():
         if not thread.is_alive():
             return
     assert not thread.is_alive(), "Timeout occurred"
+
+
+def test_deep_copy_shares_scope_and_parent():
+    """Deep copies share scope and parent, leave the original unchanged, and copy cleanly again."""
+    ast_tree = parser.parse("package P model M Real x(start = 1); end M; end P;")
+    package = ast_tree.classes["P"]
+    model = package.classes["M"]
+    (arg,) = model.symbols["x"].class_modification.arguments
+    pickled = pickle.dumps(ast_tree)
+
+    arg_copy = copy.deepcopy(arg)
+    assert arg_copy.scope is arg.scope
+    assert arg_copy.value is not arg.value
+    model_copy = copy.deepcopy(model)
+    assert model_copy.parent is package
+    assert model_copy.symbols["x"] is not model.symbols["x"]
+    assert pickle.dumps(ast_tree) == pickled
+
+    arg_copy.value.component.name = "changed"
+    assert str(copy.deepcopy(arg_copy).value.component) == "changed"
+    model_copy.name = "M2"
+    assert copy.deepcopy(model_copy).name == "M2"
 
 
 def test_visibility_in_ast():
