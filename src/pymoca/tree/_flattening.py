@@ -1075,12 +1075,14 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             # Flatten using new pipeline — discovers nested function calls
             flat_func = _create_partial_flat_instance(func_instance)
-            # Name the flat function by its dict key, which its call sites reference
-            flat_func.name = full_name
+            # Same instance path as func_instance while names are resolved relative to it
+            flat_func.name = func_instance.name
             _flatten_instance(func_instance, flat_func)
             _flatten_external_clause(func_instance, flat_func)
             _register_external_objects(flat_func, functions)
             _flatten_derivative_annotations(func_instance, flat_func, functions)
+            # Name the flat function by its dict key, which its call sites reference
+            flat_func.name = full_name
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -1147,7 +1149,7 @@ def _flatten_derivative_annotations(
         if not isinstance(found, ast.Class) or not found.type.endswith("function"):
             logger.warning(
                 "Ignoring derivative annotations of %s: %s is not a function",
-                flat_func.name,
+                flat_func.full_instance_name,
                 name,
             )
             return
@@ -1163,7 +1165,7 @@ def _flatten_derivative_annotations(
                         logger.warning(
                             "Ignoring derivative annotations of %s: order of %s must be a"
                             " positive integer literal",
-                            flat_func.name,
+                            flat_func.full_instance_name,
                             name,
                         )
                         return
@@ -1232,7 +1234,7 @@ def _flatten_external_clause(instance: InstanceClass, flat_func: InstanceClass) 
     clause, declaring = found
     if _has_algorithm(instance):
         raise ModelicaSemanticError(
-            f"Function {flat_func.name} has both an algorithm section and an external clause"
+            f"Function {flat_func.full_instance_name} has both an algorithm section and an external clause"
         )
     external = copy.deepcopy(clause)
     ctx = FlatteningContext(
@@ -1246,7 +1248,7 @@ def _flatten_external_clause(instance: InstanceClass, flat_func: InstanceClass) 
         external.external_name = cast(ast.Class, declaring.ast_ref).name
         _set_default_external_call(external, declaring)
     else:
-        _check_external_call(external, declaring, flat_func.name)
+        _check_external_call(external, declaring, flat_func.full_instance_name)
         if external.output is not None:
             external.output = cast(
                 ast.ComponentRef, _rewrite_operand(external.output, declaring, ctx)
