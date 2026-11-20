@@ -1050,6 +1050,7 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
             _flatten_instance(func_instance, flat_func)
             _flatten_external_clause(func_instance, flat_func)
             _register_external_objects(flat_func, functions)
+            _flatten_derivative_annotations(func_instance, flat_func, functions)
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -1073,6 +1074,36 @@ def _register_external_objects(flat: InstanceClass, functions: OrderedDict) -> N
         for func in lifecycle:
             functions.setdefault(func.full_name, func)
         flat.external_objects[cls.full_name] = (lifecycle[0].full_name, lifecycle[1].full_name)
+
+
+def _flatten_derivative_annotations(
+    instance: InstanceClass, flat_func: InstanceClass, functions: OrderedDict
+) -> None:
+    """Record the derivative annotations of a function and queue their functions (MLS 12.7.1)."""
+    for arg in instance.annotation.arguments if instance.annotation is not None else []:
+        mod = arg.value
+        if not isinstance(mod, ast.ElementModification) or str(mod.component) != "derivative":
+            continue
+        name = next((m for m in mod.modifications if isinstance(m, ast.ComponentRef)), None)
+        if name is None:
+            continue
+        found = _find_name(instance, name, RecursionGuard(), LookupOptions())
+        if not isinstance(found, ast.Class):
+            raise NameLookupError(f"Derivative function {name} of {flat_func.name} not found")
+        derivative = ast.DerivativeAnnotation(function=found.full_name)
+        for attrs in (m for m in mod.modifications if isinstance(m, ast.ClassModification)):
+            for attr in (a.value for a in attrs.arguments):
+                if not isinstance(attr, ast.ElementModification) or not attr.modifications:
+                    continue
+                key, value = str(attr.component), attr.modifications[0]
+                if key == "order" and isinstance(value, ast.Primary):
+                    derivative.order = int(cast(int, value.value))
+                elif key == "noDerivative":
+                    derivative.no_derivative.append(str(value))
+                elif key == "zeroDerivative":
+                    derivative.zero_derivative.append(str(value))
+        functions.setdefault(found.full_name, found)
+        flat_func.derivatives.append(derivative)
 
 
 def _find_external_clause(
@@ -1860,6 +1891,7 @@ def _instance_to_ast_class(flat_instance: InstanceClass) -> ast.Class:
     flat_class.annotation = flat_instance.annotation
     flat_class.external = flat_instance.external
     flat_class.external_objects = flat_instance.external_objects
+    flat_class.derivatives = flat_instance.derivatives
 
     # Convert symbols
     for name, isym in flat_instance.symbols.items():

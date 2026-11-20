@@ -717,6 +717,26 @@ class ExtendsClause(Node):
         )
 
 
+class DerivativeAnnotation(Node):
+    """A derivative annotation of a function, naming its derivative function (MLS 12.7.1)."""
+
+    def __init__(self, **kwargs):
+        self.function: str = ""
+        self.order: int = 1
+        self.no_derivative: list[str] = []
+        self.zero_derivative: list[str] = []
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(function={!r}, order={!r}, no_derivative={!r}, zero_derivative={!r})".format(
+            type(self).__name__,
+            self.function,
+            self.order,
+            self.no_derivative,
+            self.zero_derivative,
+        )
+
+
 class ExternalResources(Node):
     """Resolved resource annotations of an external clause (MLS 12.9.4)."""
 
@@ -775,6 +795,8 @@ class Class(Node):
         self.functions: OrderedDict[str, Class] = OrderedDict()
         # Set by flattening: external object class -> (constructor, destructor) full names
         self.external_objects: dict[str, tuple[str, str]] = {}
+        # Set by flattening from the derivative annotations of a function
+        self.derivatives: list[DerivativeAnnotation] = []
         self.initial_equations: list[Equation | ForEquation] = []
         self.equations: list[Equation | ForEquation | ConnectClause] = []
         self.initial_statements: list[AssignmentStatement | IfStatement | ForStatement] = []

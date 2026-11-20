@@ -22,7 +22,28 @@ package ExternalObjectTest
     output Real y;
   external "C"
     y = interpolateMyTable(interpolTable, u);
+    annotation(derivative(noDerivative = interpolTable) = interpolateMyTableDer);
   end interpolateMyTable;
+
+  function interpolateMyTableDer
+    input MyTable interpolTable;
+    input Real u;
+    input Real der_u;
+    output Real der_y;
+  external "C"
+    der_y = interpolateMyTableDer(interpolTable, u, der_u);
+    annotation(derivative(order = 2, zeroDerivative = interpolTable) = interpolateMyTableDer2);
+  end interpolateMyTableDer;
+
+  function interpolateMyTableDer2
+    input MyTable interpolTable;
+    input Real u;
+    input Real der_u;
+    input Real der2_u;
+    output Real der2_y;
+  external "C"
+    der2_y = interpolateMyTableDer2(interpolTable, u, der_u, der2_u);
+  end interpolateMyTableDer2;
 
   function interpolateMyTableFunc
     input Real[:] vals;

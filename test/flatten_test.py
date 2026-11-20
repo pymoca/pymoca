@@ -1379,6 +1379,13 @@ def test_external_object():
     lifecycle = {"ExternalObjectTest.MyTable": (constructor, destructor)}
     assert flat.external_objects == lifecycle
     assert flat.functions[destructor].external.external_name == "closeMyTable"
+    (der,) = flat.functions["ExternalObjectTest.interpolateMyTable"].derivatives
+    assert der.function == "ExternalObjectTest.interpolateMyTableDer"
+    assert (der.order, der.no_derivative, der.zero_derivative) == (1, ["interpolTable"], [])
+    (der2,) = flat.functions[der.function].derivatives
+    assert der2.function == "ExternalObjectTest.interpolateMyTableDer2"
+    assert (der2.order, der2.no_derivative, der2.zero_derivative) == (2, [], ["interpolTable"])
+    assert not flat.functions[der2.function].derivatives
 
     flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
     func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
@@ -1561,6 +1568,11 @@ def test_msl_external_table_functions():
     lifecycle = (table + ".constructor", table + ".destructor")
     assert flat.external_objects == {table: lifecycle}
     assert set(lifecycle) <= flat.functions.keys()
+    internal = "Modelica.Blocks.Tables.Internal."
+    (der,) = flat.functions[internal + "getTimeTableValue"].derivatives
+    assert der.function == internal + "getDerTimeTableValue"
+    assert der.no_derivative == ["nextTimeEvent", "pre_nextTimeEvent"]
+    assert der.function in flat.functions
     c_sources = os.path.join(os.path.realpath(MSL4_DIR), "Modelica", "Resources", "C-Sources")
     table_funcs = [
         func
