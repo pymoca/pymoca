@@ -22,6 +22,15 @@ Choices the spec leaves open:
   `<machine>-<os>` subdirectories, then itself, but not in compiler subdirectories such
   as `win64/vs2019` (MLS 12.9.4)
 
+Departures from the spec:
+
+- A Boolean array output is not normalized to 0 and 1, and an enumeration output is not
+  checked to be in range (MLS 12.9.1.1)
+
+Not implemented:
+
+- Language `"FORTRAN 77"` raises `NotImplementedError` (MLS 12.9)
+
 ### TODO / WIP / Stubs
 
 - `min` and `max` of an empty array give the values for Real, also for Integer expressions,
