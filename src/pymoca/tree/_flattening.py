@@ -83,6 +83,7 @@ def flatten_instance(
     opts = LookupOptions(evaluate_parameters=evaluate_parameters)
     flat_class = _create_partial_flat_instance(instance)
     _flatten_instance(instance, flat_class, opts=opts)
+    _register_external_objects(flat_class, flat_class.functions)
     _flatten_discovered_functions(flat_class)
     if evaluate_parameters:
         _evaluate_parameter_values(flat_class)
@@ -1078,6 +1079,7 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
             flat_func.name = full_name
             _flatten_instance(func_instance, flat_func)
             _flatten_external_clause(func_instance, flat_func)
+            _register_external_objects(flat_func, functions)
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -1086,6 +1088,39 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             flat_class.functions[full_name] = flat_func
             processed.add(full_name)
+
+
+def _register_external_objects(flat: InstanceClass, functions: OrderedDict) -> None:
+    """Record the external object classes of *flat*'s symbols and queue their lifecycle functions.
+
+    The destructor is never called explicitly, so it is queued here for flattening (MLS 12.9.7).
+    """
+    for sym in flat.symbols.values():
+        cls = sym.type
+        if not isinstance(cls, InstanceClass) or not ast.is_external_object(cls):
+            continue
+        lifecycle = tuple(_external_object_function(cls, f) for f in ("constructor", "destructor"))
+        constructor, destructor = (_formal_counts(func, cls) for func in lifecycle)
+        if constructor[1] != 1:
+            raise ModelicaSemanticError(
+                f"External object constructor {lifecycle[0].full_name} must have one output"
+            )
+        if destructor != (1, 0):
+            raise ModelicaSemanticError(
+                f"External object destructor {lifecycle[1].full_name} must have one input"
+                " and no outputs"
+            )
+        for func in lifecycle:
+            functions.setdefault(func.full_name, func)
+        flat.external_objects[cls.full_name] = (lifecycle[0].full_name, lifecycle[1].full_name)
+
+
+def _formal_counts(func: ast.Class, scope: InstanceClass) -> tuple[int, int]:
+    """Return the numbers of inputs and outputs of a function, including inherited ones."""
+    if not isinstance(func, InstanceClass) or func.instantiation_state < InstantiationState.PARTIAL:
+        func = cast(InstanceClass, _instantiate_element(func, scope, ast.ClassModification()))
+    symbols = _declared_symbols(func)
+    return sum("input" in s.prefixes for s in symbols), sum("output" in s.prefixes for s in symbols)
 
 
 def _find_external_clause(
@@ -1953,7 +1988,11 @@ def _instance_to_ast_symbol(isym: InstanceSymbol) -> ast.Symbol:
         setattr(sym, attr, _to_ast_value(getattr(isym, attr)))
     # Normalize type to ComponentRef for TreeWalker compatibility
     if isinstance(sym.type, InstanceClass):
-        sym.type = ast.ComponentRef(name=sym.type.name)
+        if ast.is_external_object(sym.type):
+            # Fully qualified so backends can look it up in external_objects
+            sym.type = ast.ComponentRef.from_string(sym.type.full_name)
+        else:
+            sym.type = ast.ComponentRef(name=sym.type.name)
     return sym
 
 
@@ -1965,6 +2004,7 @@ def _instance_to_ast_class(flat_instance: InstanceClass) -> ast.Class:
     flat_class.comment = flat_instance.comment
     flat_class.annotation = flat_instance.annotation
     flat_class.external = flat_instance.external
+    flat_class.external_objects = flat_instance.external_objects
 
     # Convert symbols
     for name, isym in flat_instance.symbols.items():

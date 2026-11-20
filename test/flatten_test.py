@@ -1454,10 +1454,26 @@ def test_external_object():
     assert constructor in flat.functions
     assert "interpolTable" in flat.functions["ExternalObjectTest.interpolateMyTable"].symbols
 
+    destructor = "ExternalObjectTest.MyTable.destructor"
+    lifecycle = {"ExternalObjectTest.MyTable": (constructor, destructor)}
+    assert flat.external_objects == lifecycle
+    assert flat.functions[destructor].external.external_name == "closeMyTable"
+
     flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
     func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
     assert func.symbols["myTable"].value.operator == constructor
-    assert constructor in flat.functions
+    assert func.external_objects == lifecycle
+    assert {constructor, destructor} <= flat.functions.keys()
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalObject.mo"),
+        ast.ComponentRef.from_string("ExternalObjectTest.Table"),
+    )
+    flat_class = flat_tree.classes["ExternalObjectTest.Table"]
+    assert str(flat_class.symbols["myTable"].type) == "ExternalObjectTest.MyTable"
+    assert flat_class.external_objects == lifecycle
+    interpolate = flat_tree.classes["ExternalObjectTest.interpolateMyTable"]
+    assert str(interpolate.symbols["interpolTable"].type) == "ExternalObjectTest.MyTable"
 
 
 _EXTERNAL_OBJECT_ERRORS = """
@@ -1471,6 +1487,20 @@ package P
     extends ExternalObject;
     function destructor input NoConstructor o; end destructor;
   end NoConstructor;
+  class NoDestructor
+    extends ExternalObject;
+    function constructor input Real x; output NoDestructor o; end constructor;
+  end NoDestructor;
+  class TwoOutputs
+    extends ExternalObject;
+    function constructor input Real x; output TwoOutputs o; output Real y; end constructor;
+    function destructor input TwoOutputs o; end destructor;
+  end TwoOutputs;
+  class DestructorOutput
+    extends ExternalObject;
+    function constructor input Real x; output DestructorOutput o; end constructor;
+    function destructor input DestructorOutput o; output Real y; end destructor;
+  end DestructorOutput;
   class ShortT = T;
   class DerivedT extends T; end DerivedT;
   model ModelT
@@ -1479,7 +1509,10 @@ package P
     function destructor input ModelT o; end destructor;
   end ModelT;
   model MissingConstructor NoConstructor t = NoConstructor(1.0); end MissingConstructor;
+  model MissingDestructor NoDestructor t; end MissingDestructor;
   model Short ShortT t = ShortT(1.0); end Short;
+  model Constructor TwoOutputs t = TwoOutputs(1.0); end Constructor;
+  model Destructor DestructorOutput t = DestructorOutput(1.0); end Destructor;
   model Derived DerivedT t = DerivedT(1.0); end Derived;
   model Restriction ModelT t = ModelT(1.0); end Restriction;
   model ExplicitConstructor T t = T.constructor(1.0); end ExplicitConstructor;
@@ -1493,6 +1526,9 @@ end P;
     "model, message",
     [
         ("MissingConstructor", "P.NoConstructor has no constructor"),
+        ("MissingDestructor", "P.NoDestructor has no destructor"),
+        ("Constructor", "P.TwoOutputs.constructor must have one output"),
+        ("Destructor", "P.DestructorOutput.destructor must have one input and no outputs"),
         ("Short", "P.ShortT must not extend external object class P.T"),
         ("Derived", "P.DerivedT must not extend external object class P.T"),
         ("Restriction", "P.ModelT must be a class, not a model"),
@@ -1505,6 +1541,24 @@ def test_external_object_errors(model, message):
     """Malformed or derived external object classes and lifecycle calls fail (MLS 12.9.7)."""
     with pytest.raises(tree.ModelicaSemanticError, match=message):
         tree.flatten_class(parser.parse(_EXTERNAL_OBJECT_ERRORS), f"P.{model}")
+
+
+def test_external_object_inherited_lifecycle():
+    """Constructor and destructor formals may be inherited through extends (MLS 12.9.7)."""
+    src = """
+    package P
+      function mk input Real x; output T o; external "C" o = mk(x); end mk;
+      function rm input T o; external "C" rm(o); end rm;
+      class T
+        extends ExternalObject;
+        function constructor extends mk; end constructor;
+        function destructor extends rm; end destructor;
+      end T;
+      model M T t = T(1.0); end M;
+    end P;
+    """
+    flat = tree.flatten_class(parser.parse(src), "P.M")
+    assert flat.external_objects == {"P.T": ("P.T.constructor", "P.T.destructor")}
 
 
 def test_inherited_equation_refs_resolved():
@@ -1662,11 +1716,15 @@ def test_idealgash2o_stale_stub_import():
     reason="MSL-4.0.x submodule not present",
 )
 def test_msl_external_table_functions():
-    """MSL table functions flatten with explicit external calls and resolved resources."""
+    """MSL table functions flatten with external calls, resources and object lifecycle."""
     root = parser.modelicapath_to_tree([MSL4_DIR])
     flat = tree.flatten_class(
         root, "Modelica.Electrical.Machines.Examples.InductionMachines.IMC_Conveyor"
     )
+    table = "Modelica.Blocks.Types.ExternalCombiTimeTable"
+    lifecycle = (table + ".constructor", table + ".destructor")
+    assert flat.external_objects == {table: lifecycle}
+    assert set(lifecycle) <= flat.functions.keys()
     c_sources = os.path.join(os.path.realpath(MSL4_DIR), "Modelica", "Resources", "C-Sources")
     table_funcs = [
         func
