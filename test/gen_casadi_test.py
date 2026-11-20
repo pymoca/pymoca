@@ -287,6 +287,27 @@ def test_connector_hq():
     assert_model_equivalent_numeric(ref_model, casadi_model)
 
 
+def test_connect_memberless_connectors():
+    """Connects of connectors without members reach CasADi as no equations."""
+    txt = """
+    connector E
+    end E;
+    expandable connector Bus
+    end Bus;
+    model EmptyConn
+        E e1, e2;
+        Bus b1, b2;
+        Real x;
+    equation
+        connect(e1, e2);
+        connect(b1, b2);
+        x = 1;
+    end EmptyConn;"""
+    casadi_model = gen_casadi.generate(parser.parse(txt), "EmptyConn")
+    assert [v.symbol.name() for v in casadi_model.alg_states] == ["x"]
+    assert len(casadi_model.equations) == 1
+
+
 def test_connector_hqz():
     with open(os.path.join(MODEL_DIR, "ConnectorHQZ.mo"), "r") as f:
         txt = f.read()
@@ -5072,6 +5093,57 @@ def test_delay_in_constructor_or_reduction_rejected(rhs):
     """A delay() in the body of a constructor or reduction is reported, not silently dropped."""
     with pytest.raises(NotImplementedError, match="delay"):
         _constructor_value("y[3]", rhs)
+
+
+@pytest.mark.parametrize("m, h_act", [(3.0, 2.0), (-3.0, 0.5)])
+def test_stream_connector(m, h_act):
+    """inStream and actualStream reach CasADi as plain expressions (MLS 15.2, 15.3)."""
+    casadi_model = transfer_model(MODEL_DIR, "StreamConnector", {"cache": False})
+    names = [v.symbol.name() for v in casadi_model.alg_states + casadi_model.parameters]
+    symbols = [v.symbol for v in casadi_model.alg_states + casadi_model.parameters]
+    residual = ca.Function("residual", symbols, [ca.vertcat(*casadi_model.equations)])
+
+    values = {
+        "src.port.m_flow": -m,
+        "snk.port.m_flow": m,
+        "src.port.h_outflow": 2.0,
+        "snk.port.h_outflow": 0.5,
+        "snk.h_in": 2.0,
+        "snk.h_act": h_act,
+        "src.m": m,
+        "src.h0": 2.0,
+    }
+    assert sorted(names) == sorted(values)
+    assert np.allclose(residual(*[values[n] for n in names]).full(), 0.0)
+
+
+def test_stream_connector_array():
+    """inStream and actualStream on connector array elements reach CasADi expanded."""
+    casadi_model = transfer_model(MODEL_DIR, "StreamConnectorArray", {"cache": False})
+    variables = casadi_model.alg_states + casadi_model.parameters
+    names = [v.symbol.name() for v in variables]
+    residual = ca.Function(
+        "residual", [v.symbol for v in variables], [ca.veccat(*casadi_model.equations)]
+    )
+
+    values = {
+        "src1.port.m_flow": -3.0,
+        "src2.port.m_flow": 3.0,
+        "p.a.m_flow": [3.0, -3.0],
+        "p.b.m_flow": [0.0, 0.0],
+        "src1.port.h_outflow": 2.0,
+        "src2.port.h_outflow": 4.0,
+        "p.a.h_outflow": [0.5, 1.0],
+        "p.b.h_outflow": [2.0, 4.0],
+        "p.h": [0.5, 1.0],
+        "h_act": [2.0, 1.0],
+        "src1.m": 3.0,
+        "src2.m": -3.0,
+        "src1.h0": 2.0,
+        "src2.h0": 4.0,
+    }
+    assert sorted(names) == sorted(values)
+    assert np.allclose(residual(*[values[n] for n in names]).full(), 0.0)
 
 
 if __name__ == "__main__":
