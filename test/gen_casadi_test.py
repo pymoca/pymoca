@@ -644,10 +644,15 @@ def _residual_function(casadi_model):
 
 
 @needs_compiler
-def test_external_function_callbacks():
+def test_external_function_callbacks(caplog):
     """External function calls are CasADi callbacks into the native code (MLS 12.9)."""
     ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalCasadi.mo"))
-    casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.Numeric")
+    with caplog.at_level("WARNING", logger="pymoca"):
+        casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.Numeric")
+    # Impure external functions are called like pure ones (MLS 12.3)
+    assert "lookupScale is impure, but called in ExternalCasadi.Numeric" in caplog.text
+    assert "checkedSqrt is declared neither pure nor impure" in caplog.text
+    assert "weightedSum is" not in caplog.text
     names = [v.symbol.name() for v in casadi_model.alg_states]
     assert names == ["y", "z", "m", "r", "w", "d", "q"]
 
@@ -786,6 +791,26 @@ def test_external_object_arguments():
     vals = [5, 3, 1, 9, 6]
     assert float(residual(0.7, vals, 2, 0)) == pytest.approx(-5.6)
     assert float(residual(4.5, vals, 3, 0)) == pytest.approx(-9.0)
+
+
+def test_pure_function():
+    ast_tree = parser.parse(
+        """
+        model PureFunction
+          pure function f
+            input Real x;
+            output Real y;
+          algorithm
+            y := 2 * x;
+          end f;
+          Real y = f(3.0);
+        end PureFunction;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "PureFunction")
+    (residual,) = casadi_model.equations
+    y = casadi_model.alg_states[0].symbol
+    assert float(ca.evalf(ca.substitute(residual, y, 0))) == -6.0
 
 
 def test_function_call():

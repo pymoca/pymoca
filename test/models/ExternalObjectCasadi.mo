@@ -34,7 +34,7 @@ package ExternalObjectCasadi
     end destructor;
   end Shifted;
 
-  function interpolateShifted
+  pure function interpolateShifted
     input Shifted shifted;
     input Real u;
     output Real y;
@@ -58,7 +58,7 @@ package ExternalObjectCasadi
     end if;
   end interpolateShiftedFunc;
 
-  function interpolateMyTable
+  pure function interpolateMyTable
     input MyTable interpolTable;
     input Real u;
     output Real y;
@@ -67,7 +67,7 @@ package ExternalObjectCasadi
     annotation(derivative(noDerivative = interpolTable) = interpolateMyTableDer);
   end interpolateMyTable;
 
-  function interpolateMyTableDer
+  pure function interpolateMyTableDer
     input MyTable interpolTable;
     input Real u;
     input Real der_u;

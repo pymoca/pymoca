@@ -2,7 +2,7 @@ package ExternalCasadi
   type Color = enumeration(Red, Green, Blue);
   constant Integer n = 2;
 
-  function weightedSum
+  pure function weightedSum
     input Real a[:, :];
     input Real w[size(a, 2)];
     output Real y[size(a, 1)];
@@ -10,7 +10,7 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end weightedSum;
 
-  function scaleShift
+  pure function scaleShift
     input Real x;
     input Integer k;
     input Boolean negate;
@@ -21,7 +21,7 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end scaleShift;
 
-  function describe
+  pure function describe
     input String name;
     input Real x;
     output String s;
@@ -36,7 +36,7 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end checkedSqrt;
 
-  function sumWithWork
+  pure function sumWithWork
     input Real x[:];
     output Real y;
   protected
@@ -45,7 +45,7 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end sumWithWork;
 
-  function lookupScale
+  impure function lookupScale
     input String key;
     input Real x;
     output Real y;
@@ -60,7 +60,7 @@ package ExternalCasadi
     y := 2 * checkedSqrt(x);
   end twiceSqrt;
 
-  function cube
+  pure function cube
     input Real x;
     input Integer k;
     output Real y;
@@ -69,7 +69,7 @@ package ExternalCasadi
     annotation(derivative = cubeDer);
   end cube;
 
-  function cubeDer
+  pure function cubeDer
     input Real x;
     input Integer k;
     input Real der_x;
@@ -79,7 +79,7 @@ package ExternalCasadi
     annotation(derivative(order = 2) = cubeDer2);
   end cubeDer;
 
-  function cubeDer2
+  pure function cubeDer2
     input Real x;
     input Integer k;
     input Real der_x;
@@ -89,7 +89,7 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end cubeDer2;
 
-  function addInPlace
+  pure function addInPlace
     input Real x;
     output Real y = 2.5;
     output Real w[2] = {x, 2 * x};
@@ -97,7 +97,7 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end addInPlace;
 
-  function addTwo
+  pure function addTwo
     input Real a;
     input Real b = 2 * a;
     output Real y;
@@ -105,14 +105,14 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end addTwo;
 
-  function addNegative
+  pure function addNegative
     input Real a;
     output Real y;
   external "C" y = addTwo(a, -1.5)
     annotation(Library = "ExternalCasadi");
   end addNegative;
 
-  function dotTable
+  pure function dotTable
     input Real x[3];
     output Real y;
   protected
@@ -122,21 +122,21 @@ package ExternalCasadi
     annotation(Library = "ExternalCasadi");
   end dotTable;
 
-  function addIndices
+  pure function addIndices
     input Real a[:, :];
     output Real b[size(a, 1), size(a, 2)];
   external "C" addIndices(a, size(a, 1), size(a, 2), b)
     annotation(Library = "ExternalCasadi", arrayLayout = "columnMajor");
   end addIndices;
 
-  function lengths
+  pure function lengths
     input String names[:];
     output Real y[size(names, 1)];
   external "C" lengths(names, size(names, 1), y)
     annotation(Library = "ExternalCasadi");
   end lengths;
 
-  function square
+  pure function square
     input Real x;
     output Real y;
   external "C" y = square(x)
@@ -152,7 +152,7 @@ package ExternalCasadi
     der_y := 2 * x * der_x;
   end squareDer;
 
-  function scaled
+  pure function scaled
     input Real x;
     input Real k;
     output Real y;

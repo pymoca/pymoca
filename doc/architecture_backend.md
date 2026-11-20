@@ -39,6 +39,9 @@ Choices the spec leaves open:
 
 Departures from the spec:
 
+- `impure` external functions, and the deprecated ones declared neither `pure` nor
+  `impure`, are called like pure functions in equations, so CasADi may merge or repeat
+  their calls. A warning is given instead of the diagnostics of MLS 12.3
 - An equation `obj = Constructor(...)` in an equation section binds an external object,
   which MLS 12.9.7 only allows in its declaration
 - A Boolean array output is not normalized to 0 and 1, and an enumeration output is not
