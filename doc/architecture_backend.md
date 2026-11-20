@@ -28,6 +28,9 @@ Choices the spec leaves open:
 - A `zeroDerivative` annotation is only used for a call whose inputs it names are
   numeric constants there. A parameter counts as varying, since sensitivities may be
   taken with respect to it (MLS 12.7.1)
+- `builtin` functions are compiled callbacks like `C` functions (MLS 12.9 leaves them to
+  the tool). A model calling, for example, `Modelica.Math.sin` needs a C compiler, gets
+  finite-difference sensitivities, and cannot be code generated or cached
 - `LibraryDirectory` is searched in `<os><bits>` (such as `linux64`) and
   `<machine>-<os>` subdirectories, then itself, but not in compiler subdirectories such
   as `win64/vs2019` (MLS 12.9.4)
