@@ -1045,12 +1045,14 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             # Flatten using new pipeline — discovers nested function calls
             flat_func = _create_partial_flat_instance(func_instance)
-            # Name the flat function by its dict key, which its call sites reference
-            flat_func.name = full_name
+            # Same instance path as func_instance while names are resolved relative to it
+            flat_func.name = func_instance.name
             _flatten_instance(func_instance, flat_func)
             _flatten_external_clause(func_instance, flat_func)
             _register_external_objects(flat_func, functions)
             _flatten_derivative_annotations(func_instance, flat_func, functions)
+            # Name the flat function by its dict key, which its call sites reference
+            flat_func.name = full_name
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -2286,13 +2288,18 @@ def expand_connectors(node: ast.Class) -> None:
 
 
 def add_variable_value_statements(node: ast.Class) -> None:
+    """Turn the bindings of a function's non-input variables into leading statements (MLS 12.4.4)."""
+    bindings = []
     for sym in node.symbols.values():
-        # The external call computes outputs, and input bindings are default arguments
-        if node.external is not None and sym.visibility != ast.Visibility.PROTECTED:
+        # Input bindings are default arguments, and an external call computes the outputs
+        if "input" in sym.prefixes or (
+            node.external is not None and sym.visibility != ast.Visibility.PROTECTED
+        ):
             continue
         if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
-            node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
+            bindings.append(ast.AssignmentStatement(left=[sym], right=sym.value))
             sym.value = ast.Primary(value=None)
+    node.statements[:0] = bindings
 
 
 class StateAnnotator(TreeListener):

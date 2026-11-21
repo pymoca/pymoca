@@ -29,6 +29,8 @@ def _get_default_options():
         "detect_aliases": False,
         "allow_derivative_aliases": True,
         "reduce_affine_expression": False,
+        "external_library_paths": [],
+        "external_finite_differences": True,
     }
 
 

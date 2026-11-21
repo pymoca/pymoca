@@ -368,6 +368,11 @@ def modelicapath_to_tree(
 
 
 # noinspection PyPep8Naming
+def _type_prefixes(ctx: ModelicaParser.Type_prefixContext) -> list[str]:
+    """Return the keywords of a type prefix, such as ["discrete", "input"]."""
+    return [child.getText() for child in ctx.getChildren()]  # type: ignore[attr-defined]
+
+
 class ASTListener(ModelicaListener):
     def __init__(self):
         self.file_node: ModelicaFile | None = None
@@ -1202,20 +1207,14 @@ class ASTListener(ModelicaListener):
         self.ast[ctx].replaceable = True
 
     def enterComponent_clause(self, ctx: ModelicaParser.Component_clauseContext):
-        prefixes = ctx.type_prefix().getText().split(" ")  # type: ignore[union-attr]
-        if prefixes[0] == "":
-            prefixes = []
         self.ast[ctx] = ast.ComponentClause(
-            prefixes=prefixes,
+            prefixes=_type_prefixes(ctx.type_prefix()),  # type: ignore[arg-type]
         )
         self.comp_clause = self.ast[ctx]
 
     def enterComponent_clause1(self, ctx: ModelicaParser.Component_clause1Context):
-        prefixes = ctx.type_prefix().getText().split(" ")  # type: ignore[union-attr]
-        if prefixes[0] == "":
-            prefixes = []
         self.ast[ctx] = ast.ComponentClause(
-            prefixes=prefixes,
+            prefixes=_type_prefixes(ctx.type_prefix()),  # type: ignore[arg-type]
         )
         self.comp_clause1 = self.ast[ctx]
 
