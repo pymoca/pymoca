@@ -12,6 +12,8 @@ from __future__ import annotations
 import copy
 import math
 import operator
+import os
+import re
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass, replace
@@ -81,6 +83,7 @@ def flatten_instance(
     opts = LookupOptions(evaluate_parameters=evaluate_parameters)
     flat_class = _create_partial_flat_instance(instance)
     _flatten_instance(instance, flat_class, opts=opts)
+    _register_external_objects(flat_class, flat_class.functions)
     _flatten_discovered_functions(flat_class)
     if evaluate_parameters:
         _evaluate_parameter_values(flat_class)
@@ -210,9 +213,9 @@ def _flatten_instance(
         if symbol.type.name in InstanceTree.BUILTIN_TYPES:
             flat_symbol.name = flat_name
             flat_class.symbols[flat_name] = flat_symbol
-        elif isinstance(flat_symbol.type, InstanceClass) and ast.is_enumeration(flat_symbol.type):
-            # Enumeration-typed symbols are simple leaf types (MLS 4.8.5), treated
-            # symmetrically with builtin types: place directly in the flat namespace.
+        elif isinstance(flat_symbol.type, InstanceClass) and _is_simple_class(flat_symbol.type):
+            # Enumeration and external object symbols are simple leaf types (MLS 5.6.2),
+            # treated symmetrically with builtin types: place directly in the flat namespace.
             flat_symbol.name = flat_name
             flat_class.symbols[flat_name] = flat_symbol
         elif not isinstance(flat_symbol.type, InstanceClass):
@@ -221,9 +224,9 @@ def _flatten_instance(
             resolved = _resolve_name(flat_symbol.type, instance, ctx)
             is_class = isinstance(resolved, InstanceClass)
             flat_symbol.type = resolved if is_class else resolved.parent  # type: ignore[assignment]
-            # If the resolved type is an enumeration, add the symbol here now that
+            # If the resolved type is a simple class, add the symbol here now that
             # the type is known (covers the ComponentRef → InstanceClass resolution path).
-            if ast.is_enumeration(flat_symbol.type) and flat_name not in flat_class.symbols:
+            if _is_simple_class(flat_symbol.type) and flat_name not in flat_class.symbols:
                 flat_symbol.name = flat_name
                 flat_class.symbols[flat_name] = flat_symbol
 
@@ -237,7 +240,7 @@ def _flatten_instance(
         # 1.5 Resolve modifications of other attributes of simple types
         if (
             flat_symbol.type.name in InstanceTree.BUILTIN_TYPES
-            or ast.is_enumeration(flat_symbol.type)
+            or _is_simple_class(flat_symbol.type)
             or "record" in flat_symbol.prefixes
         ):
             _resolve_modifications(flat_symbol, ctx)
@@ -304,6 +307,11 @@ def _flatten_instance(
     _collect_and_resolve_equations(instance, prefix, ctx)
 
     # Steps 1.9, 2, and 3 are done outside the recursion in the caller
+
+
+def _is_simple_class(cls) -> bool:
+    """Return True for enumeration and external object classes (simple types, MLS 5.6.2)."""
+    return ast.is_enumeration(cls) or ast.is_external_object(cls)
 
 
 def _apply_outer_variability(sym: InstanceSymbol, outer: str) -> None:
@@ -376,8 +384,8 @@ def _resolve_modifications(
     if isinstance(symbol.type, ast.ComponentRef):
         # type class, modifications at this level
         modification_environment = symbol.modification_environment  # type: ignore[union-attr]
-    elif ast.is_enumeration(symbol.type):
-        # Enum types have no value-attribute modifications to inherit from the type class
+    elif _is_simple_class(symbol.type):
+        # No value-attribute modifications to inherit from the type class
         modification_environment = symbol.modification_environment  # type: ignore[union-attr]
     else:
         assert symbol.type.name is not None
@@ -443,6 +451,7 @@ def _resolve_modification_attribute(
                 value = const_val.value
     elif isinstance(value, (ast.Array, ast.Expression, ast.ForArray)):
         # Discover function calls so the function flattening pass emits them.
+        value = copy.deepcopy(value)
         func_resolver = _FunctionCallResolver(mod_scope, ctx.flat_class.functions)
         walker = TreeWalker()
         walker.walk(func_resolver, value)
@@ -813,6 +822,18 @@ class _EquationRefResolver(TreeListener):
             self.cutoff_depth = sys.maxsize
 
 
+def _external_object_constructor(cls: ast.Class) -> ast.Class | None:
+    """Return the constructor function if *cls* is an external object class (MLS 12.9.7)."""
+    if not isinstance(cls, InstanceClass) or cls.instantiation_state < InstantiationState.PARTIAL:
+        cls = cast(
+            InstanceClass,
+            _instantiate_element(cls, cls.parent, ast.ClassModification()),  # type: ignore[arg-type]
+        )
+    if not ast.is_external_object(cls):
+        return None
+    return cls.classes["constructor"]
+
+
 class _FunctionCallResolver(TreeListener):
     """Discover function calls in equations/statements, resolve to fully-scoped names."""
 
@@ -830,6 +851,8 @@ class _FunctionCallResolver(TreeListener):
             return
         if found is None or not isinstance(found, ast.Class):
             return  # built-in function (sin, cos, etc.) or symbol
+        if found.type == "class":
+            found = _external_object_constructor(found) or found
         full_name = found.full_name
         tree.operator = full_name
         self.functions[full_name] = found
@@ -1025,6 +1048,9 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
             # Name the flat function by its dict key, which its call sites reference
             flat_func.name = full_name
             _flatten_instance(func_instance, flat_func)
+            _flatten_external_clause(func_instance, flat_func)
+            _register_external_objects(flat_func, functions)
+            _flatten_derivative_annotations(func_instance, flat_func, functions)
 
             # Merge nested discoveries back
             for nested_name, nested_class in flat_func.functions.items():
@@ -1033,6 +1059,183 @@ def _flatten_discovered_functions(flat_class: InstanceClass) -> None:
 
             flat_class.functions[full_name] = flat_func
             processed.add(full_name)
+
+
+def _register_external_objects(flat: InstanceClass, functions: OrderedDict) -> None:
+    """Record the external object classes of *flat*'s symbols and queue their lifecycle functions.
+
+    The destructor is never called explicitly, so it is queued here for flattening (MLS 12.9.7).
+    """
+    for sym in flat.symbols.values():
+        cls = sym.type
+        if not isinstance(cls, InstanceClass) or not ast.is_external_object(cls):
+            continue
+        lifecycle = (cls.classes["constructor"], cls.classes["destructor"])
+        for func in lifecycle:
+            functions.setdefault(func.full_name, func)
+        flat.external_objects[cls.full_name] = (lifecycle[0].full_name, lifecycle[1].full_name)
+
+
+def _flatten_derivative_annotations(
+    instance: InstanceClass, flat_func: InstanceClass, functions: OrderedDict
+) -> None:
+    """Record the derivative annotations of a function and queue their functions (MLS 12.7.1)."""
+    for arg in instance.annotation.arguments if instance.annotation is not None else []:
+        mod = arg.value
+        if not isinstance(mod, ast.ElementModification) or str(mod.component) != "derivative":
+            continue
+        name = next((m for m in mod.modifications if isinstance(m, ast.ComponentRef)), None)
+        if name is None:
+            continue
+        found = _find_name(instance, name, RecursionGuard(), LookupOptions())
+        if not isinstance(found, ast.Class):
+            raise NameLookupError(f"Derivative function {name} of {flat_func.name} not found")
+        derivative = ast.DerivativeAnnotation(function=found.full_name)
+        for attrs in (m for m in mod.modifications if isinstance(m, ast.ClassModification)):
+            for attr in (a.value for a in attrs.arguments):
+                if not isinstance(attr, ast.ElementModification) or not attr.modifications:
+                    continue
+                key, value = str(attr.component), attr.modifications[0]
+                if key == "order" and isinstance(value, ast.Primary):
+                    derivative.order = int(cast(int, value.value))
+                elif key == "noDerivative":
+                    derivative.no_derivative.append(str(value))
+                elif key == "zeroDerivative":
+                    derivative.zero_derivative.append(str(value))
+        functions.setdefault(found.full_name, found)
+        flat_func.derivatives.append(derivative)
+
+
+def _find_external_clause(
+    instance: InstanceClass,
+) -> tuple[ast.ExternalClause, InstanceClass] | None:
+    """Return the external clause of a function and the class declaring it, if any."""
+    ast_ref = instance.ast_ref
+    if isinstance(ast_ref, ast.Class) and ast_ref.external is not None:
+        return ast_ref.external, instance
+    for extends in instance.extends:
+        if isinstance(extends, InstanceClass):
+            found = _find_external_clause(extends)
+            if found is not None:
+                return found
+    return None
+
+
+def _flatten_external_clause(instance: InstanceClass, flat_func: InstanceClass) -> None:
+    """Resolve the external clause into *flat_func*, making a default call explicit (MLS 12.9)."""
+    found = _find_external_clause(instance)
+    if found is None:
+        return
+    clause, declaring = found
+    external = copy.deepcopy(clause)
+    ctx = FlatteningContext(
+        flat_class=flat_func,
+        guard=RecursionGuard(),
+        opts=LookupOptions(),
+        name_flat_class=flat_func,
+        prefix="",
+    )
+    if external.external_name is None:
+        external.external_name = cast(ast.Class, declaring.ast_ref).name
+        _set_default_external_call(external, flat_func)
+    else:
+        if external.output is not None:
+            external.output = cast(
+                ast.ComponentRef, _rewrite_operand(external.output, declaring, ctx)
+            )
+        _rewrite_operand_list(external.arguments, declaring, ctx)
+    external.resources = _external_resources(
+        external.annotation, cast(ast.Class, declaring.ast_ref)
+    )
+    flat_func.external = external
+
+
+_RESOURCE_ANNOTATIONS = {
+    "Include": "includes",
+    "IncludeDirectory": "include_dirs",
+    "Library": "libraries",
+    "LibraryDirectory": "library_dirs",
+}
+
+
+def _external_resources(
+    annotation: ast.ClassModification | None, declaring: ast.Class
+) -> ast.ExternalResources:
+    """Normalize the resource annotations of an external clause (MLS 12.9.4)."""
+    resources = ast.ExternalResources()
+    for arg in annotation.arguments if annotation is not None else []:
+        mod = arg.value
+        if not isinstance(mod, ast.ElementModification) or not mod.modifications:
+            continue
+        field = _RESOURCE_ANNOTATIONS.get(str(mod.component))
+        if field is None:
+            continue
+        value = mod.modifications[0]
+        items = value.values if isinstance(value, ast.Array) else [value]
+        strings = [
+            _unescape_string(i.value)
+            for i in items
+            if isinstance(i, ast.Primary) and isinstance(i.value, str)
+        ]
+        setattr(resources, field, strings)
+
+    ancestors = declaring.ancestors()
+    top = ancestors[1] if len(ancestors) > 1 else declaring
+    root = ancestors[0] if ancestors else declaring
+    resources.include_dirs = resources.include_dirs or [f"modelica://{top.name}/Resources/Include"]
+    resources.library_dirs = resources.library_dirs or [f"modelica://{top.name}/Resources/Library"]
+    resources.include_dirs = [_resolve_modelica_uri(uri, root) for uri in resources.include_dirs]
+    resources.library_dirs = [_resolve_modelica_uri(uri, root) for uri in resources.library_dirs]
+    return resources
+
+
+_STRING_ESCAPES = {"a": "\a", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
+
+
+def _unescape_string(text: str) -> str:
+    """Replace the escape sequences of a Modelica string literal (MLS 2.4.6)."""
+    return re.sub(r"\\(.)", lambda m: _STRING_ESCAPES.get(m[1], m[1]), text)
+
+
+def _resolve_modelica_uri(uri: str, root: ast.Class) -> str:
+    """Return the file system path of a modelica: URI, or *uri* if it cannot be resolved (MLS 13.5)."""
+    match = re.fullmatch(r"modelica:/{1,2}([^/]+)(/.*)?", uri, re.IGNORECASE)
+    if match is None:
+        return uri
+    class_name, resource = match.groups()
+    top_name, *packages = class_name.split(".")
+    top = root.classes.get(top_name)
+    if top is None or top.resource_dir is None:
+        return uri
+    resource = resource or ""
+    path = str(top.resource_dir.joinpath(*packages, *filter(None, resource.split("/"))))
+    return path + os.sep if resource.endswith("/") else path
+
+
+def _set_default_external_call(external: ast.ExternalClause, flat_func: InstanceClass) -> None:
+    """Fill in the arguments and returned output of an omitted external call (MLS 12.9.1-2)."""
+    formals = [s for s in flat_func.symbols.values() if {"input", "output"} & set(s.prefixes)]
+    outputs = [s for s in formals if "output" in s.prefixes]
+    returned = outputs[0] if len(outputs) == 1 else None
+    arguments = external.arguments
+    for sym in formals:
+        if sym is returned:
+            continue
+        arguments.append(ast.ComponentRef(name=sym.name))
+        ndims = sum(
+            not (isinstance(dim, ast.Primary) and dim.value is None)
+            for dims in sym.dimensions
+            for dim in dims
+        )
+        for dim in range(1, ndims + 1):
+            arguments.append(
+                ast.Expression(
+                    operator="size",
+                    operands=[ast.ComponentRef(name=sym.name), ast.Primary(value=dim)],
+                )
+            )
+    if returned is not None:
+        external.output = ast.ComponentRef(name=returned.name)
 
 
 def _check_all_references_valid(flat_class: InstanceClass):
@@ -1671,7 +1874,11 @@ def _instance_to_ast_symbol(isym: InstanceSymbol) -> ast.Symbol:
         setattr(sym, attr, _to_ast_value(getattr(isym, attr)))
     # Normalize type to ComponentRef for TreeWalker compatibility
     if isinstance(sym.type, InstanceClass):
-        sym.type = ast.ComponentRef(name=sym.type.name)
+        if ast.is_external_object(sym.type):
+            # Fully qualified so backends can look it up in external_objects
+            sym.type = ast.ComponentRef.from_string(sym.type.full_name)
+        else:
+            sym.type = ast.ComponentRef(name=sym.type.name)
     return sym
 
 
@@ -1682,6 +1889,9 @@ def _instance_to_ast_class(flat_instance: InstanceClass) -> ast.Class:
     flat_class.type = flat_instance.type
     flat_class.comment = flat_instance.comment
     flat_class.annotation = flat_instance.annotation
+    flat_class.external = flat_instance.external
+    flat_class.external_objects = flat_instance.external_objects
+    flat_class.derivatives = flat_instance.derivatives
 
     # Convert symbols
     for name, isym in flat_instance.symbols.items():
@@ -2077,6 +2287,9 @@ def expand_connectors(node: ast.Class) -> None:
 
 def add_variable_value_statements(node: ast.Class) -> None:
     for sym in node.symbols.values():
+        # The external call computes outputs, and input bindings are default arguments
+        if node.external is not None and sym.visibility != ast.Visibility.PROTECTED:
+            continue
         if not (isinstance(sym.value, ast.Primary) and sym.value.value is None):
             node.statements.append(ast.AssignmentStatement(left=[sym], right=sym.value))
             sym.value = ast.Primary(value=None)

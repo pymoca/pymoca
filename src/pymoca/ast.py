@@ -137,13 +137,22 @@ class Node:
             res = {
                 key: cls.to_json(guard(var.__dict__[key]))
                 for key in var.__dict__.keys()
-                if key not in ("parent", "parent_instance", "scope", "__deepcopy__")
+                if key not in ("parent", "parent_instance", "scope")
             }
         elif isinstance(var, Visibility):
             res = str(var)
         else:
             res = var
         return res
+
+
+def _deepcopy_fields(obj: Node, memo: dict, shared: tuple[str, ...] = ()) -> Any:
+    """Deep copy *obj* field by field, sharing the fields named in *shared* by reference."""
+    new = obj.__class__.__new__(obj.__class__)
+    memo[id(obj)] = new
+    for key, value in vars(obj).items():
+        vars(new)[key] = value if key in shared else copy.deepcopy(value, memo)
+    return new
 
 
 class Primary(Node):
@@ -544,6 +553,15 @@ def is_enumeration(obj: Any) -> bool:
     return getattr(obj, "enumeration", False)
 
 
+def is_external_object(obj: Any) -> bool:
+    """Return True if *obj* is an instantiated class extending ExternalObject (MLS 12.9.7)."""
+    for ext in getattr(obj, "extends", ()):
+        ref = getattr(ext, "ast_ref", None)
+        if isinstance(ref, Class) and ref.name == "ExternalObject" and isinstance(ref.parent, Tree):
+            return True
+    return False
+
+
 class ComponentClause(Node):
     def __init__(self, **kwargs):
         self.prefixes: list[str] = []
@@ -678,12 +696,7 @@ class ClassModificationArgument(Node):
         )
 
     def __deepcopy__(self, memo):
-        _scope, _deepcp = self.scope, self.__deepcopy__
-        self.scope, self.__deepcopy__ = None, None  # type: ignore[method-assign]
-        new = copy.deepcopy(self, memo)
-        self.scope, self.__deepcopy__ = _scope, _deepcp  # type: ignore[method-assign]
-        new.scope, new.__deepcopy__ = _scope, _deepcp  # type: ignore[method-assign]
-        return new
+        return _deepcopy_fields(self, memo, shared=("scope",))
 
 
 class ExtendsClause(Node):
@@ -704,6 +717,65 @@ class ExtendsClause(Node):
         )
 
 
+class DerivativeAnnotation(Node):
+    """A derivative annotation of a function, naming its derivative function (MLS 12.7.1)."""
+
+    def __init__(self, **kwargs):
+        self.function: str = ""
+        self.order: int = 1
+        self.no_derivative: list[str] = []
+        self.zero_derivative: list[str] = []
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(function={!r}, order={!r}, no_derivative={!r}, zero_derivative={!r})".format(
+            type(self).__name__,
+            self.function,
+            self.order,
+            self.no_derivative,
+            self.zero_derivative,
+        )
+
+
+class ExternalResources(Node):
+    """Resolved resource annotations of an external clause (MLS 12.9.4)."""
+
+    def __init__(self, **kwargs):
+        self.includes: list[str] = []
+        self.include_dirs: list[str] = []
+        self.libraries: list[str] = []
+        self.library_dirs: list[str] = []
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(includes={!r}, include_dirs={!r}, libraries={!r}, library_dirs={!r})".format(
+            type(self).__name__,
+            self.includes,
+            self.include_dirs,
+            self.libraries,
+            self.library_dirs,
+        )
+
+
+class ExternalClause(Node):
+    """External function interface of a function class (MLS 12.9)."""
+
+    def __init__(self, **kwargs):
+        self.language: str = "C"
+        self.output: ComponentRef | None = None
+        self.external_name: str | None = None
+        self.arguments: list[Expression | Primary | ComponentRef | Array] = []
+        self.annotation: ClassModification | None = None
+        # Set by flattening from the annotation
+        self.resources: ExternalResources | None = None
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return "{}(language={!r}, output={!r}, external_name={!r}, arguments={!r})".format(
+            type(self).__name__, self.language, self.output, self.external_name, self.arguments
+        )
+
+
 class Class(Node):
     BUILTIN = ("Real", "Integer", "String", "Boolean")
 
@@ -721,11 +793,18 @@ class Class(Node):
         self.classes: dict[str, Class] = OrderedDict()
         self.symbols: OrderedDict[str, Symbol] = OrderedDict()
         self.functions: OrderedDict[str, Class] = OrderedDict()
+        # Set by flattening: external object class -> (constructor, destructor) full names
+        self.external_objects: dict[str, tuple[str, str]] = {}
+        # Set by flattening from the derivative annotations of a function
+        self.derivatives: list[DerivativeAnnotation] = []
         self.initial_equations: list[Equation | ForEquation] = []
         self.equations: list[Equation | ForEquation | ConnectClause] = []
         self.initial_statements: list[AssignmentStatement | IfStatement | ForStatement] = []
         self.statements: list[AssignmentStatement | IfStatement | ForStatement] = []
         self.annotation: ClassModification | None = None
+        self.external: ExternalClause | None = None
+        # Directory that modelica:/<name>/ URIs map to, set on top-level classes from files
+        self.resource_dir: Path | None = None
         self.parent: Class | None = None
         self.visibility: Visibility = Visibility.PUBLIC
         self.is_short_class_definition: bool = False
@@ -842,15 +921,9 @@ class Class(Node):
 
     def __deepcopy__(self, memo):
         # Avoid copying the entire tree
-        if self.parent is not None and self.parent not in memo:
-            memo[id(self.parent)] = self.parent
-
-        _deepcp = self.__deepcopy__
-        self.__deepcopy__ = None  # type: ignore[method-assign]
-        new = copy.deepcopy(self, memo)
-        self.__deepcopy__ = _deepcp  # type: ignore[method-assign]
-        new.__deepcopy__ = _deepcp  # type: ignore[method-assign]
-        return new
+        if self.parent is not None:
+            memo.setdefault(id(self.parent), self.parent)
+        return _deepcopy_fields(self, memo)
 
     def __repr__(self):
         return "{}(name={!r}, type={!r})".format(type(self).__name__, self.name, self.type)
@@ -934,8 +1007,8 @@ class Tree(Class):
         "StateSelect": ("never", "avoid", "default", "prefer", "always"),
     }
 
-    # Predefined opaque types (no attributes/literals); MLS 16.2 Clock
-    BUILTIN_OPAQUE_TYPES = frozenset({"Clock"})
+    # Predefined opaque types (no attributes/literals); MLS 16.2 Clock, 12.9.7 ExternalObject
+    BUILTIN_OPAQUE_TYPES = frozenset({"Clock", "ExternalObject"})
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -964,7 +1037,9 @@ class Tree(Class):
                 type_class.symbols[literal] = enum_sym
             self.classes[name] = type_class
         for name in self.BUILTIN_OPAQUE_TYPES:
-            type_class = Class(name=name, type="type", parent=self)
+            type_class = Class(
+                name=name, type="class" if name == "ExternalObject" else "type", parent=self
+            )
             self.classes[name] = type_class
 
     def extend(self, other: Tree) -> None:

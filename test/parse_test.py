@@ -3,8 +3,10 @@
 Parse-only and miscellaneous AST tests.
 """
 
+import copy
 import io
 import os
+import pickle
 import re
 import threading
 import time
@@ -118,6 +120,28 @@ def test_deep_copy_timeout():
         if not thread.is_alive():
             return
     assert not thread.is_alive(), "Timeout occurred"
+
+
+def test_deep_copy_shares_scope_and_parent():
+    """Deep copies share scope and parent, leave the original unchanged, and copy cleanly again."""
+    ast_tree = parser.parse("package P model M Real x(start = 1); end M; end P;")
+    package = ast_tree.classes["P"]
+    model = package.classes["M"]
+    (arg,) = model.symbols["x"].class_modification.arguments
+    pickled = pickle.dumps(ast_tree)
+
+    arg_copy = copy.deepcopy(arg)
+    assert arg_copy.scope is arg.scope
+    assert arg_copy.value is not arg.value
+    model_copy = copy.deepcopy(model)
+    assert model_copy.parent is package
+    assert model_copy.symbols["x"] is not model.symbols["x"]
+    assert pickle.dumps(ast_tree) == pickled
+
+    arg_copy.value.component.name = "changed"
+    assert str(copy.deepcopy(arg_copy).value.component) == "changed"
+    model_copy.name = "M2"
+    assert copy.deepcopy(model_copy).name == "M2"
 
 
 def test_visibility_in_ast():
@@ -558,6 +582,33 @@ def test_lazyparse_remove_class(tmp_path):
     assert "Child" not in vars(pkg)["classes"]
     assert child.parent is None
     assert isinstance(pkg, parser.LazyParseClass)  # parse never fired
+
+
+def test_resource_dir(tmp_path):
+    """Top-level classes record the directory modelica: URIs resolve against (MLS 13.5)."""
+    pkg_dir = tmp_path / "Pkg"
+    (pkg_dir / "Sub").mkdir(parents=True)
+    (pkg_dir / "package.mo").write_text("package Pkg\nend Pkg;")
+    (pkg_dir / "Sub" / "package.mo").write_text("within Pkg;\npackage Sub\nend Sub;")
+    (pkg_dir / "Sub" / "M.mo").write_text("within Pkg.Sub;\nmodel M\nend M;")
+    (tmp_path / "Single.mo").write_text("package Single\nend Single;")
+
+    for path, name in (
+        (pkg_dir / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "M.mo", "Pkg"),
+        (tmp_path / "Single.mo", "Single"),
+    ):
+        expected = tmp_path.resolve() if name == "Single" else pkg_dir.resolve()
+        assert parser.parse_file(path).classes[name].resource_dir == expected
+    assert (
+        parser.parse(pkg_dir.joinpath("package.mo").read_text()).classes["Pkg"].resource_dir is None
+    )
+
+    pkg = parser.modelicapath_to_tree(dirs=[tmp_path]).classes["Pkg"]
+    _ = pkg.classes
+    assert not isinstance(pkg, parser.LazyParseClass)
+    assert pkg.resource_dir == pkg_dir.resolve()
 
 
 def test_modelicapath_first_root_wins(tmp_path):
@@ -1075,6 +1126,58 @@ def test_parse_stepped_range():
     slice_ = ast_tree.classes["M"].equations[0].right.indices[0][0]
     assert isinstance(slice_, ast.Slice)
     assert (slice_.start.value, slice_.step.value, slice_.stop.value) == (1, 2, 3)
+
+
+def test_external_clause():
+    """External function clauses keep language, call and annotation (MLS 12.9)."""
+    ast_tree = parser.parse(
+        """
+        package P
+          function f
+            input Real x[:]; output Real y;
+          external "C" y = cfun(x, size(x, 1)) annotation(Library = "m");
+          end f;
+          function g
+            input Real x;
+          external "FORTRAN 77" gfun(x);
+          end g;
+          function h
+            input Real x; output Real y;
+          external "C";
+          end h;
+          function k
+            input Real x; output Real y;
+          external;
+          end k;
+          function n
+            input Real x; output Real y;
+          algorithm
+            y := x;
+          end n;
+        end P;
+        """
+    )
+    classes = ast_tree.classes["P"].classes
+
+    f = classes["f"].external
+    assert (f.language, str(f.output), f.external_name) == ("C", "y", "cfun")
+    assert str(f.arguments[0]) == "x"
+    assert f.arguments[1].operator.to_tuple() == ("size",)
+    (lib,) = f.annotation.arguments
+    assert str(lib.value.component) == "Library"
+    assert lib.value.modifications[0].value == "m"
+    assert classes["f"].annotation is None
+
+    g = classes["g"].external
+    assert (g.language, g.output, g.external_name) == ("FORTRAN 77", None, "gfun")
+    assert [str(a) for a in g.arguments] == ["x"]
+
+    for name in ("h", "k"):
+        ext = classes[name].external
+        assert (ext.language, ext.external_name, ext.arguments) == ("C", None, [])
+        assert ext.annotation is None
+
+    assert classes["n"].external is None
 
 
 if __name__ == "__main__":

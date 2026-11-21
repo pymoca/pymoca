@@ -6,8 +6,10 @@ Tests for tree.flatten_instance() / tree.flatten().
 import copy
 import os
 import pickle
+from pathlib import Path
 
 from conftest_parse import (
+    MODEL_DIR,
     MSL4_DIR,
     _flush,
     parse_and_flatten_model,
@@ -1297,6 +1299,111 @@ def test_clock_builtin_type():
     assert parse_and_flatten_model("ClockBuiltin.mo", "ClockBuiltin.UsesClock") is not None
 
 
+def _external_call(func):
+    """Return a flat function's external call as (name, output, argument strings)."""
+
+    def arg(a):
+        if isinstance(a, ast.Expression):
+            return "{}({})".format(a.operator, ", ".join(arg(o) for o in a.operands))
+        return str(a.value) if isinstance(a, ast.Primary) else str(a)
+
+    ext = func.external
+    output = str(ext.output) if ext.output is not None else None
+    return ext.external_name, output, [arg(a) for a in ext.arguments]
+
+
+def test_external_function_call():
+    """External calls resolve to function-local names, an omitted call made explicit (MLS 12.9)."""
+    flat = parse_and_flatten_model("ExternalFunction.mo", "ExternalFunctionTest.M")
+    funcs = {name.rsplit(".", 1)[1]: func for name, func in flat.functions.items()}
+    assert _external_call(funcs["explicitCall"]) == (
+        "cExplicit",
+        "y",
+        ["x", "size(x, 1)", "k", "n", "work"],
+    )
+    default_call = ("defaultCall", "y", ["a", "size(a, 1)", "size(a, 2)", "s"])
+    assert _external_call(funcs["defaultCall"]) == default_call
+    assert _external_call(funcs["derivedCall"]) == default_call
+    assert _external_call(funcs["defaultProcedure"]) == (
+        "defaultProcedure",
+        None,
+        ["x", "y1", "y2", "size(y2, 1)"],
+    )
+    assert funcs["defaultCall"].external.language == "C"
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalFunction.mo"),
+        ast.ComponentRef.from_string("ExternalFunctionTest.M"),
+    )
+    explicit = flat_tree.classes["ExternalFunctionTest.explicitCall"]
+    (stmt,) = explicit.statements
+    assert stmt.left[0].name == "work"
+    assert explicit.symbols["k"].value.value == 1
+    assert not flat_tree.classes["ExternalFunctionTest.defaultCall"].statements
+
+
+def test_external_resources():
+    """External resource annotations normalize, modelica URIs resolved (MLS 12.9.4, 13.5)."""
+    flat = parse_and_flatten_model("ExternalFunction.mo", "ExternalFunctionTest.M")
+    resources = flat.functions["ExternalFunctionTest.explicitCall"].external.resources
+    resources_dir = os.path.join(MODEL_DIR, "Resources")
+    assert resources.includes == ['#include "explicit.h"']
+    assert resources.libraries == ["lib1", "lib2"]
+    assert resources.include_dirs == [os.path.join(resources_dir, "C-Sources")]
+    assert resources.library_dirs == [os.path.join(resources_dir, "Library")]
+
+    resources = flat.functions["ExternalFunctionTest.defaultCall"].external.resources
+    assert (resources.includes, resources.libraries) == ([], [])
+    assert resources.include_dirs == [os.path.join(resources_dir, "Include")]
+
+    flat = tree.flatten_class(
+        parser.parse(Path(MODEL_DIR, "ExternalFunction.mo").read_text()), "ExternalFunctionTest.M"
+    )
+    resources = flat.functions["ExternalFunctionTest.explicitCall"].external.resources
+    assert resources.include_dirs == ["modelica://ExternalFunctionTest/Resources/C-Sources"]
+
+
+def test_external_object():
+    """External objects flatten as simple-type leaves built by their constructor (MLS 12.9.7)."""
+    assert "ExternalObject" in ast.Tree().classes
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.Table")
+    assert "myTable" in flat.symbols
+    constructor = "ExternalObjectTest.MyTable.constructor"
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "myTable"]
+    assert eq.right.operator == constructor
+    assert constructor in flat.functions
+    assert "interpolTable" in flat.functions["ExternalObjectTest.interpolateMyTable"].symbols
+
+    destructor = "ExternalObjectTest.MyTable.destructor"
+    lifecycle = {"ExternalObjectTest.MyTable": (constructor, destructor)}
+    assert flat.external_objects == lifecycle
+    assert flat.functions[destructor].external.external_name == "closeMyTable"
+    (der,) = flat.functions["ExternalObjectTest.interpolateMyTable"].derivatives
+    assert der.function == "ExternalObjectTest.interpolateMyTableDer"
+    assert (der.order, der.no_derivative, der.zero_derivative) == (1, ["interpolTable"], [])
+    (der2,) = flat.functions[der.function].derivatives
+    assert der2.function == "ExternalObjectTest.interpolateMyTableDer2"
+    assert (der2.order, der2.no_derivative, der2.zero_derivative) == (2, [], ["interpolTable"])
+    assert not flat.functions[der2.function].derivatives
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
+    func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
+    assert func.symbols["myTable"].value.operator == constructor
+    assert func.external_objects == lifecycle
+    assert {constructor, destructor} <= flat.functions.keys()
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalObject.mo"),
+        ast.ComponentRef.from_string("ExternalObjectTest.Table"),
+    )
+    flat_class = flat_tree.classes["ExternalObjectTest.Table"]
+    assert str(flat_class.symbols["myTable"].type) == "ExternalObjectTest.MyTable"
+    assert flat_class.external_objects == lifecycle
+    interpolate = flat_tree.classes["ExternalObjectTest.interpolateMyTable"]
+    assert str(interpolate.symbols["interpolTable"].type) == "ExternalObjectTest.MyTable"
+
+
 def test_inherited_equation_refs_resolved():
     """Equations referencing inherited (via extends) symbols flatten before resolution (MLS 5.6.2)."""
     flat = parse_and_flatten_model("InheritedEquationConnector.mo", "P.B")
@@ -1443,6 +1550,46 @@ def test_idealgash2o_stale_stub_import():
     flat = tree.flatten_class(root, "Modelica.Media.Examples.IdealGasH2O")
     assert "state.p" in flat.symbols
     assert "smoothState.T" in flat.symbols
+
+
+@pytest.mark.library
+@pytest.mark.msl
+@pytest.mark.skipif(
+    not os.path.isfile(os.path.join(MSL4_DIR, "Modelica", "package.mo")),
+    reason="MSL-4.0.x submodule not present",
+)
+def test_msl_external_table_functions():
+    """MSL table functions flatten with external calls, resources and object lifecycle."""
+    root = parser.modelicapath_to_tree([MSL4_DIR])
+    flat = tree.flatten_class(
+        root, "Modelica.Electrical.Machines.Examples.InductionMachines.IMC_Conveyor"
+    )
+    table = "Modelica.Blocks.Types.ExternalCombiTimeTable"
+    lifecycle = (table + ".constructor", table + ".destructor")
+    assert flat.external_objects == {table: lifecycle}
+    assert set(lifecycle) <= flat.functions.keys()
+    internal = "Modelica.Blocks.Tables.Internal."
+    (der,) = flat.functions[internal + "getTimeTableValue"].derivatives
+    assert der.function == internal + "getDerTimeTableValue"
+    assert der.no_derivative == ["nextTimeEvent", "pre_nextTimeEvent"]
+    assert der.function in flat.functions
+    c_sources = os.path.join(os.path.realpath(MSL4_DIR), "Modelica", "Resources", "C-Sources")
+    table_funcs = [
+        func
+        for name, func in flat.functions.items()
+        if name.startswith("Modelica.Blocks.Types.ExternalCombiTimeTable.")
+        or name.startswith("Modelica.Blocks.Tables.Internal.")
+    ]
+    assert table_funcs
+    for func in table_funcs:
+        assert func.external.external_name.startswith("ModelicaStandardTables_")
+        assert func.external.resources.include_dirs == [c_sources]
+        assert func.external.resources.libraries == [
+            "ModelicaStandardTables",
+            "ModelicaIO",
+            "ModelicaMatIO",
+            "zlib",
+        ]
 
 
 @pytest.mark.xfail(reason="outer components are not yet merged with their inner match (MLS 5.4)")
@@ -2034,6 +2181,25 @@ def test_binding_equation_subscript_function_call_discovered():
         "M",
     )
     assert list(flat.functions) == ["idx"]
+
+
+def test_binding_equation_function_call_leaves_ast_unchanged():
+    """Discovering a function called in a binding expression doesn't rewrite the parsed AST."""
+    flat = _flatten_inline(
+        """
+    function f
+        input Real u;
+        output Real y;
+    algorithm
+        y := 2 * u;
+    end f;
+    model M
+        parameter Real p = 1;
+        Real y = f(p);
+    end M;""",
+        "M",
+    )
+    assert list(flat.functions) == ["f"]
 
 
 def test_constant_via_composite_name_lookup_resolves_dimension():
