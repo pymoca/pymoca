@@ -34,7 +34,6 @@
     "TotalGeneratingPower",
     "TotalSystemPower",
     "TotalSystemRevenue",
-    "TotalSystemRevenueSum",
     "TurbinePower",
     "V_LowerBasin",
     "V_UpperBasin"
