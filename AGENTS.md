@@ -28,7 +28,7 @@ tox -e coverage                   # with coverage
 
 ## Code Style
 
-- Python 3.10+, black (100 char), flake8 (bugbear, comprehensions, import-order), pyright
+- Python 3.11+, black (100 char), flake8 (bugbear, comprehensions, import-order), pyright
 - **Comments concise** - Only comment if you can't determine local context from code within surrounding ~80 lines. **One line is the strong default**; add lines only for a constraint the code can't show and the reader would otherwise break. Design rationale, alternatives considered, and "why not X" belong in the commit message body, not in comments. **Don't reference context outside the function, class, module, etc.**
 - **Docstrings concise** - {} denotes optional: """One line summary{\n\nparagraph to clarify}{\n\nReturns: if not None}{\n\nRaises:}""". **Optional parts only if surrounding context is > ~80 lines.**
 - Generated code in `src/pymoca/generated/` and `test/generated/` - do not edit
