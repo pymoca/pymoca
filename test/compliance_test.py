@@ -370,9 +370,6 @@ for _model, _reason in _VALUE_CHECK_WIP.items():
 
 # Flattening or value check failures
 _FLATTEN_WIP = {
-    "ModelicaCompliance.Redeclare.Flattening.InheritanceStream": (
-        "Flattening WIP: inStream not in transform_operator"
-    ),
     "ModelicaCompliance.Inheritance.Flattening.ReplacedBaseClass": (
         "Value check WIP: extends through redeclared base class"
     ),

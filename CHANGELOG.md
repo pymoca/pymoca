@@ -16,6 +16,10 @@ A tag with no section here fails before anything is published. A `.devN` or
 or `0.12.0rc1` needs a `## 0.12.0` heading.
 -->
 
+## NEXT RELEASE
+
+Pymoca now supports stream connectors (MLS chapter 15): `inStream()` and `actualStream()` are expanded during flattening, also on connector array elements selected by a literal, range, or for-loop subscript. With this, 582 of the 628 example models in Modelica Standard Library 4.0.x flatten without error (17 partial classes counted among the 0.12.0 total are no longer included), and every remaining failure is due to `ExternalObject`, which is not yet supported. The operators are still left unexpanded, with a warning, on connectors used in connects inside for- or if-equations, on elements of connector arrays connected as a whole, and on connector arrays connected both as a whole and element-wise. Such models flatten but fail in the backends.
+
 ## 0.12.0
 
 Pymoca now contains a complete rewrite of flattening based on the Modelica Language Specification v3.5, tested against 645 example models in Modelica Standard Library 4.0.x. 577 of them (about 90%) flatten without error. Every remaining failure is one of two unimplemented features, `ExternalObject` and stream connectors. Getting those models through the backends is separate work still in progress.
