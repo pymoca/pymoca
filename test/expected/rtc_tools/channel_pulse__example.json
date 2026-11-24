@@ -27,7 +27,7 @@
     "der(Channel.Q[9])"
   ],
   "equations_count": 23,
-  "initial_equations_count": 12,
+  "initial_equations_count": 10,
   "inputs": [
     "Inflow_Q",
     "Level_H"
