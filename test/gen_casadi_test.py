@@ -20,7 +20,13 @@ import pymoca.backends.casadi.generator as gen_casadi
 from pymoca import ast, parser, tree
 from pymoca.backends.casadi._options import _merge_default_options
 from pymoca.backends.casadi.alias_relation import AliasRelation
-from pymoca.backends.casadi.api import CachedModel, InvalidCacheError, load_model, transfer_model
+from pymoca.backends.casadi.api import (
+    CachedModel,
+    InvalidCacheError,
+    generate_model,
+    load_model,
+    transfer_model,
+)
 from pymoca.backends.casadi.model import (
     CASADI_ATTRIBUTES,
     DelayArgument,
@@ -5241,6 +5247,64 @@ def test_subscripted_expression_for_loop_rejected():
     """
     with pytest.raises(NotImplementedError, match="The iterator i in a subscript"):
         gen_casadi.generate(parser.parse(txt), "M")
+
+
+_QUOTED_HIERARCHY = """
+package 'P.Q'
+  constant Real 'k.v' = 3;
+  model 'C.D'
+    parameter Real 'k.1' = 'P.Q'.'k.v';
+    Real 'a.b';
+    Real 'x y';
+  equation
+    'a.b' = 'k.1';
+    'x y' = 2 * 'a.b';
+  end 'C.D';
+  model 'Base'
+    'C.D' 'c.d'[2]('k.1' = {3, 4});
+  end 'Base';
+  model 'S.T'
+    extends 'Base'('c.d'(each 'a.b'(start = 5)));
+    Real 'w'[2];
+  equation
+    for 'i' in 1:2 loop
+      'w'['i'] = 'c.d'['i'].'x y';
+    end for;
+  end 'S.T';
+end 'P.Q';
+"""
+
+
+@pytest.mark.parametrize("expand_vectors", [False, True])
+def test_flatten_quoted_identifiers_with_dots(expand_vectors):
+    """Quoted identifiers with dots stay single name parts through flattening (MLS 2.3.1)."""
+    ast_tree = parser.parse(_QUOTED_HIERARCHY)
+    model = generate_model(ast_tree, "'P.Q'.'S.T'", {"expand_vectors": expand_vectors})
+
+    if expand_vectors:
+        elements = ["'c.d'[1].", "'c.d'[2]."]
+        assert [v.symbol.name() for v in model.alg_states] == [
+            *(e + "'a.b'" for e in elements),
+            *(e + "'x y'" for e in elements),
+            "'w'[1]",
+            "'w'[2]",
+        ]
+        assert [p.symbol.name() for p in model.parameters] == [e + "'k.1'" for e in elements]
+        assert [p.value for p in model.parameters] == [3.0, 4.0]
+    else:
+        assert [v.symbol.name() for v in model.alg_states] == ["'c.d'.'a.b'", "'c.d'.'x y'", "'w'"]
+        assert [p.symbol.name() for p in model.parameters] == ["'c.d'.'k.1'"]
+
+
+def test_flatten_quoted_class_name_lookup():
+    """A quoted class name with a dot is found, and so is a constant through it."""
+    ast_tree = parser.parse(
+        "package 'L.M' constant Real 'k.v' = 3; model 'I' parameter Real p = 'L.M'.'k.v';"
+        " end 'I'; end 'L.M'; model 'A.B' 'L.M'.'I' 'i n'; end 'A.B';"
+    )
+    model = generate_model(ast_tree, "'A.B'", {})
+    assert [p.symbol.name() for p in model.parameters] == ["'i n'.p"]
+    assert model.parameters[0].value == 3.0
 
 
 if __name__ == "__main__":
