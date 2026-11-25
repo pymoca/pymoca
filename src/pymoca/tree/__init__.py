@@ -10,6 +10,7 @@ The implementation is split across submodules:
   _name_lookup.py    — find_name and helpers (MLS 5.3, other details throughout Chapter 5)
   _instantiation.py  — instantiate (MLS 5.6.1)
   _flattening.py     — flatten_instance and helpers (MLS 5.6.2)
+  _unquote.py        - unquote_flat_names, unquote_name (MLS 2.3.1)
 """
 
 from __future__ import annotations
@@ -36,6 +37,8 @@ __all__ = [
     "flatten_to_tree",
     "instantiate",
     "range_values",
+    "unquote_flat_names",
+    "unquote_name",
 ]
 
 
@@ -139,6 +142,10 @@ from ._instantiation import (  # noqa: E402,F401,I100
 )
 from ._name_lookup import (  # noqa: E402,F401,I100
     find_name,
+)
+from ._unquote import (  # noqa: E402,F401,I100
+    unquote_flat_names,
+    unquote_name,
 )
 
 

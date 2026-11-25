@@ -586,7 +586,7 @@ def _ast_class_lookup(dotted_name: str, scope: ast.Class) -> ast.Class | None:
     Used only for `class extends X` base-class resolution, where the instance tree
     may not yet be populated for the relevant parent classes.
     """
-    parts = dotted_name.split(".")
+    parts = ast.split_name(dotted_name)
     current = scope
     while current is not None:
         if isinstance(current, InstanceClass):
