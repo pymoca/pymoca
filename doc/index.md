@@ -46,3 +46,4 @@ API changes a 0.11 user is most likely to hit:
 
 See [architecture](architecture.md) for the pymoca flattening architecture and how it
 follows the Modelica Language Specification (MLS).
+See [backend architecture](architecture_backend.md) for the code generation backends.

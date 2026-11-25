@@ -12,6 +12,8 @@ to pass flattening tests on the ModelicaCompliance Suite and Modelica Standard L
 There are remaining features to be implemented, but the core instantiation and
 flattening algorithms appear to be broadly working for the test suite.
 
+The backends are described in [backend architecture](architecture_backend.md).
+
 ## References
 
 The ground truth for all language syntax and semantics decisions, in priority order:
@@ -763,25 +765,10 @@ Not implemented:
   xfail
 - Connector compatibility check on `connect`: members are taken from the left
   connector only, so mismatched connectors are silently accepted (MLS 9.3)
-- `min` and `max` of an empty array give the values for Real, also for Integer expressions,
-  since the CasADi backend does not track the type of an expression here (MLS 10.3.4)
-- An array literal with more than two dimensions raises `NotImplementedError` in an
-  expression, as CasADi has no such arrays. As a variable attribute it is kept as a nested
-  list, which only vector expansion (`expand_vectors`) can use
 - Array constructors with iterators `{expr for i in range}` and reduction expressions
   `f(expr for i in range)` are not unrolled while flattening (MLS 10.3.4.1, 10.4.1). They pass
   through to the backends as a `ForArray` node with its names resolved. The reduction function
   name is not checked against the legal set (`array`, `sum`, `product`, `min`, `max`)
-- Only the CasADi backend handles a `ForArray`: the SymPy and XML backends fail with a
-  `KeyError`. It supports one iterator with a scalar or vector body, in an equation, a
-  declaration and an attribute. It builds the body once and maps it over the range.
-  A constructor whose body has a range that depends on its iterator, as in
-  `{sum(x[j] for j in 1:i) for i in 1:n}` or the slice in `{sum(x[i:i + 1]) for i in 1:n}`, is
-  built for each value of that iterator instead.
-  It raises `NotImplementedError` for several iterators, a matrix body, an implicit or
-  array-valued range, a `delay()` in the body, and a subscript or range that uses the iterator
-  of an enclosing for-loop, as in `for j in 1:n loop y[j] = sum(A[j, i] for i in 1:m); end for`.
-  The enclosing iterator can be used as a value in the body
 - `discrete` (and other unsupported) connector-variable prefixes raise
   `NotImplementedError` during connect expansion rather than being flattened
 - Imports are effectively re-exported: composite-name lookup searches the target
