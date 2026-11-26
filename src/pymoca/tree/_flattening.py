@@ -465,7 +465,7 @@ def _resolve_modification_attribute(
             const_val = _get_constant_value(value)
             if const_val is not None and isinstance(const_val, ast.Primary):
                 value = const_val.value
-    elif isinstance(value, (ast.Array, ast.Expression, ast.ForArray)):
+    elif isinstance(value, (ast.Array, ast.Expression, ast.ForArray, ast.IfExpression)):
         # Discover function calls so the function flattening pass emits them.
         value = copy.deepcopy(value)
         func_resolver = _FunctionCallResolver(mod_scope, ctx.flat_class.functions)
@@ -482,7 +482,7 @@ def _resolve_modification_attribute(
         expr_ctx = replace(ctx, flat_class=expr_flat_class, name_flat_class=ctx.flat_class)
         _rewrite_operand_list(value.values, expr_scope, expr_ctx)
     elif (
-        isinstance(value, ast.ForArray)
+        isinstance(value, (ast.ForArray, ast.IfExpression))
         and isinstance(expr_scope, InstanceClass)
         and isinstance(expr_flat_class, InstanceClass)
     ):

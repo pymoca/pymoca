@@ -3,6 +3,7 @@
 Modelica parse Tree to AST tree.
 """
 
+import gc
 import glob
 import math
 import os
@@ -31,6 +32,11 @@ from pymoca.backends.casadi.model import (
 from pymoca.tree import ModelicaSemanticError
 
 import pytest
+
+needs_compiler = pytest.mark.skipif(
+    os.name == "nt" or shutil.which(os.environ.get("CC") or "cc") is None,
+    reason="needs a C compiler (Windows compilers are not detected yet)",
+)
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "models")
 
@@ -629,6 +635,274 @@ def test_function_binding():
     (residual,) = casadi_model.equations
     y = casadi_model.alg_states[0].symbol
     assert float(ca.evalf(ca.substitute(residual, y, 0))) == -10.0
+
+
+def _residual_function(casadi_model):
+    """Return the equations as a function of the inputs, parameters and algebraic states."""
+    symbols = [v.symbol for v in casadi_model.inputs + casadi_model.alg_states]
+    return ca.Function("residual", symbols, [ca.vertcat(*casadi_model.equations)])
+
+
+@needs_compiler
+def test_external_function_callbacks(caplog):
+    """External function calls are CasADi callbacks into the native code (MLS 12.9)."""
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalCasadi.mo"))
+    with caplog.at_level("WARNING", logger="pymoca"):
+        casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.Numeric")
+    # Impure external functions are called like pure ones (MLS 12.3)
+    assert "lookupScale is impure, but called in ExternalCasadi.Numeric" in caplog.text
+    assert "checkedSqrt is declared neither pure nor impure" in caplog.text
+    assert "weightedSum is" not in caplog.text
+    names = [v.symbol.name() for v in casadi_model.alg_states]
+    assert names == ["y", "z", "m", "r", "w", "d", "q"]
+
+    # With zero algebraic states, the residuals are minus the right-hand sides
+    residual = _residual_function(casadi_model)
+    zeros = [ca.DM.zeros(*v.symbol.shape) for v in casadi_model.alg_states]
+    values = -np.array(residual(4.0, *zeros)).ravel()
+    # (z, m), then y, r, w, d (key is bound from its string parameter) and q
+    np.testing.assert_allclose(values, [-8, 5, 12, 34, 2, 17, 8, 4])
+
+    with pytest.raises(RuntimeError, match="checkedSqrt: negative input -1"):
+        residual(-1.0, *zeros)
+
+
+_EXTERNAL_OBJECT_SOURCE = os.path.join(MODEL_DIR, "Resources", "Include", "ExternalObjectCasadi.c")
+
+
+def _generate_external_object_model(model_name):
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalObjectCasadi.mo"))
+    options = {"external_library_paths": [_EXTERNAL_OBJECT_SOURCE]}
+    return gen_casadi.generate(ast_tree, "ExternalObjectCasadi." + model_name, options)
+
+
+@needs_compiler
+def test_external_objects():
+    """A model's external objects live as long as the Model (MLS 12.9.7)."""
+    casadi_model = _generate_external_object_model("Table")
+    assert [p.symbol.name() for p in casadi_model.parameters] == ["vals", "scaled"]
+    residual = _residual_function(casadi_model)
+    # The constructor binding is a modification of a parameter, or an equation of a variable
+    np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [3.6, 7.5, 8.1])
+    with pytest.raises(RuntimeError, match="4.5 is outside of the table"):
+        residual(4.5, 0, 0, 0)
+
+    library = casadi_model._external_objects[0].destructor.library
+    assert library.cdll.countMyTables() == 2
+    del casadi_model, residual
+    gc.collect()
+    assert library.cdll.countMyTables() == 0
+
+    # Constructor arguments may call functions, here an algorithm with an external call
+    casadi_model = _generate_external_object_model("ScaledTable")
+    residual = _residual_function(casadi_model)
+    np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [7.2, 15.0, 8.1])
+
+    with pytest.raises(NotImplementedError, match="myTable must evaluate at generation time"):
+        _generate_external_object_model("FreeTable")
+
+
+@needs_compiler
+def test_external_function_sensitivities(caplog):
+    """Sensitivities use derivative functions, or else finite differences (MLS 12.7.1)."""
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalCasadi.mo"))
+    with caplog.at_level("WARNING", logger="pymoca"):
+        casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.Smooth")
+    u = casadi_model.inputs[0].symbol
+    (p,) = (v.symbol for v in casadi_model.parameters)
+    c, r, s, k, kp = (
+        -ca.substitute(eq, v.symbol, 0)
+        for eq, v in zip(casadi_model.equations, casadi_model.alg_states)
+    )
+    derivatives = ca.Function(
+        "derivatives",
+        [u, p],
+        [ca.jacobian(c, u), ca.hessian(c, u)[0], ca.jacobian(r, u), ca.jacobian(s, u)]
+        + [ca.jacobian(k, u), ca.jacobian(kp, u), ca.jacobian(kp, p)],
+    )
+    dc, d2c, dr, ds, dk, dkp_du, dkp_dp = (float(v) for v in derivatives(2.0, 3.0))
+    # c = 2 u^3: exact from cubeDer and, by its order 2 annotation, cubeDer2
+    assert (dc, d2c) == (24.0, 24.0)
+    assert dr == pytest.approx(0.25 / np.sqrt(0.5), rel=1e-6)
+    assert "checkedSqrt has no derivative function" in caplog.text
+    assert "cubeDer2" not in caplog.text
+    # The derivative function of square is a Modelica function
+    assert ds == 4.0
+    assert "square has no derivative function" not in caplog.text
+    # A zeroDerivative annotation is only used where its input is constant
+    assert (dk, dkp_du, dkp_dp) == (2.0, 3.0, 2.0)
+    used = {
+        c.derivative.function
+        for c in casadi_model._external_callbacks
+        if getattr(c, "function", None) is not None and c.function.name == "ExternalCasadi.scaled"
+    }
+    assert used == {"ExternalCasadi.scaledDerK", "ExternalCasadi.scaledDer"}
+
+    casadi_model = _generate_external_object_model("Table")
+    u = casadi_model.inputs[0].symbol
+    y = -ca.substitute(casadi_model.equations[0], casadi_model.alg_states[0].symbol, 0)
+    assert float(ca.Function("dy", [u], [ca.jacobian(y, u)])(0.7)) == -2.0
+
+
+@needs_compiler
+def test_external_functions_cache_and_codegen(tmp_path, caplog):
+    """Models calling external functions are neither cached nor code generated."""
+    shutil.copy(os.path.join(MODEL_DIR, "ExternalObjectCasadi.mo"), tmp_path)
+    options = {"external_library_paths": [_EXTERNAL_OBJECT_SOURCE], "cache": True}
+    with caplog.at_level("WARNING", logger="pymoca"):
+        casadi_model = transfer_model(str(tmp_path), "ExternalObjectCasadi.Table", options)
+    assert "cannot be expanded to SX" in caplog.text
+    assert not list(tmp_path.glob("*.pymoca_cache"))
+    residual = _residual_function(casadi_model)
+    np.testing.assert_allclose(-np.array(residual(0.7, 0, 0, 0)).ravel(), [3.6, 7.5, 8.1])
+
+    options = {"external_library_paths": [_EXTERNAL_OBJECT_SOURCE], "codegen": True}
+    with pytest.raises(NotImplementedError, match="do not support codegen"):
+        transfer_model(str(tmp_path), "ExternalObjectCasadi.Table", options)
+
+
+@needs_compiler
+def test_external_objects_in_function():
+    """A protected external object of a function lives for one call (MLS 12.9.7)."""
+    casadi_model = _generate_external_object_model("TableInFunction")
+    symbols = [casadi_model.inputs[0].symbol, casadi_model.parameters[0].symbol]
+    symbols += [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, casadi_model.equations)
+    vals = [5, 3, 1, 9, 6]
+    assert float(residual(0.7, vals, 0)) == pytest.approx(-3.6)
+    assert float(residual(3.5, vals, 0)) == pytest.approx(-7.5)
+
+    (callback,) = [c for c in casadi_model._external_callbacks if hasattr(c, "constructors")]
+    (constructor, destructor, _, _) = callback.constructors[0]
+    assert destructor.library.cdll.countMyTables() == 0
+
+
+@needs_compiler
+def test_external_string_arguments():
+    """String arguments must be known at generation time, and may be arrays."""
+    ast_tree = parser.parse_file(os.path.join(MODEL_DIR, "ExternalCasadi.mo"))
+    casadi_model = gen_casadi.generate(ast_tree, "ExternalCasadi.StringArray")
+    residual = _residual_function(casadi_model)
+    np.testing.assert_array_equal(-np.array(residual(0.0, [0, 0])).ravel(), [2, 1])
+
+    with pytest.raises(NotImplementedError, match="String input names of external function"):
+        gen_casadi.generate(ast_tree, "ExternalCasadi.ForwardedString")
+
+
+@needs_compiler
+def test_external_object_arguments():
+    """Constructor arguments may be Integers and other external objects (MLS 12.9.7)."""
+    casadi_model = _generate_external_object_model("ShiftedInFunction")
+    symbols = [casadi_model.inputs[0].symbol] + [p.symbol for p in casadi_model.parameters]
+    symbols += [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, casadi_model.equations)
+    vals = [5, 3, 1, 9, 6]
+    assert float(residual(0.7, vals, 2, 0)) == pytest.approx(-5.6)
+    assert float(residual(4.5, vals, 3, 0)) == pytest.approx(-9.0)
+
+    # Defaults of inputs depend on the other inputs, not on the model (MLS 12.4.1)
+    casadi_model = _generate_external_object_model("DefaultArgument")
+    y = casadi_model.alg_states[0].symbol
+    assert float(ca.evalf(ca.substitute(casadi_model.equations[0], y, 0))) == -2.0
+
+
+def test_function_in_for_equation():
+    """A function generated for a call in a for-equation does not see its index."""
+    ast_tree = parser.parse(
+        """
+        model ForFunction
+          function twice
+            input Real i;
+            output Real y;
+          algorithm
+            y := 2 * i;
+          end twice;
+          Real x[3];
+        equation
+          for i in 1:3 loop
+            x[i] = twice(10.0 * i);
+          end for;
+        end ForFunction;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "ForFunction")
+    x = casadi_model.alg_states[0].symbol
+    residual = ca.vertcat(*casadi_model.equations)
+    np.testing.assert_array_equal(
+        -np.array(ca.evalf(ca.substitute(residual, x, 0))).ravel(), [20, 40, 60]
+    )
+
+
+def test_pure_function():
+    ast_tree = parser.parse(
+        """
+        model PureFunction
+          pure function f
+            input Real x;
+            output Real y;
+          algorithm
+            y := 2 * x;
+          end f;
+          Real y = f(3.0);
+        end PureFunction;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "PureFunction")
+    (residual,) = casadi_model.equations
+    y = casadi_model.alg_states[0].symbol
+    assert float(ca.evalf(ca.substitute(residual, y, 0))) == -6.0
+
+
+def test_enumeration_literals():
+    """Enumeration literals are their ordinals (MLS 4.8.5)."""
+    ast_tree = parser.parse(
+        """
+        model EnumerationLiterals
+          type Mode = enumeration(Off, Slow, Fast);
+          parameter Mode mode = Mode.Fast;
+          Real y = if mode == Mode.Slow then 3.0 else 1.0;
+          Real z = if Mode.Fast > Mode.Slow then 2.0 else 0.0;
+        end EnumerationLiterals;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "EnumerationLiterals")
+    (mode,) = casadi_model.parameters
+    assert mode.value == 3
+    symbols = [mode.symbol] + [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, [ca.vertcat(*casadi_model.equations)])
+    np.testing.assert_array_equal(np.array(residual(2, 0, 0)).ravel(), [-3, -2])
+    np.testing.assert_array_equal(np.array(residual(3, 0, 0)).ravel(), [-1, -2])
+
+
+def test_enumeration_literal_scope():
+    """An enumeration literal is found where it is written, not in the model (MLS 5.3.1)."""
+    ast_tree = parser.parse(
+        """
+        package P
+          type E = enumeration(a, b, c);
+          function f
+            input Real x;
+            output Real y;
+          algorithm
+            y := if E.b > E.a then x else -x;
+          end f;
+          model C
+            Real y = if E.b > E.a then 1.0 else 0.0;
+            Real z = f(2.0);
+          end C;
+        end P;
+        package Q
+          type E = enumeration(c, b, a);
+          model M
+            P.C c;
+          end M;
+        end Q;
+        """
+    )
+    casadi_model = gen_casadi.generate(ast_tree, "Q.M")
+    symbols = [v.symbol for v in casadi_model.alg_states]
+    residual = ca.Function("residual", symbols, [ca.vertcat(*casadi_model.equations)])
+    np.testing.assert_array_equal(np.array(residual(0, 0)).ravel(), [-1, -2])
 
 
 def test_function_call():

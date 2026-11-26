@@ -120,6 +120,10 @@ class Model:
         self.delay_arguments = []
         self.alias_relation = AliasRelation()
         self._expand_mx_func = lambda x: x
+        # CasADi destroys a Callback with its Python object, so the model owns them
+        self._external_callbacks = []
+        # Destroyed when the model is garbage collected
+        self._external_objects = []
 
     def __str__(self):
         r = ""
@@ -417,6 +421,9 @@ class Model:
 
     def simplify(self, options):
         options = _merge_default_options(options)
+        if options["expand_mx"] and getattr(self, "_external_callbacks", None):
+            logger.warning("External function calls cannot be expanded to SX, keeping MX")
+            options["expand_mx"] = False
 
         alg_states_left = 0
 
