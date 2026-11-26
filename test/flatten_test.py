@@ -4,10 +4,13 @@ Tests for tree.flatten_instance() / tree.flatten().
 """
 
 import copy
+import logging
 import os
 import pickle
+from pathlib import Path
 
 from conftest_parse import (
+    MODEL_DIR,
     MSL4_DIR,
     _flush,
     parse_and_flatten_model,
@@ -1297,6 +1300,374 @@ def test_clock_builtin_type():
     assert parse_and_flatten_model("ClockBuiltin.mo", "ClockBuiltin.UsesClock") is not None
 
 
+def _external_call(func):
+    """Return a flat function's external call as (name, output, argument strings)."""
+
+    def arg(a):
+        if isinstance(a, ast.Expression):
+            return "{}({})".format(a.operator, ", ".join(arg(o) for o in a.operands))
+        return str(a.value) if isinstance(a, ast.Primary) else str(a)
+
+    ext = func.external
+    output = str(ext.output) if ext.output is not None else None
+    return ext.external_name, output, [arg(a) for a in ext.arguments]
+
+
+def test_external_function_call():
+    """External calls resolve to function-local names, an omitted call made explicit (MLS 12.9)."""
+    flat = parse_and_flatten_model("ExternalFunction.mo", "ExternalFunctionTest.M")
+    funcs = {name.rsplit(".", 1)[1]: func for name, func in flat.functions.items()}
+    assert _external_call(funcs["explicitCall"]) == (
+        "cExplicit",
+        "y",
+        ["x", "size(x, 1)", "k", "n", "work"],
+    )
+    default_call = ("defaultCall", "y", ["a", "size(a, 1)", "size(a, 2)", "s"])
+    assert _external_call(funcs["defaultCall"]) == default_call
+    assert _external_call(funcs["derivedCall"]) == default_call
+    assert _external_call(funcs["extendedCall"]) == default_call
+    assert _external_call(funcs["recordCall"]) == (
+        "recordCall",
+        "y",
+        ["r", "v", "size(v, 1)", "s"],
+    )
+    assert _external_call(funcs["defaultProcedure"]) == (
+        "defaultProcedure",
+        None,
+        ["x", "y1", "y2", "size(y2, 1)"],
+    )
+    assert funcs["defaultCall"].external.language == "C"
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalFunction.mo"),
+        ast.ComponentRef.from_string("ExternalFunctionTest.M"),
+    )
+    explicit = flat_tree.classes["ExternalFunctionTest.explicitCall"]
+    (stmt,) = explicit.statements
+    assert stmt.left[0].name == "work"
+    assert explicit.symbols["k"].value.value == 1
+    assert not flat_tree.classes["ExternalFunctionTest.defaultCall"].statements
+
+
+_EXTERNAL_CALL_ERRORS = """
+package P
+  record R Real a; end R;
+  constant Integer k = 1;
+  constant Real kr = 1.0;
+  function valid
+    input R r; input Real a[:]; output Real y;
+    external "C" y = cf(r, r.a, a, size(a, k), size(a, 1), k, -1, 2.5, "s", true);
+  end valid;
+  function size_vector input Real a[:]; output Real y; external "C" y = cf(size(a)); end size_vector;
+  function size_real input Real a[:]; output Real y; external "C" y = cf(size(a, 1.5)); end size_real;
+  function size_real_constant
+    input Real a[:]; output Real y; external "C" y = cf(size(a, kr));
+  end size_real_constant;
+  function expr input Real s; output Real y; external "C" y = cf(s + 1); end expr;
+  function undeclared input Real s; output Real y; external "C" y = cf(nosuch); end undeclared;
+  function size_input
+    input Real a[:]; input Integer n; output Real y; external "C" y = cf(a, size(a, n));
+  end size_input;
+  function lhs_input input Real s; output Real y; external "C" s = cf(y); end lhs_input;
+  function array_return
+    input Real s; output Real y[2]; external "C" y = cf(s);
+  end array_return;
+  function both input Real s; output Real y; algorithm y := s; external "C"; end both;
+  function base input Real s; output Real y; algorithm y := s; end base;
+  function inherited extends base; external "C"; end inherited;
+  model M Real a[1]; Real z = F(R(a=1), a); end M;
+end P;
+"""
+
+
+@pytest.mark.parametrize(
+    "func, message",
+    [
+        ("valid", None),
+        ("expr", "P.expr has invalid argument 1"),
+        ("undeclared", "P.undeclared has invalid argument 1"),
+        ("size_input", "P.size_input has invalid argument 2"),
+        ("size_vector", "P.size_vector has invalid argument 1"),
+        ("size_real", "P.size_real has invalid argument 1"),
+        ("size_real_constant", "P.size_real_constant has invalid argument 1"),
+        ("lhs_input", "P.lhs_input must return to an output, not s"),
+        ("array_return", "P.array_return must not return array y"),
+        ("both", "P.both has both an algorithm section and an external clause"),
+        ("inherited", "P.inherited has both an algorithm section and an external clause"),
+    ],
+)
+def test_external_call_errors(func, message):
+    """Invalid external calls and functions with an algorithm are rejected (MLS 12.2, 12.9)."""
+    args = "R(a=1), a" if func == "valid" else "1"
+    src = _EXTERNAL_CALL_ERRORS.replace("F(R(a=1), a)", f"{func}({args})")
+    if message is None:
+        assert f"P.{func}" in tree.flatten_class(parser.parse(src), "P.M").functions
+        return
+    with pytest.raises(tree.ModelicaSemanticError, match=message):
+        tree.flatten_class(parser.parse(src), "P.M")
+
+
+def test_external_default_array_output():
+    """A single array output of a default call is passed as an argument (MLS 12.9.2)."""
+    src = """
+    package P
+      type Angle = Real(unit = "rad");
+      function f input Real s; output Real y[3]; external "C"; end f;
+      function g input Angle a; output Angle y; external "C"; end g;
+      model M Real v[3] = f(1); Real w = g(1); end M;
+    end P;
+    """
+    flat = tree.flatten_class(parser.parse(src), "P.M")
+    assert _external_call(flat.functions["P.f"]) == ("f", None, ["s", "y", "size(y, 1)"])
+    assert _external_call(flat.functions["P.g"]) == ("g", "y", ["a"])
+
+
+def test_external_resources():
+    """External resource annotations normalize, modelica URIs resolved (MLS 12.9.4, 13.5)."""
+    flat = parse_and_flatten_model("ExternalFunction.mo", "ExternalFunctionTest.M")
+    resources = flat.functions["ExternalFunctionTest.explicitCall"].external.resources
+    resources_dir = os.path.join(MODEL_DIR, "Resources")
+    assert resources.includes == ['#include "explicit.h"']
+    assert resources.libraries == ["lib1", "lib2"]
+    assert resources.include_dirs == [os.path.join(resources_dir, "C-Sources")]
+    assert resources.library_dirs == [os.path.join(resources_dir, "Library")]
+
+    resources = flat.functions["ExternalFunctionTest.defaultCall"].external.resources
+    assert (resources.includes, resources.libraries) == ([], [])
+    assert resources.include_dirs == [os.path.join(resources_dir, "Include")]
+
+    flat = tree.flatten_class(
+        parser.parse(Path(MODEL_DIR, "ExternalFunction.mo").read_text()), "ExternalFunctionTest.M"
+    )
+    resources = flat.functions["ExternalFunctionTest.explicitCall"].external.resources
+    assert resources.include_dirs == ["modelica://ExternalFunctionTest/Resources/C-Sources"]
+
+
+def test_external_object():
+    """External objects flatten as simple-type leaves built by their constructor (MLS 12.9.7)."""
+    assert ast.Tree().classes["ExternalObject"].partial
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.Table")
+    assert "myTable" in flat.symbols
+    constructor = "ExternalObjectTest.MyTable.constructor"
+    (eq,) = [eq for eq in flat.equations if _ref_name(eq.left) == "myTable"]
+    assert eq.right.operator == constructor
+    assert constructor in flat.functions
+    assert "interpolTable" in flat.functions["ExternalObjectTest.interpolateMyTable"].symbols
+
+    destructor = "ExternalObjectTest.MyTable.destructor"
+    lifecycle = {"ExternalObjectTest.MyTable": (constructor, destructor)}
+    assert flat.external_objects == lifecycle
+    assert flat.functions[destructor].external.external_name == "closeMyTable"
+    (der,) = flat.functions["ExternalObjectTest.interpolateMyTable"].derivatives
+    assert der.function == "ExternalObjectTest.interpolateMyTableDer"
+    assert (der.order, der.no_derivative, der.zero_derivative) == (1, ["interpolTable"], [])
+    (der2,) = flat.functions[der.function].derivatives
+    assert der2.function == "ExternalObjectTest.interpolateMyTableDer2"
+    assert (der2.order, der2.no_derivative, der2.zero_derivative) == (2, [], ["interpolTable"])
+    assert not flat.functions[der2.function].derivatives
+
+    flat = parse_and_flatten_model("ExternalObject.mo", "ExternalObjectTest.TableInFunction")
+    func = flat.functions["ExternalObjectTest.interpolateMyTableFunc"]
+    assert func.symbols["myTable"].value.operator == constructor
+    assert func.external_objects == lifecycle
+    assert {constructor, destructor} <= flat.functions.keys()
+
+    flat_tree = tree.flatten(
+        parse_model_files("ExternalObject.mo"),
+        ast.ComponentRef.from_string("ExternalObjectTest.Table"),
+    )
+    flat_class = flat_tree.classes["ExternalObjectTest.Table"]
+    assert str(flat_class.symbols["myTable"].type) == "ExternalObjectTest.MyTable"
+    assert flat_class.external_objects == lifecycle
+    interpolate = flat_tree.classes["ExternalObjectTest.interpolateMyTable"]
+    assert str(interpolate.symbols["interpolTable"].type) == "ExternalObjectTest.MyTable"
+
+
+_EXTERNAL_OBJECT_ERRORS = """
+package P
+  class T
+    extends ExternalObject;
+    function constructor input Real x; output T o; end constructor;
+    function destructor input T o; end destructor;
+  end T;
+  class NoConstructor
+    extends ExternalObject;
+    function destructor input NoConstructor o; end destructor;
+  end NoConstructor;
+  class NoDestructor
+    extends ExternalObject;
+    function constructor input Real x; output NoDestructor o; end constructor;
+  end NoDestructor;
+  class TwoOutputs
+    extends ExternalObject;
+    function constructor input Real x; output TwoOutputs o; output Real y; end constructor;
+    function destructor input TwoOutputs o; end destructor;
+  end TwoOutputs;
+  class DestructorOutput
+    extends ExternalObject;
+    function constructor input Real x; output DestructorOutput o; end constructor;
+    function destructor input DestructorOutput o; output Real y; end destructor;
+  end DestructorOutput;
+  class ShortT = T;
+  class DerivedT extends T; end DerivedT;
+  model ModelT
+    extends ExternalObject;
+    function constructor input Real x; output ModelT o; end constructor;
+    function destructor input ModelT o; end destructor;
+  end ModelT;
+  model MissingConstructor NoConstructor t = NoConstructor(1.0); end MissingConstructor;
+  model MissingDestructor NoDestructor t; end MissingDestructor;
+  model Short ShortT t = ShortT(1.0); end Short;
+  model Constructor TwoOutputs t = TwoOutputs(1.0); end Constructor;
+  model Destructor DestructorOutput t = DestructorOutput(1.0); end Destructor;
+  model Derived DerivedT t = DerivedT(1.0); end Derived;
+  model Restriction ModelT t = ModelT(1.0); end Restriction;
+  model ExplicitConstructor T t = T.constructor(1.0); end ExplicitConstructor;
+  model ExplicitDestructor T t = T(1.0); algorithm T.destructor(t); end ExplicitDestructor;
+  model Predefined ExternalObject o; end Predefined;
+end P;
+"""
+
+
+@pytest.mark.parametrize(
+    "model, message",
+    [
+        ("MissingConstructor", "P.NoConstructor has no constructor"),
+        ("MissingDestructor", "P.NoDestructor has no destructor"),
+        ("Constructor", "P.TwoOutputs.constructor must have one output"),
+        ("Destructor", "P.DestructorOutput.destructor must have one input and no outputs"),
+        ("Short", "P.ShortT must not extend external object class P.T"),
+        ("Derived", "P.DerivedT must not extend external object class P.T"),
+        ("Restriction", "P.ModelT must be a class, not a model"),
+        ("ExplicitConstructor", "P.T.constructor must not be called explicitly"),
+        ("ExplicitDestructor", "P.T.destructor must not be called explicitly"),
+        ("Predefined", "Partial class ExternalObject cannot be a component type"),
+    ],
+)
+def test_external_object_errors(model, message):
+    """Malformed or derived external object classes and lifecycle calls fail (MLS 12.9.7)."""
+    with pytest.raises(tree.ModelicaSemanticError, match=message):
+        tree.flatten_class(parser.parse(_EXTERNAL_OBJECT_ERRORS), f"P.{model}")
+
+
+def test_external_object_inherited_lifecycle():
+    """Constructor and destructor formals may be inherited through extends (MLS 12.9.7)."""
+    src = """
+    package P
+      function mk input Real x; output T o; external "C" o = mk(x); end mk;
+      function rm input T o; external "C" rm(o); end rm;
+      class T
+        extends ExternalObject;
+        function constructor extends mk; end constructor;
+        function destructor extends rm; end destructor;
+      end T;
+      model M T t = T(1.0); end M;
+    end P;
+    """
+    flat = tree.flatten_class(parser.parse(src), "P.M")
+    assert flat.external_objects == {"P.T": ("P.T.constructor", "P.T.destructor")}
+
+
+_DERIVATIVE_ANNOTATIONS = """
+package P
+  constant Integer n = 1;
+  function d input Real x; input Real dx; output Real dy; algorithm dy := dx; end d;
+  function d2
+    input Real x; input Real dx; input Real ddx; output Real dy; algorithm dy := ddx;
+  end d2;
+  function valid input Real x; output Real y; algorithm y := x;
+    annotation(derivative = d, derivative(order = 2) = d2); end valid;
+  function zero input Real x; output Real y; algorithm y := x;
+    annotation(derivative = d, derivative(order = 0) = d2); end zero;
+  function reference input Real x; output Real y; algorithm y := x;
+    annotation(derivative(order = n) = d); end reference;
+  function missing input Real x; output Real y; algorithm y := x;
+    annotation(derivative = d, derivative(order = 2) = nosuch); end missing;
+  function component input Real x; output Real y; algorithm y := x;
+    annotation(derivative = n); end component;
+  model M
+    Real a = valid(1); Real b = zero(1); Real c = reference(1);
+    Real e = missing(1); Real f = component(1);
+  end M;
+end P;
+"""
+
+
+def test_invalid_derivative_annotations(caplog):
+    """An invalid derivative annotation drops all of the function's derivatives (MLS 12.7.1)."""
+    with caplog.at_level(logging.WARNING, logger="pymoca"):
+        flat = tree.flatten_class(parser.parse(_DERIVATIVE_ANNOTATIONS), "P.M")
+    derivatives = {
+        name: [(d.function, d.order) for d in flat.functions[f"P.{name}"].derivatives]
+        for name in ("valid", "zero", "reference", "missing", "component")
+    }
+    assert derivatives == {
+        "valid": [("P.d", 1), ("P.d2", 2)],
+        "zero": [],
+        "reference": [],
+        "missing": [],
+        "component": [],
+    }
+    assert "Ignoring derivative annotations of P.zero: order of d2" in caplog.text
+    assert "Ignoring derivative annotations of P.reference: order of d" in caplog.text
+    assert "Ignoring derivative annotations of P.missing: nosuch is not a function" in caplog.text
+    assert "Ignoring derivative annotations of P.component: n is not a function" in caplog.text
+
+
+def test_inherited_derivative_annotations():
+    """Derivatives are inherited unless the function declares formals of its own (MLS 12.7.1)."""
+    src = """
+    package P
+      function d input Real x; input Real dx; output Real dy; algorithm dy := dx; end d;
+      function base input Real x; output Real y; algorithm y := x;
+        annotation(derivative = d); end base;
+      function derived extends base; end derived;
+      function short = base;
+      function modified extends base(x(min = 0)); end modified;
+      function added extends base; input Real z; end added;
+      function own extends base; annotation(derivative(order = 2) = d); end own;
+      model M
+        Real a = derived(1); Real b = short(1); Real c = modified(1);
+        Real e = added(1, 2); Real f = own(1);
+      end M;
+    end P;
+    """
+    flat = tree.flatten_class(parser.parse(src), "P.M")
+    derivatives = {
+        name: [(d.function, d.order) for d in flat.functions[f"P.{name}"].derivatives]
+        for name in ("derived", "short", "modified", "added", "own")
+    }
+    assert derivatives == {
+        "derived": [("P.d", 1)],
+        "short": [("P.d", 1)],
+        "modified": [("P.d", 1)],
+        "added": [],
+        "own": [("P.d", 2)],
+    }
+
+
+def _function_binding_test_function():
+    flat_tree = tree.flatten(
+        parse_model_files("FunctionBinding.mo"),
+        ast.ComponentRef.from_string("FunctionBindingTest.M"),
+    )
+    return flat_tree.classes["FunctionBindingTest.f"]
+
+
+def test_function_binding_names():
+    """A binding in a function references the function's own variables by flat name."""
+    func = _function_binding_test_function()
+    (binding,) = [s for s in func.statements if s.left[0].name == "a"]
+    assert [str(o) for o in binding.right.operands] == ["k", "x"]
+
+
+def test_function_binding_statements():
+    """Non-input bindings of a function run before its algorithm (MLS 12.4.4)."""
+    func = _function_binding_test_function()
+    assert [s.left[0].name for s in func.statements] == ["a", "y"]
+
+
 def test_inherited_equation_refs_resolved():
     """Equations referencing inherited (via extends) symbols flatten before resolution (MLS 5.6.2)."""
     flat = parse_and_flatten_model("InheritedEquationConnector.mo", "P.B")
@@ -1443,6 +1814,46 @@ def test_idealgash2o_stale_stub_import():
     flat = tree.flatten_class(root, "Modelica.Media.Examples.IdealGasH2O")
     assert "state.p" in flat.symbols
     assert "smoothState.T" in flat.symbols
+
+
+@pytest.mark.library
+@pytest.mark.msl
+@pytest.mark.skipif(
+    not os.path.isfile(os.path.join(MSL4_DIR, "Modelica", "package.mo")),
+    reason="MSL-4.0.x submodule not present",
+)
+def test_msl_external_table_functions():
+    """MSL table functions flatten with external calls, resources and object lifecycle."""
+    root = parser.modelicapath_to_tree([MSL4_DIR])
+    flat = tree.flatten_class(
+        root, "Modelica.Electrical.Machines.Examples.InductionMachines.IMC_Conveyor"
+    )
+    table = "Modelica.Blocks.Types.ExternalCombiTimeTable"
+    lifecycle = (table + ".constructor", table + ".destructor")
+    assert flat.external_objects == {table: lifecycle}
+    assert set(lifecycle) <= flat.functions.keys()
+    internal = "Modelica.Blocks.Tables.Internal."
+    (der,) = flat.functions[internal + "getTimeTableValue"].derivatives
+    assert der.function == internal + "getDerTimeTableValue"
+    assert der.no_derivative == ["nextTimeEvent", "pre_nextTimeEvent"]
+    assert der.function in flat.functions
+    c_sources = os.path.join(os.path.realpath(MSL4_DIR), "Modelica", "Resources", "C-Sources")
+    table_funcs = [
+        func
+        for name, func in flat.functions.items()
+        if name.startswith("Modelica.Blocks.Types.ExternalCombiTimeTable.")
+        or name.startswith("Modelica.Blocks.Tables.Internal.")
+    ]
+    assert table_funcs
+    for func in table_funcs:
+        assert func.external.external_name.startswith("ModelicaStandardTables_")
+        assert func.external.resources.include_dirs == [c_sources]
+        assert func.external.resources.libraries == [
+            "ModelicaStandardTables",
+            "ModelicaIO",
+            "ModelicaMatIO",
+            "zlib",
+        ]
 
 
 @pytest.mark.xfail(reason="outer components are not yet merged with their inner match (MLS 5.4)")
@@ -2034,6 +2445,25 @@ def test_binding_equation_subscript_function_call_discovered():
         "M",
     )
     assert list(flat.functions) == ["idx"]
+
+
+def test_binding_equation_function_call_leaves_ast_unchanged():
+    """Discovering a function called in a binding expression doesn't rewrite the parsed AST."""
+    flat = _flatten_inline(
+        """
+    function f
+        input Real u;
+        output Real y;
+    algorithm
+        y := 2 * u;
+    end f;
+    model M
+        parameter Real p = 1;
+        Real y = f(p);
+    end M;""",
+        "M",
+    )
+    assert list(flat.functions) == ["f"]
 
 
 def test_constant_via_composite_name_lookup_resolves_dimension():

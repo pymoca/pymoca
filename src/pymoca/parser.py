@@ -110,6 +110,7 @@ class ModelicaFile:
 
 _TYPE_KEYWORD_RE = re.compile(r"\b(package|model|connector|record|function|type|block|operator)\b")
 _WITHIN_RE = re.compile(r"\bwithin\s+[^;]*;")
+_EXTERNAL_TOKEN = ModelicaParser.literalNames.index("'external'")
 
 
 def _file_class_type(path: Path) -> str:
@@ -148,6 +149,7 @@ class LazyParseClass(ast.Class):
             "initial_statements",
             "imports",
             "annotation",
+            "external",
             "functions",
             "enumeration",  # True for enumeration types; governs instantiation/flattening
         }
@@ -171,6 +173,7 @@ class LazyParseClass(ast.Class):
         # the update overwrites .classes with the parsed content.
         existing_subdir_stubs = list(my["classes"].values())
         saved_parent = my["parent"]
+        saved_resource_dir = my["resource_dir"]
 
         # Set parent BEFORE __dict__.update so that arg.scope references inside parsed
         # symbols (e.g. stateSelect=stateSelect) resolve via the correct full_name.
@@ -179,6 +182,7 @@ class LazyParseClass(ast.Class):
         # parsed content without needing to know a swap occurred.
         self.__dict__.update(parsed_class.__dict__)
         self.parent = saved_parent
+        self.resource_dir = saved_resource_dir
         self.__class__ = ast.Class  # type: ignore[assignment]  # demote: drops .path, removes __getattribute__ overhead
 
         # Re-parent classes/symbols that arrived via parsed_class (parsed_class is orphaned)
@@ -207,6 +211,8 @@ class LazyParseClass(ast.Class):
         c.parent = None
 
     def _extend(self, other: ast.Class) -> None:
+        if vars(self)["resource_dir"] is None:
+            vars(self)["resource_dir"] = vars(other)["resource_dir"]
         my_classes = vars(self)["classes"]
         other_classes = vars(other)["classes"]
         for class_name in other_classes:
@@ -358,6 +364,8 @@ def modelicapath_to_tree(
         # unions same-named top-level packages across roots, which is non-conforming.
         for cls in list(dir_tree.classes.values()):
             if cls.name not in modelicapath_tree.classes:
+                if isinstance(cls, LazyParseClass) and cls.path is not None:
+                    cls.resource_dir = cls.path.parent
                 modelicapath_tree.add_class(cls)
     return modelicapath_tree
 
@@ -553,8 +561,39 @@ class ASTListener(ModelicaListener):
                 else:
                     self.class_node.statements += alglist.statements
 
+        if ctx.getToken(_EXTERNAL_TOKEN, 0) is not None:
+            self.class_node.external = self._external_clause(ctx)
+
         if ctx.comp_annotation is not None:
             self.class_node.annotation = self.ast[ctx.comp_annotation]
+
+    def _external_clause(self, ctx: ModelicaParser.CompositionContext) -> ast.ExternalClause:
+        """Build the external function clause of a composition (MLS 12.9)."""
+        if not self.class_node.type.endswith("function"):
+            raise syntax_error_from_ctx("External clause is only allowed in a function", ctx)
+        external = ast.ExternalClause()
+        lang = ctx.language_specification()
+        if lang is not None:
+            external.language = lang.getText()[1:-1]
+            if external.language not in ("builtin", "FORTRAN 77") and not (
+                external.language.startswith("C")
+            ):
+                raise syntax_error_from_ctx(
+                    f'External language "{external.language}" must be "builtin", "C", "C..."'
+                    ' or "FORTRAN 77"',
+                    lang,
+                )
+        call = ctx.external_function_call()
+        if call is not None:
+            if call.component_reference() is not None:
+                external.output = self.ast[call.component_reference()]
+            external.external_name = call.IDENT().getText()  # type: ignore[union-attr]
+            expr_list = call.expression_list()
+            if expr_list is not None:
+                external.arguments = [self.ast[e] for e in expr_list.expression()]  # type: ignore[union-attr]
+        if ctx.ext_annotation is not None:
+            external.annotation = self.ast[ctx.ext_annotation]
+        return external
 
     def exitArgument(self, ctx: ModelicaParser.ArgumentContext):
         # class_spec_base does not create a new scope
@@ -1820,7 +1859,7 @@ def parse_file(file_path: str | Path, trace: bool = False) -> ast.Tree:
         raise FileNotFoundError(f"File not found: {path}")
     txt = path.read_text(encoding="utf-8")
     try:
-        ast_tree = parse(txt, trace=trace)
+        modelica_file = parse_text(txt, trace=trace)
     except ModelicaSyntaxError as exception:
         # Add filename to the exception
         info = (str(path),) + exception.args[1][1:]
@@ -1828,4 +1867,30 @@ def parse_file(file_path: str | Path, trace: bool = False) -> ast.Tree:
             exception.msg,
             info,
         ) from exception
+    ast_tree = file_to_tree(modelica_file)
+    _set_resource_dir(ast_tree, modelica_file, path)
     return ast_tree
+
+
+def _set_resource_dir(ast_tree: ast.Tree, modelica_file: ModelicaFile, path: Path) -> None:
+    """Record the directory of the top-level class of a parsed file (MLS 13.5)."""
+    within = modelica_file.within[0].to_tuple() if modelica_file.within else ()
+    top_dir = path.resolve().parent
+    if within and path.name == "package.mo":
+        # A package.mo file sits inside the directory of the package it defines
+        top_dir = top_dir.parent
+    for i, part in reversed(list(enumerate(within))):
+        name = top_dir.name
+        # The top-level package directory may carry a version (MLS 13.4.2)
+        if not (name == part or i == 0 and name.startswith(part + " ")):
+            logger.warning(
+                "within %s does not match directory layout of %s, modelica:// URIs will not"
+                " be resolved",
+                ".".join(within),
+                path,
+            )
+            return
+        if i:
+            top_dir = top_dir.parent
+    for name in within[:1] or modelica_file.classes:
+        ast_tree.classes[name].resource_dir = top_dir

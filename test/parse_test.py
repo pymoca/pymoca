@@ -3,8 +3,11 @@
 Parse-only and miscellaneous AST tests.
 """
 
+import copy
 import io
+import logging
 import os
+import pickle
 import re
 import threading
 import time
@@ -118,6 +121,28 @@ def test_deep_copy_timeout():
         if not thread.is_alive():
             return
     assert not thread.is_alive(), "Timeout occurred"
+
+
+def test_deep_copy_shares_scope_and_parent():
+    """Deep copies share scope and parent, leave the original unchanged, and copy cleanly again."""
+    ast_tree = parser.parse("package P model M Real x(start = 1); end M; end P;")
+    package = ast_tree.classes["P"]
+    model = package.classes["M"]
+    (arg,) = model.symbols["x"].class_modification.arguments
+    pickled = pickle.dumps(ast_tree)
+
+    arg_copy = copy.deepcopy(arg)
+    assert arg_copy.scope is arg.scope
+    assert arg_copy.value is not arg.value
+    model_copy = copy.deepcopy(model)
+    assert model_copy.parent is package
+    assert model_copy.symbols["x"] is not model.symbols["x"]
+    assert pickle.dumps(ast_tree) == pickled
+
+    arg_copy.value.component.name = "changed"
+    assert str(copy.deepcopy(arg_copy).value.component) == "changed"
+    model_copy.name = "M2"
+    assert copy.deepcopy(model_copy).name == "M2"
 
 
 def test_visibility_in_ast():
@@ -558,6 +583,64 @@ def test_lazyparse_remove_class(tmp_path):
     assert "Child" not in vars(pkg)["classes"]
     assert child.parent is None
     assert isinstance(pkg, parser.LazyParseClass)  # parse never fired
+
+
+def test_resource_dir(tmp_path):
+    """Top-level classes record the directory modelica: URIs resolve against (MLS 13.5)."""
+    pkg_dir = tmp_path / "Pkg"
+    (pkg_dir / "Sub").mkdir(parents=True)
+    (pkg_dir / "package.mo").write_text("package Pkg\nend Pkg;")
+    (pkg_dir / "Sub" / "package.mo").write_text("within Pkg;\npackage Sub\nend Sub;")
+    (pkg_dir / "Sub" / "M.mo").write_text("within Pkg.Sub;\nmodel M\nend M;")
+    (tmp_path / "Single.mo").write_text("package Single\nend Single;")
+
+    for path, name in (
+        (pkg_dir / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "package.mo", "Pkg"),
+        (pkg_dir / "Sub" / "M.mo", "Pkg"),
+        (tmp_path / "Single.mo", "Single"),
+    ):
+        expected = tmp_path.resolve() if name == "Single" else pkg_dir.resolve()
+        assert parser.parse_file(path).classes[name].resource_dir == expected
+    assert (
+        parser.parse(pkg_dir.joinpath("package.mo").read_text()).classes["Pkg"].resource_dir is None
+    )
+
+    pkg = parser.modelicapath_to_tree(dirs=[tmp_path]).classes["Pkg"]
+    _ = pkg.classes
+    assert not isinstance(pkg, parser.LazyParseClass)
+    assert pkg.resource_dir == pkg_dir.resolve()
+
+
+def test_resource_dir_layout(tmp_path, caplog):
+    """A within that does not match the directories leaves modelica: URIs unresolved (MLS 13.4)."""
+    versioned = tmp_path / "Lib 1.2" / "Sub"
+    versioned.mkdir(parents=True)
+    (versioned / "M.mo").write_text("within Lib.Sub;\nmodel M\nend M;")
+    assert parser.parse_file(versioned / "M.mo").classes["Lib"].resource_dir == (
+        versioned.parent.resolve()
+    )
+
+    (tmp_path / "Other").mkdir()
+    deep = ".".join("ABCDEFGHIJKLMNOPQRSTUVWXYZ") * 2
+    for path, within in ((tmp_path / "Other" / "M.mo", "Lib.Sub"), (tmp_path / "D.mo", deep)):
+        path.write_text(f"within {within};\nmodel M\nend M;")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="pymoca"):
+            top = parser.parse_file(path).classes[within.split(".")[0]]
+        assert top.resource_dir is None
+        assert f"within {within} does not match directory layout of {path}" in caplog.text
+
+
+def test_resource_dir_extend(tmp_path):
+    """Merging files of one package keeps the first resource_dir found (MLS 13.5)."""
+    (tmp_path / "Other").mkdir()
+    (tmp_path / "Lib").mkdir()
+    (tmp_path / "Other" / "A.mo").write_text("within Lib;\nmodel A\nend A;")
+    (tmp_path / "Lib" / "B.mo").write_text("within Lib;\nmodel B\nend B;")
+    tree = parser.parse_file(tmp_path / "Other" / "A.mo")
+    tree.extend(parser.parse_file(tmp_path / "Lib" / "B.mo"))
+    assert tree.classes["Lib"].resource_dir == (tmp_path / "Lib").resolve()
 
 
 def test_modelicapath_first_root_wins(tmp_path):
@@ -1089,6 +1172,88 @@ def test_subscripted_output_expression_list():
 
     with pytest.raises(parser.ModelicaSyntaxError):
         parser.parse("model M Real y = (1, 2)[1]; end M;")
+
+
+def test_external_clause():
+    """External function clauses keep language, call and annotation (MLS 12.9)."""
+    ast_tree = parser.parse(
+        """
+        package P
+          function f
+            input Real x[:]; output Real y;
+          external "C" y = cfun(x, size(x, 1)) annotation(Library = "m");
+          end f;
+          function g
+            input Real x;
+          external "FORTRAN 77" gfun(x);
+          end g;
+          function h
+            input Real x; output Real y;
+          external "C";
+          end h;
+          function k
+            input Real x; output Real y;
+          external;
+          end k;
+          function n
+            input Real x; output Real y;
+          algorithm
+            y := x;
+          end n;
+        end P;
+        """
+    )
+    classes = ast_tree.classes["P"].classes
+
+    f = classes["f"].external
+    assert (f.language, str(f.output), f.external_name) == ("C", "y", "cfun")
+    assert str(f.arguments[0]) == "x"
+    assert f.arguments[1].operator.to_tuple() == ("size",)
+    (lib,) = f.annotation.arguments
+    assert str(lib.value.component) == "Library"
+    assert lib.value.modifications[0].value == "m"
+    assert classes["f"].annotation is None
+
+    g = classes["g"].external
+    assert (g.language, g.output, g.external_name) == ("FORTRAN 77", None, "gfun")
+    assert [str(a) for a in g.arguments] == ["x"]
+
+    for name in ("h", "k"):
+        ext = classes[name].external
+        assert (ext.language, ext.external_name, ext.arguments) == ("C", None, [])
+        assert ext.annotation is None
+
+    assert classes["n"].external is None
+
+
+def test_external_clause_lazy(tmp_path):
+    """Reading the external clause of a lazy MODELICAPATH stub parses it."""
+    lib_dir = tmp_path / "Lib"
+    lib_dir.mkdir()
+    (lib_dir / "package.mo").write_text("package Lib\nend Lib;")
+    (lib_dir / "f.mo").write_text('within Lib;\nfunction f\n  external "C";\nend f;')
+    lazy = parser.modelicapath_to_tree(dirs=[tmp_path])
+    stub = vars(lazy.classes["Lib"])["classes"]["f"]
+    assert isinstance(stub, parser.LazyParseClass)
+    assert stub.external.language == "C"
+
+
+@pytest.mark.parametrize(
+    "src, message",
+    [
+        ('function f external "Java"; end f;', 'External language "Java" must be'),
+        ('model m external "C"; end m;', "External clause is only allowed in a function"),
+        ('operator function f external "C99"; end f;', None),
+        ('impure function f external "builtin"; end f;', None),
+    ],
+)
+def test_external_clause_errors(src, message):
+    """External clauses need a known language and a function (MLS 12.9)."""
+    if message is None:
+        parser.parse(src)
+        return
+    with pytest.raises(parser.ModelicaSyntaxError, match=message):
+        parser.parse(src)
 
 
 if __name__ == "__main__":

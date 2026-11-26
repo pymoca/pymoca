@@ -386,7 +386,9 @@ able to preserve the declaration order of components)." This ordering deviation 
 before inherited) remains a known limitation for functions whose inputs or outputs are
 interleaved across local declarations and an extends clause. We have kept this
 limitation for now to avoid additional significant changes on top of what is already a
-huge change.
+huge change. For an external function with a default call it also changes the C argument
+order: `function f input Real b; extends base; input Real c; external "C"; end f;` with
+`base` declaring `input Real a` calls `f(b, c, a)` where the spec gives `f(b, a, c)`.
 
 The spec later says: "At the end, the current instance is checked whether their children
 (including children of extends-clauses) with the same name are identical and only the
@@ -684,10 +686,62 @@ Primarily this is so the intermediate connector symbols (e.g. `plug_p`) that
 into `_connector_type`, so the strip/restore must bracket a walk that already sees the
 fully-populated connector symbols.
 
+### External Functions and Objects (MLS 12.7.1, 12.9)
+
+Flattening checks the external clause, the external object lifecycle and the derivative
+annotations only as far as backends depend on them. It rejects an explicit call with
+arguments other than component references, scalar constants and `size` of a component
+reference with an Integer literal or `constant Integer` dimension, a call LHS that is not
+an output, a function with both an algorithm section and an external clause, an external
+object class with a restriction other than `class`, an explicit constructor or destructor
+call, a constructor without exactly one output, and a destructor without exactly one input
+and no outputs. The parser rejects an unknown language and an external clause outside a
+function.
+
+A derivative annotation naming something other than a function, or with an `order` that
+is not a positive integer literal, drops all derivative annotations of that function with
+a warning instead of an error. MLS 12.7.1 does not oblige a tool to use a derivative, so a
+bad annotation in a library should not stop flattening. Dropping only some of them would
+let a backend take an order 2 derivative for order 1.
+
+Three choices the spec leaves open:
+
+- A default call returns a single output by value only when it is a scalar. MLS 12.9.2
+  does not allow an array return type, so a single array output is passed as an argument
+  with its sizes, like the outputs of a call with several outputs. An explicit call that
+  returns an array is rejected
+- A function inherits derivative annotations through extends, as it does the external
+  clause, unless it declares its own or declares formals of its own. A derivative is only
+  valid for the same inputs and outputs, and a short class definition is the same as an
+  extends without new elements (MLS 4.5.1)
+- A function that extends a function with a default call inherits that call as built for
+  the base function, with its name and formals. Formals the derived function adds are not
+  passed, since the C function is declared for the base
+
+Accepted without a check:
+
+- Binding rules of external objects (MLS 12.9.7): a component bound by a function other
+  than the constructor, an unbound component, an input with a default binding, and
+  attribute modifications such as `start`. The CasADi backend raises for the first two
+- Shape of an external object class beyond the lifecycle function counts: other elements,
+  a `replaceable` constructor, and the type of the constructor output and destructor input
+- Unknown derivative attributes, `noDerivative` and `zeroDerivative` naming an input that
+  does not exist, and a derivative function whose inputs and outputs do not match the
+  annotated function
+
+Not implemented:
+
+- `SourceDirectory` is not recorded, and platform subdirectories of `LibraryDirectory`
+  such as `linux64` or `win64` are left to backends (MLS 12.9.4)
+- Percent-encoded characters in `modelica://` URIs are not decoded (MLS 13.5)
+- A file whose `within` clause does not match its directories records no resource
+  directory, so its `modelica://` URIs stay unresolved, with a warning (MLS 13.4)
+
 ## TODO / WIP / Stubs
 
 - Partial-class rejection: as a component type (MLS 4.4.2) and in global name lookup
-  (MLS 5.3.3) - `partial` is currently never enforced at instantiation
+  (MLS 5.3.3) - `partial` is enforced only for a component of the predefined
+  `ExternalObject` class
 - `_evaluate_conditional_declarations` (MLS 5.6.2 step 1.2)
 - `_process_transitions` (MLS 5.6.2 step 3)
 - `_check_all_references_valid` (MLS 5.6.2 step 1.9)
